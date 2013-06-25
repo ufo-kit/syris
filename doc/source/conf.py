@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
-# X-ray Imaging Simulation documentation build configuration file, created by
-# sphinx-quickstart on Tue Jun 25 10:57:08 2013.
+# Syris documentation build configuration file, created by
+# sphinx-quickstart on Tue Jun 25 11:22:23 2013.
 #
 # This file is execfile()d with the current directory set to its containing dir.
 #
@@ -40,7 +40,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'X-ray Imaging Simulation'
+project = u'Syris'
 copyright = u'2013, Tomas Farago'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -164,7 +164,7 @@ html_static_path = ['_static']
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'X-rayImagingSimulationdoc'
+htmlhelp_basename = 'Syrisdoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -183,7 +183,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'X-rayImagingSimulation.tex', u'X-ray Imaging Simulation Documentation',
+  ('index', 'Syris.tex', u'Syris Documentation',
    u'Tomas Farago', 'manual'),
 ]
 
@@ -213,7 +213,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'x-rayimagingsimulation', u'X-ray Imaging Simulation Documentation',
+    ('index', 'syris', u'Syris Documentation',
      [u'Tomas Farago'], 1)
 ]
 
@@ -227,8 +227,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'X-rayImagingSimulation', u'X-ray Imaging Simulation Documentation',
-   u'Tomas Farago', 'X-rayImagingSimulation', 'One line description of project.',
+  ('index', 'Syris', u'Syris Documentation',
+   u'Tomas Farago', 'Syris', 'One line description of project.',
    'Miscellaneous'),
 ]
 
