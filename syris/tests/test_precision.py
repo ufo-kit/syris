@@ -14,8 +14,8 @@ class TestPrecision(unittest.TestCase):
         self.kernel_fn = "float_test.cl"
 
     def _create_mem_objs(self, ctx, n):
-        mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n*cfg.cl_float)
-        ar = np.empty(n, dtype=cfg.np_float)
+        mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n*cfg.CL_FLOAT)
+        ar = np.empty(n, dtype=cfg.NP_FLOAT)
 
         return mem, ar
 
@@ -27,7 +27,7 @@ class TestPrecision(unittest.TestCase):
                        None,
                        mem)
         cl.enqueue_copy(queue, ar, mem)
-        res = ar == np.array([0, 1], dtype=cfg.np_float)
+        res = ar == np.array([0, 1], dtype=cfg.NP_FLOAT)
         self.assertTrue(res.all())
 
     def test_float(self):

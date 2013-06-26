@@ -10,10 +10,10 @@ import logging
 import os
 
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
 
 
-single_header = """
+SINGLE_HEADER = """
         typedef float vfloat;
         typedef float2 vfloat2;
         typedef float3 vfloat3;
@@ -23,7 +23,7 @@ single_header = """
 
         """
 
-double_header = """
+DOUBLE_HEADER = """
         #pragma OPENCL EXTENSION cl_khr_fp64 : enable
         typedef double vfloat;
         typedef double2 vfloat2;
@@ -40,55 +40,57 @@ def get_source(file_name, precision_sensitive=True):
     precision parametrization if *precision_sensitive* is True.
     """
     path = os.path.join(os.path.dirname(__file__), "opencl", file_name)
-    s = open(path, "r").read()
+    string = open(path, "r").read()
 
     if precision_sensitive:
-        if cfg.cl_float == 4:
-            s = single_header + s
+        if cfg.CL_FLOAT == 4:
+            string = SINGLE_HEADER + string
         else:
-            s = double_header + s
+            string = DOUBLE_HEADER + string
 
-    return s
+    return string
 
 
-def execute(function, *args, **kwargs):
+def execute(function, *ARGS, **kwargs):
     """Execute a *function* which can be an OpenCL kernel or other OpenCL
     related function and profile it.
     """
-    event = function(*args, **kwargs)
+    event = function(*ARGS, **kwargs)
     if function.__class__ == cl.Kernel:
         func_name = function.function_name
     else:
         func_name = function.__name__
 
-    prf.profiler.add(event, func_name)
+    prf.PROFILER.add(event, func_name)
 
     return event
 
 
 def get_cuda_platform(platforms):
-    for p in platforms:
-        if p.name == "NVIDIA CUDA":
-            return p
+    """Get the NVIDIA CUDA platform if any."""
+    for plat in platforms:
+        if plat.name == "NVIDIA CUDA":
+            return plat
     return None
-
-
-def get_cuda_context():
-    platforms = cl.get_platforms()
-    p = get_cuda_platform(platforms)
-    devices = p.get_devices()
-
-    logger.debug("Creating OpenCL context for %d devices." % (len(devices)))
-    st = time.time()
-    ctx = cl.Context(devices)
-    logger.debug("OpenCL context created in %g s." % (time.time()-st))
-
-    return ctx
 
 
 def get_cuda_devices():
     """Get all CUDA devices."""
     return get_cuda_platform(cl.get_platforms()).get_devices()
+
+
+def get_cuda_context(devices=None, properties=None):
+    """Create an NVIDIA CUDA context with *properties* for *devices*,
+    if None are given create the context for all available."""
+    if devices is None:
+        devices = get_cuda_platform(cl.get_platforms()).get_devices()
+
+    LOGGER.debug("Creating OpenCL context for %d devices." % (len(devices)))
+    start = time.time()
+    ctx = cl.Context(devices, properties)
+    LOGGER.debug("OpenCL context created in %g s." % (time.time() - start))
+
+    return ctx
 
 
 def get_command_queues(context, devices=None,
@@ -100,12 +102,12 @@ def get_command_queues(context, devices=None,
     if devices is None:
         devices = get_cuda_devices()
 
-    logger.debug("Creating %d command queues." % (len(devices)))
+    LOGGER.debug("Creating %d command queues." % (len(devices)))
     queues = []
     for device in devices:
         queues.append(cl.CommandQueue(context, device,
                                       *queue_args, **queue_kwargs))
 
-    logger.debug("%d command queues created." % (len(devices)))
+    LOGGER.debug("%d command queues created." % (len(devices)))
 
     return queues
