@@ -4,7 +4,8 @@ Utility functions.
 import atexit
 from optparse import OptionParser
 import logging
-from syris.profiling import profiler, Profiler
+from syris import profiling as prf
+from syris.profiling import Profiler, DummyProfiler
 
 logger = logging.getLogger()
 
@@ -41,13 +42,15 @@ def init(queues):
                      cmdoptions.logger_file)
 
     if cmdoptions.profiler:
-        profiler.init(cmdoptions.profiler_file, queues)
-        profiler.start()
+        prf.profiler = Profiler(queues, cmdoptions.profiler_file)
+        prf.profiler.start()
 
         @atexit.register
         def exit_handler():
             logger.info("Shutting down profiler...")
-            profiler.shutdown()
+            prf.profiler.shutdown()
+    else:
+        prf.profiler = DummyProfiler
 
 
 def init_logging(level, logger_file):

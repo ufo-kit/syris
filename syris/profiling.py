@@ -1,3 +1,7 @@
+"""
+Module for profiling OpenCL GPU code execution.
+"""
+
 import pyopencl as cl
 from threading import Thread
 from Queue import Queue, Empty
@@ -10,22 +14,24 @@ import time
 logger = logging.getLogger(__name__)
 
 
+class DummyProfiler():
+    """A profiler which does nothing for saving time."""
+    def add(self, event, func_name=""):
+        pass
+
+
 class Profiler(Thread):
-    states = {cl.profiling_info.QUEUED: "QUEUED",
-              cl.profiling_info.SUBMIT: "SUBMIT",
-              cl.profiling_info.START: "START",
-              cl.profiling_info.END: "END"
-              }
+    """An OpenCL GPU code profiler."""
+    states = [cl.profiling_info.QUEUED, cl.profiling_info.SUBMIT,
+              cl.profiling_info.START, cl.profiling_info.END]
+    state_strs = dict(zip(states, ["QUEUED", "SUBMIT", "START", "END"]))
     format_string = "%d\t%d\t%d\t%s\t%s\t%d"
 
-    def __init__(self):
+    def __init__(self, queues, file_name):
+        """Create a profiler for command *queues* and output file
+        *file_name*.
+        """
         Thread.__init__(self)
-
-    def init(self, file_name, queues):
-        if hasattr(self, "_file_name"):
-            raise RuntimeError("Cannot reinitialize profiler at runtime.")
-
-        # Lazy initialization.
         self._events = Queue()
         self._event_next = itertools.count().next
         self._clqeue_next = itertools.count().next
@@ -38,13 +44,9 @@ class Profiler(Thread):
         self._profile_file = None
         self._file_name = file_name
 
-        # If we define the file name, add() will process arguments as expected.
-        def _add(event, func_name=""):
-            self._events.put((event, func_name))
-        self.add = _add
-
         self._profile_file = open(file_name, "w")
-        self._determine_time_shift(queues)
+        self._profile_file.write("# units\nns\n")
+        self._write_time_shift(queues)
 
         self._profile_file.write("# " +
                                  Profiler.format_string.replace("%d", "%s")
@@ -52,7 +54,7 @@ class Profiler(Thread):
                                     "device_id", "state", "func_name",
                                     "time") + "\n")
 
-    def _determine_time_shift(self, queues):
+    def _write_time_shift(self, queues):
         # Get only a single command queue for a device on which we will
         # determine the zero time of a device.
         unique_queues = []
@@ -104,23 +106,22 @@ class Profiler(Thread):
         logger.info("Profiler finished.")
 
     def add(self, event, func_name=""):
-        """Add *event* and function with name *func_name* into the profiler's
-        queue. This happens only if profiler's file name is specified,
-        otherwise the method does nothing to increase performance.
+        """Add an OpenCL *event* and function with name *func_name*
+        into the profiler's queue.
         """
-        pass
+        self._events.put((event, func_name))
 
-    def _get_string(self, state, event_id, clq_id, device_id, func_name, t):
-        """Format profile string.
-
-        @param state: Event state
-        @param event_id: event's id
-        @param clq_id: command queue
-        @param func_name: kernel function name
-        @param t: time [ns]
+    def _get_string(self, event_state, event, event_id, func_name):
+        """Format profile string based on *event_state*, *event_id*
+        and *func_name*.
         """
-        return Profiler.format_string % (event_id, clq_id, device_id,
-                                         Profiler.states[state], func_name, t)
+        return Profiler.format_string % (event_id,
+                                         self._clqueues[event.command_queue],
+                                         self._cldevices[
+                                         event.command_queue.device],
+                                         Profiler.state_strs[event_state],
+                                         func_name,
+                                         event.get_profiling_info(event_state))
 
     def _process(self, event, func_name=""):
         # clqueue id
@@ -136,41 +137,16 @@ class Profiler(Thread):
 
         event_id = self._event_next()
 
-        s = "%s\n%s\n%s\n%s\n" % (self._get_string(
-                                  cl.profiling_info.QUEUED,
-                                  event_id,
-                                  self._clqueues[event.command_queue],
-                                  self._cldevices[event.command_queue.device],
-                                  func_name,
-                                  event.profile.QUEUED),
-
-                                  self._get_string(
-                                      cl.profiling_info.SUBMIT, event_id,
-                                  self._clqueues[event.command_queue],
-                                  self._cldevices[event.command_queue.device],
-                                  func_name,
-                                  event.profile.SUBMIT),
-
-                                  self._get_string(
-                                      cl.profiling_info.START, event_id,
-                                  self._clqueues[event.command_queue],
-                                  self._cldevices[event.command_queue.device],
-                                  func_name,
-                                  event.profile.START),
-
-                                  self._get_string(
-                                      cl.profiling_info.END, event_id,
-                                  self._clqueues[event.command_queue],
-                                  self._cldevices[event.command_queue.device],
-                                  func_name,
-                                  event.profile.END))
+        # Get all records for one event (queued, submit, ...)
+        strings = [self._get_string(event_state, event, event_id, func_name)
+                   for event_state in Profiler.states]
+        s = "%s\n%s\n%s\n%s\n" % (strings[0], strings[1], strings[2],
+                                  strings[3])
 
         self._profile_file.write(s)
 
-# Singleton. We have profiling information in the framework, but for
-# performance purposes this can be disabled by not setting the profiler
-# output file on simulation initialization.
-profiler = Profiler()
+# Singleton.
+profiler = None
 
 
 #=============================================================================
@@ -196,7 +172,7 @@ colors = {
 }
 
 
-class Record(object):
+class _Record(object):
     def __init__(self, *args, **kwargs):
         for a, v in args:
             setattr(self, a, v)
@@ -205,13 +181,15 @@ class Record(object):
         return "Record("+str(self.__dict__)+")"
 
 
-class Event(object):
-
+class _Event(object):
     def __str__(self):
         return "Event("+str(self.__dict__)+")"
 
 
 class ProfileReconstructor(object):
+    """Profile reconstructor which handles the profiling file created by
+    :py:class:`Profiler`.
+    """
     attributes = ["EVENT_ID", "QUEUE_ID", "DEVICE_ID", "STATE", "FUNC_NAME",
                   "TIME"]
     pattern = re.compile(r"(?P<%s>[0-9]+)\s*(?P<%s>[0-9]+)\s*(?P<%s>[0-9]+)" %
@@ -219,31 +197,32 @@ class ProfileReconstructor(object):
                          "\s*(?P<%s>[A-Z]+)\s*(?P<%s>\w*)\s*(?P<%s>[0-9]+)\n" %
                          (attributes[3], attributes[4], attributes[5]))
     cl_states = ["QUEUED", "SUBMIT", "START", "END"]
-    time_units = ["s", "ms", "us", "ns"]
-    # the values are stored as ns
-    units_conversion = dict(zip(time_units, [1.0e-9, 1.0e-6, 1.0e-3, 1.0]))
+    str_to_qtime = {q.ns.symbol: q.ns,
+                    q.us.symbol: q.us,
+                    q.ms.symbol: q.ms,
+                    q.s.symbol: q.s}
 
-    def __init__(self, fn, units):
-        """Constructor.
-        @param fn: file name of the profiling file
-
+    def __init__(self, file_name, str_units):
+        """Create profile reconstructor reading from *file_name* and using
+        units based on string *str_units*.
         """
-        self._profile_file_name = fn
+        self._profile_file_name = file_name
         self._min_time = sys.maxint
         self._records = []
         self._events = {}
             # event objects dictionary {event_id: event}
         self._starts = {}           # {device_id: initial_time}
         self._cache = {}, None
-        self._units = units
+        self.units = ProfileReconstructor.str_to_qtime[str_units]
+        # We will need to convert between units used in the file and
+        # units wanted for output.
+        self.file_units = None
 
     def get_data(self, attr):
-        """Get data in a dictionary aggregated to a multidictionary.
-
-        @param attr: Record attribute which will serve as a key to
-                        the top level of result dictionary
-
-        @return: dictionary in form: {attr: {event_id: Event}}
+        """Get data in a dictionary aggregated to a multidictionary. *attr*
+        is a record attribute which will serve as a key to the top level
+        of result dictionary Return a dictionary in form
+        {attr: {event_id: Event}}.
         """
         if attr == self._cache[1]:
             # last request was on the same attribute -> data do not change
@@ -267,11 +246,19 @@ class ProfileReconstructor(object):
                 ]
         args = zip(ProfileReconstructor.attributes, vals)
 
-        return Record(*args)
+        return _Record(*args)
 
     def _process_header(self, f):
+        self._process_units(f)
         self._process_t0(f)
         self._process_dt_error(f)
+
+    def _process_units(self, f):
+        l = f.readline()
+        if l != "# units\n":
+            raise ValueError("File corrupted.")
+        l = f.readline().strip()
+        self.file_units = ProfileReconstructor.str_to_qtime[l.lower()]
 
     def _process_t0(self, f):
         """Different devices have different time offsets,
@@ -294,7 +281,8 @@ class ProfileReconstructor(object):
             if not l.startswith("#"):
                 dt = float(l.strip())
                 print "Relative device time error: %g %s" %\
-                    (dt*self.units_conversion[self._units], self._units)
+                    (q.Quantity(dt, self.file_units).rescale(self.units),
+                     self.units.symbol)
 
     def _process(self):
         records = {}
@@ -318,16 +306,13 @@ class ProfileReconstructor(object):
         self._create_events(records)
 
     def _create_events(self, records):
-        """Create events from individual records.
-
-        @param records: 4 individual records for each event based on
-                        computational status (QUEUED, SUBMIT, START, END)
-
+        """Create events from individual *records* for each event based on
+        computational status (QUEUED, SUBMIT, START, END).
         """
         for event_records in records.values():
             for rec in event_records:
                 if rec.EVENT_ID not in self._events:
-                    self._events[rec.EVENT_ID] = Event()
+                    self._events[rec.EVENT_ID] = _Event()
                 for k in rec.__dict__:
                     if k == "STATE":
                         setattr(self._events[rec.EVENT_ID], getattr(rec, k),
@@ -346,17 +331,19 @@ class ProfileReconstructor(object):
         return prop
 
 
-def plot(data, attribute, states, start_from=0, stop_at=sys.float_info.max,
-         conversion=1.0e-6, delta=0.0, only_averages=False, units="ms"):
-    """Plot the profiling information.
+def plot(data, attribute, states, file_units, out_units, start_from=0,
+         stop_at=sys.float_info.max, delta=0.0, only_averages=False):
+    """Plot the profiling information, where
 
-    @param data: dictionary in the form {id: {event_id: values}}
-    @param attribute: attribute (event_id, device_id, queue_id)
-    @param states: OpenCL Event states to use as beginning and end
-    @param start_from: plot events started after start_from
-    @param stop_at: plot events started before stop_at
-    @param conversion: conversion to different time units from ns
-    @param delta: plot only events with duration >= delta
+    * *data* - a dictionary in the form {id: {event_id: values}}
+    * *attribute* - (event_id, device_id, queue_id)
+    * *states* - OpenCL Event states to use as beginning and end
+    * *file_units* - units used in the profiling file
+    * *out_units* - units used for output
+    * *start_from* - plot events started after start_from
+    * *stop_at* - plot events started before stop_at
+    * *delta* - plot only events with duration >= delta
+    * *only_averages* - outputs only the average timings
     """
     y_limits = set([])  # make plot well visible in vertical direction
     func_colors = {}
@@ -372,13 +359,15 @@ def plot(data, attribute, states, start_from=0, stop_at=sys.float_info.max,
     for attr in data:
         y_limits.add(attr)
         for event in data[attr]:
-            start = getattr(event, states[0])*conversion
-            stop = getattr(event, states[1])*conversion
+            start = q.Quantity(getattr(event, states[0]), file_units).\
+                rescale(out_units)
+            stop = q.Quantity(getattr(event, states[1]), file_units).\
+                rescale(out_units)
             if start >= start_from and start <= stop_at and\
                     stop - start >= delta:
                 if not only_averages:
                     events_infos.append((event.FUNC_NAME, stop-start,
-                                         start, stop, units))
+                                         start, stop, out_units))
                     if event.FUNC_NAME in func_colors:
                         # assign color to the functions
                         plt.plot([start, stop], [attr, attr], linewidth=5.0,
@@ -400,18 +389,20 @@ def plot(data, attribute, states, start_from=0, stop_at=sys.float_info.max,
         print "Functions and times spent in them:"
         for ev_info in events_infos:
             print "{0:>{1}} - duration: {2:10.5f} start: {3:10.5f} ".format(
-                ev_info[0], max_func_name, ev_info[1], ev_info[2]) +\
-                "stop: {0:10.5f} {1}".format(ev_info[3], ev_info[4])
+                ev_info[0], max_func_name, float(ev_info[1].magnitude),
+                float(ev_info[2].magnitude)) +\
+                "stop: {0:10.5f} {1}".format(float(ev_info[3].magnitude),
+                                             ev_info[4].symbol)
         print
     print "Plot information:"
     print "states:", states, "start from:", start_from, "stop at:", stop_at,\
-        "minimum event duration:", delta, units
+        "minimum event duration:", delta, out_units.symbol
     print
     print "Timing statistics:"
     for fn in averages:
         print "{0:>{1}}: called {2:5} times, average time {3:10.5f} {4}".\
             format(fn, max_func_name, counts[fn],
-                   float(averages[fn])/counts[fn], units)
+                   float(averages[fn])/counts[fn], out_units.symbol)
     if not only_averages:
         print
         print "Legend:"
@@ -419,7 +410,7 @@ def plot(data, attribute, states, start_from=0, stop_at=sys.float_info.max,
             print "{0:>{1}}: {2}".format(
                 fn, max_func_name, colors[func_colors[fn]])
         plt.ylim(min(y_limits)-0.5, max(y_limits)+0.5)
-        plt.xlabel(units)
+        plt.xlabel(out_units.symbol)
         plt.ylabel(attribute)
         plt.show()
 
@@ -453,7 +444,7 @@ if __name__ == '__main__':
                       ", (default: %default)")
     parser.add_option("-u", "--units", metavar="UNITS", default="ms",
                       dest="units", help="Time units. One of %s" %
-                      (ProfileReconstructor.time_units) +
+                      (ProfileReconstructor.str_to_qtime.keys()) +
                       ", (default: %default)")
     parser.add_option("-d", "--delta", metavar="DELTA", type="float",
                       default=0.0, dest="delta",
@@ -497,6 +488,5 @@ if __name__ == '__main__':
     # init OK, plot the data
     pr = ProfileReconstructor(args[0], opts.units)
     plot(pr.get_data(opts.attribute.upper()), opts.attribute.upper(),
-         (opts.entry.upper(), opts.exit.upper()), opts.start, opts.stop,
-         ProfileReconstructor.units_conversion[opts.units], opts.delta,
-         opts.only_averages > 0, opts.units)
+         (opts.entry.upper(), opts.exit.upper()), pr.file_units, pr.units,
+         opts.start, opts.stop, opts.delta, opts.only_averages > 0)

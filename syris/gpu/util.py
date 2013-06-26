@@ -4,7 +4,7 @@ Utility functions concerning GPU programming.
 
 import pyopencl as cl
 import time
-from syris.profiling import profiler
+from syris import profiling as prf
 import logging
 
 
@@ -19,7 +19,7 @@ def execute(function, *args, **kwargs):
     else:
         func_name = function.__name__
 
-    profiler.add(event, func_name)
+    prf.profiler.add(event, func_name)
 
     return event
 
