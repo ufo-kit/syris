@@ -5,14 +5,56 @@ Utility functions concerning GPU programming.
 import pyopencl as cl
 import time
 from syris import profiling as prf
+from syris import config as cfg
 import logging
+import os
 
 
 logger = logging.getLogger(__name__)
 
 
+single_header = """
+        typedef float vfloat;
+        typedef float2 vfloat2;
+        typedef float3 vfloat3;
+        typedef float4 vfloat4;
+        typedef float8 vfloat8;
+        typedef float16 vfloat16;
+
+        """
+
+double_header = """
+        #pragma OPENCL EXTENSION cl_khr_fp64 : enable
+        typedef double vfloat;
+        typedef double2 vfloat2;
+        typedef double3 vfloat3;
+        typedef double4 vfloat4;
+        typedef double8 vfloat8;
+        typedef double16 vfloat16;
+
+        """
+
+
+def get_source(file_name, precision_sensitive=True):
+    """Get source from a file with *file_name* and apply single or double
+    precision parametrization if *precision_sensitive* is True.
+    """
+    path = os.path.join(os.path.dirname(__file__), "opencl", file_name)
+    s = open(path, "r").read()
+
+    if precision_sensitive:
+        if cfg.cl_float == 4:
+            s = single_header + s
+        else:
+            s = double_header + s
+
+    return s
+
+
 def execute(function, *args, **kwargs):
-    """Execute an OpenCL *function* and profile it."""
+    """Execute a *function* which can be an OpenCL kernel or other OpenCL
+    related function and profile it.
+    """
     event = function(*args, **kwargs)
     if function.__class__ == cl.Kernel:
         func_name = function.function_name

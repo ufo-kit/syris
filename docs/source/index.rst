@@ -8,10 +8,21 @@ Welcome to Syris's documentation!
 
 Contents:
 
+Usage
+=====
+
 .. toctree::
    :maxdepth: 2
 
    usage/profiling
+
+Application Programming Interface
+=================================
+
+.. toctree::
+   :maxdepth: 2
+
+   api/gpu
 
 Indices and tables
 ==================

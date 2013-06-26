@@ -1,7 +1,8 @@
 import numpy as np
 import pyopencl as cl
-from syris.util import init
+from syris import config as cfg
 from syris.gpu import util as gpu_util
+from syris.gpu.kernels import loader
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,10 +24,10 @@ if __name__ == '__main__':
                            queue_kwargs={"properties":
                                          cl.command_queue_properties.
                                          PROFILING_ENABLE})
-    init(queues)
+    cfg.init(queues)
     q = queues[0]
     n = 8
-    mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n*4)
+    mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n*cfg.cl_float)
     prg = cl.Program(ctx, kernels()).build()
 
     gpu_util.execute(prg.test_kernel, q,
@@ -34,7 +35,7 @@ if __name__ == '__main__':
                      None,
                      mem)
 
-    res = np.empty(n, dtype=np.float32)
+    res = np.empty(n, dtype=cfg.np_float)
     cl.enqueue_copy(q, res, mem)
 
     print res
