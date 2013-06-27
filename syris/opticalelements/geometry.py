@@ -2,7 +2,10 @@
 specification.
 """
 import numpy as np
+from numpy import linalg
+import quantities as q
 from scipy import interpolate, integrate
+from syris import config as cfg
 import itertools
 import logging
 
@@ -17,6 +20,155 @@ Z_AX = (0, 0, 1)
 AXES = {X: X_AX, Y: Y_AX, Z: Z_AX}
 
 LOGGER = logging.getLogger(__name__)
+
+
+class GraphicalObject(object):
+    """Class representing an abstract graphical object."""
+    def __init__(self, trajectory, v_0=0.0, max_velocity=None,
+                 accel_dist_ratio=0.0, decel_dist_ratio=0.0):
+        """Create a graphical object with a *trajectory*, where:
+
+        * *v_0* - initial velocity
+        * *max_velocity* - maximum velocity to achieve during movement
+        * *accel_dist_ratio* - ratio between distance for which the object
+            accelerates and total distance
+        * *decel_dist_ratio* ratio between distance for which the object
+            decelerates and total distance
+        """
+        self._trajectory = trajectory
+        self._center = trajectory.points[0]
+
+        # matrix holding transformation
+        self._trans_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
+
+        # movement related attributes
+        self._max_velocity = cfg.NP_FLOAT(max_velocity)
+        self._v_0 = v_0
+
+        # Last position as tuple consisting of a 3D point and a vector.
+        self._last_position = None
+
+        if accel_dist_ratio is not None and decel_dist_ratio is not None and\
+                accel_dist_ratio + decel_dist_ratio > 1.0:
+            raise ValueError("Acceleration and deceleration" +
+                             "ratios sum must be <= 1.0")
+        self._accel_dist_ratio = cfg.NP_FLOAT(accel_dist_ratio)
+        self._decel_dist_ratio = cfg.NP_FLOAT(decel_dist_ratio)
+
+        # Time needed to move along the whole trajectory.
+        self._total_time = None
+        self._set_movement_params()
+
+    @property
+    def position(self):
+        """Current position."""
+        return np.dot(linalg.inv(self._trans_matrix), (0, 0, 0, 1))[:-1]
+
+    @property
+    def last_position(self):
+        """Last position."""
+        return self._last_position
+
+    @property
+    def center(self):
+        """Center."""
+        return self._center
+
+    @center.setter
+    def center(self, cen):
+        self._center = cen
+
+    @property
+    def total_time(self):
+        """Total time needed to move along the whole trajectory."""
+        return self._total_time
+
+    @property
+    def transformation_matrix(self):
+        """Current transformation matrix."""
+        return self._trans_matrix
+
+    def clear_transformation(self):
+        """Clear all transformations."""
+        self._trans_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
+
+    @property
+    def trajectory(self):
+        return self._trajectory
+
+    @trajectory.setter
+    def trajectory(self, traj):
+        self._trajectory = traj
+        self._center = traj.points[0]
+        self._set_movement_params()
+
+    @property
+    def v_0(self):
+        """Initial velocity."""
+        return self._v_0
+
+    @property
+    def max_velocity(self):
+        """Maximum achieved velocity."""
+        return self._max_velocity
+
+    @property
+    def accel_dist_ratio(self):
+        """The ratio between the acceleration distance and the whole
+        trajectory.
+        """
+        return self._accel_dist_ratio
+
+    @property
+    def decel_dist_ratio(self):
+        """The ratio between the deceleration distance and the whole
+        trajectory.
+        """
+        return self._decel_dist_ratio
+
+    def _set_movement_params(self):
+        """Set movement parameters."""
+        v_0 = self._v_0.rescale(q.m/q.s)
+        v_max = self._max_velocity.rescale(v_0)
+        dist = self._trajectory.length.rescale(q.m)
+        accel_dist = dist*self._accel_dist_ratio.rescale(dist)
+        decel_dist = dist*self._decel_dist_ratio.rescale(dist)
+        const_dist = dist-accel_dist-decel_dist.rescale(dist)
+
+        if self._max_velocity <= 0 or self._trajectory.length == 0:
+            self._acceleration = 0.0*q.m/q.s**2
+            self._deceleration = 0.0*q.m/q.s**2
+            self._accel_end_time = 0.0*q.s
+            self._decel_start_time = 0.0*q.s
+            return
+        if self._accel_dist_ratio <= 0.0:
+            accel = 0.0*q.m/q.s**2
+            accel_time = 0.0*q.s
+        else:
+            # dist = 1/2at^2, v = at, ar...accel_dist_ratio
+            # dist = 1/2vt => t = 2s/v => accel = v/t =
+            # v/(2s/v) = v^2/2s = v^2/2(ar*dist)
+            accel = (v_max**2 - v_0**2)/(2*accel_dist)
+            accel_time = 2.0*accel_dist/(v_0 + v_max)
+        if self._decel_dist_ratio <= 0.0:
+            decel = 0.0*q.m/q.s**2
+            decel_time = 0.0*q.s
+            # total_time = accel_time + const_time
+            total_time = accel_time + const_dist/v_max
+        else:
+            decel = (v_max**2 - v_0**2)/(2*decel_dist)
+            # t_d = t_a + t_mv (mv...max_velocity) (t = dist/v)
+            # t_d = t_a + dist/v = t_a + dist*(1-ar-dr)/mv
+            decel_time = accel_time + const_dist/v_max
+
+            # Do not stop, just return to the v_0 speed.
+            total_time = decel_time + 2.0*decel_dist/(v_0 + v_max)
+
+        self._acceleration = accel
+        self._deceleration = decel
+        self._accel_end_time = accel_time
+        self._decel_start_time = decel_time
+        self._total_time = total_time
 
 
 class BoundingBox(object):
