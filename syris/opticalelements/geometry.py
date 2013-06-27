@@ -1,13 +1,11 @@
-"""Sample geometry including affine transformations and trajectory
-specification.
-"""
+"""Geometry operations."""
 import numpy as np
 from numpy import linalg
 import quantities as q
 from scipy import interpolate, integrate
-from syris import config as cfg
 import itertools
 import logging
+import math
 
 # Constants.
 X = 0
@@ -20,155 +18,6 @@ Z_AX = (0, 0, 1)
 AXES = {X: X_AX, Y: Y_AX, Z: Z_AX}
 
 LOGGER = logging.getLogger(__name__)
-
-
-class GraphicalObject(object):
-    """Class representing an abstract graphical object."""
-    def __init__(self, trajectory, v_0=0.0, max_velocity=None,
-                 accel_dist_ratio=0.0, decel_dist_ratio=0.0):
-        """Create a graphical object with a *trajectory*, where:
-
-        * *v_0* - initial velocity
-        * *max_velocity* - maximum velocity to achieve during movement
-        * *accel_dist_ratio* - ratio between distance for which the object
-            accelerates and total distance
-        * *decel_dist_ratio* ratio between distance for which the object
-            decelerates and total distance
-        """
-        self._trajectory = trajectory
-        self._center = trajectory.points[0]
-
-        # matrix holding transformation
-        self._trans_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
-
-        # movement related attributes
-        self._max_velocity = cfg.NP_FLOAT(max_velocity)
-        self._v_0 = v_0
-
-        # Last position as tuple consisting of a 3D point and a vector.
-        self._last_position = None
-
-        if accel_dist_ratio is not None and decel_dist_ratio is not None and\
-                accel_dist_ratio + decel_dist_ratio > 1.0:
-            raise ValueError("Acceleration and deceleration" +
-                             "ratios sum must be <= 1.0")
-        self._accel_dist_ratio = cfg.NP_FLOAT(accel_dist_ratio)
-        self._decel_dist_ratio = cfg.NP_FLOAT(decel_dist_ratio)
-
-        # Time needed to move along the whole trajectory.
-        self._total_time = None
-        self._set_movement_params()
-
-    @property
-    def position(self):
-        """Current position."""
-        return np.dot(linalg.inv(self._trans_matrix), (0, 0, 0, 1))[:-1]
-
-    @property
-    def last_position(self):
-        """Last position."""
-        return self._last_position
-
-    @property
-    def center(self):
-        """Center."""
-        return self._center
-
-    @center.setter
-    def center(self, cen):
-        self._center = cen
-
-    @property
-    def total_time(self):
-        """Total time needed to move along the whole trajectory."""
-        return self._total_time
-
-    @property
-    def transformation_matrix(self):
-        """Current transformation matrix."""
-        return self._trans_matrix
-
-    def clear_transformation(self):
-        """Clear all transformations."""
-        self._trans_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
-
-    @property
-    def trajectory(self):
-        return self._trajectory
-
-    @trajectory.setter
-    def trajectory(self, traj):
-        self._trajectory = traj
-        self._center = traj.points[0]
-        self._set_movement_params()
-
-    @property
-    def v_0(self):
-        """Initial velocity."""
-        return self._v_0
-
-    @property
-    def max_velocity(self):
-        """Maximum achieved velocity."""
-        return self._max_velocity
-
-    @property
-    def accel_dist_ratio(self):
-        """The ratio between the acceleration distance and the whole
-        trajectory.
-        """
-        return self._accel_dist_ratio
-
-    @property
-    def decel_dist_ratio(self):
-        """The ratio between the deceleration distance and the whole
-        trajectory.
-        """
-        return self._decel_dist_ratio
-
-    def _set_movement_params(self):
-        """Set movement parameters."""
-        v_0 = self._v_0.rescale(q.m/q.s)
-        v_max = self._max_velocity.rescale(v_0)
-        dist = self._trajectory.length.rescale(q.m)
-        accel_dist = dist*self._accel_dist_ratio.rescale(dist)
-        decel_dist = dist*self._decel_dist_ratio.rescale(dist)
-        const_dist = dist-accel_dist-decel_dist.rescale(dist)
-
-        if self._max_velocity <= 0 or self._trajectory.length == 0:
-            self._acceleration = 0.0*q.m/q.s**2
-            self._deceleration = 0.0*q.m/q.s**2
-            self._accel_end_time = 0.0*q.s
-            self._decel_start_time = 0.0*q.s
-            return
-        if self._accel_dist_ratio <= 0.0:
-            accel = 0.0*q.m/q.s**2
-            accel_time = 0.0*q.s
-        else:
-            # dist = 1/2at^2, v = at, ar...accel_dist_ratio
-            # dist = 1/2vt => t = 2s/v => accel = v/t =
-            # v/(2s/v) = v^2/2s = v^2/2(ar*dist)
-            accel = (v_max**2 - v_0**2)/(2*accel_dist)
-            accel_time = 2.0*accel_dist/(v_0 + v_max)
-        if self._decel_dist_ratio <= 0.0:
-            decel = 0.0*q.m/q.s**2
-            decel_time = 0.0*q.s
-            # total_time = accel_time + const_time
-            total_time = accel_time + const_dist/v_max
-        else:
-            decel = (v_max**2 - v_0**2)/(2*decel_dist)
-            # t_d = t_a + t_mv (mv...max_velocity) (t = dist/v)
-            # t_d = t_a + dist/v = t_a + dist*(1-ar-dr)/mv
-            decel_time = accel_time + const_dist/v_max
-
-            # Do not stop, just return to the v_0 speed.
-            total_time = decel_time + 2.0*decel_dist/(v_0 + v_max)
-
-        self._acceleration = accel
-        self._deceleration = decel
-        self._accel_end_time = accel_time
-        self._decel_start_time = decel_time
-        self._total_time = total_time
 
 
 class BoundingBox(object):
@@ -266,7 +115,7 @@ class Trajectory(object):
         points = zip(*control_points)
 
         tck, vals = interpolate.splprep([points[0], points[1], points[2]], s=0)
-        self._length = integrate.romberg(_length_part,
+        self._length = integrate.romberg(_length_curve_part,
                                          vals[0],
                                          vals[len(vals)-1],
                                          args=(tck,))
@@ -277,8 +126,8 @@ class Trajectory(object):
         # the worst case is that two values are in the two most distanced
         # ends of two voxels, vx_1 - 0.5 in all directions and vx_2 - 0.5
         # in all directions (x,y,z), the distance between two such points is
-        # then sqrt(12) which is twice the voxel's diagonal
-        # TODO: assumes the distances are not larger then the diagonal, check!
+        # then sqrt(12) which is twice the voxel's diagonal.
+        # Assumes the distances are not larger then the diagonal.
         x_new, y_new, z_new = interpolate.splev(
             np.linspace(0, 1,
                         self._length*(1.0/self._pixel_size) *
@@ -309,10 +158,180 @@ class Trajectory(object):
         return self._length
 
 
-def _length_part(param, tck):
+def _length_curve_part(param, tck):
     """Compute length of a part of the parametrized curve with parameter
     *param* and a tuple *tck* consisting of knots, b-spline coefficients
     and the degree of the spline.
     """
     p_x, p_y, p_z = interpolate.splev(param, tck, der=1)
     return np.sqrt(p_x**2 + p_y**2 + p_z**2)
+
+
+def length(vec):
+    """Vector length.
+
+    @param vec: a vector
+    @return: vector length
+    """
+    sum_all = 0.0
+    for elem in vec:
+        sum_all += elem**2
+
+    return np.sqrt(sum_all)
+
+
+def normalize(vec):
+    """Normalize a vector *vec*."""
+    if vec[0] == 0 and vec[1] == 0 and vec[2] == 0:
+        return vec
+    return np.array([x/float(length(vec)) for x in vec])*vec.units
+
+
+def is_normalized(vec):
+    """Test whether a vector is normalized.
+
+    @param vec: a tuple
+    """
+    return length(vec) == 1.0
+
+
+def transform_vector(trans_matrix, vector):
+    """Transform *vector* by the transformation matrix *trans_matrix* with
+    dimensions (4,3) width x height.
+    """
+    return np.dot(trans_matrix, np.append(vector, 1)*vector.units)[:-1]
+
+
+def translate(vec):
+    """Translate the object by a vector *vec*. The transformation is
+    in the backward form.
+    """
+    trans_matrix = np.identity(4)
+
+    # minus because of the backward fashion
+    trans_matrix[0][3] = -vec[0]
+    trans_matrix[1][3] = -vec[1]
+    trans_matrix[2][3] = -vec[2]
+
+    return trans_matrix
+
+
+def rotate(phi, axis, total_start=None):
+    """Rotate the object by *phi* around vector *axis*, where
+    *total_start* is the center of rotation point which results in
+    transformation TRT^-1. The transformation is in the backward form.
+    """
+    if (not is_normalized(axis)):
+        axis = normalize(axis)
+
+    phi = phi.rescale(q.rad)
+    sin = np.sin(phi)
+    cos = np.cos(phi)
+    v_x = axis[0]
+    v_y = axis[1]
+    v_z = axis[2]
+
+    if total_start is not None:
+        t_1 = translate(total_start)
+
+    rot_matrix = np.identity(4)
+    rot_matrix[0][0] = cos + pow(v_x, 2) * (1 - cos)
+    rot_matrix[0][1] = v_x * v_y * (1 - cos) - v_z * sin
+    rot_matrix[0][2] = v_x * v_z * (1 - cos) + v_y * sin
+    rot_matrix[1][0] = v_x * v_y * (1 - cos) + v_z * sin
+    rot_matrix[1][1] = cos + pow(v_y, 2) * (1 - cos)
+    rot_matrix[1][2] = v_y * v_z * (1 - cos) - v_x * sin
+    rot_matrix[2][0] = v_z * v_x * (1 - cos) - v_y * sin
+    rot_matrix[2][1] = v_z * v_y * (1 - cos) + v_x * sin
+    rot_matrix[2][2] = cos + pow(v_z, 2) * (1 - cos)
+
+    if total_start is not None:
+        t_2 = translate(-total_start)
+        return np.dot(np.dot(t_2, linalg.inv(rot_matrix)), t_1)
+    else:
+        return linalg.inv(rot_matrix)
+
+
+def scale(scale_vec):
+    """Scale the object by scaling coefficients (kx, ky, kz)
+    given by *sc_vec*. The transformation is in the backward form.
+    """
+    if (scale_vec[0] == 0 or scale_vec[1] == 0 or scale_vec[2] == 0):
+        raise ValueError("All components of the scaling " +
+                         "must be greater than 0")
+    trans_matrix = np.identity(4)
+
+    # 1/x because of the backward fashion
+    trans_matrix[0][0] = 1.0 / scale_vec[0]
+    trans_matrix[1][1] = 1.0 / scale_vec[1]
+    trans_matrix[2][2] = 1.0 / scale_vec[2]
+
+    return trans_matrix
+
+
+def _simple_angle(vec_0, vec_1, ax_num):
+    """Angle between a coordinate axis and a vector."""
+    x_n = vec_0[X] == 0 and vec_1[X] == 0
+    y_n = vec_0[Y] == 0 and vec_1[Y] == 0
+    z_n = vec_0[Z] == 0 and vec_1[Z] == 0
+
+    if x_n and y_n or x_n and z_n or y_n and z_n:
+        return 0*q.rad
+
+    if np.cross(vec_0, vec_1)[ax_num] <= 0:
+        return (2*np.pi - math.atan2(length(np.cross(vec_0, vec_1)),
+                                     np.dot(vec_0, vec_1)))*q.rad
+    else:
+        return math.atan2(length(np.cross(vec_0, vec_1)),
+                          np.dot(vec_0, vec_1))*q.rad
+
+
+def _align_with_plane(vec_0, vec_1, rot_axis, axis):
+    """Put vectors *vec_0*, *vec_1* and *rot_axis* to a plane defined by
+    z-axis and *axis*."""
+    tmp = rot_axis[axis]
+    rot_axis[axis] = 0*rot_axis.units
+    # angle between axis and a projected axis of rotation and Z axis
+    phi = _simple_angle(Z_AX, rot_axis, axis)
+    rot_axis[axis] = tmp
+    # rotate around X to put into XZ plane (forward rotation)
+    trans_matrix = linalg.inv(rotate(-phi, AXES[axis]))
+    rot_axis = transform_vector(trans_matrix, rot_axis)
+    vec_0 = transform_vector(trans_matrix, vec_0)
+    vec_1 = transform_vector(trans_matrix, vec_0)
+
+    return normalize(vec_0), normalize(vec_1), list(normalize(rot_axis))
+
+
+def angle(vec_0, vec_1):
+    """
+    Angle between two vectors *vec_0* and *vec_1* in a left handed system.
+
+    Align rotation axis with Z-axis, transform the vectors accordingly,
+    determine the "up" vector by checking the transformed axis z-coordinate
+    and based on that determine the angle in the range <0,2pi)
+
+    Source:
+    http://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/
+    3drota.htm#Rotation about an Arbitrary Axis
+    """
+    vec_1 = vec_1.rescale(vec_0)
+    vec_0 = normalize(vec_0)
+    vec_1 = normalize(vec_1)
+
+    # axis of rotation
+    rot_ax = normalize(np.cross(vec_0, vec_1))*vec_0.units
+
+    # align with XZ
+    if rot_ax[X] != 0:
+        vec_0, vec_1, rot_ax = _align_with_plane(vec_0, vec_1, rot_ax, X)
+
+    # align with Z
+    if rot_ax[Y] != 0:
+        vec_0, vec_1, rot_ax = _align_with_plane(vec_0, vec_1, rot_ax, Y)
+
+    phi = _simple_angle(vec_0, vec_1, Z)
+
+    LOGGER.debug("Angle between %s, %s: %g deg." % (vec_0, vec_1, phi))
+
+    return phi
