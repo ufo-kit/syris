@@ -1,4 +1,6 @@
 numpy>=1.6.1
 quantities>=0.10.1
 pyopencl>=(2012, 1)
+scipy>=0.10.0b2
 testfixtures>=3.0.0
+
