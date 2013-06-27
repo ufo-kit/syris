@@ -14,7 +14,7 @@ LOGGER = logging.getLogger()
 # Default single precision specification of data types.
 NP_FLOAT = np.float32
 NP_CPLX = np.complex64
-# In bytes.
+# Bytes per value.
 CL_FLOAT = 4
 CL_CPLX = 8
 
