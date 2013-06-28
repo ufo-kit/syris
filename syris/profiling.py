@@ -22,7 +22,7 @@ PROFILER = None
 
 
 class DummyProfiler():
-    """A PROFILER which does nothing for saving time."""
+    """A profiler which does nothing for saving time."""
     def __init__(self):
         pass
 
@@ -39,7 +39,7 @@ class Profiler(Thread):
     format_string = "%d\t%d\t%d\t%s\t%s\t%d"
 
     def __init__(self, queues, file_name):
-        """Create a PROFILER for command *queues* and output file
+        """Create a profiler for command *queues* and output file
         *file_name*.
         """
         Thread.__init__(self)

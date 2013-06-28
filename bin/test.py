@@ -24,3 +24,4 @@ if __name__ == '__main__':
                                          cl.command_queue_properties.
                                          PROFILING_ENABLE})
     cfg.init(queues)
+    LOGGER.debug("Done.")

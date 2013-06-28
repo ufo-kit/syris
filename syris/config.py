@@ -49,7 +49,7 @@ def init(queues=None):
     PARSER.add_option("--LOGGER-file", dest="logger_file",
                       default="simulation.log",
                       help="log file path", metavar="LOG_FILE")
-    PARSER.add_option("--pmasf-file", dest="PMASF_FILE", default="pmasf",
+    PARSER.add_option("--pmasf-file", dest="pmasf_file", default="pmasf",
                       help="full path to the pmasf binary",
                       metavar="PMASF_FILE")
 
@@ -75,7 +75,7 @@ def init(queues=None):
 
     # Profiling options, they depend on the created command queues.
     if cmdoptions.profiler:
-        prf.profiler = Profiler(queues, cmdoptions.profiler_file)
+        prf.PROFILER = Profiler(queues, cmdoptions.profiler_file)
         prf.PROFILER.start()
 
         @atexit.register
@@ -84,7 +84,7 @@ def init(queues=None):
             LOGGER.debug("Shutting down profiler...")
             prf.PROFILER.shutdown()
     else:
-        prf.profiler = DummyProfiler()
+        prf.PROFILER = DummyProfiler()
 
     # Set the pmasf excutable path.
     global PMASF_FILE
@@ -102,3 +102,4 @@ def _init_logging(level, logger_file):
     file_handler.setLevel(level)
     file_handler.setFormatter(logging.Formatter(fmt))
     LOGGER.addHandler(file_handler)
+    LOGGER.debug("Log.")
