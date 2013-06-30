@@ -67,10 +67,17 @@ class PMASFMaterial(Material):
 
         Return a list of refractive indices.
         """
+        # determine if we are executing pmasf remotely and extract executable
+        # name.
+        if cfg.PMASF_FILE.startswith("ssh"):
+            executable = cfg.PMASF_FILE.split()[-1]
+        else:
+            executable = cfg.PMASF_FILE
+
         cmd = "%s -C %s -E %f %f -p %d -+l%s -w Ed" % \
             (cfg.PMASF_FILE, name, energies[0].rescale(q.eV),
              energies[-1].rescale(q.eV), len(energies),
-             os.path.dirname(cfg.PMASF_FILE))
+             os.path.dirname(executable))
 
         # Execute the pmasf program and get the text results
         # via a pipe.

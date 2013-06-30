@@ -4,8 +4,13 @@ from unittest import TestCase
 from syris import config as cfg
 from syris.opticalelements.material import PMASFMaterial
 from testfixtures import ShouldRaise
+import os
 
 cfg.PMASF_FILE = "/home/farago/software/asf/pmasf"
+
+if not os.path.exists(cfg.PMASF_FILE):
+    # Remote access.
+    cfg.PMASF_FILE = "ssh hopped_ufo /home/farago/software/asf/pmasf"
 
 
 class TestPMASFMaterial(TestCase):
