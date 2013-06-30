@@ -307,13 +307,8 @@ class CompositeObject(GraphicalObject):
         return self._primitive_len(primitive_objects=[])
 
     def _primitive_len(self, primitive_objects=[]):
-        """Internal primitive objects counter. This is needed to hide the
-        argument from arguments which a user can specify. It is used only
-        internally throughout recursion.
-
-        @param primitive_objects: A list of objects from upper level calls
-                                    of this method.
-        """
+        """Internal primitive objects counter. *primitive_objects* is the
+        accumulated list of primitive objects within this composite object."""
         for obj in self._objects:
             if obj.__class__ == CompositeObject:
                 obj._primitive_len(primitive_objects)

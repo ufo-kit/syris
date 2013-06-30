@@ -157,10 +157,7 @@ class Trajectory(object):
 
     @property
     def length(self):
-        """Compute the length of the trajectory.
-
-        @return: curve length in mm
-        """
+        """Trajectory length."""
         return self._length
 
 
@@ -183,12 +180,9 @@ def normalize(vector):
     return vector.magnitude if length(vector) == 0 else vector / length(vector)
 
 
-def is_normalized(vec):
-    """Test whether a vector is normalized.
-
-    @param vec: a tuple
-    """
-    return length(vec) == 1.0 * vec.units
+def is_normalized(vector):
+    """Test whether a *vector* is normalized."""
+    return length(vector) == 1.0 * vector.units
 
 
 def transform_vector(trans_matrix, vector):
