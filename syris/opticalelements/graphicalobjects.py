@@ -12,8 +12,10 @@ LOGGER = logging.getLogger(__name__)
 
 
 class GraphicalObject(object):
+
     """Class representing an abstract graphical object."""
-    def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0*q.m/q.s,
+
+    def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
                  max_velocity=None, accel_dist_ratio=0.0,
                  decel_dist_ratio=0.0):
         """Create a graphical object with a *trajectory*, where:
@@ -124,41 +126,41 @@ class GraphicalObject(object):
 
     def _set_movement_params(self):
         """Set movement parameters."""
-        v_0 = self._v_0.rescale(q.m/q.s)
+        v_0 = self._v_0.rescale(q.m / q.s)
         v_max = self._max_velocity.rescale(v_0.units)
         dist = self._trajectory.length.rescale(q.m)
-        accel_dist = dist*self._accel_dist_ratio.rescale(dist.units)
-        decel_dist = dist*self._decel_dist_ratio.rescale(dist.units)
-        const_dist = dist-accel_dist-decel_dist.rescale(dist.units)
+        accel_dist = dist * self._accel_dist_ratio.rescale(dist.units)
+        decel_dist = dist * self._decel_dist_ratio.rescale(dist.units)
+        const_dist = dist - accel_dist - decel_dist.rescale(dist.units)
 
         if self._max_velocity <= 0 or self._trajectory.length == 0:
-            self._acceleration = 0.0*q.m/q.s**2
-            self._deceleration = 0.0*q.m/q.s**2
-            self._accel_end_time = 0.0*q.s
-            self._decel_start_time = 0.0*q.s
+            self._acceleration = 0.0 * q.m / q.s ** 2
+            self._deceleration = 0.0 * q.m / q.s ** 2
+            self._accel_end_time = 0.0 * q.s
+            self._decel_start_time = 0.0 * q.s
             return
         if self._accel_dist_ratio <= 0.0:
-            accel = 0.0*q.m/q.s**2
-            accel_time = 0.0*q.s
+            accel = 0.0 * q.m / q.s ** 2
+            accel_time = 0.0 * q.s
         else:
             # dist = 1/2at^2, v = at, ar...accel_dist_ratio
             # dist = 1/2vt => t = 2s/v => accel = v/t =
             # v/(2s/v) = v^2/2s = v^2/2(ar*dist)
-            accel = (v_max**2 - v_0**2)/(2*accel_dist)
-            accel_time = 2.0*accel_dist/(v_0 + v_max)
+            accel = (v_max ** 2 - v_0 ** 2) / (2 * accel_dist)
+            accel_time = 2.0 * accel_dist / (v_0 + v_max)
         if self._decel_dist_ratio <= 0.0:
-            decel = 0.0*q.m/q.s**2
-            decel_time = 0.0*q.s
+            decel = 0.0 * q.m / q.s ** 2
+            decel_time = 0.0 * q.s
             # total_time = accel_time + const_time
-            total_time = accel_time + const_dist/v_max
+            total_time = accel_time + const_dist / v_max
         else:
-            decel = (v_max**2 - v_0**2)/(2*decel_dist)
+            decel = (v_max ** 2 - v_0 ** 2) / (2 * decel_dist)
             # t_d = t_a + t_mv (mv...max_velocity) (t = dist/v)
             # t_d = t_a + dist/v = t_a + dist*(1-ar-dr)/mv
-            decel_time = accel_time + const_dist/v_max
+            decel_time = accel_time + const_dist / v_max
 
             # Do not stop, just return to the v_0 speed.
-            total_time = decel_time + 2.0*decel_dist/(v_0 + v_max)
+            total_time = decel_time + 2.0 * decel_dist / (v_0 + v_max)
 
         self._acceleration = accel
         self._deceleration = decel
@@ -170,32 +172,32 @@ class GraphicalObject(object):
         """Get the distance traveled from the beginning until the time
         given by *abs_time*.
         """
-        v_0 = self._v_0.rescale(q.m/q.s)
+        v_0 = self._v_0.rescale(q.m / q.s)
         v_max = self._max_velocity.rescale(v_0.units)
         acc_end = self._accel_end_time.rescale(q.s)
         decel_start = self._decel_start_time.rescale(q.s)
         total_time = self._total_time.rescale(q.s)
-        accel = self._acceleration.rescale(q.m/q.s**2)
-        decel = self._deceleration.rescale(q.m/q.s**2)
+        accel = self._acceleration.rescale(q.m / q.s ** 2)
+        decel = self._deceleration.rescale(q.m / q.s ** 2)
 
         if self._accel_dist_ratio > 0.0 and abs_time <= self._accel_end_time:
-            return v_0*abs_time + accel*abs_time**2/2.0
+            return v_0 * abs_time + accel * abs_time ** 2 / 2.0
         elif self._decel_dist_ratio > 0.0 and\
                 abs_time < self._decel_start_time:
-            return v_0*acc_end + accel*acc_end**2/2.0 + \
-                v_max*(abs_time - acc_end)
+            return v_0 * acc_end + accel * acc_end ** 2 / 2.0 + \
+                v_max * (abs_time - acc_end)
         else:
             if self._decel_start_time > 0.0:
-                return v_0*acc_end + 0.5*accel*acc_end**2 + \
-                    v_max*(decel_start-acc_end) + \
-                    (abs_time - decel_start)*v_0 + \
-                    0.5*decel*(2*total_time*(abs_time - decel_start) +
-                               decel_start**2 - abs_time**2)
+                return v_0 * acc_end + 0.5 * accel * acc_end ** 2 + \
+                    v_max * (decel_start - acc_end) + \
+                    (abs_time - decel_start) * v_0 + \
+                    0.5 * decel * (2 * total_time * (abs_time - decel_start) +
+                                   decel_start ** 2 - abs_time ** 2)
             else:
                 # no deceleration
-                return self._v_0*self._accel_end_time +\
-                    (self._acceleration*self._accel_end_time**2) / 2.0 +\
-                    self._max_velocity*(abs_time - self._accel_end_time)
+                return self._v_0 * self._accel_end_time +\
+                    (self._acceleration * self._accel_end_time ** 2) / 2.0 +\
+                    self._max_velocity * (abs_time - self._accel_end_time)
 
     def get_trajectory_index(self, abs_time):
         """Get index into trajectory points at a specified time *abs_time*."""
@@ -209,9 +211,10 @@ class GraphicalObject(object):
         if index >= len(self._trajectory.points):
             LOGGER.debug("Index to trajectories out of bounds: " +
                          "index=%d, max_i=%d, abs_time=%g, d_s=%g, max_d=%g." %
-                         (index, len(self._trajectory.points)-1, abs_time, d_s,
-                          self._trajectory.length) + "The object reaches " +
-                         "beyond its trajectory end by the specified time.")
+                         (index, len(self._trajectory.points) - 1, abs_time,
+                          d_s, self._trajectory.length) + "The object " +
+                         "reaches beyond its trajectory end by " +
+                         "the specified time.")
             index = len(self._trajectory.points) - 1
 
         return index
@@ -253,8 +256,10 @@ class GraphicalObject(object):
 
 
 class CompositeObject(GraphicalObject):
+
     """Class representing an object consisting of more sub-objects."""
-    def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0*q.m/q.s,
+
+    def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
                  max_velocity=None, accel_dist_ratio=0.0,
                  decel_dist_ratio=0.0, gr_objects=[]):
         """*gr_objects* are the graphical objects which is this object

@@ -9,12 +9,13 @@ queue = gpu_util.get_command_queues(ctx)[0]
 
 
 class TestPrecision(unittest.TestCase):
+
     def setUp(self):
         self.n = 2
         self.kernel_fn = "float_test.cl"
 
     def _create_mem_objs(self, ctx, n):
-        mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n*cfg.CL_FLOAT)
+        mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n * cfg.CL_FLOAT)
         ar = np.empty(n, dtype=cfg.NP_FLOAT)
 
         return mem, ar

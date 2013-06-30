@@ -10,7 +10,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 class Material(object):
+
     """Abstract class representing materials."""
+
     def __init__(self, name, energies):
         """Create material with *name* store its complex refractive indices
         for all given *energies*.
@@ -45,9 +47,11 @@ class Material(object):
 
 
 class PMASFMaterial(Material):
+
     """Class representing materials based on their complex refractive
     indices calculated by PMASF program written by Petr Mikulik.
     """
+
     def __init__(self, name, energies):
         """Create material with *name* for given *energies*."""
         Material.__init__(self, name, energies)
@@ -78,7 +82,7 @@ class PMASFMaterial(Material):
 
         # Parse the text output to obtain the refractive indices.
         lines = out.split("\n")
-        i_0 = lines.index("# Columns: Energy[eV]\tdelta")+1
+        i_0 = lines.index("# Columns: Energy[eV]\tdelta") + 1
         for line in lines[i_0:]:
             line = line.strip()
             if line != "":
@@ -86,4 +90,4 @@ class PMASFMaterial(Material):
                 delta, beta = ref_ind.split(" ")
                 self._refractive_indices.append(
                     cfg.NP_CPLX(cfg.NP_FLOAT(delta) +
-                                cfg.NP_FLOAT(beta)*1j))
+                                cfg.NP_FLOAT(beta) * 1j))

@@ -22,7 +22,9 @@ PROFILER = None
 
 
 class DummyProfiler():
+
     """A profiler which does nothing for saving time."""
+
     def __init__(self):
         pass
 
@@ -32,6 +34,7 @@ class DummyProfiler():
 
 
 class Profiler(Thread):
+
     """An OpenCL GPU code PROFILER."""
     states = [cl.profiling_info.QUEUED, cl.profiling_info.SUBMIT,
               cl.profiling_info.START, cl.profiling_info.END]
@@ -83,7 +86,7 @@ class Profiler(Thread):
         start = time.time()
         for i in range(len(devices)):
             starts[devices[i]] = cl.enqueue_marker(unique_queues[i])
-        d_t = (time.time()-start)*q.s
+        d_t = (time.time() - start) * q.s
 
         cl.wait_for_events(starts.values())
 
@@ -183,22 +186,27 @@ COLORS = {
 
 
 class _Record(object):
+
     """A record in a profile file."""
+
     def __init__(self, *ARGS):
         for att, val in ARGS:
             setattr(self, att, val)
 
     def __str__(self):
-        return "Record("+str(self.__dict__)+")"
+        return "Record(" + str(self.__dict__) + ")"
 
 
 class _Event(object):
+
     """An OpenCL event representation."""
+
     def __str__(self):
-        return "Event("+str(self.__dict__)+")"
+        return "Event(" + str(self.__dict__) + ")"
 
 
 class ProfileReconstructor(object):
+
     """Profile reconstructor which handles the profiling file created by
     :py:class:`Profiler`.
     """
@@ -383,7 +391,7 @@ def plot(data, attribute, states, file_units, out_units, start_from=0,
             if start >= start_from and start <= stop_at and\
                     stop - start >= delta:
                 if not only_averages:
-                    events_infos.append((event.FUNC_NAME, stop-start,
+                    events_infos.append((event.FUNC_NAME, stop - start,
                                          start, stop, out_units))
                     if event.FUNC_NAME in func_colors:
                         # assign color to the functions
@@ -396,10 +404,10 @@ def plot(data, attribute, states, file_units, out_units, start_from=0,
                 if max_func_name < len(event.FUNC_NAME):
                     max_func_name = len(event.FUNC_NAME)
                 if event.FUNC_NAME in averages:
-                    averages[event.FUNC_NAME] += stop-start
+                    averages[event.FUNC_NAME] += stop - start
                     counts[event.FUNC_NAME] += 1
                 else:
-                    averages[event.FUNC_NAME] = stop-start
+                    averages[event.FUNC_NAME] = stop - start
                     counts[event.FUNC_NAME] = 1
 
     if not only_averages:
@@ -419,14 +427,14 @@ def plot(data, attribute, states, file_units, out_units, start_from=0,
     for f_name in averages:
         print "{0:>{1}}: called {2:5} times, average time {3:10.5f} {4}".\
             format(f_name, max_func_name, counts[f_name],
-                   float(averages[f_name])/counts[f_name], out_units.symbol)
+                   float(averages[f_name]) / counts[f_name], out_units.symbol)
     if not only_averages:
         print
         print "Legend:"
         for f_name in func_colors:
             print "{0:>{1}}: {2}".format(
                 f_name, max_func_name, COLORS[func_colors[f_name]])
-        plt.ylim(min(y_limits)-0.5, max(y_limits)+0.5)
+        plt.ylim(min(y_limits) - 0.5, max(y_limits) + 0.5)
         plt.xlabel(out_units.symbol)
         plt.ylabel(attribute)
         plt.show()

@@ -21,7 +21,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 class BoundingBox(object):
+
     """Class representing a graphical object's bounding box."""
+
     def __init__(self, points):
         """Create a bounding box from the object border *points*."""
         self._points = points
@@ -36,11 +38,13 @@ class BoundingBox(object):
     def get_projected_points(self, axis):
         """Get the points projection by releasing the specified *axis*."""
         if axis == X:
-            return np.array([x[1:] for x in self._points])*self._points.units
+            return np.array([x[1:] for x in self._points]) * self._points.units
         elif axis == Y:
-            return np.array([x[::2] for x in self._points])*self._points.units
+            return np.array([x[::2] for x in self._points]) * \
+                self._points.units
         elif axis == Z:
-            return np.array([x[:-1] for x in self._points])*self._points.units
+            return np.array([x[:-1] for x in self._points]) * \
+                self._points.units
 
     def get_min(self, axis=X):
         """Get minimum along the specified *axis*."""
@@ -77,7 +81,7 @@ class BoundingBox(object):
                                                        [z_min, z_max]))) *\
             x_min.units
         self._points_z_proj = np.array(
-            [x[:-1] for x in self._points])*self._points.units
+            [x[:-1] for x in self._points]) * self._points.units
 
     def __repr__(self):
         return "BoundingBox(%s)" % (str(self))
@@ -93,10 +97,12 @@ class BoundingBox(object):
 
 
 class Trajectory(object):
+
     """Class representing object's trajectory.
 
     Trajectory is a spline interpolated from a set of points.
     """
+
     def __init__(self, control_points, pixel_size):
         """Create trajectory with *control_points* as a list of (x,y,z)
         tuples representing control points of the curve (if only one is
@@ -117,7 +123,7 @@ class Trajectory(object):
         tck, vals = interpolate.splprep([points[0], points[1], points[2]], s=0)
         self._length = integrate.romberg(_length_curve_part,
                                          vals[0],
-                                         vals[len(vals)-1],
+                                         vals[len(vals) - 1],
                                          args=(tck,))
 
         # Compute points of the curve based on the curve length and
@@ -130,7 +136,7 @@ class Trajectory(object):
         # Assumes the distances are not larger then the diagonal.
         x_new, y_new, z_new = interpolate.splev(
             np.linspace(0, 1,
-                        self._length*(1.0/self._pixel_size) *
+                        self._length * (1.0 / self._pixel_size) *
                         np.sqrt(12)), tck)
         self._points = zip(x_new, y_new, z_new)
 
@@ -164,27 +170,17 @@ def _length_curve_part(param, tck):
     and the degree of the spline.
     """
     p_x, p_y, p_z = interpolate.splev(param, tck, der=1)
-    return np.sqrt(p_x**2 + p_y**2 + p_z**2)
+    return np.sqrt(p_x ** 2 + p_y ** 2 + p_z ** 2)
 
 
-def length(vec):
-    """Vector length.
-
-    @param vec: a vector
-    @return: vector length
-    """
-    sum_all = 0.0*vec.units**2
-    for elem in vec:
-        sum_all += elem**2
-
-    return np.sqrt(sum_all)
+def length(vector):
+    """Get length of a *vector*."""
+    return np.sqrt(np.sum(vector ** 2))
 
 
-def normalize(vec):
-    """Normalize a vector *vec*."""
-    if vec[0] == 0 and vec[1] == 0 and vec[2] == 0:
-        return vec
-    return np.array([x/float(length(vec)) for x in vec])*vec.units
+def normalize(vector):
+    """Normalize a *vector*."""
+    return vector.magnitude if length(vector) == 0 else vector / length(vector)
 
 
 def is_normalized(vec):
@@ -192,14 +188,14 @@ def is_normalized(vec):
 
     @param vec: a tuple
     """
-    return length(vec) == 1.0*vec.units
+    return length(vec) == 1.0 * vec.units
 
 
 def transform_vector(trans_matrix, vector):
     """Transform *vector* by the transformation matrix *trans_matrix* with
     dimensions (4,3) width x height.
     """
-    return np.dot(trans_matrix, np.append(vector, 1)*vector.units)[:-1]
+    return np.dot(trans_matrix, np.append(vector, 1) * vector.units)[:-1]
 
 
 def translate(vec):
@@ -221,9 +217,7 @@ def rotate(phi, axis, total_start=None):
     *total_start* is the center of rotation point which results in
     transformation TRT^-1. The transformation is in the backward form.
     """
-    if (not is_normalized(axis)):
-        axis = normalize(axis)
-    axis = axis.magnitude
+    axis = normalize(axis)
 
     phi = phi.rescale(q.rad)
     sin = np.sin(phi)
@@ -257,7 +251,7 @@ def scale(scale_vec):
     """Scale the object by scaling coefficients (kx, ky, kz)
     given by *sc_vec*. The transformation is in the backward form.
     """
-    if (scale_vec[0] == 0 or scale_vec[1] == 0 or scale_vec[2] == 0):
+    if (scale_vec[0] <= 0 or scale_vec[1] <= 0 or scale_vec[2] <= 0):
         raise ValueError("All components of the scaling " +
                          "must be greater than 0")
     trans_matrix = np.identity(4)
@@ -269,7 +263,8 @@ def scale(scale_vec):
 
     return trans_matrix
 
+
 def angle(vec_0, vec_1):
     """Angle between vectors *vec_0* and *vec_1*."""
-    return math.atan2(length(np.cross(vec_0, vec_1)*q.dimensionless),
-                          np.dot(vec_0, vec_1))*q.rad
+    return math.atan2(length(np.cross(vec_0, vec_1) * q.dimensionless),
+                      np.dot(vec_0, vec_1)) * q.rad
