@@ -11,9 +11,9 @@ import math
 X = 0
 Y = 1
 Z = 2
-X_AX = (1, 0, 0)
-Y_AX = (0, 1, 0)
-Z_AX = (0, 0, 1)
+X_AX = np.array([1, 0, 0])
+Y_AX = np.array([0, 1, 0])
+Z_AX = np.array([0, 0, 1])
 
 AXES = {X: X_AX, Y: Y_AX, Z: Z_AX}
 
@@ -173,7 +173,7 @@ def length(vec):
     @param vec: a vector
     @return: vector length
     """
-    sum_all = 0.0
+    sum_all = 0.0*vec.units**2
     for elem in vec:
         sum_all += elem**2
 
@@ -192,7 +192,7 @@ def is_normalized(vec):
 
     @param vec: a tuple
     """
-    return length(vec) == 1.0
+    return length(vec) == 1.0*vec.units
 
 
 def transform_vector(trans_matrix, vector):
@@ -223,6 +223,7 @@ def rotate(phi, axis, total_start=None):
     """
     if (not is_normalized(axis)):
         axis = normalize(axis)
+    axis = axis.magnitude
 
     phi = phi.rescale(q.rad)
     sin = np.sin(phi)
@@ -268,70 +269,7 @@ def scale(scale_vec):
 
     return trans_matrix
 
-
-def _simple_angle(vec_0, vec_1, ax_num):
-    """Angle between a coordinate axis and a vector."""
-    x_n = vec_0[X] == 0 and vec_1[X] == 0
-    y_n = vec_0[Y] == 0 and vec_1[Y] == 0
-    z_n = vec_0[Z] == 0 and vec_1[Z] == 0
-
-    if x_n and y_n or x_n and z_n or y_n and z_n:
-        return 0*q.rad
-
-    if np.cross(vec_0, vec_1)[ax_num] <= 0:
-        return (2*np.pi - math.atan2(length(np.cross(vec_0, vec_1)),
-                                     np.dot(vec_0, vec_1)))*q.rad
-    else:
-        return math.atan2(length(np.cross(vec_0, vec_1)),
-                          np.dot(vec_0, vec_1))*q.rad
-
-
-def _align_with_plane(vec_0, vec_1, rot_axis, axis):
-    """Put vectors *vec_0*, *vec_1* and *rot_axis* to a plane defined by
-    z-axis and *axis*."""
-    tmp = rot_axis[axis]
-    rot_axis[axis] = 0*rot_axis.units
-    # angle between axis and a projected axis of rotation and Z axis
-    phi = _simple_angle(Z_AX, rot_axis, axis)
-    rot_axis[axis] = tmp
-    # rotate around X to put into XZ plane (forward rotation)
-    trans_matrix = linalg.inv(rotate(-phi, AXES[axis]))
-    rot_axis = transform_vector(trans_matrix, rot_axis)
-    vec_0 = transform_vector(trans_matrix, vec_0)
-    vec_1 = transform_vector(trans_matrix, vec_0)
-
-    return normalize(vec_0), normalize(vec_1), list(normalize(rot_axis))
-
-
 def angle(vec_0, vec_1):
-    """
-    Angle between two vectors *vec_0* and *vec_1* in a left handed system.
-
-    Align rotation axis with Z-axis, transform the vectors accordingly,
-    determine the "up" vector by checking the transformed axis z-coordinate
-    and based on that determine the angle in the range <0,2pi)
-
-    Source:
-    http://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/
-    3drota.htm#Rotation about an Arbitrary Axis
-    """
-    vec_1 = vec_1.rescale(vec_0.units)
-    vec_0 = normalize(vec_0)
-    vec_1 = normalize(vec_1)
-
-    # axis of rotation
-    rot_ax = normalize(np.cross(vec_0, vec_1))*vec_0.units
-
-    # align with XZ
-    if rot_ax[X] != 0:
-        vec_0, vec_1, rot_ax = _align_with_plane(vec_0, vec_1, rot_ax, X)
-
-    # align with Z
-    if rot_ax[Y] != 0:
-        vec_0, vec_1, rot_ax = _align_with_plane(vec_0, vec_1, rot_ax, Y)
-
-    phi = _simple_angle(vec_0, vec_1, Z)
-
-    LOGGER.debug("Angle between %s, %s: %g deg." % (vec_0, vec_1, phi))
-
-    return phi
+    """Angle between vectors *vec_0* and *vec_1*."""
+    return math.atan2(length(np.cross(vec_0, vec_1)*q.dimensionless),
+                          np.dot(vec_0, vec_1))*q.rad
