@@ -2,7 +2,7 @@ import numpy as np
 import quantities as q
 from unittest import TestCase
 from syris import config as cfg
-from syris.sample.material import PMASFMaterial
+from syris.opticalelements.material import PMASFMaterial
 from testfixtures import ShouldRaise
 
 cfg.PMASF_FILE = "/home/farago/software/asf/pmasf"

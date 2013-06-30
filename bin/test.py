@@ -1,4 +1,3 @@
-import numpy as np
 import pyopencl as cl
 from syris import config as cfg
 from syris.gpu import util as gpu_util

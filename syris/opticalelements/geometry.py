@@ -315,7 +315,7 @@ def angle(vec_0, vec_1):
     http://www.siggraph.org/education/materials/HyperGraph/modeling/mod_tran/
     3drota.htm#Rotation about an Arbitrary Axis
     """
-    vec_1 = vec_1.rescale(vec_0)
+    vec_1 = vec_1.rescale(vec_0.units)
     vec_0 = normalize(vec_0)
     vec_1 = normalize(vec_1)
 

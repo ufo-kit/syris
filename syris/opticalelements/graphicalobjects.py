@@ -125,11 +125,11 @@ class GraphicalObject(object):
     def _set_movement_params(self):
         """Set movement parameters."""
         v_0 = self._v_0.rescale(q.m/q.s)
-        v_max = self._max_velocity.rescale(v_0)
+        v_max = self._max_velocity.rescale(v_0.units)
         dist = self._trajectory.length.rescale(q.m)
-        accel_dist = dist*self._accel_dist_ratio.rescale(dist)
-        decel_dist = dist*self._decel_dist_ratio.rescale(dist)
-        const_dist = dist-accel_dist-decel_dist.rescale(dist)
+        accel_dist = dist*self._accel_dist_ratio.rescale(dist.units)
+        decel_dist = dist*self._decel_dist_ratio.rescale(dist.units)
+        const_dist = dist-accel_dist-decel_dist.rescale(dist.units)
 
         if self._max_velocity <= 0 or self._trajectory.length == 0:
             self._acceleration = 0.0*q.m/q.s**2
@@ -171,7 +171,7 @@ class GraphicalObject(object):
         given by *abs_time*.
         """
         v_0 = self._v_0.rescale(q.m/q.s)
-        v_max = self._max_velocity.rescale(v_0)
+        v_max = self._max_velocity.rescale(v_0.units)
         acc_end = self._accel_end_time.rescale(q.s)
         decel_start = self._decel_start_time.rescale(q.s)
         total_time = self._total_time.rescale(q.s)

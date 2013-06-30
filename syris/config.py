@@ -102,4 +102,3 @@ def _init_logging(level, logger_file):
     file_handler.setLevel(level)
     file_handler.setFormatter(logging.Formatter(fmt))
     LOGGER.addHandler(file_handler)
-    LOGGER.debug("Log.")
