@@ -6,47 +6,67 @@ import pyopencl as cl
 import time
 from syris import profiling as prf
 from syris import config as cfg
+from syris.opticalelements import graphicalobjects as gro
 import logging
 import os
 
 
 LOGGER = logging.getLogger(__name__)
 
+_SINGLE_HEADER = """
+typedef float vfloat;
+typedef float2 vfloat2;
+typedef float3 vfloat3;
+typedef float4 vfloat4;
+typedef float8 vfloat8;
+typedef float16 vfloat16;
 
-SINGLE_HEADER = """
-        typedef float vfloat;
-        typedef float2 vfloat2;
-        typedef float3 vfloat3;
-        typedef float4 vfloat4;
-        typedef float8 vfloat8;
-        typedef float16 vfloat16;
+"""
 
-        """
+_DOUBLE_HEADER = """
+#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+typedef double vfloat;
+typedef double2 vfloat2;
+typedef double3 vfloat3;
+typedef double4 vfloat4;
+typedef double8 vfloat8;
+typedef double16 vfloat16;
 
-DOUBLE_HEADER = """
-        #pragma OPENCL EXTENSION cl_khr_fp64 : enable
-        typedef double vfloat;
-        typedef double2 vfloat2;
-        typedef double3 vfloat3;
-        typedef double4 vfloat4;
-        typedef double8 vfloat8;
-        typedef double16 vfloat16;
-
-        """
+"""
 
 
-def get_source(file_name, precision_sensitive=True):
-    """Get source from a file with *file_name* and apply single or double
-    precision parametrization if *precision_sensitive* is True.
+def get_source(file_names, precision_sensitive=True):
+    """Get source by concatenating files from *file_names* list and apply
+    single or double precision parametrization if *precision_sensitive*
+    is True.
     """
-    path = os.path.join(os.path.dirname(__file__), "opencl", file_name)
-    string = open(path, "r").read()
+    string = ""
+    for file_name in file_names:
+        path = os.path.join(os.path.dirname(__file__),
+                            cfg.KERNELS_FOLDER, file_name)
+        string += open(path, "r").read()
 
     if precision_sensitive:
-        if cfg.CL_FLOAT == 4:
-            string = SINGLE_HEADER + string
-        else:
-            string = DOUBLE_HEADER + string
+        header = _SINGLE_HEADER if cfg.single_precision() else _DOUBLE_HEADER
+        string = header + string
+
+    return string
+
+
+def get_metaobjects_source():
+    """Get source string for metaobjects creation."""
+    obj_types = _object_types_to_struct()
+    source = get_source(["metaballs.cl"])
+
+    return obj_types + source
+
+
+def _object_types_to_struct():
+    string = "typedef enum _OBJECT_TYPE {"
+    for i in range(len(gro.OBJECT_TYPES) - 1):
+        string += gro.OBJECT_TYPES[i] + ","
+    string += gro.OBJECT_TYPES[len(gro.OBJECT_TYPES) - 1]
+    string += "} OBJECT_TYPE;"
 
     return string
 

@@ -7,8 +7,11 @@ import quantities as q
 from syris import config as cfg
 from syris.opticalelements.geometry import BoundingBox
 import syris.opticalelements.geometry as geom
+import struct
 
 LOGGER = logging.getLogger(__name__)
+
+object_id = itertools.count().next
 
 
 class GraphicalObject(object):
@@ -16,13 +19,13 @@ class GraphicalObject(object):
     """Class representing an abstract graphical object."""
 
     def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
-                 max_velocity=None, accel_dist_ratio=0.0,
+                 v_max=None, accel_dist_ratio=0.0,
                  decel_dist_ratio=0.0):
         """Create a graphical object with a *trajectory*, where:
 
         * *orientation* - (x, y, z) vector specifying object's "up" vector
         * *v_0* - initial velocity
-        * *max_velocity* - maximum velocity to achieve during movement
+        * *v_max* - maximum velocity to achieve during movement
         * *accel_dist_ratio* - ratio between distance for which the object
             accelerates and total distance
         * *decel_dist_ratio* ratio between distance for which the object
@@ -32,14 +35,15 @@ class GraphicalObject(object):
         self._orientation = orientation
         self._center = trajectory.points[0]
 
-        # matrix holding transformation
+        # Matrix holding transformation.
         self._trans_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
 
-        # movement related attributes
-        self._max_velocity = cfg.NP_FLOAT(max_velocity)
+        # Movement related attributes.
+        self._v_max = cfg.NP_FLOAT(v_max)
         self._v_0 = v_0
 
-        # Last position as tuple consisting of a 3D point and a vector.
+        # Last position as tuple consisting of a 3D point and a vector giving
+        # the object orientation.
         self._last_position = None
 
         if accel_dist_ratio is not None and decel_dist_ratio is not None and\
@@ -106,9 +110,9 @@ class GraphicalObject(object):
         return self._v_0
 
     @property
-    def max_velocity(self):
+    def v_max(self):
         """Maximum achieved velocity."""
-        return self._max_velocity
+        return self._v_max
 
     @property
     def accel_dist_ratio(self):
@@ -127,13 +131,13 @@ class GraphicalObject(object):
     def _set_movement_params(self):
         """Set movement parameters."""
         v_0 = self._v_0.rescale(q.m / q.s)
-        v_max = self._max_velocity.rescale(v_0.units)
+        v_max = self._v_max.rescale(v_0.units)
         dist = self._trajectory.length.rescale(q.m)
         accel_dist = dist * self._accel_dist_ratio.rescale(dist.units)
         decel_dist = dist * self._decel_dist_ratio.rescale(dist.units)
         const_dist = dist - accel_dist - decel_dist.rescale(dist.units)
 
-        if self._max_velocity <= 0 or self._trajectory.length == 0:
+        if self._v_max <= 0 or self._trajectory.length == 0:
             self._acceleration = 0.0 * q.m / q.s ** 2
             self._deceleration = 0.0 * q.m / q.s ** 2
             self._accel_end_time = 0.0 * q.s
@@ -155,7 +159,7 @@ class GraphicalObject(object):
             total_time = accel_time + const_dist / v_max
         else:
             decel = (v_max ** 2 - v_0 ** 2) / (2 * decel_dist)
-            # t_d = t_a + t_mv (mv...max_velocity) (t = dist/v)
+            # t_d = t_a + t_mv (mv...v_max) (t = dist/v)
             # t_d = t_a + dist/v = t_a + dist*(1-ar-dr)/mv
             decel_time = accel_time + const_dist / v_max
 
@@ -173,7 +177,7 @@ class GraphicalObject(object):
         given by *abs_time*.
         """
         v_0 = self._v_0.rescale(q.m / q.s)
-        v_max = self._max_velocity.rescale(v_0.units)
+        v_max = self._v_max.rescale(v_0.units)
         acc_end = self._accel_end_time.rescale(q.s)
         decel_start = self._decel_start_time.rescale(q.s)
         total_time = self._total_time.rescale(q.s)
@@ -197,7 +201,7 @@ class GraphicalObject(object):
                 # no deceleration
                 return self._v_0 * self._accel_end_time +\
                     (self._acceleration * self._accel_end_time ** 2) / 2.0 +\
-                    self._max_velocity * (abs_time - self._accel_end_time)
+                    self._v_max * (abs_time - self._accel_end_time)
 
     def get_trajectory_index(self, abs_time):
         """Get index into trajectory points at a specified time *abs_time*."""
@@ -255,18 +259,132 @@ class GraphicalObject(object):
         self._trans_matrix = np.dot(geom.scale(scale_vec), self._trans_matrix)
 
 
+class MetaObject(GraphicalObject):
+
+    """"Metaball-like graphical object. Metaballs are smooth blobs formed
+    by summing density functions representing particular objects."""
+
+    # Object type.
+    TYPE = None
+
+    def __init__(self, trajectory, radius, blobbiness=None,
+                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s, v_max=None,
+                 accel_dist_ratio=0.0, decel_dist_ratio=0.0):
+        """Create a metaobject with *radius* and *blobbiness* defining the
+        distance after the object's radius until which it influences the
+        scene.
+        """
+        super(MetaObject, self).__init__(trajectory, orientation, v_0,
+                                         v_max, accel_dist_ratio,
+                                         decel_dist_ratio)
+        if radius <= 0:
+            raise ValueError("Blobbiness must be greater than zero.")
+        if blobbiness is None:
+            self._blobbiness = radius
+        elif blobbiness <= 0:
+            raise ValueError("Blobbiness must be greater than zero.")
+
+        self._radius = radius
+        self._blobbiness = blobbiness
+
+    def radius(self):
+        return self._radius
+
+    def blobbiness(self):
+        """Influence region behind the radius of the object."""
+        return self._blobbiness
+
+    def get_transform_const(self):
+        """Precompute the transformation constant which does not change for
+        x,y position."""
+        a_x = self._trans_matrix[0][2]
+        a_y = self._trans_matrix[1][2]
+        a_z = self._trans_matrix[2][2]
+        return a_x ** 2 + a_y ** 2 + a_z ** 2
+
+    def pack(self):
+        """Pack the object into a structure suitable for OpenCL kernels."""
+
+        fmt = get_format_string("iffff" + 16 * "f")
+        return struct.pack(fmt, self.TYPE, self.radius, self.blobbiness,
+                           self.get_transform_const(),
+                           self.get_falloff_const(),
+                           tuple(self._trans_matrix.flatten()))
+
+
+class MetaBall(MetaObject):
+
+    """Metaball graphical object."""
+    TYPE = object_id()
+
+    def __init__(self, trajectory, radius, blobbiness=None,
+                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s, v_max=None,
+                 accel_dist_ratio=0.0, decel_dist_ratio=0.0):
+        super(MetaBall, self).__init__(trajectory, radius, blobbiness,
+                                       orientation, v_0, v_max,
+                                       accel_dist_ratio, decel_dist_ratio)
+
+    def get_falloff_const(self):
+        """Precompute mataball falloff curve constant which are the same
+        for all the x,y coordinates. It ensures that f(x) = 1 <=> x = r."""
+        influence = float(self._blobbiness + self._radius[0])
+        transformation_const = self.get_transform_const()
+
+        a_x = self._trans_matrix[0][2]
+        a_y = self._trans_matrix[1][2]
+        a_z = self._trans_matrix[2][2]
+        # Calculate the 1/(influence^2 - r^2)^2 coefficient.
+        center_x = self._center[0]
+        center_y = self._center[1]
+        k_x = self._trans_matrix[0][0] * center_x + \
+            self._trans_matrix[0][1] * center_y + self._trans_matrix[0][3]
+        k_y = self._trans_matrix[1][0] * center_x + \
+            self._trans_matrix[1][1] * center_y + self._trans_matrix[1][3]
+        k_z = self._trans_matrix[2][0] * center_x + \
+            self._trans_matrix[2][1] * center_y + self._trans_matrix[2][3]
+
+        roots = np.roots([transformation_const,
+                          2 * k_x * a_x + 2 * k_y * a_y + 2 * k_z * a_z,
+                          k_x * k_x + k_y * k_y + k_z * k_z - influence ** 2])
+        influence_0 = (roots[1] - roots[0]) / 2
+        roots = np.roots([transformation_const,
+                          2 * k_x * a_x + 2 * k_y * a_y + 2 * k_z * a_z,
+                          k_x * k_x + k_y * k_y + k_z * k_z -
+                          self.radius ** 2])
+        r_0 = (roots[1] - roots[0]) / 2
+
+        return 1.0 / (influence_0 ** 2 - r_0 ** 2) ** 2
+
+
+class MetaCube(MetaObject):
+
+    """Metacube graphical object."""
+    TYPE = object_id()
+
+    def __init__(self, trajectory, radius, blobbiness=None,
+                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s, v_max=None,
+                 accel_dist_ratio=0.0, decel_dist_ratio=0.0):
+        super(MetaCube, self).__init__(trajectory, radius, blobbiness,
+                                       orientation, v_0, v_max,
+                                       accel_dist_ratio, decel_dist_ratio)
+
+    def get_falloff_const(self):
+        """There is no falloff constant for metacubes."""
+        return 0 * self.radius.units
+
+
 class CompositeObject(GraphicalObject):
 
     """Class representing an object consisting of more sub-objects."""
 
     def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
-                 max_velocity=None, accel_dist_ratio=0.0,
+                 v_max=None, accel_dist_ratio=0.0,
                  decel_dist_ratio=0.0, gr_objects=[]):
         """*gr_objects* are the graphical objects which is this object
         composed of.
         """
         super(CompositeObject, self).__init__(self, trajectory, orientation,
-                                              v_0, max_velocity,
+                                              v_0, v_max,
                                               accel_dist_ratio,
                                               decel_dist_ratio)
         self._objects = gr_objects
@@ -431,3 +549,13 @@ class CompositeObject(GraphicalObject):
     def __str__(self):
         return "center=" + repr(self._center) +\
             ", subobjects=" + repr(len(self._objects))
+
+OBJECT_TYPES = {MetaCube.TYPE: "METACUBE",
+                MetaBall.TYPE: "METABALL"}
+
+
+def get_format_string(string):
+    """Get string in single or double precision floating point number
+    format."""
+    float_string = "f" if cfg.single_precision() else "d"
+    return string.replace("vf", float_string)

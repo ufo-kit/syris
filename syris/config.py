@@ -21,10 +21,20 @@ CL_CPLX = 8
 # Refractive index calculation program path.
 PMASF_FILE = "pmasf"
 
+# OpenCL kernels folder
+KERNELS_FOLDER = "opencl"
+
 # Available for customization.
 PARSER = OptionParser()
 
 _INITIALIZED = False
+
+
+def single_precision():
+    """Return True if single precision is set for floating point numbers."""
+    global CL_FLOAT
+
+    return CL_FLOAT == 4
 
 
 def init(queues=None):
@@ -36,7 +46,7 @@ def init(queues=None):
         raise RuntimeError("Already initialized.")
     _INITIALIZED = True
 
-    PARSER.add_option("-d", "--double", dest="double", action="store_true",
+    PARSER.add_option("--double", dest="double", action="store_true",
                       default=False,
                       help="Use double precision", metavar="DOUBLE")
     PARSER.add_option("-l", "--log", dest="logging_level",
