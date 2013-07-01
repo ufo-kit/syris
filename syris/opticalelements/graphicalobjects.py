@@ -19,7 +19,7 @@ class GraphicalObject(object):
     """Class representing an abstract graphical object."""
 
     def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
-                 v_max=None, accel_dist_ratio=0.0,
+                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
                  decel_dist_ratio=0.0):
         """Create a graphical object with a *trajectory*, where:
 
@@ -39,7 +39,10 @@ class GraphicalObject(object):
         self._trans_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
 
         # Movement related attributes.
-        self._v_max = cfg.NP_FLOAT(v_max)
+        if v_max < v_0:
+            raise ValueError("Maximum velocity must be greater than the " +
+                             "initial velocity.")
+        self._v_max = v_max
         self._v_0 = v_0
 
         # Last position as tuple consisting of a 3D point and a vector giving
@@ -133,8 +136,8 @@ class GraphicalObject(object):
         v_0 = self._v_0.rescale(q.m / q.s)
         v_max = self._v_max.rescale(v_0.units)
         dist = self._trajectory.length.rescale(q.m)
-        accel_dist = dist * self._accel_dist_ratio.rescale(dist.units)
-        decel_dist = dist * self._decel_dist_ratio.rescale(dist.units)
+        accel_dist = dist * self._accel_dist_ratio
+        decel_dist = dist * self._decel_dist_ratio
         const_dist = dist - accel_dist - decel_dist.rescale(dist.units)
 
         if self._v_max <= 0 or self._trajectory.length == 0:
@@ -198,7 +201,7 @@ class GraphicalObject(object):
                     0.5 * decel * (2 * total_time * (abs_time - decel_start) +
                                    decel_start ** 2 - abs_time ** 2)
             else:
-                # no deceleration
+                # No deceleration.
                 return self._v_0 * self._accel_end_time +\
                     (self._acceleration * self._accel_end_time ** 2) / 2.0 +\
                     self._v_max * (abs_time - self._accel_end_time)
@@ -250,7 +253,8 @@ class GraphicalObject(object):
         *total_start* is the center of rotation point which results in
         transformation TRT^-1.
         """
-        self._trans_matrix = np.dot(geom.rotate(angle, axis, total_start))
+        self._trans_matrix = np.dot(geom.rotate(angle, axis, total_start),
+                                    self._trans_matrix)
 
     def scale(self, scale_vec):
         """Scale the object by scaling coefficients (kx, ky, kz)
@@ -268,8 +272,9 @@ class MetaObject(GraphicalObject):
     TYPE = None
 
     def __init__(self, trajectory, radius, blobbiness=None,
-                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s, v_max=None,
-                 accel_dist_ratio=0.0, decel_dist_ratio=0.0):
+                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
+                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
+                 decel_dist_ratio=0.0):
         """Create a metaobject with *radius* and *blobbiness* defining the
         distance after the object's radius until which it influences the
         scene.
@@ -318,8 +323,9 @@ class MetaBall(MetaObject):
     TYPE = object_id()
 
     def __init__(self, trajectory, radius, blobbiness=None,
-                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s, v_max=None,
-                 accel_dist_ratio=0.0, decel_dist_ratio=0.0):
+                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
+                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
+                 decel_dist_ratio=0.0):
         super(MetaBall, self).__init__(trajectory, radius, blobbiness,
                                        orientation, v_0, v_max,
                                        accel_dist_ratio, decel_dist_ratio)
@@ -362,8 +368,9 @@ class MetaCube(MetaObject):
     TYPE = object_id()
 
     def __init__(self, trajectory, radius, blobbiness=None,
-                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s, v_max=None,
-                 accel_dist_ratio=0.0, decel_dist_ratio=0.0):
+                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
+                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
+                 decel_dist_ratio=0.0):
         super(MetaCube, self).__init__(trajectory, radius, blobbiness,
                                        orientation, v_0, v_max,
                                        accel_dist_ratio, decel_dist_ratio)
@@ -378,7 +385,7 @@ class CompositeObject(GraphicalObject):
     """Class representing an object consisting of more sub-objects."""
 
     def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
-                 v_max=None, accel_dist_ratio=0.0,
+                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
                  decel_dist_ratio=0.0, gr_objects=[]):
         """*gr_objects* are the graphical objects which is this object
         composed of.

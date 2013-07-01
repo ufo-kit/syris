@@ -1,4 +1,15 @@
-"""Geometry operations."""
+"""Geometry operations.
+
+All the transformation operations are in the backward form, which means if
+the order of operations is:
+A = trans_1
+B = trans_2
+C = trams_3,
+then in the forward form of the resulting transformation matrix would be
+T = ABC yielding x' = ABCx = Tx. Backward form means that we calculate
+the matrix in the form T^{-1} = C^{-1}B^{-1}A^{-1} = (ABC)^{-1}. Thus, we can
+easily obtain x = T^{-1}x'.
+"""
 import numpy as np
 from numpy import linalg
 import quantities as q
@@ -111,10 +122,10 @@ class Trajectory(object):
         pixel size.
         """
         self._control_points = control_points
-        self._pixel_size = pixel_size
+        self._pixel_size = pixel_size.rescale(self._control_points.units)
         if len(control_points) == 1:
             # the object does not move
-            self._length = 0
+            self._length = 0 * self._control_points.units
             self._points = control_points
             return
 
@@ -122,9 +133,9 @@ class Trajectory(object):
 
         tck, vals = interpolate.splprep([points[0], points[1], points[2]], s=0)
         self._length = integrate.romberg(_length_curve_part,
-                                         vals[0],
-                                         vals[len(vals) - 1],
-                                         args=(tck,))
+                                         vals[0], vals[len(vals) - 1],
+                                         args=(tck,)) * \
+            self._control_points.units
 
         # Compute points of the curve based on the curve length and
         # the smallest pixel size from x,y,z pixel sizes.
@@ -138,7 +149,7 @@ class Trajectory(object):
             np.linspace(0, 1,
                         self._length * (1.0 / self._pixel_size) *
                         np.sqrt(12)), tck)
-        self._points = zip(x_new, y_new, z_new)
+        self._points = zip(x_new, y_new, z_new) * self._control_points.units
 
     @property
     def control_points(self):
