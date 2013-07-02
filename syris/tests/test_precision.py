@@ -21,7 +21,7 @@ class TestPrecision(unittest.TestCase):
         return mem, ar
 
     def _execute_and_check(self):
-        prg = cl.Program(ctx, gpu_util.get_source(self.kernel_fn)).build()
+        prg = cl.Program(ctx, gpu_util.get_source([self.kernel_fn])).build()
         mem, ar = self._create_mem_objs(ctx, self.n)
         prg.float_test(queue,
                        (self.n,),

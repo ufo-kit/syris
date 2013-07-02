@@ -17,6 +17,7 @@ from scipy import interpolate, integrate
 import itertools
 import logging
 import math
+import time
 
 # Constants.
 X = 0
@@ -114,66 +115,73 @@ class Trajectory(object):
     Trajectory is a spline interpolated from a set of points.
     """
 
-    def __init__(self, control_points, pixel_size, velocities=None):
-        """Create trajectory with *control_points* as a list of (x,y,z)
-        tuples representing control points of the curve (if only one is
-        specified, the object does not move and its center is the control
-        point specified). *pixel_size* is the minimum of the x, y, z
-        pixel size. *velocities* is a list of (time, velocity) tuples, where
-        the first component specifies after how much time will be the
-        trajectory at the given velocity.
+    def __init__(self, points, traj_length, dist_velocities=None,
+                 v_0=0 * q.m / q.s):
+        """Create trajectory from given *points* which represent (x,y,z)
+        coordinates, *length* is the trajectory length, *dist_velocities*
+        is a list of (time, velocity) tuples, where the first component
+        specifies the relative distance in which the object following
+        the trajectory will achieve the given velocity. *v_0* is the initial
+        velocity.
         """
-        self._control_points = control_points
-        self._pixel_size = pixel_size.rescale(self._control_points.units)
-        self._velocities = velocities
-        self._time = np.sum([pair[0] for pair in self._parts]) *\
-            self._parts[0][0].units
-        if len(control_points) == 1:
-            # the object does not move
-            self._length = 0 * self._control_points.units
-            self._points = control_points
-            return
+        self._points = points
+        self._length = traj_length
 
-        points = zip(*control_points)
+        self._v_0 = v_0
+        self._dist_velos = dist_velocities
+        if self._dist_velos is not None:
+            self._length = self._length.rescale(self._dist_velos[0][0].units)
+            self._points.rescale(self._dist_velos[0][0].units)
+            self._v_0 = self._v_0.rescale(self._dist_velos[0][1].units)
+            sum_dists = np.sum(zip(*self._dist_velos)[0]) * self._length.units
+            if sum_dists < self.length:
+                # Speeds and distances specification ends before the end of
+                # the trajectory. Add constant movement until the end.
+                self._dist_velos.append((self._length - sum_dists,
+                                         self._dist_velos[-1][1]))
+            self._time_velos = self._distance_to_time()
+            self._time = np.sum([time_velo[0] for
+                                 time_velo in self._time_velos]) *\
+                self._time_velos[0][0].units
+        else:
+            self._time_velos = None
+            self._time = 0 * q.s
 
-        tck, vals = interpolate.splprep([points[0], points[1], points[2]], s=0)
-        self._length = integrate.romberg(_length_curve_part,
-                                         vals[0], vals[len(vals) - 1],
-                                         args=(tck,)) * \
-            self._control_points.units
-
-        # Compute points of the curve based on the curve length and
-        # the smallest pixel size from x,y,z pixel sizes.
-        # sqrt(12) factor to make sure the length of a step is < 1 voxel
-        # the worst case is that two values are in the two most distanced
-        # ends of two voxels, vx_1 - 0.5 in all directions and vx_2 - 0.5
-        # in all directions (x,y,z), the distance between two such points is
-        # then sqrt(12) which is twice the voxel's diagonal.
-        # Assumes the distances are not larger then the diagonal.
-        x_new, y_new, z_new = interpolate.splev(
-            np.linspace(0, 1,
-                        self._length * (1.0 / self._pixel_size) *
-                        np.sqrt(12)), tck)
-        self._points = zip(x_new, y_new, z_new) * self._control_points.units
+    def _get_point_index(self, abs_time):
+        """Get index of a point in the points list at the time *abs_time*."""
+        dist = self.get_distance(abs_time)
+        return int(round(dist / self.length * (len(self.points) - 1)))
 
     def get_point(self, abs_time):
-        """Get point of the trajectory at the time *abs_time*."""
-        dist = self.get_distance(abs_time)
-        index = int(round(dist / self.length * (len(self.points) - 1)))
+        """Get a point on the trajectory at the time *abs_time*."""
+        return self.points[self._get_point_index(abs_time)]
 
-        return self.points[index]
+    def get_direction(self, abs_time):
+        """Get direction of the trajectory at the time *abs_time*. If p_0
+        is the point at which the trajectory resides at *abs_time* and p_1
+        is the point right after p_0, then the direction is defined as
+        vector p_1 - p_0.
+        """
+        index = self._get_point_index(abs_time)
+        if index == len(self.points) - 1:
+            # If we are at the end of the trajectory we use the same direction
+            # as for the previous point.
+            index -= 1
+
+        return normalize(self.points[index + 1] - self.points[index])
 
     def get_distance(self, abs_time):
         """Get distance from the beginning of the trajectory to the time
         given by *abs_time*.
         """
-        abs_time = abs_time.rescale(self.time.units)
+        if self._dist_velos is None:
+            return 0 * q.m
         total_time = 0 * abs_time.units
-        distance = 0 * self.length.units
+        distance = 0 * self._dist_velos[0][0].units
 
-        for i in range(len(self._velocities)):
-            t_1, v_1 = self._velocities[i]
-            v_0 = self._v_0 if i == 0 else self._velocities[i - 1][1]
+        for i in range(len(self._time_velos)):
+            t_1, v_1 = self._time_velos[i]
+            v_0 = self._v_0 if i == 0 else self._time_velos[i - 1][1]
             total_time += t_1
             t_x = t_1 if abs_time >= total_time else abs_time - \
                 total_time + t_1
@@ -183,10 +191,17 @@ class Trajectory(object):
 
         return distance
 
-    @property
-    def control_points(self):
-        """Control points used for spline creation."""
-        return self._control_points
+    def _distance_to_time(self):
+        """Convert (distance, velocity) pairs to (time, velocity) pairs."""
+        velocities = []
+
+        for i in range(len(self._dist_velos)):
+            s_1, v_1 = self._dist_velos[i]
+            v_0 = self._v_0 if i == 0 else self._dist_velos[i - 1][1]
+            t_1 = _get_time(s_1, v_0, v_1)
+            velocities.append((t_1, v_1))
+
+        return velocities
 
     @property
     def pixel_size(self):
@@ -209,6 +224,46 @@ class Trajectory(object):
         return self._time
 
 
+def interpolate_points(control_points, pixel_size):
+    """Create points by interpolating the *control_points*. Thanks to given
+    *pixel_size* the resulting sampling has sub-voxel precision. Return
+    a tuple (points, length), where length is the length of the created
+    trajectory.
+    """
+    if len(control_points) == 1:
+        return control_points, 0 * q.m
+
+    points = zip(*control_points)
+
+    tck, vals = interpolate.splprep([points[0], points[1], points[2]], s=0)
+    p_length = integrate.romberg(_length_curve_part,
+                                 vals[0], vals[len(vals) - 1],
+                                 args=(tck,)) * control_points.units
+
+    # Compute points of the curve based on the curve length and pixel size.
+    # sqrt(12) factor to make sure the length of a step is < 1 voxel
+    # the worst case is that two values are in the two most distanced
+    # ends of two voxels, vx_1 - 0.5 in all directions and vx_2 - 0.5
+    # in all directions (x,y,z), the distance between two such points is
+    # then sqrt(12) which is twice the voxel's diagonal.
+    # Assumes the distances are not larger then the diagonal.
+    size = p_length / pixel_size * np.sqrt(12)
+    x_new, y_new, z_new = interpolate.splev(
+        np.linspace(0, 1, size.simplified), tck)
+
+    return zip(x_new, y_new, z_new) * control_points.units, p_length
+
+
+def _get_time(dist, v_0, v_1):
+    """Get time needed for traveling distance *dist* with initial velocity
+    *v_0* and ending velocity *v_1*.
+    """
+    if v_0 == v_1:
+        return dist / v_0
+    else:
+        return 2 * dist / (v_0 + v_1)
+
+
 def _get_distance(t_x, t_1, v_0, v_1):
     """Get distance at time *t_x* in a window taking *t_1* time with starting
     velocity *v_0* and ending with velocity *v_1*.
@@ -217,13 +272,9 @@ def _get_distance(t_x, t_1, v_0, v_1):
         # Constant velocity.
         return v_0 * t_x
     else:
-        accel = abs(v_1 - v_0) / t_1
-        if v_1 > v_0:
-            # Acceleration.
-            return v_0 * t_x + 0.5 * accel * t_x ** 2
-        else:
-            # Deceleration.
-            return v_1 * t_x + accel * t_x * (t_1 - 0.5 * t_x)
+        accel = (v_1 - v_0) / t_1
+        # Acceleration if accel > 0, otherwise deceleration.
+        return v_0 * t_x + 0.5 * accel * t_x ** 2
 
 
 def _length_curve_part(param, tck):

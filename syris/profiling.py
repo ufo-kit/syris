@@ -189,8 +189,8 @@ class _Record(object):
 
     """A record in a profile file."""
 
-    def __init__(self, *ARGS):
-        for att, val in ARGS:
+    def __init__(self, *args):
+        for att, val in args:
             setattr(self, att, val)
 
     def __str__(self):
@@ -265,9 +265,9 @@ class ProfileReconstructor(object):
                 match.group(ProfileReconstructor.attributes[4]),
                 int(match.group(ProfileReconstructor.attributes[5]))
                 ]
-        ARGS = zip(ProfileReconstructor.attributes, vals)
+        args = zip(ProfileReconstructor.attributes, vals)
 
-        return _Record(*ARGS)
+        return _Record(*args)
 
     def _process_header(self, file_obj):
         """Get the header information."""

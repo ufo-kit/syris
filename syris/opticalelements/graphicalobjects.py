@@ -3,7 +3,6 @@ import itertools
 import logging
 import numpy as np
 from numpy import linalg
-import quantities as q
 from syris import config as cfg
 from syris.opticalelements.geometry import BoundingBox
 import syris.opticalelements.geometry as geom
@@ -11,7 +10,7 @@ import struct
 
 LOGGER = logging.getLogger(__name__)
 
-object_id = itertools.count().next
+OBJECT_ID = itertools.count().next
 
 
 class GraphicalObject(object):
@@ -69,20 +68,22 @@ class GraphicalObject(object):
     def trajectory(self):
         return self._trajectory
 
+    def apply_transformation(self, trans_matrix):
+        """Apply transformation given by the transformation matrix
+        *trans_matrix* on the current transformation matrix.
+        """
+        self._trans_matrix = np.dot(trans_matrix, self._trans_matrix)
+
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
-        index = self.get_trajectory_index(abs_time)
-        p_0 = self._trajectory.points[index]
+        p_0 = self.trajectory.get_point(abs_time)
+        vec = self.trajectory.get_direction(abs_time)
 
-        if index + 1 >= len(self.trajectory.points):
-            # end of trajectory, use the same inclination as in the position
-            # before
-            vec = geom.normalize(p_0 - self._trajectory.points[index - 1])
-        else:
-            vec = geom.normalize(self._trajectory.points[index + 1] - p_0)
-
+        # First translate to the point at time abs_time
         self.translate((p_0[0], p_0[1], p_0[2], 1))
 
+        # Then rotate about rotation axis given by trajectory direction
+        # and object orientation.
         rot_ax = geom.normalize(np.cross(self._orientation, vec))
         angle = geom.angle(self._orientation, vec)
         self.rotate(angle, rot_ax)
@@ -159,7 +160,7 @@ class MetaObject(GraphicalObject):
 class MetaBall(MetaObject):
 
     """Metaball graphical object."""
-    TYPE = object_id()
+    TYPE = OBJECT_ID()
 
     def __init__(self, trajectory, radius, blobbiness=None,
                  orientation=geom.Y_AX):
@@ -201,7 +202,7 @@ class MetaBall(MetaObject):
 class MetaCube(MetaObject):
 
     """Metacube graphical object."""
-    TYPE = object_id()
+    TYPE = OBJECT_ID()
 
     def __init__(self, trajectory, radius, blobbiness=None,
                  orientation=geom.Y_AX):
@@ -344,38 +345,22 @@ class CompositeObject(GraphicalObject):
 
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
-        index = self.get_trajectory_index(abs_time)
-        p_0 = self._trajectory.points[index]
-
-        if index + 1 >= len(self.trajectory.points):
-            # end of trajectory, use the same inclination as in the position
-            # before
-            vec = geom.normalize(p_0 - self._trajectory.points[index - 1])
-        else:
-            vec = geom.normalize(self._trajectory.points[index + 1] - p_0)
-
-        GraphicalObject.translate(self, (p_0[0], p_0[1], p_0[2], 1))
-
-        rot_ax = geom.normalize(np.cross(self._orientation, vec))
-        angle = -geom.angle(self._orientation, vec)
-        GraphicalObject.rotate(self, angle, rot_ax)
-        for obj in self:
-            m_diff = obj.center - self._center
-            obj.translate((p_0[0], p_0[1], p_0[2], 1))
-            obj.rotate(angle, rot_ax)
-            obj.translate(m_diff)
-
-        self._last_position = p_0, vec
-
-        return True
+        # First adjust the tranformation matrix.
+        GraphicalObject.move(self, abs_time)
+        for gr_object in self:
+            # Then apply the transformation matrix on the sub-objects and
+            # move also them according to their relative trajectories.
+            gr_object.apply_transformation(self.transformation_matrix)
+            gr_object.move(abs_time)
 
     def pack(self):
         """Pack all the sub-objects into a structure suitable for GPU
         calculation.
         """
         string = ""
-        for obj in self._objects:
-            string += obj.pack()
+        for gr_object in self._objects:
+            string += gr_object.pack()
+
         return string
 
     def __repr__(self):

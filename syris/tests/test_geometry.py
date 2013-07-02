@@ -5,6 +5,7 @@ from syris.opticalelements import geometry as geom
 from unittest import TestCase
 import itertools
 from testfixtures.shouldraise import ShouldRaise
+from opticalelements.geometry import Trajectory
 
 
 def get_base():
@@ -26,7 +27,50 @@ def get_vec_0():
     return np.array([1.75, -3.89, 4.7]) * q.m
 
 
+def get_control_points():
+    return np.array([(0, 0, 0),
+                     (1, 0, 0),
+                     (1, 1, 0),
+                     (0, 0, 1),
+                     (1, 1, 1)]) * q.mm
+
+
+def init_trajectory(c_points=None, kwargs={}):
+    if c_points is None:
+        c_points = get_control_points()
+    points, t_length = geom.interpolate_points(c_points, 1 * q.um)
+
+    return Trajectory(points, t_length, **kwargs)
+
+
 class Test(TestCase):
+
+    def test_trajectory_interpolation(self):
+        c_points = np.array([(0, 0, 0)]) * q.mm
+        points, length = geom.interpolate_points(c_points, 1 * q.um)
+        self.assertEqual(len(points), 1)
+        self.assertEqual(length, 0)
+
+        c_points = get_control_points()
+        points, length = geom.interpolate_points(c_points, 1 * q.um)
+        self.assertGreater(len(points), 1)
+        self.assertNotEqual(length, 0)
+
+    def test_static_trajectory(self):
+        c_points = np.array([(0, 0, 0)]) * q.mm
+        traj = init_trajectory(c_points)
+        self.assertEqual(traj.length, 0)
+        self.assertEqual(traj.time, 0)
+        self.assertEqual(traj.get_distance(10 * q.s), 0)
+
+    def test_trajectory(self):
+        dist_velos = [(1 * q.mm, 10 * q.mm / q.s), (3 * q.mm, 2 * q.mm / q.s)]
+        traj = init_trajectory(kwargs={"dist_velocities": dist_velos})
+        self.assertGreater(traj.length, 0)
+        self.assertNotEqual(traj.time, 0)
+        self.assertAlmostEqual(traj.length, traj.get_distance(traj.time))
+        self.assertAlmostEqual(
+            traj.length, traj.get_distance(traj.time + 1 * q.s))
 
     def test_zero_angle(self):
         zero_vec = np.zeros(3) * q.m
