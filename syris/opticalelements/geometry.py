@@ -114,15 +114,20 @@ class Trajectory(object):
     Trajectory is a spline interpolated from a set of points.
     """
 
-    def __init__(self, control_points, pixel_size):
+    def __init__(self, control_points, pixel_size, velocities=None):
         """Create trajectory with *control_points* as a list of (x,y,z)
         tuples representing control points of the curve (if only one is
         specified, the object does not move and its center is the control
         point specified). *pixel_size* is the minimum of the x, y, z
-        pixel size.
+        pixel size. *velocities* is a list of (time, velocity) tuples, where
+        the first component specifies after how much time will be the
+        trajectory at the given velocity.
         """
         self._control_points = control_points
         self._pixel_size = pixel_size.rescale(self._control_points.units)
+        self._velocities = velocities
+        self._time = np.sum([pair[0] for pair in self._parts]) *\
+            self._parts[0][0].units
         if len(control_points) == 1:
             # the object does not move
             self._length = 0 * self._control_points.units
@@ -151,6 +156,33 @@ class Trajectory(object):
                         np.sqrt(12)), tck)
         self._points = zip(x_new, y_new, z_new) * self._control_points.units
 
+    def get_point(self, abs_time):
+        """Get point of the trajectory at the time *abs_time*."""
+        dist = self.get_distance(abs_time)
+        index = int(round(dist / self.length * (len(self.points) - 1)))
+
+        return self.points[index]
+
+    def get_distance(self, abs_time):
+        """Get distance from the beginning of the trajectory to the time
+        given by *abs_time*.
+        """
+        abs_time = abs_time.rescale(self.time.units)
+        total_time = 0 * abs_time.units
+        distance = 0 * self.length.units
+
+        for i in range(len(self._velocities)):
+            t_1, v_1 = self._velocities[i]
+            v_0 = self._v_0 if i == 0 else self._velocities[i - 1][1]
+            total_time += t_1
+            t_x = t_1 if abs_time >= total_time else abs_time - \
+                total_time + t_1
+            distance += _get_distance(t_x, t_1, v_0, v_1)
+            if total_time >= abs_time:
+                break
+
+        return distance
+
     @property
     def control_points(self):
         """Control points used for spline creation."""
@@ -170,6 +202,28 @@ class Trajectory(object):
     def length(self):
         """Trajectory length."""
         return self._length
+
+    @property
+    def time(self):
+        """Total time needed to travel the whole trajectory."""
+        return self._time
+
+
+def _get_distance(t_x, t_1, v_0, v_1):
+    """Get distance at time *t_x* in a window taking *t_1* time with starting
+    velocity *v_0* and ending with velocity *v_1*.
+    """
+    if v_0 == v_1:
+        # Constant velocity.
+        return v_0 * t_x
+    else:
+        accel = abs(v_1 - v_0) / t_1
+        if v_1 > v_0:
+            # Acceleration.
+            return v_0 * t_x + 0.5 * accel * t_x ** 2
+        else:
+            # Deceleration.
+            return v_1 * t_x + accel * t_x * (t_1 - 0.5 * t_x)
 
 
 def _length_curve_part(param, tck):

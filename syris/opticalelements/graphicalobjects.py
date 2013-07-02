@@ -18,18 +18,9 @@ class GraphicalObject(object):
 
     """Class representing an abstract graphical object."""
 
-    def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
-                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
-                 decel_dist_ratio=0.0):
-        """Create a graphical object with a *trajectory*, where:
-
-        * *orientation* - (x, y, z) vector specifying object's "up" vector
-        * *v_0* - initial velocity
-        * *v_max* - maximum velocity to achieve during movement
-        * *accel_dist_ratio* - ratio between distance for which the object
-            accelerates and total distance
-        * *decel_dist_ratio* ratio between distance for which the object
-            decelerates and total distance
+    def __init__(self, trajectory, orientation=geom.Y_AX):
+        """Create a graphical object with a *trajectory* and *orientation*,
+        which is an (x, y, z) vector specifying object's "up" vector
         """
         self._trajectory = trajectory
         self._orientation = orientation
@@ -38,27 +29,9 @@ class GraphicalObject(object):
         # Matrix holding transformation.
         self._trans_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
 
-        # Movement related attributes.
-        if v_max < v_0:
-            raise ValueError("Maximum velocity must be greater than the " +
-                             "initial velocity.")
-        self._v_max = v_max
-        self._v_0 = v_0
-
         # Last position as tuple consisting of a 3D point and a vector giving
         # the object orientation.
         self._last_position = None
-
-        if accel_dist_ratio is not None and decel_dist_ratio is not None and\
-                accel_dist_ratio + decel_dist_ratio > 1.0:
-            raise ValueError("Acceleration and deceleration" +
-                             "ratios sum must be <= 1.0")
-        self._accel_dist_ratio = cfg.NP_FLOAT(accel_dist_ratio)
-        self._decel_dist_ratio = cfg.NP_FLOAT(decel_dist_ratio)
-
-        # Time needed to move along the whole trajectory.
-        self._total_time = None
-        self._set_movement_params()
 
     @property
     def position(self):
@@ -84,11 +57,6 @@ class GraphicalObject(object):
         return self._orientation
 
     @property
-    def total_time(self):
-        """Total time needed to move along the whole trajectory."""
-        return self._total_time
-
-    @property
     def transformation_matrix(self):
         """Current transformation matrix."""
         return self._trans_matrix
@@ -100,131 +68,6 @@ class GraphicalObject(object):
     @property
     def trajectory(self):
         return self._trajectory
-
-    @trajectory.setter
-    def trajectory(self, traj):
-        self._trajectory = traj
-        self._center = traj.points[0]
-        self._set_movement_params()
-
-    @property
-    def v_0(self):
-        """Initial velocity."""
-        return self._v_0
-
-    @property
-    def v_max(self):
-        """Maximum achieved velocity."""
-        return self._v_max
-
-    @property
-    def accel_dist_ratio(self):
-        """The ratio between the acceleration distance and the whole
-        trajectory.
-        """
-        return self._accel_dist_ratio
-
-    @property
-    def decel_dist_ratio(self):
-        """The ratio between the deceleration distance and the whole
-        trajectory.
-        """
-        return self._decel_dist_ratio
-
-    def _set_movement_params(self):
-        """Set movement parameters."""
-        v_0 = self._v_0.rescale(q.m / q.s)
-        v_max = self._v_max.rescale(v_0.units)
-        dist = self._trajectory.length.rescale(q.m)
-        accel_dist = dist * self._accel_dist_ratio
-        decel_dist = dist * self._decel_dist_ratio
-        const_dist = dist - accel_dist - decel_dist.rescale(dist.units)
-
-        if self._v_max <= 0 or self._trajectory.length == 0:
-            self._acceleration = 0.0 * q.m / q.s ** 2
-            self._deceleration = 0.0 * q.m / q.s ** 2
-            self._accel_end_time = 0.0 * q.s
-            self._decel_start_time = 0.0 * q.s
-            return
-        if self._accel_dist_ratio <= 0.0:
-            accel = 0.0 * q.m / q.s ** 2
-            accel_time = 0.0 * q.s
-        else:
-            # dist = 1/2at^2, v = at, ar...accel_dist_ratio
-            # dist = 1/2vt => t = 2s/v => accel = v/t =
-            # v/(2s/v) = v^2/2s = v^2/2(ar*dist)
-            accel = (v_max ** 2 - v_0 ** 2) / (2 * accel_dist)
-            accel_time = 2.0 * accel_dist / (v_0 + v_max)
-        if self._decel_dist_ratio <= 0.0:
-            decel = 0.0 * q.m / q.s ** 2
-            decel_time = 0.0 * q.s
-            # total_time = accel_time + const_time
-            total_time = accel_time + const_dist / v_max
-        else:
-            decel = (v_max ** 2 - v_0 ** 2) / (2 * decel_dist)
-            # t_d = t_a + t_mv (mv...v_max) (t = dist/v)
-            # t_d = t_a + dist/v = t_a + dist*(1-ar-dr)/mv
-            decel_time = accel_time + const_dist / v_max
-
-            # Do not stop, just return to the v_0 speed.
-            total_time = decel_time + 2.0 * decel_dist / (v_0 + v_max)
-
-        self._acceleration = accel
-        self._deceleration = decel
-        self._accel_end_time = accel_time
-        self._decel_start_time = decel_time
-        self._total_time = total_time
-
-    def get_distance(self, abs_time):
-        """Get the distance traveled from the beginning until the time
-        given by *abs_time*.
-        """
-        v_0 = self._v_0.rescale(q.m / q.s)
-        v_max = self._v_max.rescale(v_0.units)
-        acc_end = self._accel_end_time.rescale(q.s)
-        decel_start = self._decel_start_time.rescale(q.s)
-        total_time = self._total_time.rescale(q.s)
-        accel = self._acceleration.rescale(q.m / q.s ** 2)
-        decel = self._deceleration.rescale(q.m / q.s ** 2)
-
-        if self._accel_dist_ratio > 0.0 and abs_time <= self._accel_end_time:
-            return v_0 * abs_time + accel * abs_time ** 2 / 2.0
-        elif self._decel_dist_ratio > 0.0 and\
-                abs_time < self._decel_start_time:
-            return v_0 * acc_end + accel * acc_end ** 2 / 2.0 + \
-                v_max * (abs_time - acc_end)
-        else:
-            if self._decel_start_time > 0.0:
-                return v_0 * acc_end + 0.5 * accel * acc_end ** 2 + \
-                    v_max * (decel_start - acc_end) + \
-                    (abs_time - decel_start) * v_0 + \
-                    0.5 * decel * (2 * total_time * (abs_time - decel_start) +
-                                   decel_start ** 2 - abs_time ** 2)
-            else:
-                # No deceleration.
-                return self._v_0 * self._accel_end_time +\
-                    (self._acceleration * self._accel_end_time ** 2) / 2.0 +\
-                    self._v_max * (abs_time - self._accel_end_time)
-
-    def get_trajectory_index(self, abs_time):
-        """Get index into trajectory points at a specified time *abs_time*."""
-        if self._trajectory is None or self._trajectory.length == 0:
-            return 0
-
-        # get the minimum delta s
-        d_s = self._trajectory.length / len(self._trajectory.points)
-        # index to the coordinates list computation
-        index = int(round((self.get_distance(abs_time)) / d_s))
-        if index >= len(self._trajectory.points):
-            LOGGER.debug("Index to trajectories out of bounds: " +
-                         "index=%d, max_i=%d, abs_time=%g, d_s=%g, max_d=%g." %
-                         (index, len(self._trajectory.points) - 1, abs_time,
-                          d_s, self._trajectory.length) + "The object " +
-                         "reaches beyond its trajectory end by " +
-                         "the specified time.")
-            index = len(self._trajectory.points) - 1
-
-        return index
 
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
@@ -272,16 +115,12 @@ class MetaObject(GraphicalObject):
     TYPE = None
 
     def __init__(self, trajectory, radius, blobbiness=None,
-                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
-                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
-                 decel_dist_ratio=0.0):
+                 orientation=geom.Y_AX):
         """Create a metaobject with *radius* and *blobbiness* defining the
         distance after the object's radius until which it influences the
         scene.
         """
-        super(MetaObject, self).__init__(trajectory, orientation, v_0,
-                                         v_max, accel_dist_ratio,
-                                         decel_dist_ratio)
+        super(MetaObject, self).__init__(trajectory, orientation)
         if radius <= 0:
             raise ValueError("Blobbiness must be greater than zero.")
         if blobbiness is None:
@@ -323,12 +162,9 @@ class MetaBall(MetaObject):
     TYPE = object_id()
 
     def __init__(self, trajectory, radius, blobbiness=None,
-                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
-                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
-                 decel_dist_ratio=0.0):
+                 orientation=geom.Y_AX):
         super(MetaBall, self).__init__(trajectory, radius, blobbiness,
-                                       orientation, v_0, v_max,
-                                       accel_dist_ratio, decel_dist_ratio)
+                                       orientation)
 
     def get_falloff_const(self):
         """Precompute mataball falloff curve constant which are the same
@@ -368,12 +204,9 @@ class MetaCube(MetaObject):
     TYPE = object_id()
 
     def __init__(self, trajectory, radius, blobbiness=None,
-                 orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
-                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
-                 decel_dist_ratio=0.0):
+                 orientation=geom.Y_AX):
         super(MetaCube, self).__init__(trajectory, radius, blobbiness,
-                                       orientation, v_0, v_max,
-                                       accel_dist_ratio, decel_dist_ratio)
+                                       orientation)
 
     def get_falloff_const(self):
         """There is no falloff constant for metacubes."""
@@ -384,16 +217,11 @@ class CompositeObject(GraphicalObject):
 
     """Class representing an object consisting of more sub-objects."""
 
-    def __init__(self, trajectory, orientation=geom.Y_AX, v_0=0.0 * q.m / q.s,
-                 v_max=0.0 * q.m / q.s, accel_dist_ratio=0.0,
-                 decel_dist_ratio=0.0, gr_objects=[]):
+    def __init__(self, trajectory, orientation=geom.Y_AX, gr_objects=[]):
         """*gr_objects* are the graphical objects which is this object
         composed of.
         """
-        super(CompositeObject, self).__init__(self, trajectory, orientation,
-                                              v_0, v_max,
-                                              accel_dist_ratio,
-                                              decel_dist_ratio)
+        super(CompositeObject, self).__init__(self, trajectory, orientation)
         self._objects = gr_objects
         self._index = -1
 
