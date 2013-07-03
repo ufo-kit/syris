@@ -115,10 +115,10 @@ class Trajectory(object):
     Trajectory is a spline interpolated from a set of points.
     """
 
-    def __init__(self, points, traj_length, dist_velocities=None,
+    def __init__(self, points, traj_length, velocities=None,
                  v_0=0 * q.m / q.s):
         """Create trajectory from given *points* which represent (x,y,z)
-        coordinates, *length* is the trajectory length, *dist_velocities*
+        coordinates, *length* is the trajectory length, *velocities*
         is a list of (time, velocity) tuples, where the first component
         specifies the relative distance in which the object following
         the trajectory will achieve the given velocity. *v_0* is the initial
@@ -128,17 +128,17 @@ class Trajectory(object):
         self._length = traj_length
 
         self._v_0 = v_0
-        self._dist_velos = dist_velocities
-        if self._dist_velos is not None:
-            self._length = self._length.rescale(self._dist_velos[0][0].units)
-            self._points.rescale(self._dist_velos[0][0].units)
-            self._v_0 = self._v_0.rescale(self._dist_velos[0][1].units)
-            sum_dists = np.sum(zip(*self._dist_velos)[0]) * self._length.units
-            if sum_dists < self.length:
-                # Speeds and distances specification ends before the end of
-                # the trajectory. Add constant movement until the end.
-                self._dist_velos.append((self._length - sum_dists,
-                                         self._dist_velos[-1][1]))
+        self._length_velos = velocities
+        if self._length_velos is not None:
+            self._length = self._length.rescale(self._length_velos[0][0].units)
+            self._points.rescale(self._length_velos[0][0].units)
+            self._v_0 = self._v_0.rescale(self._length_velos[0][1].units)
+            sum_dists = np.sum(
+                zip(*self._length_velos)[0]) * self._length.units
+            if sum_dists != self.length:
+                raise ValueError("Specified velocities do not match the " +
+                                 "trajectory length {0} != {1}".format(
+                                     self.length, sum_dists))
             self._time_velos = self._distance_to_time()
             self._time = np.sum([time_velo[0] for
                                  time_velo in self._time_velos]) *\
@@ -174,10 +174,10 @@ class Trajectory(object):
         """Get distance from the beginning of the trajectory to the time
         given by *abs_time*.
         """
-        if self._dist_velos is None:
+        if self._length_velos is None:
             return 0 * q.m
         total_time = 0 * abs_time.units
-        distance = 0 * self._dist_velos[0][0].units
+        distance = 0 * self._length_velos[0][0].units
 
         for i in range(len(self._time_velos)):
             t_1, v_1 = self._time_velos[i]
@@ -195,9 +195,9 @@ class Trajectory(object):
         """Convert (distance, velocity) pairs to (time, velocity) pairs."""
         velocities = []
 
-        for i in range(len(self._dist_velos)):
-            s_1, v_1 = self._dist_velos[i]
-            v_0 = self._v_0 if i == 0 else self._dist_velos[i - 1][1]
+        for i in range(len(self._length_velos)):
+            s_1, v_1 = self._length_velos[i]
+            v_0 = self._v_0 if i == 0 else self._length_velos[i - 1][1]
             t_1 = _get_time(s_1, v_0, v_1)
             velocities.append((t_1, v_1))
 
@@ -222,6 +222,20 @@ class Trajectory(object):
     def time(self):
         """Total time needed to travel the whole trajectory."""
         return self._time
+
+    @property
+    def length_profile(self):
+        """Relative times and velocities as a list of tuples
+        (relative_time, velocity).
+        """
+        return self._length_velos
+
+    @property
+    def time_profile(self):
+        """Relative times and velocities as a list of tuples
+        (relative_time, velocity).
+        """
+        return self._time_velos
 
 
 def interpolate_points(control_points, pixel_size):
