@@ -17,15 +17,15 @@ from scipy import interpolate, integrate
 import itertools
 import logging
 import math
-import time
+from quantities.quantity import Quantity
 
 # Constants.
 X = 0
 Y = 1
 Z = 2
-X_AX = np.array([1, 0, 0])
-Y_AX = np.array([0, 1, 0])
-Z_AX = np.array([0, 0, 1])
+X_AX = np.array([1, 0, 0]) * q.dimensionless
+Y_AX = np.array([0, 1, 0]) * q.dimensionless
+Z_AX = np.array([0, 0, 1]) * q.dimensionless
 
 AXES = {X: X_AX, Y: Y_AX, Z: Z_AX}
 
@@ -38,9 +38,9 @@ class BoundingBox(object):
 
     def __init__(self, points):
         """Create a bounding box from the object border *points*."""
-        self._points = points
+        self._points = points.simplified
         # 3D -> 2D for overlap
-        self._points_z_proj = np.array([x[:-1] for x in points]) * points.units
+        self._points_z_proj = np.array([x[:-1] for x in points]) * q.m
 
     @property
     def points(self):
@@ -50,13 +50,11 @@ class BoundingBox(object):
     def get_projected_points(self, axis):
         """Get the points projection by releasing the specified *axis*."""
         if axis == X:
-            return np.array([x[1:] for x in self._points]) * self._points.units
+            return np.array([x[1:] for x in self._points]) * q.m
         elif axis == Y:
-            return np.array([x[::2] for x in self._points]) * \
-                self._points.units
+            return np.array([x[::2] for x in self._points]) * q.m
         elif axis == Z:
-            return np.array([x[:-1] for x in self._points]) * \
-                self._points.units
+            return np.array([x[:-1] for x in self._points]) * q.m
 
     def get_min(self, axis=X):
         """Get minimum along the specified *axis*."""
@@ -70,7 +68,7 @@ class BoundingBox(object):
         """Determine whether the 2D projected bounding box overlaps a
         given region specified by *fov* as ((y0, y1), (x0, x1)).
         """
-        d_x, d_y = zip(*self._points_z_proj.rescale(fov[0][0].units))
+        d_x, d_y = zip(*self._points_z_proj.simplified)
         x_0, x_1 = min(d_x), max(d_x)
         y_0, y_1 = min(d_y), max(d_y)
         f_y, f_x = fov
@@ -90,10 +88,9 @@ class BoundingBox(object):
 
         self._points = np.array(list(itertools.product([x_min, x_max],
                                                        [y_min, y_max],
-                                                       [z_min, z_max]))) *\
-            x_min.units
+                                                       [z_min, z_max]))) * q.m
         self._points_z_proj = np.array(
-            [x[:-1] for x in self._points]) * self._points.units
+            [x[:-1] for x in self._points]) * q.m
 
     def __repr__(self):
         return "BoundingBox(%s)" % (str(self))
@@ -124,25 +121,22 @@ class Trajectory(object):
         the trajectory will achieve the given velocity. *v_0* is the initial
         velocity.
         """
-        self._points = points
-        self._length = traj_length
-
-        self._v_0 = v_0
+        self._points = points.simplified
+        self._length = traj_length.simplified
+        self._v_0 = v_0.simplified
         self._length_velos = velocities
+
         if self._length_velos is not None:
-            self._length = self._length.rescale(self._length_velos[0][0].units)
-            self._points.rescale(self._length_velos[0][0].units)
-            self._v_0 = self._v_0.rescale(self._length_velos[0][1].units)
-            sum_dists = np.sum(
-                zip(*self._length_velos)[0]) * self._length.units
+            self._length_velos = [(dist.simplified, velo.simplified)
+                                  for dist, velo in velocities]
+            sum_dists = np.sum(zip(*self._length_velos)[0]) * q.m
             if sum_dists != self.length:
                 raise ValueError("Specified velocities do not match the " +
                                  "trajectory length {0} != {1}".format(
                                      self.length, sum_dists))
             self._time_velos = self._distance_to_time()
             self._time = np.sum([time_velo[0] for
-                                 time_velo in self._time_velos]) *\
-                self._time_velos[0][0].units
+                                 time_velo in self._time_velos]) * q.s
         else:
             self._time_velos = None
             self._time = 0 * q.s
@@ -150,6 +144,9 @@ class Trajectory(object):
     def _get_point_index(self, abs_time):
         """Get index of a point in the points list at the time *abs_time*."""
         dist = self.get_distance(abs_time)
+        if dist == 0:
+            return 0
+
         return int(round(dist / self.length * (len(self.points) - 1)))
 
     def get_point(self, abs_time):
@@ -176,8 +173,8 @@ class Trajectory(object):
         """
         if self._length_velos is None:
             return 0 * q.m
-        total_time = 0 * abs_time.units
-        distance = 0 * self._length_velos[0][0].units
+        total_time = 0 * q.s
+        distance = 0 * q.m
 
         for i in range(len(self._time_velos)):
             t_1, v_1 = self._time_velos[i]
@@ -244,6 +241,8 @@ def interpolate_points(control_points, pixel_size):
     a tuple (points, length), where length is the length of the created
     trajectory.
     """
+    control_points = control_points.simplified
+
     if len(control_points) == 1:
         return control_points, 0 * q.m
 
@@ -252,7 +251,7 @@ def interpolate_points(control_points, pixel_size):
     tck, vals = interpolate.splprep([points[0], points[1], points[2]], s=0)
     p_length = integrate.romberg(_length_curve_part,
                                  vals[0], vals[len(vals) - 1],
-                                 args=(tck,)) * control_points.units
+                                 args=(tck,)) * q.m
 
     # Compute points of the curve based on the curve length and pixel size.
     # sqrt(12) factor to make sure the length of a step is < 1 voxel
@@ -265,7 +264,7 @@ def interpolate_points(control_points, pixel_size):
     x_new, y_new, z_new = interpolate.splev(
         np.linspace(0, 1, size.simplified), tck)
 
-    return zip(x_new, y_new, z_new) * control_points.units, p_length
+    return zip(x_new, y_new, z_new) * q.m, p_length
 
 
 def _get_time(dist, v_0, v_1):
@@ -307,7 +306,12 @@ def length(vector):
 
 def normalize(vector):
     """Normalize a *vector*."""
-    return vector.magnitude if length(vector) == 0 else vector / length(vector)
+    if length(vector) == 0:
+        if vector.__class__ == Quantity:
+            vector = vector.magnitude
+        return vector * q.dimensionless
+    else:
+        return vector / length(vector)
 
 
 def is_normalized(vector):
@@ -319,13 +323,16 @@ def transform_vector(trans_matrix, vector):
     """Transform *vector* by the transformation matrix *trans_matrix* with
     dimensions (4,3) width x height.
     """
+    vector = vector.simplified
+
     return np.dot(trans_matrix, np.append(vector, 1) * vector.units)[:-1]
 
 
 def translate(vec):
     """Translate the object by a vector *vec*. The transformation is
-    in the backward form.
+    in the backward form and the vector is _always_ transformed into meters.
     """
+    vec = vec.simplified
     trans_matrix = np.identity(4)
 
     # minus because of the backward fashion
@@ -339,11 +346,12 @@ def translate(vec):
 def rotate(phi, axis, total_start=None):
     """Rotate the object by *phi* around vector *axis*, where
     *total_start* is the center of rotation point which results in
-    transformation TRT^-1. The transformation is in the backward form.
+    transformation TRT^-1. The transformation is in the backward form and
+    the angle is _always_ rescaled to radians.
     """
-    axis = normalize(axis)
+    axis = normalize(axis.simplified)
 
-    phi = phi.rescale(q.rad)
+    phi = phi.simplified
     sin = np.sin(phi)
     cos = np.cos(phi)
     v_x = axis[0]
@@ -351,6 +359,7 @@ def rotate(phi, axis, total_start=None):
     v_z = axis[2]
 
     if total_start is not None:
+        total_start = total_start.simplified
         t_1 = translate(total_start)
 
     rot_matrix = np.identity(4)
@@ -390,5 +399,7 @@ def scale(scale_vec):
 
 def angle(vec_0, vec_1):
     """Angle between vectors *vec_0* and *vec_1*."""
+    vec_1 = vec_1.rescale(vec_0.units)
+
     return math.atan2(length(np.cross(vec_0, vec_1) * q.dimensionless),
                       np.dot(vec_0, vec_1)) * q.rad

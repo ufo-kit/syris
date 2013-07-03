@@ -12,7 +12,7 @@ class TestPrecision(unittest.TestCase):
 
     def setUp(self):
         self.n = 2
-        self.kernel_fn = "float_test.cl"
+        self.kernel_fn = "vfloat_test.cl"
 
     def _create_mem_objs(self, ctx, n):
         mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n * cfg.CL_FLOAT)
@@ -35,6 +35,6 @@ class TestPrecision(unittest.TestCase):
         self._execute_and_check()
 
     def test_double(self):
-        cfg.cl_float = 8
-        cfg.np_float = np.float64
+        cfg.CL_FLOAT = 8
+        cfg.NP_FLOAT = np.float64
         self._execute_and_check()

@@ -56,7 +56,8 @@ def get_source(file_names, precision_sensitive=True):
 def get_metaobjects_source():
     """Get source string for metaobjects creation."""
     obj_types = _object_types_to_struct()
-    source = get_source(["metaballs.cl"])
+    source = get_source(["polyobject.cl", "heapsort.cl",
+                         "newtonraphson.cl", "metaobjects.cl"])
 
     return obj_types + source
 
