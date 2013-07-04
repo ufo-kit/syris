@@ -14,6 +14,11 @@ class TestPrecision(TestCase):
         self.n = 2
         self.kernel_fn = "vfloat_test.cl"
 
+    def tearDown(self):
+        # Cleanup.
+        cfg.CL_FLOAT = 4
+        cfg.NP_FLOAT = np.float32
+
     def _create_mem_objs(self, ctx, n):
         mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n * cfg.CL_FLOAT)
         ar = np.empty(n, dtype=cfg.NP_FLOAT)

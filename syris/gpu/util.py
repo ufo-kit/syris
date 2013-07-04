@@ -153,3 +153,10 @@ def _make_vfloat_functions():
         globals()[_wrapper(i).__name__] = _wrapper(i)
 
 _make_vfloat_functions()
+
+
+def make_vcomplex(value):
+    """Make complex value for OpenCL based on the set floating point
+    precision.
+    """
+    return make_vfloat2(value.real, value.imag)
