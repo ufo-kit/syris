@@ -1,11 +1,15 @@
 /*
- * Wavefield propagation through Fresnel approximation.
+ * Image processing routines on OpenCL.
  *
  * Requires definition of vfloat data type, which defines single or double
  * precision for floating point numbers. Also requires vcomplex data type
  * for working with complex numbers.
  */
 
+
+/*
+ * Fresnel approximated Wavefield propagation.
+ */
 __kernel void propagator(__global vcomplex *out,
 							const vfloat distance,
 							const vfloat lam,

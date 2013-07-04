@@ -1,5 +1,5 @@
 /*
- * OpenCL code for metaballs.
+ * Metaballs on OpenCL.
  *
  * Requires definition of vfloat data type, which defines single or double
  * precision for floating point numbers.

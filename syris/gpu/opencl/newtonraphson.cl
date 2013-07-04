@@ -1,5 +1,5 @@
 /*
- * Bisection and Newton-Raphson combination for root finding.
+ * Bisection and Newton-Raphson combination for root finding on OpenCL.
  *
  * Currently only 2 and 4-order polynomials are supported.
  *

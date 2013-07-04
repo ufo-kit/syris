@@ -1,5 +1,5 @@
 /*
- * Complex arithmetic.
+ * Complex arithmetic on OpenCL.
  */
 
 typedef vfloat2 vcomplex;

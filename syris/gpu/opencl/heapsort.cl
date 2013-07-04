@@ -1,5 +1,5 @@
 /*
- * Heap sort for fast sorting in O(n log(n)) time.
+ * Heap sort for fast sorting in O(n log(n)) time in OpenCL.
  */
 
 typedef enum {

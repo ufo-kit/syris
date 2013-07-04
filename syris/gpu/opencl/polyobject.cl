@@ -1,5 +1,5 @@
 /*
- * Polynomial representation of a metaobject.
+ * Polynomial representation of a metaobject on OpenCL.
  *
  * Requires definition of vfloat data type, which defines single or double
  * precision for floating point numbers.
