@@ -73,11 +73,11 @@ def _object_types_to_struct():
     return string
 
 
-def execute(function, *ARGS, **kwargs):
+def execute(function, *args, **kwargs):
     """Execute a *function* which can be an OpenCL kernel or other OpenCL
     related function and profile it.
     """
-    event = function(*ARGS, **kwargs)
+    event = function(*args, **kwargs)
     if function.__class__ == cl.Kernel:
         func_name = function.function_name
     else:
