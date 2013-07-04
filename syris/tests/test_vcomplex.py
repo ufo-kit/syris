@@ -24,7 +24,7 @@ class TestVComplex(TestCase):
         self.mem_out = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
                                  cfg.CL_CPLX)
         self.host_array = np.empty(1, cfg.NP_CPLX)
-        src = gpu_util.get_source(["complex.cl"])
+        src = gpu_util.get_source(["vcomplex.cl"])
         self.prg = cl.Program(self.ctx, src).build()
 
     def test_addition(self):

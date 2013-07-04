@@ -6,20 +6,6 @@ typedef vfloat2 vcomplex;
 
 
 /*
- * Complex addition.
- */
-vcomplex vc_add(vcomplex *a, vcomplex *b) {
-	return *a + *b;
-}
-
-/*
- * Complex subtraction.
- */
-vcomplex vc_sub(vcomplex *a, vcomplex *b) {
-	return *a - *b;
-}
-
-/*
  * Complex multiplication.
  */
 vcomplex vc_mul(vcomplex *a, vcomplex *b) {
@@ -43,12 +29,8 @@ __kernel void vc_add_kernel(__global vcomplex *in_0,
 								__global vcomplex *in_1,
 								__global vcomplex *out) {
 	int ix = get_global_id(0);
-	vcomplex a, b;
 
-	a = in_0[ix];
-	b = in_1[ix];
-
-	out[ix] = vc_add(&a, &b);
+	out[ix] = in_0[ix] + in_1[ix];
 }
 
 /*
@@ -58,12 +40,8 @@ __kernel void vc_sub_kernel(__global vcomplex *in_0,
 								__global vcomplex *in_1,
 								__global vcomplex *out) {
 	int ix = get_global_id(0);
-	vcomplex a, b;
 
-	a = in_0[ix];
-	b = in_1[ix];
-
-	out[ix] = vc_sub(&a, &b);
+	out[ix] = in_0[ix] - in_1[ix];
 }
 
 /*
