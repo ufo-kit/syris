@@ -72,6 +72,7 @@ def _object_types_to_struct():
 
     return string
 
+
 def execute(function, *ARGS, **kwargs):
     """Execute a *function* which can be an OpenCL kernel or other OpenCL
     related function and profile it.
@@ -133,6 +134,7 @@ def get_command_queues(context, devices=None,
 
     return queues
 
+
 def _make_vfloat_functions():
     """Make functions for creating OpenCL vfloat data types from host
     data types. Follow PyOpenCL make_floatn and make_doublen convention
@@ -146,7 +148,7 @@ def _make_vfloat_functions():
                 return getattr(vec, "make_double%d" % (i))(*args)
         make_vfloat.__name__ = "make_vfloat%d" % (i)
         return make_vfloat
-    
+
     for i in [2, 3, 4, 8, 16]:
         globals()[_wrapper(i).__name__] = _wrapper(i)
 
