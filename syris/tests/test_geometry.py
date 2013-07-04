@@ -5,7 +5,6 @@ from syris.opticalelements import geometry as geom
 from unittest import TestCase
 import itertools
 from testfixtures.shouldraise import ShouldRaise
-from opticalelements.geometry import Trajectory
 
 
 def get_base():
