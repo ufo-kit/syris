@@ -52,7 +52,7 @@ class TestImageProcessing(TestCase):
                      (2 * np.pi * sigma[0] * sigma[1] /
                       self.pixel_size.simplified ** 2)
 
-    def _compare(self, im_0, im_1):
+    def _compare_propagators(self, im_0, im_1):
         real = np.abs(im_0.real - im_1.real)
         imag = np.abs(im_0.imag - im_1.imag)
 
@@ -63,7 +63,7 @@ class TestImageProcessing(TestCase):
         self._propagate()
         cpu = self._cpu_propagator()
 
-        self.assertTrue(self._compare(self.res, cpu))
+        self.assertTrue(self._compare_propagators(self.res, cpu))
 
     def test_with_phase_factor(self):
         phase = np.exp(2 * np.pi / self.lam.simplified *
@@ -72,23 +72,27 @@ class TestImageProcessing(TestCase):
         self._propagate(phase)
         cpu = self._cpu_propagator(phase)
 
-        self.assertTrue(self._compare(self.res, cpu))
+        self.assertTrue(self._compare_propagators(self.res, cpu))
 
     def test_gauss(self):
         """Test if the gauss in Fourier space calculated on a GPU is
         the same as Fourier transform of a gauss in real space.
         """
         sigma = 10 * self.pixel_size.simplified, 5 * self.pixel_size.simplified
-        self.prg.gauss_2d_f(self.queue,
-                            (self.size, self.size),
-                            None,
-                            self.mem,
-                            gpu_util.make_vfloat2(sigma[0], sigma[1]),
-                            cfg.NP_FLOAT(self.pixel_size.simplified))
+        self.prg.gauss_2_f(self.queue,
+                          (self.size, self.size),
+                           None,
+                           self.mem,
+                           gpu_util.make_vfloat2(sigma[0], sigma[1]),
+                           cfg.NP_FLOAT(self.pixel_size.simplified))
 
         cl.enqueue_copy(self.queue, self.res, self.mem)
 
         cpu = np.fft.fftshift(self._gauss_2d((sigma[1], sigma[0])))
         cpu_f = np.fft.fft2(cpu)
 
-        self.assertTrue(self._compare(self.res, cpu_f))
+        self.assertTrue(self._compare_propagators(self.res, cpu_f))
+
+        # Normalization test. The sum of the Gaussian must be 1.
+        gauss_real = np.fft.ifft2(self.res)
+        self.assertAlmostEqual(np.sum(gauss_real), 1)

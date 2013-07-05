@@ -22,14 +22,15 @@ __kernel void propagator(__global vcomplex *out,
 	vfloat i, j, tmp;
 	vcomplex result, c_tmp;
 
-	/* Map image coordinates to fourier coordinates. */
+	/* Map image coordinates to Fourier coordinates. */
 	i = -0.5 + ((vfloat) ix) / n;
 	j = -0.5 + ((vfloat) iy) / n;
 
 	/*
 	 * Fresnel propagator in the Fourier domain:
 	 *
-	 * F(i, j) = e^(2*pi*distance*i/lam) * e^(-i*pi*lam*distance*(i^2 + j^2)).
+	 * F(i, j) = e ^ (2 * pi * distance * i / lam) *
+	 * e ^ (- i * pi * lam * distance * (i ^ 2 + j ^ 2)).
 	 */
 	tmp = - M_PI * lam * distance * (i * i + j * j) /
 			(pixel_size * pixel_size);
@@ -48,7 +49,7 @@ __kernel void propagator(__global vcomplex *out,
 /*
  * 2D normalized Gaussian in Fourier space.
  */
-__kernel void gauss_2d_f(__global vcomplex *out,
+__kernel void gauss_2_f(__global vcomplex *out,
 						const float2 sigma,
 						const vfloat pixel_size) {
     int ix = get_global_id(0);
@@ -56,13 +57,26 @@ __kernel void gauss_2d_f(__global vcomplex *out,
     int n = get_global_size(0);
     vfloat i, j;
 
-	/* Map image coordinates to fourier coordinates. */
+	/* Map image coordinates to Fourier coordinates. */
 	i = -0.5 + ((vfloat) ix) / n;
 	j = -0.5 + ((vfloat) iy) / n;
 
+	/* Fourier transform of a Gaussian is a stretched Gaussian.
+	 * We assume a Gaussian with standard deviation c to be
+	 *
+	 * g(x) = 1 / (c * sqrt(2*pi)) * e ^ (- x ^ 2 / (2 * c ^ 2))
+	 *
+	 * Given the Fourier transform
+	 *
+	 * F(xi) = int(f(x) e ^ (- 2 * pi * x * xi * i) dx),
+	 *
+	 * the fourier transform of a gaussian g(x) is
+	 *
+	 * G(xi) = e ^ (- 2 * pi ^ 2 * c ^ 2 * xi ^ 2).
+	 *
+	 * The description is for brevity for 1D case.
+	 */
     out[n * ((iy + n / 2) % n) + ((ix + n / 2) % n)] = (vcomplex)
-    		(exp(- 2 * M_PI * M_PI * sigma.x * sigma.x * i * i /
-    				(pixel_size * pixel_size) -
-    				2 * M_PI * M_PI * sigma.y * sigma.y * j * j /
-					(pixel_size * pixel_size)), 0);
+    		(exp(- 2 * M_PI * M_PI / (pixel_size * pixel_size) *
+				(sigma.x * sigma.x * i * i + sigma.y * sigma.y * j * j)), 0);
 }
