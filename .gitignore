@@ -3,4 +3,5 @@
 docs/build/
 *.dat
 *.log
+build/
 

@@ -29,8 +29,10 @@ __kernel void propagator(__global vcomplex *out,
 	/*
 	 * Fresnel propagator in the Fourier domain:
 	 *
-	 * F(i, j) = e ^ (2 * pi * distance * i / lam) *
-	 * e ^ (- i * pi * lam * distance * (i ^ 2 + j ^ 2)).
+	 * \begin{align}
+	 * F(i, j) = e ^ {\frac{2 * pi * distance * i} {lam}} *
+	 * e ^ {- i * \pi * lam * distance * (i ^ 2 + j ^ 2)}.
+	 * \end{align}
 	 */
 	tmp = - M_PI * lam * distance * (i * i + j * j) /
 			(pixel_size * pixel_size);
@@ -64,15 +66,15 @@ __kernel void gauss_2_f(__global vcomplex *out,
 	/* Fourier transform of a Gaussian is a stretched Gaussian.
 	 * We assume a Gaussian with standard deviation c to be
 	 *
-	 * g(x) = 1 / (c * sqrt(2*pi)) * e ^ (- x ^ 2 / (2 * c ^ 2))
+	 * $g(x) = \frac{1}{c * sqrt(2 * \pi)} e ^ {\frac{- x ^ 2} {2 * c ^ 2}}$
 	 *
 	 * Given the Fourier transform
 	 *
-	 * F(xi) = int(f(x) e ^ (- 2 * pi * x * xi * i) dx),
+	 * $F(xi) = \int f(x) e ^ {- 2 * \pi * x * xi * i} \, \dif x,$
 	 *
 	 * the fourier transform of a gaussian g(x) is
 	 *
-	 * G(xi) = e ^ (- 2 * pi ^ 2 * c ^ 2 * xi ^ 2).
+	 * $G(xi) = e ^ {- 2 * \pi ^ 2 * c ^ 2 * xi ^ 2}.$
 	 *
 	 * The description is for brevity for 1D case.
 	 */
