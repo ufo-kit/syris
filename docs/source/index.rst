@@ -22,7 +22,11 @@ Application Programming Interface
 .. toctree::
    :maxdepth: 2
 
+   api/devices
    api/gpu
+   api/imageprocessing
+   api/opticalelements
+   api/physics
 
 Indices and tables
 ==================
