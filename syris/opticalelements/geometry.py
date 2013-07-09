@@ -261,8 +261,8 @@ def interpolate_points(control_points, pixel_size):
     # then sqrt(12) which is twice the voxel's diagonal.
     # Assumes the distances are not larger then the diagonal.
     size = p_length / pixel_size * np.sqrt(12)
-    x_new, y_new, z_new = interpolate.splev(
-        np.linspace(0, 1, size.simplified), tck)
+    x_new, y_new, z_new = interpolate.splev(np.linspace(0, 1,
+                                                        size.simplified), tck)
 
     return zip(x_new, y_new, z_new) * q.m, p_length
 
