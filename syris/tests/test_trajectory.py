@@ -7,7 +7,7 @@ import numpy as np
 import quantities as q
 from syris.opticalelements import geometry as geom
 from unittest import TestCase
-from opticalelements.geometry import Trajectory
+from syris.opticalelements.geometry import Trajectory
 from testfixtures.shouldraise import ShouldRaise
 
 

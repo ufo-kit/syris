@@ -2,7 +2,7 @@ import numpy as np
 import quantities as q
 from unittest import TestCase
 from syris import config as cfg
-from syris.opticalelements.material import PMASFMaterial
+from syris.opticalelements.materials import PMASFMaterial
 from testfixtures import ShouldRaise
 import os
 

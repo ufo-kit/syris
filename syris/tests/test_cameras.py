@@ -1,10 +1,8 @@
 import numpy as np
 import quantities as q
-from syris.devices.camera import Camera
+from syris.devices.cameras import Camera, FPSError, is_fps_feasible
 from testfixtures import ShouldRaise
 from unittest import TestCase
-from syris.devices.camera import FPSError
-from syris.devices.camera import is_fps_feasible
 
 
 class TestCamera(TestCase):
