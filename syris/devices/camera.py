@@ -55,7 +55,7 @@ class Camera(object):
         _fps_check_raise(fps, exp_time)
         self._fps = fps.simplified
         self._exp_time = exp_time.simplified
-        self.quantum_efficiencies = quantum_efficiencies
+        self.quantum_effs = quantum_efficiencies
         self._dtype = np.ushort
         self._dark_image = np.ones(self.shape, self._dtype) * self.dark_current
 

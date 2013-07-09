@@ -1,5 +1,5 @@
 """Sample material represented by a complex refractive index."""
-from syris import config as cfg
+from syris import config as cfg, physics
 import logging
 import os
 from subprocess import Popen, PIPE
@@ -41,9 +41,13 @@ class Material(object):
         """
         return self._refractive_indices
 
-#    def pack(self):
-#        """Pack material into an OpenCL compliant structure."""
-#        raise NotImplementedError
+    def get_attenuation_coeff(self, energy_index):
+        """Get the linear attenuation coefficient baseo on *energy_index*
+        to the energies for which the material was defined.
+        """
+        return physics.ref_index_to_attenuation(
+            self.refractive_indices[energy_index],
+            self.energies[energy_index])
 
 
 class PMASFMaterial(Material):
