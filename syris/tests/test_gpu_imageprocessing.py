@@ -2,7 +2,7 @@ import numpy as np
 import pyopencl as cl
 import quantities as q
 from syris.gpu import util as gpu_util
-from syris import config as cfg
+from syris import physics, config as cfg
 from unittest import TestCase
 
 
@@ -21,16 +21,11 @@ class TestGPUImageProcessing(TestCase):
         self.lam = 4.9594e-11 * q.m
         self.pixel_size = 1 * q.um
 
-    def _propagate(self, phase_factor=0 + 0j):
-        self.prg.propagator(cfg.QUEUE,
-                            (self.size, self.size),
-                            None,
-                            self.mem,
-                            cfg.NP_FLOAT(self.distance.simplified),
-                            cfg.NP_FLOAT(self.lam.simplified),
-                            cfg.NP_FLOAT(self.pixel_size.simplified),
-                            gpu_util.make_vcomplex(phase_factor))
-        cl.enqueue_copy(cfg.QUEUE, self.res, self.mem)
+    def _get_propagator(self, apply_phase_factor=False):
+        return physics.get_propagator(self.size, self.distance,
+                                      self.lam, self.pixel_size,
+                                      apply_phase_factor,
+                                      copy_to_host=True)
 
     def _cpu_propagator(self, phase_factor=1):
         j, i = np.mgrid[-0.5:0.5:1.0 / self.size, -0.5:0.5:1.0 / self.size].\
@@ -53,7 +48,7 @@ class TestGPUImageProcessing(TestCase):
                       self.pixel_size.simplified ** 2)
 
     def test_no_phase_factor(self):
-        self._propagate()
+        self.res = self._get_propagator()
         cpu = self._cpu_propagator()
 
         np.testing.assert_almost_equal(self.res, cpu, 5)
@@ -62,7 +57,7 @@ class TestGPUImageProcessing(TestCase):
         phase = np.exp(2 * np.pi / self.lam.simplified *
                        self.distance.simplified * 1j)
 
-        self._propagate(phase)
+        self.res = self._get_propagator(True)
         cpu = self._cpu_propagator(phase)
 
         np.testing.assert_almost_equal(self.res, cpu, 5)

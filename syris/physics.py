@@ -1,20 +1,47 @@
 """Physics on the light path."""
 
 import numpy as np
+import pyopencl as cl
 import quantities as q
 import quantities.constants.quantum as cq
 from syris.gpu import util as g_util
+from syris import config as cfg
 
 CL_PRG = g_util.get_program(g_util.get_source(["vcomplex.cl", "physics.cl"]))
 
 
-def propagator(size, distance, lam, copy_to_host=False, queue=None):
+def get_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
+                   copy_to_host=False):
     """Create a propagator with (*size*, *size*) dimensions for propagation
-    *distance*, wavelength *lam* and if *copy_to_host* is True, copy the
-    propagator to host. If command *queue* is specified, execute the kernel
-    on it.
+    *distance*, wavelength *lam*, *pixel_size* and if *apply_phase_factor*
+    is True, apply the phase factor defined by Fresne approximation. If
+    *copy_to_host* is True, copy the propagator to host. If command *queue*
+    is specified, execute the kernel on it.
     """
-    pass
+    mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_ONLY,
+                    size=size ** 2 * cfg.CL_CPLX)
+    if apply_phase_factor:
+        phase_factor = np.exp(2 * np.pi * distance.simplified /
+                              lam.simplified * 1j)
+    else:
+        phase_factor = 0 + 0j
+
+    CL_PRG.propagator(cfg.QUEUE,
+                      (size, size),
+                      None,
+                      mem,
+                      cfg.NP_FLOAT(distance.simplified),
+                      cfg.NP_FLOAT(lam.simplified),
+                      cfg.NP_FLOAT(pixel_size.simplified),
+                      g_util.make_vcomplex(phase_factor))
+
+    if copy_to_host:
+        res = np.empty((size, size), dtype=cfg.NP_CPLX)
+        cl.enqueue_copy(cfg.QUEUE, res, mem)
+    else:
+        res = mem
+
+    return res
 
 
 def energy_to_wavelength(energy):
