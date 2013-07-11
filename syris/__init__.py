@@ -2,40 +2,16 @@
 
 __version__ = 0.1
 
-import atexit
-import logging
-import numpy as np
-from optparse import OptionParser
-import pyopencl as cl
-import config as cfg
-import profiling as prf
-from profiling import Profiler, DummyProfiler
-from gpu import util as g_util
 
+import atexit
+import config as cfg
+import logging
+import syris.profiling as prf
+from syris.profiling import Profiler, DummyProfiler
+from syris.gpu import util as g_util
+from syris import physics
 
 LOGGER = logging.getLogger()
-
-
-PARSER = OptionParser()
-
-PARSER.add_option("--double", dest="double", action="store_true",
-                  default=False,
-                  help="Use double precision", metavar="DOUBLE")
-PARSER.add_option("-l", "--log", dest="logging_level",
-                  help="logging level", metavar="LEVEL")
-PARSER.add_option("--profile", dest="profiler", action="count",
-                  default=0, help="enable profiling", metavar="PROFILE")
-PARSER.add_option("--profiler-file", dest="profiler_file", action="store",
-                  default="profile.dat", help="profiler file",
-                  metavar="PROFILER_FILE")
-PARSER.add_option("--LOGGER-file", dest="logger_file",
-                  default="simulation.log",
-                  help="log file path", metavar="LOG_FILE")
-PARSER.add_option("--pmasf-file", dest="pmasf_file", default="pmasf",
-                  help="full path to the pmasf binary",
-                  metavar="PMASF_FILE")
-
-CMDOPTIONS = PARSER.parse_args()[0]
 
 
 def _init_logging(level, logger_file):
@@ -50,45 +26,65 @@ def _init_logging(level, logger_file):
     LOGGER.addHandler(file_handler)
 
 
-def _init_command_queues():
-    if CMDOPTIONS.profiler:
-        kwargs = {"properties": cl.command_queue_properties.PROFILING_ENABLE}
+def _init_gpus(profiler, queues=None):
+    import pyopencl as cl
+
+    if queues is None:
+        cfg.CTX = g_util.get_cuda_context()
+
+        if profiler:
+            kwargs = {"properties":
+                      cl.command_queue_properties.PROFILING_ENABLE}
+        else:
+            kwargs = {}
+
+        cfg.QUEUES = g_util.get_command_queues(cfg.CTX, queue_kwargs=kwargs)
+        cfg.QUEUE = cfg.QUEUES[0]
     else:
-        kwargs = {}
+        if profiler and not queues[0].properties & \
+                cl.command_queue_properties.PROFILING_ENABLE:
+            raise ValueError("Command queues are not enabled for profiling.")
 
-    cfg.QUEUES = g_util.get_command_queues(cfg.CTX, queue_kwargs=kwargs)
-    cfg.QUEUE = cfg.QUEUES[0]
+        cfg.QUEUES = queues
+        cfg.QUEUE = cfg.QUEUES[0]
+
+    physics.CL_PRG = g_util.get_program(g_util.get_source(["vcomplex.cl",
+                                                           "physics.cl"]))
 
 
-# Single or double floating point precision settings.
-if CMDOPTIONS.double:
-    # redefine floating point data types to double precision
-    cfg.NP_FLOAT = np.float64
-    cfg.NP_CPLX = np.complex128
-    cfg.CL_FLOAT = 8
-    cfg.CL_CPLX = 16
+def init(queues=None):
+    """Initialize Syris by the command line arguments."""
+    import numpy as np
 
-# Logging level and output file.
-if CMDOPTIONS.logging_level is not None:
-    _init_logging(logging.getLevelName(CMDOPTIONS.logging_level),
-                  CMDOPTIONS.logger_file)
+    args = cfg.get_arguments()
+    _init_gpus(args.profiler, queues)
 
-cfg.CTX = g_util.get_cuda_context()
-_init_command_queues()
+    # Single or double floating point precision settings.
+    if args.double:
+        # redefine floating point data types to double precision
+        cfg.NP_FLOAT = np.float64
+        cfg.NP_CPLX = np.complex128
+        cfg.CL_FLOAT = 8
+        cfg.CL_CPLX = 16
 
-# Profiling options, they depend on the created command queues.
-if CMDOPTIONS.profiler:
-    prf.PROFILER = Profiler(cfg.QUEUES, CMDOPTIONS.profiler_file)
-    prf.PROFILER.start()
+    # Logging level and output file.
+    if args.logging_level is not None:
+        _init_logging(logging.getLevelName(args.logging_level),
+                      args.logger_file)
 
-    @atexit.register
-    def exit_handler():
-        """Shutdown the profiler on exit."""
-        LOGGER.debug("Shutting down profiler...")
-        prf.PROFILER.shutdown()
-else:
-    prf.PROFILER = DummyProfiler()
+    # Profiling options, they depend on the created command queues.
+    if args.profiler:
+        prf.PROFILER = Profiler(cfg.QUEUES, args.profiler_file)
+        prf.PROFILER.start()
 
-# Set the pmasf excutable path.
-if CMDOPTIONS.pmasf_file != cfg.PMASF_FILE:
-    cfg.PMASF_FILE = CMDOPTIONS.pmasf_file
+        @atexit.register
+        def exit_handler():
+            """Shutdown the profiler on exit."""
+            LOGGER.debug("Shutting down profiler...")
+            prf.PROFILER.shutdown()
+    else:
+        prf.PROFILER = DummyProfiler()
+
+    # Set the pmasf excutable path.
+    if args.pmasf_file != cfg.PMASF_FILE:
+        cfg.PMASF_FILE = args.pmasf_file

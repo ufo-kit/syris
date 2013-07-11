@@ -7,7 +7,7 @@ import quantities.constants.quantum as cq
 from syris.gpu import util as g_util
 from syris import config as cfg
 
-CL_PRG = g_util.get_program(g_util.get_source(["vcomplex.cl", "physics.cl"]))
+CL_PRG = None
 
 
 def get_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,

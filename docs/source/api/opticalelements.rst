@@ -7,5 +7,5 @@ Optical Elements
 .. automodule:: syris.opticalelements.graphicalobjects
     :members:
 
-.. automodule:: syris.opticalelements.material
+.. automodule:: syris.opticalelements.materials
     :members:

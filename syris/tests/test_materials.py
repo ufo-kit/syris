@@ -3,16 +3,15 @@ import quantities as q
 from unittest import TestCase
 from syris import config as cfg
 from syris.opticalelements.materials import PMASFMaterial
-from testfixtures import ShouldRaise
 import os
 
 
-if not os.path.exists(cfg.PMASF_FILE):
-    # Remote access.
-    cfg.PMASF_FILE = "ssh hopped_ufo /home/farago/software/asf/pmasf"
-
-
 class TestPMASFMaterial(TestCase):
+
+    def setUp(self):
+        if not os.path.exists(cfg.PMASF_FILE):
+            # Remote access.
+            cfg.PMASF_FILE = "ssh hopped_ufo /home/farago/software/asf/pmasf"
 
     def test_one_energy(self):
         material = PMASFMaterial("PMMA", [20] * q.keV)
@@ -24,9 +23,7 @@ class TestPMASFMaterial(TestCase):
         self.assertEqual(len(material.refractive_indices), 10)
 
     def test_wrong_energy(self):
-        with ShouldRaise(RuntimeError):
-            PMASFMaterial("PMMA", [0] * q.keV)
+        self.assertRaises(RuntimeError, PMASFMaterial, "PMMA", [0] * q.keV)
 
     def test_wrong_material(self):
-        with ShouldRaise(RuntimeError):
-            PMASFMaterial("asd", [0] * q.keV)
+        self.assertRaises(RuntimeError, PMASFMaterial, "asd", [0] * q.keV)

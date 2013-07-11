@@ -1,11 +1,11 @@
 Devices
 =======
 
-.. automodule:: syris.devices.camera
+.. automodule:: syris.devices.cameras
     :members:
 
 .. automodule:: syris.devices.filters
     :members:
 
-.. automodule:: syris.devices.source
+.. automodule:: syris.devices.sources
     :members:

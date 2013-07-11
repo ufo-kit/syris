@@ -38,7 +38,8 @@ typedef double16 vfloat16;
 
 def get_program(src):
     """Create and build an OpenCL program from source string *src*."""
-    return cl.Program(cfg.CTX, src).build()
+    if cfg.CTX is not None:
+        return cl.Program(cfg.CTX, src).build()
 
 
 def get_source(file_names, precision_sensitive=True):

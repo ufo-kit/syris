@@ -1,6 +1,7 @@
 import numpy as np
 import pyopencl as cl
 import quantities as q
+import syris
 from syris.gpu import util as gpu_util
 from syris import physics, config as cfg
 from unittest import TestCase
@@ -9,6 +10,7 @@ from unittest import TestCase
 class TestGPUImageProcessing(TestCase):
 
     def setUp(self):
+        syris.init()
         src = gpu_util.get_source(["vcomplex.cl",
                                    "imageprocessing.cl",
                                    "physics.cl"])
