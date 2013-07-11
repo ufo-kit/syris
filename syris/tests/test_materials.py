@@ -6,7 +6,6 @@ from syris.opticalelements.materials import PMASFMaterial
 from testfixtures import ShouldRaise
 import os
 
-cfg.PMASF_FILE = "/home/farago/software/asf/pmasf"
 
 if not os.path.exists(cfg.PMASF_FILE):
     # Remote access.

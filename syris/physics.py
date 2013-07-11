@@ -3,6 +3,18 @@
 import numpy as np
 import quantities as q
 import quantities.constants.quantum as cq
+from syris.gpu import util as g_util
+
+CL_PRG = g_util.get_program(g_util.get_source(["vcomplex.cl", "physics.cl"]))
+
+
+def propagator(size, distance, lam, copy_to_host=False, queue=None):
+    """Create a propagator with (*size*, *size*) dimensions for propagation
+    *distance*, wavelength *lam* and if *copy_to_host* is True, copy the
+    propagator to host. If command *queue* is specified, execute the kernel
+    on it.
+    """
+    pass
 
 
 def energy_to_wavelength(energy):

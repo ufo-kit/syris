@@ -9,14 +9,12 @@ from unittest import TestCase
 class TestGPUImageProcessing(TestCase):
 
     def setUp(self):
-        self.ctx = gpu_util.get_cuda_context()
-        self.queue = gpu_util.get_command_queues(self.ctx)[0]
         src = gpu_util.get_source(["vcomplex.cl",
                                    "imageprocessing.cl",
                                    "physics.cl"])
-        self.prg = cl.Program(self.ctx, src).build()
+        self.prg = cl.Program(cfg.CTX, src).build()
         self.size = 256
-        self.mem = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
+        self.mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
                              size=self.size ** 2 * cfg.CL_CPLX)
         self.res = np.empty((self.size, self.size), dtype=cfg.NP_CPLX)
         self.distance = 1 * q.m
@@ -24,7 +22,7 @@ class TestGPUImageProcessing(TestCase):
         self.pixel_size = 1 * q.um
 
     def _propagate(self, phase_factor=0 + 0j):
-        self.prg.propagator(self.queue,
+        self.prg.propagator(cfg.QUEUE,
                             (self.size, self.size),
                             None,
                             self.mem,
@@ -32,7 +30,7 @@ class TestGPUImageProcessing(TestCase):
                             cfg.NP_FLOAT(self.lam.simplified),
                             cfg.NP_FLOAT(self.pixel_size.simplified),
                             gpu_util.make_vcomplex(phase_factor))
-        cl.enqueue_copy(self.queue, self.res, self.mem)
+        cl.enqueue_copy(cfg.QUEUE, self.res, self.mem)
 
     def _cpu_propagator(self, phase_factor=1):
         j, i = np.mgrid[-0.5:0.5:1.0 / self.size, -0.5:0.5:1.0 / self.size].\
@@ -74,14 +72,14 @@ class TestGPUImageProcessing(TestCase):
         the same as Fourier transform of a gauss in real space.
         """
         sigma = 10 * self.pixel_size.simplified, 5 * self.pixel_size.simplified
-        self.prg.gauss_2_f(self.queue,
+        self.prg.gauss_2_f(cfg.QUEUE,
                           (self.size, self.size),
                            None,
                            self.mem,
                            gpu_util.make_vfloat2(sigma[0], sigma[1]),
                            cfg.NP_FLOAT(self.pixel_size.simplified))
 
-        cl.enqueue_copy(self.queue, self.res, self.mem)
+        cl.enqueue_copy(cfg.QUEUE, self.res, self.mem)
 
         cpu = np.fft.fftshift(self._gauss_2d((sigma[1], sigma[0])))
         cpu_f = np.fft.fft2(cpu)
