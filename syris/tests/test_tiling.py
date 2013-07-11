@@ -1,7 +1,6 @@
 import numpy as np
 from syris import config as cfg
 from syris.imageprocessing import Tiler
-from testfixtures.shouldraise import ShouldRaise
 from unittest import TestCase
 
 
@@ -49,18 +48,14 @@ class TestImageTiling(TestCase):
     def test_invalid_tiles(self):
         size = 16, 16
         tiles_count = 4, 3
-        with ShouldRaise(ValueError):
-            Tiler(size, tiles_count, True)
+        self.assertRaises(ValueError, Tiler, size, tiles_count, True)
 
-        with ShouldRaise(ValueError):
-            Tiler(size, tiles_count, False)
+        self.assertRaises(ValueError, Tiler, size, tiles_count, False)
 
         tiles_count = 3, 4
-        with ShouldRaise(ValueError):
-            Tiler(size, tiles_count, True)
+        self.assertRaises(ValueError, Tiler, size, tiles_count, True)
 
-        with ShouldRaise(ValueError):
-            Tiler(size, tiles_count, False)
+        self.assertRaises(ValueError, Tiler, size, tiles_count, False)
 
     def test_tile_size(self):
         for size, tiles_count in self.data:

@@ -4,7 +4,6 @@ import quantities as q
 from syris.opticalelements import geometry as geom
 from unittest import TestCase
 import itertools
-from testfixtures.shouldraise import ShouldRaise
 
 
 def get_base():
@@ -81,10 +80,8 @@ class Test(TestCase):
             self.assertAlmostEqual(res, 0)
 
     def test_scale(self):
-        with ShouldRaise(ValueError):
-            geom.scale(np.array([0, 1, 2]))
-        with ShouldRaise(ValueError):
-            geom.scale(np.array([1, -1, 2]))
+        self.assertRaises(ValueError, geom.scale, np.array([0, 1, 2]))
+        self.assertRaises(ValueError, geom.scale, np.array([1, -1, 2]))
 
         base = np.array([0.1, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0])
         coeffs = np.array(list(itertools.product(base, base, base)))

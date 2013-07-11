@@ -1,7 +1,6 @@
 import numpy as np
 import quantities as q
 from syris.devices.cameras import Camera, FPSError, is_fps_feasible
-from testfixtures import ShouldRaise
 from unittest import TestCase
 
 
@@ -26,14 +25,18 @@ class TestCamera(TestCase):
     def test_fps_setting(self):
         self.camera.fps = 500 / q.s
 
-        with ShouldRaise(FPSError):
-            self.camera.fps = 1001 / q.s
+        def _set_fps(fps):
+            self.camera.fps = fps
+
+        self.assertRaises(FPSError, _set_fps, 1001 / q.s)
 
     def test_exp_time_setting(self):
         self.camera.exp_time = 0.5 * q.ms
 
-        with ShouldRaise(FPSError):
-            self.camera.exp_time = 1.5 * q.ms
+        def _set_exp_time(exp_time):
+            self.camera.exp_time = exp_time
+
+        self.assertRaises(FPSError, _set_exp_time, 1.5 * q.ms)
 
     def test_bpp(self):
         self.assertEqual(self.camera.max_grey_value, 2 ** self.camera.bpp - 1)

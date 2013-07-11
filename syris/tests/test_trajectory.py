@@ -8,7 +8,6 @@ import quantities as q
 from syris.opticalelements import geometry as geom
 from unittest import TestCase
 from syris.opticalelements.geometry import Trajectory
-from testfixtures.shouldraise import ShouldRaise
 
 
 def get_control_points():
@@ -52,13 +51,13 @@ class Test(TestCase):
     def test_wrong_velocities(self):
         # Too short.
         velos = [(1 * q.mm, 1 * q.mm / q.s)]
-        with ShouldRaise(ValueError):
-            init_trajectory(kwargs={"velocities": velos})
+        self.assertRaises(ValueError, init_trajectory,
+                          kwargs={"velocities": velos})
 
         # Too long.
         velos = [(1 * q.mm, 1 * q.mm / q.s), (1000 * q.mm, 10 * q.mm / q.s)]
-        with ShouldRaise(ValueError):
-            init_trajectory(kwargs={"velocities": velos})
+        self.assertRaises(ValueError, init_trajectory,
+                          kwargs={"velocities": velos})
 
     def test_trajectory(self):
         c_points = get_control_points()
