@@ -2,7 +2,6 @@
 import itertools
 import numpy as np
 from syris import config as cfg
-import sys
 
 
 def fft_2(data, plan, wait_for_finish=False):

@@ -8,10 +8,10 @@ from syris.opticalelements import geometry as geom
 from syris.gpu import util as gpu_util
 import logging
 from opticalelements.graphicalobjects import MetaBall
-from opticalelements.geometry import Trajectory, interpolate_points
 import time
 import struct
 from pyopencl.array import vec
+from syris.devices.sources import BendingMagnet
 
 LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     cfg.init(queues)
         
 #     plt.figure()
-#     plt.imshow(res, origin="lower", cmap=cm.get_cmap("gray"),
+#     plt.imshow(res.magnitude, origin="lower", cmap=cm.get_cmap("gray"),
 #                interpolation="nearest")
 #     plt.colorbar()
 #     plt.show()

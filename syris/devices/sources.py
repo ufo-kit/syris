@@ -42,7 +42,7 @@ class XraySource(object):
 class BendingMagnet(XraySource):
 
     """Bending magnet X-ray source."""
-    _SR_CONST = 3 * fine_structure_constant.simplified / (4 * q.pi ** 2)
+    _SR_CONST = 3 * fine_structure_constant.simplified / (4 * np.pi ** 2)
 
     def __init__(self, electron_energy, el_current, magnetic_field,
                  sample_distance, energies, size, pixel_size,
@@ -65,6 +65,7 @@ class BendingMagnet(XraySource):
                                    self._angle_step * angle_steps / 2,
                                    angle_steps)
         self.profile_approx = profile_approx
+        self._profiles = self._create_vertical_profiles()
 
     @property
     def critical_energy(self):
@@ -111,14 +112,22 @@ class BendingMagnet(XraySource):
         properties and *energy_index* pointing to the array of energies for
         which the source was created.
         """
-        if self.profile_approx:
-            # Much faster but less precise.
-            return self.get_flux(self.energies[energy_index],
-                                 self._angles) * \
-                self._d_energy.rescale(q.keV).magnitude
-        else:
-            # Full energy integration.
-            return self._get_full_profile(energy_index)
+        return self._profiles[energy_index]
+
+    def _create_vertical_profiles(self):
+        """Create vertical profiles."""
+        profiles = []
+        for energy_index in range(len(self.energies)):
+            if self.profile_approx:
+                # Much faster but less precise.
+                profiles.append(self.get_flux(self.energies[energy_index],
+                                              self._angles) *
+                                self._d_energy.rescale(q.keV).magnitude)
+            else:
+                # Full energy integration.
+                profiles.append(self._get_full_profile(energy_index))
+
+        return profiles
 
     def get_flux(self, photon_energy, vertical_angle):
         """Get the photon flux coming from the source consisting of photons
@@ -133,6 +142,7 @@ class BendingMagnet(XraySource):
         xi = Quantity(0.5 * norm_energy.magnitude *
                       (1.0 + gama_psi ** 2) ** (3.0 / 2)).magnitude
 
+        # 1e-3 for 0.1 % BW
         return Quantity(BendingMagnet._SR_CONST * gama ** 2 *
                         self.el_current / q.elementary_charge *
                         norm_energy ** 2 *
