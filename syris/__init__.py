@@ -6,12 +6,34 @@ __version__ = 0.1
 import atexit
 import config as cfg
 import logging
+import pyopencl as cl
 import syris.profiling as prf
 from syris.profiling import Profiler, DummyProfiler
 from syris.gpu import util as g_util
 from syris import physics
+from argparse import ArgumentParser
 
 LOGGER = logging.getLogger()
+
+
+def _get_arguments():
+    parser = ArgumentParser()
+
+    parser.add_argument("--double", dest="double", action="store_true",
+                        default=False, help="Use double precision")
+    parser.add_argument("-l", "--log", dest="logging_level",
+                        help="logging level")
+    parser.add_argument("--profile", dest="profiler", action="count",
+                        default=0, help="enable profiling")
+    parser.add_argument("--profiler-file", dest="profiler_file",
+                        action="store",
+                        default="profile.dat", help="profiler file")
+    parser.add_argument("--LOGGER-file", dest="logger_file",
+                        default="simulation.log", help="log file path")
+    parser.add_argument("--pmasf-file", dest="pmasf_file", default="pmasf",
+                        help="full path to the pmasf binary")
+
+    return parser.parse_known_args()[0]
 
 
 def _init_logging(level, logger_file):
@@ -27,7 +49,8 @@ def _init_logging(level, logger_file):
 
 
 def _init_gpus(profiler, queues=None):
-    import pyopencl as cl
+    if profiler:
+        _wrap_opencl()
 
     if queues is None:
         cfg.CTX = g_util.get_cuda_context()
@@ -52,11 +75,16 @@ def _init_gpus(profiler, queues=None):
                                                            "physics.cl"]))
 
 
+def _wrap_opencl():
+    for function in cfg.PROFILED_CL_FUNCTIONS:
+        setattr(cl, function.__name__, g_util.execute_profiled(function))
+
+
 def init(queues=None):
     """Initialize Syris by the command line arguments."""
     import numpy as np
 
-    args = cfg.get_arguments()
+    args = _get_arguments()
     _init_gpus(args.profiler, queues)
 
     # Single or double floating point precision settings.

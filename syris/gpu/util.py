@@ -79,19 +79,25 @@ def _object_types_to_struct():
     return string
 
 
-def execute(function, *args, **kwargs):
+def execute_profiled(function):
     """Execute a *function* which can be an OpenCL kernel or other OpenCL
     related function and profile it.
     """
-    event = function(*args, **kwargs)
-    if function.__class__ == cl.Kernel:
-        func_name = function.function_name
-    else:
-        func_name = function.__name__
+    def wrapped(*args, **kwargs):
+        """Wrap a function for profiling."""
+        event = function(*args, **kwargs)
+        if hasattr(function, "function_name"):
+            name = function.function_name
+        else:
+            name = function.__name__
 
-    prf.PROFILER.add(event, func_name)
+        prf.PROFILER.add(event, name)
+        return event
 
-    return event
+    # Preserve the name.
+    wrapped.__name__ = function.__name__
+
+    return wrapped
 
 
 def get_cuda_platform(platforms):
