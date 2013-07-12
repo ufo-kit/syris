@@ -4,10 +4,10 @@ __version__ = 0.1
 
 
 import atexit
-import config as cfg
+import syris.config as cfg
 import logging
 import pyopencl as cl
-import syris.profiling as prf
+from syris import profiling as prf
 from syris.profiling import Profiler, DummyProfiler
 from syris.gpu import util as g_util
 from syris import physics, imageprocessing

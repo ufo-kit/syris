@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 """Physics on the light path."""
 
 import numpy as np
@@ -103,6 +102,3 @@ def visible_light_attenuation_coeff(scintillator, camera, num_aperture,
 
     return lens_trans_eff * quantum_eff * \
         optics_collection_eff(num_aperture, scintillator.opt_ref_index)
-=======
-"""Module for physics-based calculations."""
->>>>>>> Stashed changes
