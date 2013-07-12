@@ -3,7 +3,6 @@ Utility functions.
 """
 import numpy as np
 import pyopencl as cl
-from argparse import ArgumentParser
 
 
 # Default single precision specification of data types.

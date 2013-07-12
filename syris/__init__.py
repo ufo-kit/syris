@@ -10,7 +10,7 @@ import pyopencl as cl
 import syris.profiling as prf
 from syris.profiling import Profiler, DummyProfiler
 from syris.gpu import util as g_util
-from syris import physics
+from syris import physics, imageprocessing
 from argparse import ArgumentParser
 
 LOGGER = logging.getLogger()
@@ -71,13 +71,19 @@ def _init_gpus(profiler, queues=None):
         cfg.QUEUES = queues
         cfg.QUEUE = cfg.QUEUES[0]
 
-    physics.CL_PRG = g_util.get_program(g_util.get_source(["vcomplex.cl",
-                                                           "physics.cl"]))
+    _init_programs()
 
 
 def _wrap_opencl():
     for function in cfg.PROFILED_CL_FUNCTIONS:
         setattr(cl, function.__name__, g_util.execute_profiled(function))
+
+
+def _init_programs():
+    physics.CL_PRG = g_util.get_program(g_util.get_source(["vcomplex.cl",
+                                                           "physics.cl"]))
+    imageprocessing.CL_PRG = g_util.get_program(
+        g_util.get_source(["vcomplex.cl", "imageprocessing.cl"]))
 
 
 def init(queues=None):

@@ -10,7 +10,7 @@
  * 2D normalized Gaussian in Fourier space.
  */
 __kernel void gauss_2_f(__global vcomplex *out,
-						const float2 sigma,
+						const vfloat2 sigma,
 						const vfloat pixel_size) {
     int ix = get_global_id(0);
     int iy = get_global_id(1);

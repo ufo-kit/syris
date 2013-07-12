@@ -1,7 +1,11 @@
 """Module for GPU-based image processing."""
 import itertools
 import numpy as np
+import pyopencl as cl
 from syris import config as cfg
+from syris.gpu import util as g_util
+
+CL_PRG = None
 
 
 def fft_2(data, plan, wait_for_finish=False):
@@ -17,6 +21,24 @@ def ifft_2(data, plan, wait_for_finish=False):
     finish.
     """
     plan.execute(data, inverse=True, wait_for_finish=wait_for_finish)
+
+
+def get_gauss_2_f(size, sigma, pixel_size):
+    """Get 2D Gaussian of *size* (*size*, *size*) in Fourier Space
+    with standard deviation *sigma* specified as (y, x) and *pixel_size*.
+    """
+    mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
+                    size=size ** 2 * cfg.CL_CPLX)
+
+    CL_PRG.gauss_2_f(cfg.QUEUE,
+                     (size, size),
+                     None,
+                     mem,
+                     g_util.make_vfloat2(sigma[1].simplified,
+                                         sigma[0].simplified),
+                     cfg.NP_FLOAT(pixel_size.simplified))
+
+    return mem
 
 
 def _check_tiling(size, tiles_count):
