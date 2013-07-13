@@ -5,10 +5,12 @@ class Lens(object):
 
     """Class holsing lenses."""
 
-    def __init__(self, transmission_eff, numerical_aperture, sigma):
+    def __init__(self, transmission_eff, numerical_aperture, magnification,
+                 sigma):
         """Create a lens with transmission efficiency *transmission_eff*,
-        *numerical_aperture* and *sigma* (y, x) giving the standard
-        deviation of the point spread function approximated by a Gaussian.
+        *numerical_aperture*, *magnification* and *sigma* (y, x)
+        giving the standard deviation of the point spread function
+        approximated by a Gaussian.
         """
         if transmission_eff < 0 or transmission_eff > 1:
             raise ValueError("Transmission efficiency must " +
@@ -17,4 +19,5 @@ class Lens(object):
             raise ValueError("Numerical aperture must be greater than 1.")
         self.transmission_eff = transmission_eff
         self.numerical_aperture = numerical_aperture
+        self.magnification = magnification
         self.sigma = sigma

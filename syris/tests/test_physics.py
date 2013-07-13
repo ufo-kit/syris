@@ -12,7 +12,7 @@ class TestPhysics(TestCase):
         syris.init()
         self.energy = 20 * q.keV
         self.lam = 6.19920937165e-11 * q.m
-        self.size = 256
+        self.size = 64
         self.mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
                              size=self.size ** 2 * cfg.CL_CPLX)
         self.res = np.empty((self.size, self.size), dtype=cfg.NP_CPLX)

@@ -23,115 +23,105 @@ def ifft_2(data, plan, wait_for_finish=False):
     plan.execute(data, inverse=True, wait_for_finish=wait_for_finish)
 
 
-def get_gauss_2_f(size, sigma, pixel_size):
-    """Get 2D Gaussian of *size* (*size*, *size*) in Fourier Space
-    with standard deviation *sigma* specified as (y, x) and *pixel_size*.
+def get_gauss_2_f(shape, sigma, pixel_shape):
+    """Get 2D Gaussian of *shape* (*shape*, *shape*) in Fourier Space
+    with standard deviation *sigma* specified as (y, x) and *pixel_shape*.
     """
     mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                    size=size ** 2 * cfg.CL_CPLX)
+                    shape=shape ** 2 * cfg.CL_CPLX)
 
     CL_PRG.gauss_2_f(cfg.QUEUE,
-                     (size, size),
+                     (shape, shape),
                      None,
                      mem,
                      g_util.make_vfloat2(sigma[1].simplified,
                                          sigma[0].simplified),
-                     cfg.NP_FLOAT(pixel_size.simplified))
+                     cfg.NP_FLOAT(pixel_shape.simplified))
 
     return mem
 
 
-def _check_tiling(size, tiles_count):
+def _check_tiling(shape, tiles_count):
     """Check if tiling with tile counts *tile_counts* as (y, x) is possible
-    for *size* (y, x).
+    for *shape* (y, x).
     """
-    if size[0] % tiles_count[0] != 0 or size[1] % tiles_count[1] != 0:
-        raise ValueError("Size must be a multiple of tile size.")
+    if shape[0] % tiles_count[0] != 0 or shape[1] % tiles_count[1] != 0:
+        raise ValueError("shape must be a multiple of tile shape.")
 
 
 class Tiler(object):
 
     """Class for breaking images into smaller tiles."""
 
-    def __init__(self, size, tiles_count, outlier):
+    def __init__(self, shape, tiles_count, outlier=True, supersampling=1,
+                 cplx=False):
         """
-        Create image tiler for a region of *size* (y, x) to tiles with (y, x)
+        Create image tiler for a region of *shape* (y, x) to tiles with (y, x)
         *tiles_count*. If *outlier* is True we want to include outlier regions
         in the tiles, thus they are twice as large (this is used for dealing
-        with FFT outlier artifacts).
+        with FFT outlier artifacts). *Supersampling* determines
+        the coeffiecient by which the resulting image dimensions will be
+        multiplied. If *cplx* is True, the resulting overall image will
+        be complex.
         """
-        _check_tiling(size, tiles_count)
+        _check_tiling(shape, tiles_count)
 
-        self.size = size
         self.tiles_count = tiles_count
-        self.outlier = outlier
+        self._outlier_coeff = 2 if outlier else 1
+        self.supersampling = supersampling
+        self.shape = (shape[0] * self.supersampling,
+                     shape[1] * self.supersampling)
+        
+        ar_type = cfg.NP_CPLX if cplx else cfg.NP_FLOAT
+        
+        self._overall = np.empty((self.shape[0] / self.supersampling,
+                         self.shape[1] / self.supersampling), dtype=ar_type)
 
     @property
-    def tile_size(self):
-        """Get tile size based on tile counts *tile_counts* as (y, x)
-        and *size* (y, x).
-        """
-        if self.outlier:
-            size = 2 * self.size[0] / self.tiles_count[0], \
-                2 * self.size[1] / self.tiles_count[1]
-        else:
-            size = self.size[0] / self.tiles_count[0], \
-                self.size[1] / self.tiles_count[1]
+    def outlier(self):
+        return bool(self._outlier_coeff - 1)
 
-        return size
+    @property
+    def overall_image(self):
+        return self._overall
+
+    @property
+    def tile_shape(self):
+        """Get the supersampled tile shape based on tile counts
+        *tile_counts* as (y, x) and *shape* (y, x).
+        """
+        return self._outlier_coeff * self.shape[0] / self.tiles_count[0], \
+            self._outlier_coeff * self.shape[1] / self.tiles_count[1]
 
     @property
     def tile_indices(self):
-        """Get tile indices which are starting points of a given tile
-        in (y, x) fashion.
+        """Get the supersampled tile indices which are starting points
+        of a given tile in (y, x) fashion.
         """
-        coeff = 2 if self.outlier else 1
-
-        y_ind = np.array([i * self.tile_size[0] / coeff
+        y_ind = np.array([i * self.tile_shape[0] / self._outlier_coeff
                           for i in range(self.tiles_count[0])])
-        x_ind = np.array([i * self.tile_size[1] / coeff
+        x_ind = np.array([i * self.tile_shape[1] / self._outlier_coeff
                           for i in range(self.tiles_count[1])])
 
         if self.outlier:
-            # If the tile starts at x and has a size n, then with outlier
+            # If the tile starts at x and has a shape n, then with outlier
             # treatment it starts at x - n / 2 and ends in x + n / 2, thus
-            # has size 2 * n
-            y_ind = y_ind - self.tile_size[0] / 4
-            x_ind = x_ind - self.tile_size[1] / 4
+            # has shape 2 * n
+            y_ind = y_ind - self.tile_shape[0] / 4
+            x_ind = x_ind - self.tile_shape[1] / 4
 
         return np.array(list(itertools.product(y_ind, x_ind))).\
             reshape(self.tiles_count + (2,))
-
-    def create_tiles(self, cplx=False):
-        """Create a numpy 4D array which will hold the tiles. If *cplx*
-        is True, the tiles in the array will be complex-valued.
+        
+    def insert(self, tile, indices):
+        """Insert a non-supersampled, outlier-free *tile* into the overall
+        image. *indices* (y, x) are tile indices in the overall image.
         """
-        ar_type = cfg.NP_CPLX if cplx else cfg.NP_FLOAT
+        # Get rid of supersampling and outlier.
+        tile_shape = [dim / self.supersampling / self._outlier_coeff
+                        for dim in self.tile_shape]
 
-        return np.empty(self.tiles_count + self.tile_size, dtype=ar_type)
-
-    def reconstruct(self, tiles):
-        """Reconstruct the whole image from image *tiles*."""
-        result = np.empty(self.size, dtype=tiles.dtype)
-
-        if self.outlier:
-            # Cut the outlier regions to n / 4 .. 3 * n / 4
-            start = self.tile_size[0] / 4, self.tile_size[1] / 4
-            end = 3 * start[0], 3 * start[1]
-        else:
-            start = 0, 0
-            end = self.tile_size
-
-        for j in range(tiles.shape[0]):
-            for i in range(tiles.shape[1]):
-                # If outlier was used, we need to add tile_size / 4 to the
-                # index.
-                result[self.tile_indices[j, i][0] + start[0]:
-                       self.tile_indices[j, i][0] +
-                       self.tile_size[0] - start[0],
-                       self.tile_indices[j, i][1] + start[1]:
-                       self.tile_indices[j, i][1] +
-                       self.tile_size[1] - start[1]] = \
-                    tiles[j, i][start[0]:end[0], start[1]:end[1]]
-
-        return result
+        self._overall[indices[0] * tile_shape[0]:
+                      tile_shape[0] * (indices[0] + 1),
+                      indices[1] * tile_shape[1]:
+                      tile_shape[1] * (indices[1] + 1)] = tile

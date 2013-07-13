@@ -32,10 +32,10 @@ class Camera(object):
 
     """Base class representing a camera."""
 
-    def __init__(self, shape, pixel_size, gain, dark_current,
-                 amplifier_sigma, bits_per_pixel, quantum_efficiencies,
-                 exp_time, fps):
-        """Create a camera with *shape* (y, x), *pixel_size*, *gain*
+    def __init__(self, pixel_size, gain, dark_current, amplifier_sigma,
+                 bits_per_pixel, quantum_efficiencies, shape=None,
+                 exp_time=None, fps=None):
+        """Create a camera with *pixel_size*, *gain*
         specifying :math:`\frac{counts}{e^-}`, *dark_current* as mean number
         of electrons present without incident light, *amplifier_sigma* is the
         sigma of the normal distributed noise given by camera electronics,
@@ -46,18 +46,42 @@ class Camera(object):
         e.g. fps can be set to 1000 and exposure time to 1 \mu s, but
         it cannot exceed :math:`1/fps` s).
         """
-        self.shape = shape
         self.pixel_size = pixel_size
         self.gain = gain
         self.dark_current = dark_current
         self.amplifier_sigma = amplifier_sigma
         self.bpp = bits_per_pixel
-        _fps_check_raise(fps, exp_time)
-        self._fps = fps.simplified
-        self._exp_time = exp_time.simplified
         self.quantum_effs = quantum_efficiencies
         self._dtype = np.ushort
-        self._dark_image = np.ones(self.shape, self._dtype) * self.dark_current
+        self.shape = shape
+        
+        if fps is None and exp_time is None:
+            self._fps = None
+            self._exp_time = None
+        else:
+            if fps is not None:
+                if exp_time is None:
+                    exp_time = 1.0 / fps
+            else:
+                fps = 1.0 / exp_time
+        
+        if fps is not None:
+            _fps_check_raise(fps, exp_time)
+        self._exp_time = exp_time
+        self._fps = fps
+            
+    @property
+    def shape(self):
+        return self._shape
+    
+    @shape.setter
+    def shape(self, shape):
+        self._shape = shape
+        if self._shape is not None:
+            self._dark_image = np.ones(self.shape, self._dtype) * \
+                                self.dark_current
+        else:
+            self.dark_image = None
 
     @property
     def exp_time(self):

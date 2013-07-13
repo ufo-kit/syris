@@ -21,7 +21,7 @@ class TestImageTiling(TestCase):
     def setUp(self):
         self.data = []
 
-        sizes = [256, 1024]
+        sizes = [8, 32]
         tile_counts = [2, 4]
         for j in range(len(sizes)):
             for i in range(len(sizes)):
@@ -57,19 +57,19 @@ class TestImageTiling(TestCase):
 
         self.assertRaises(ValueError, Tiler, size, tiles_count, False)
 
-    def test_tile_size(self):
+    def test_tile_shape(self):
         for size, tiles_count in self.data:
             tiler = Tiler(size, tiles_count, True)
             self.assertEqual(2 * size[0] / tiles_count[0],
-                             tiler.tile_size[0])
+                             tiler.tile_shape[0])
             self.assertEqual(2 * size[1] / tiles_count[1],
-                             tiler.tile_size[1])
+                             tiler.tile_shape[1])
 
             tiler = Tiler(size, tiles_count, False)
             self.assertEqual(size[0] / tiles_count[0],
-                             tiler.tile_size[0])
+                             tiler.tile_shape[0])
             self.assertEqual(size[1] / tiles_count[1],
-                             tiler.tile_size[1])
+                             tiler.tile_shape[1])
 
     def test_tile_indices(self):
         sizes = [256, 1024]
@@ -89,50 +89,28 @@ class TestImageTiling(TestCase):
                         tiler = Tiler(size, tiles_count, outlier)
                         self._check_tiles(tiler.tile_indices, size,
                                           tiles_count, outlier)
-
-    def test_create_tiles(self):
-        for size, tiles_count in self.data:
-            tiler = Tiler(size, tiles_count, True)
-            shape = np.array(tiles_count + tiler.tile_size)
-            ar = tiler.create_tiles(cplx=False)
-            diff = np.sum(shape - np.array(ar.shape))
-            self.assertEqual(diff, 0)
-            self.assertEqual(ar.dtype, cfg.NP_FLOAT)
-            ar = tiler.create_tiles(cplx=True)
-            self.assertEqual(ar.dtype, cfg.NP_CPLX)
-
-            tiler = Tiler(size, tiles_count, True)
-            shape = np.array(tiles_count + tiler.tile_size)
-            ar = tiler.create_tiles(cplx=False)
-            diff = np.sum(shape - np.array(ar.shape))
-            self.assertEqual(diff, 0)
-            self.assertEqual(ar.dtype, cfg.NP_FLOAT)
-            ar = tiler.create_tiles(cplx=True)
-            self.assertEqual(ar.dtype, cfg.NP_CPLX)
-
-    def _compare_reconstruction(self, tiler, cplx):
-        ar_type = cfg.NP_CPLX if cplx else cfg.NP_FLOAT
-        tiles = tiler.create_tiles(cplx=cplx)
-        for j in (range(tiler.tiles_count[0])):
-            for i in (range(tiler.tiles_count[1])):
-                y_start, x_start = tiler.tile_indices[j, i]
-                tiles[j, i] = _get_image((y_start, y_start +
-                                          tiler.tile_size[0]),
-                                         (x_start, x_start + tiler.tile_size[
-                                          1]),
-                                         ar_type=ar_type)
-
-        orig = _get_image((0, tiler.size[0]), (0, tiler.size[1]),
-                          ar_type=ar_type)
-        reco = tiler.reconstruct(tiles)
-        self.assertAlmostEqual(np.sum(reco - orig), 0)
-
-    def test_reconstruct(self):
-        for size, tiles_count in self.data:
-            tiler = Tiler(size, tiles_count, False)
-            self._compare_reconstruction(tiler, False)
-            self._compare_reconstruction(tiler, True)
-
-            tiler = Tiler(size, tiles_count, True)
-            self._compare_reconstruction(tiler, False)
-            self._compare_reconstruction(tiler, True)
+            
+    def test_insert(self):
+        shape = 16, 32
+        tiles_count = 4, 2
+        tile_shape = [shape[i] / tiles_count[i] for i in range(len(shape))]
+        
+        tilers = [Tiler(shape, tiles_count, outlier=True, supersampling=1),
+                  Tiler(shape, tiles_count, outlier=False, supersampling=1),
+                  Tiler(shape, tiles_count, outlier=True, supersampling=2),
+                  Tiler(shape, tiles_count, outlier=False, supersampling=2),
+                  Tiler(shape, tiles_count, outlier=True, supersampling=4),
+                  Tiler(shape, tiles_count, outlier=False, supersampling=4)]
+        for tiler in tilers:
+            self.assertEqual(tiler.overall_image.shape, shape)
+            for j in range(tiles_count[0]):
+                for i in range(tiles_count[1]):
+                    tile = np.random.random(tile_shape).\
+                        astype(tiler.overall_image.dtype)
+                    tiler.insert(tile, (j, i))
+                    np.testing.assert_equal(
+                            tiler.overall_image[j * tile_shape[0]:
+                                                tile_shape[0] * (j + 1),
+                                                i * tile_shape[1]:
+                                                tile_shape[1] * (i + 1)],
+                                                tile)
