@@ -49,8 +49,8 @@ class GraphicalObject(object):
         return self._center
 
     @center.setter
-    def center(self, cen):
-        self._center = cen
+    def center(self, center):
+        self._center = center.simplified
 
     @property
     def orientation(self):

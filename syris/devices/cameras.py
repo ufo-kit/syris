@@ -46,7 +46,7 @@ class Camera(object):
         e.g. fps can be set to 1000 and exposure time to 1 \mu s, but
         it cannot exceed :math:`1/fps` s).
         """
-        self.pixel_size = pixel_size
+        self.pixel_size = pixel_size.simplified
         self.gain = gain
         self.dark_current = dark_current
         self.amplifier_sigma = amplifier_sigma
