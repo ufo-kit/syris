@@ -4,7 +4,9 @@ import quantities as q
 import syris
 from syris.gpu import util as gpu_util
 from syris import config as cfg
+from syris import imageprocessing as ip
 from unittest import TestCase
+import itertools
 
 
 class TestGPUImageProcessing(TestCase):
@@ -54,3 +56,53 @@ class TestGPUImageProcessing(TestCase):
         # Normalization test. The sum of the Gaussian must be 1.
         gauss_real = np.fft.ifft2(self.res)
         self.assertAlmostEqual(np.sum(gauss_real), 1)
+
+    def test_sum(self):
+        widths = [8, 16, 32]
+        region_widths = [1, 2, 4, widths[-1]]
+
+        shapes = list(itertools.product(widths, widths))
+        regions = list(itertools.product(region_widths, region_widths))
+
+        for shape in shapes:
+            for region in regions:
+                for coeff in [0, 1]:
+                    summed_shape = [shape[i] / (coeff + 1) / region[i]
+                                    for i in range(len(shape))]
+                    if summed_shape[0] == 0 or summed_shape[1] == 0:
+                        continue
+
+                    # Create such tile, that summing along x and y is
+                    # not equal to summing along y and then x.
+                    tile = np.arange(region[0] * region[1]).reshape(region)
+                    im = np.tile(tile, (shape[0] / region[0],
+                                        shape[1] / region[1])).\
+                        astype(cfg.NP_FLOAT)
+                    mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE |
+                                    cl.mem_flags.COPY_HOST_PTR, hostbuf=im)
+
+                    if coeff:
+                        offset = shape[0] / 4, shape[1] / 4
+                    else:
+                        offset = 0, 0
+                    out_mem = ip.sum(shape, summed_shape, mem, region, offset)
+                    res = np.empty(summed_shape, dtype=cfg.NP_FLOAT)
+                    cl.enqueue_copy(cfg.QUEUE, res, out_mem)
+                    mem.release()
+                    out_mem.release()
+
+                    ground_truth = np.ones_like(res) * np.sum(tile)
+                    np.testing.assert_almost_equal(res, ground_truth)
+
+        shape = 16, 16
+        summed_shape = 2, 2
+        region = 8, 8
+        im = np.ones(shape, dtype=cfg.NP_FLOAT)
+        mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE |
+                        cl.mem_flags.COPY_HOST_PTR, hostbuf=im)
+        out_mem = ip.sum(shape, summed_shape, mem, region,
+                         (0, 0), average=True)
+        res = np.empty(summed_shape, dtype=cfg.NP_FLOAT)
+        cl.enqueue_copy(cfg.QUEUE, res, out_mem)
+        ground_truth = np.ones(summed_shape, dtype=cfg.NP_FLOAT)
+        np.testing.assert_almost_equal(res, ground_truth)

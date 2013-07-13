@@ -2,6 +2,7 @@
 import itertools
 import numpy as np
 import pyopencl as cl
+from pyopencl.array import vec
 from syris import config as cfg
 from syris.gpu import util as g_util
 
@@ -41,6 +42,34 @@ def get_gauss_2_f(shape, sigma, pixel_shape):
     return mem
 
 
+def sum(orig_shape, summed_shape, mem, region, offset,
+        average=False, out_mem=None):
+    """Sum 2D OpenCL buffer *mem* with *orig_shape* as (y, x). One
+    resulting pixel is summed over *region* (y, x) of pixels
+    in the original buffer. The resulting buffer has shape *summer_shape*
+    (y, x). *Offset* (y, x) is the offset to the original buffer *mem*.
+    If *average* is True, the summed pixel is normalized by the
+    region area. If *out_mem* is not None, the output buffer
+    will be *out_mem*.
+    """
+    if out_mem is None:
+        bpp = mem.size / (orig_shape[0] * orig_shape[1])
+        out_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
+                            size=summed_shape[0] * summed_shape[1] * bpp)
+
+    CL_PRG.sum(cfg.QUEUE,
+              (summed_shape[::-1]),
+               None,
+               out_mem,
+               mem,
+               vec.make_int2(*region[::-1]),
+               np.int32(orig_shape[1]),
+               vec.make_int2(*offset[::-1]),
+               np.int32(average))
+
+    return out_mem
+
+
 def _check_tiling(shape, tiles_count):
     """Check if tiling with tile counts *tile_counts* as (y, x) is possible
     for *shape* (y, x).
@@ -70,12 +99,19 @@ class Tiler(object):
         self._outlier_coeff = 2 if outlier else 1
         self.supersampling = supersampling
         self.shape = (shape[0] * self.supersampling,
-                     shape[1] * self.supersampling)
-        
+                      shape[1] * self.supersampling)
+
         ar_type = cfg.NP_CPLX if cplx else cfg.NP_FLOAT
-        
+
         self._overall = np.empty((self.shape[0] / self.supersampling,
-                         self.shape[1] / self.supersampling), dtype=ar_type)
+                                  self.shape[1] / self.supersampling),
+                                 dtype=ar_type)
+
+    @property
+    def result_tile_shape(self):
+        """Result tile shape without outlier and supersampling."""
+        return tuple([dim / self.supersampling / self._outlier_coeff
+                      for dim in self.tile_shape])
 
     @property
     def outlier(self):
@@ -112,14 +148,26 @@ class Tiler(object):
 
         return np.array(list(itertools.product(y_ind, x_ind))).\
             reshape(self.tiles_count + (2,))
-        
+
+    def average(self, tile_mem, out_mem=None):
+        """Average OpenCL buffer *tile_mem* based on supersampling
+        and outlier specified for the tiler. If *out_mem* is not None,
+        it will be used for returning the sum.
+        """
+        summed_shape = self.result_tile_shape
+        offset = [(self._outlier_coeff - 1) * dim / 4
+                  for dim in self.tile_shape]
+
+        return sum(self.tile_shape, summed_shape, tile_mem,
+                   (self.supersampling, self.supersampling),
+                   offset, average=True, out_mem=out_mem)
+
     def insert(self, tile, indices):
         """Insert a non-supersampled, outlier-free *tile* into the overall
         image. *indices* (y, x) are tile indices in the overall image.
         """
         # Get rid of supersampling and outlier.
-        tile_shape = [dim / self.supersampling / self._outlier_coeff
-                        for dim in self.tile_shape]
+        tile_shape = self.result_tile_shape
 
         self._overall[indices[0] * tile_shape[0]:
                       tile_shape[0] * (indices[0] + 1),

@@ -40,3 +40,31 @@ __kernel void gauss_2_f(__global vcomplex *out,
     		(exp(- 2 * M_PI * M_PI / (pixel_size * pixel_size) *
 				(sigma.x * sigma.x * i * i + sigma.y * sigma.y * j * j)), 0);
 }
+
+/*
+ * Sum image over a given region.
+ */
+__kernel void sum(__global vfloat *out,
+                        __global vfloat *in,
+                        const int2 region,
+                        const int orig_width,
+                        const int2 offset,
+                        const int average) {
+    int ix = get_global_id(0);
+    int iy = get_global_id(1);
+    int i, j, width;
+    vfloat value = 0.0;
+
+    for (j = 0; j < region.y; j++) {
+    	for (i = 0; i < region.x; i++) {
+    		value += in[orig_width * (iy * region.y + offset.y + j) +
+    		            					ix * region.x + i + offset.x];
+        }
+    }
+
+    if (average) {
+    	value /= (vfloat)(region.x * region.y);
+    }
+
+    out[iy * get_global_size(0) + ix] = value;
+}

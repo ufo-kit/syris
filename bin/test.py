@@ -2,6 +2,7 @@ import logging
 from matplotlib import pyplot as plt, cm
 import numpy as np
 import pyopencl as cl
+from pyopencl.array import vec
 import quantities as q
 import syris
 from syris import physics, config as cfg
@@ -12,11 +13,16 @@ LOGGER = logging.getLogger(__name__)
 
 def kernels():
     return """
-    __kernel void mulmy(__global float *out) {
+    __kernel void ones(__global float *out) {
+        out[get_global_id(0)] = 1;
+    }
+    
+    __kernel void mul(__global float *out) {
         int ix = get_global_id(0);
-        //int iy = get_global_id(1);
         
-        out[ix] = ix;
+        ones(out);
+        
+        out[ix] += 4; 
     }
     """
 
@@ -24,20 +30,21 @@ if __name__ == '__main__':
     syris.init()
     
     prg = g_util.get_program(kernels())
+    n = 4
+    mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE, size=n*cfg.CL_FLOAT)
     
-    n = 512
-    mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE, size=n**2*4)
-    res = np.empty((2*n,2*n), dtype=np.float32)
-    
-    prg.mulmy(cfg.QUEUE,
-            (n,n),
+    prg.mul(cfg.QUEUE,
+            (n,),
             None,
             mem)
-    print res[:n, :n].__class__
-    cl.enqueue_copy(cfg.QUEUE, res[:n, :n], mem)
+    
+    res = np.empty(n, dtype=cfg.NP_FLOAT)
+    cl.enqueue_copy(cfg.QUEUE, res, mem)
+    
+    print res
         
-    plt.figure()
-    plt.imshow(res, origin="lower", cmap=cm.get_cmap("gray"),
-               interpolation="nearest")
-    plt.colorbar()
-    plt.show()
+#     plt.figure()
+#     plt.imshow(res, origin="lower", cmap=cm.get_cmap("gray"),
+#                interpolation="nearest")
+#     plt.colorbar()
+#     plt.show()

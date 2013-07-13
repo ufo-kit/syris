@@ -54,7 +54,7 @@ class Camera(object):
         self.quantum_effs = quantum_efficiencies
         self._dtype = np.ushort
         self.shape = shape
-        
+
         if fps is None and exp_time is None:
             self._fps = None
             self._exp_time = None
@@ -64,24 +64,24 @@ class Camera(object):
                     exp_time = 1.0 / fps
             else:
                 fps = 1.0 / exp_time
-        
+
         if fps is not None:
             _fps_check_raise(fps, exp_time)
         self._exp_time = exp_time
         self._fps = fps
-            
+
     @property
     def shape(self):
         return self._shape
-    
+
     @shape.setter
     def shape(self, shape):
         self._shape = shape
         if self._shape is not None:
             self._dark_image = np.ones(self.shape, self._dtype) * \
-                                self.dark_current
+                self.dark_current
         else:
-            self.dark_image = None
+            self._dark_image = None
 
     @property
     def exp_time(self):
