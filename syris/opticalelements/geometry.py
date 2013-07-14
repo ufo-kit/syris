@@ -116,7 +116,7 @@ class Trajectory(object):
                  v_0=0 * q.m / q.s):
         """Create trajectory from given *points* which represent (x,y,z)
         coordinates, *length* is the trajectory length, *velocities*
-        is a list of (time, velocity) tuples, where the first component
+        is a list of (length, velocity) tuples, where the first component
         specifies the relative distance in which the object following
         the trajectory will achieve the given velocity. *v_0* is the initial
         velocity.
@@ -148,6 +148,15 @@ class Trajectory(object):
             return 0
 
         return int(round(dist / self.length * (len(self.points) - 1)))
+
+    def moved(self, t_0, t_1, pixel_size):
+        """Return True if the trajectory moved between time *t_0* and *t_1*
+        more than one pixel with respect to the given *pixel_size*.
+        """
+        p_0 = self.get_point(t_0)
+        p_1 = self.get_point(t_1)
+
+        return length(p_1 - p_0) > pixel_size
 
     def get_point(self, abs_time):
         """Get a point on the trajectory at the time *abs_time*."""
@@ -199,11 +208,6 @@ class Trajectory(object):
             velocities.append((t_1, v_1))
 
         return velocities
-
-    @property
-    def pixel_size(self):
-        """Pixel size."""
-        return self._pixel_size
 
     @property
     def points(self):
