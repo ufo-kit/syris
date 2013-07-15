@@ -43,7 +43,7 @@ class Test(TestCase):
             self.assertEqual(geom.angle(vec_0, vec_1), 90 * q.deg)
 
     def test_is_normalized(self):
-        norm_vec = np.array([1, 0, 0]) * q.m
+        norm_vec = np.array([1, 0, 0]) * q.dimensionless
         unnorm_vec = np.array([1, 1, 1]) * q.m
 
         self.assertTrue(geom.is_normalized(norm_vec))

@@ -149,15 +149,6 @@ class Trajectory(object):
 
         return int(round(dist / self.length * (len(self.points) - 1)))
 
-    def moved(self, t_0, t_1, pixel_size):
-        """Return True if the trajectory moved between time *t_0* and *t_1*
-        more than one pixel with respect to the given *pixel_size*.
-        """
-        p_0 = self.get_point(t_0)
-        p_1 = self.get_point(t_1)
-
-        return length(p_1 - p_0) > pixel_size
-
     def get_point(self, abs_time):
         """Get a point on the trajectory at the time *abs_time*."""
         return self.points[self._get_point_index(abs_time)]
@@ -320,7 +311,7 @@ def normalize(vector):
 
 def is_normalized(vector):
     """Test whether a *vector* is normalized."""
-    return length(vector) == 1.0 * vector.units
+    return length(vector) == 1.0 * q.dimensionless
 
 
 def transform_vector(trans_matrix, vector):
@@ -353,7 +344,7 @@ def rotate(phi, axis, total_start=None):
     transformation TRT^-1. The transformation is in the backward form and
     the angle is _always_ rescaled to radians.
     """
-    axis = normalize(axis.simplified)
+    axis = normalize(axis)
 
     phi = phi.simplified
     sin = np.sin(phi)

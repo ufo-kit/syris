@@ -8,6 +8,7 @@ from syris import config as cfg
 from syris.opticalelements.geometry import BoundingBox
 import syris.opticalelements.geometry as geom
 import struct
+from quantities.quantity import Quantity
 
 LOGGER = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ class GraphicalObject(object):
         self._center = trajectory.points[0].simplified
 
         # Matrix holding transformation.
-        self._trans_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
+        self.transform_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
 
         # Last position as tuple consisting of a 3D point and a vector giving
         # the object orientation.
@@ -36,7 +37,8 @@ class GraphicalObject(object):
     @property
     def position(self):
         """Current position."""
-        return np.dot(linalg.inv(self._trans_matrix), (0, 0, 0, 1))[:-1]
+        return np.dot(linalg.inv(self.transform_matrix), (0, 0, 0, 1))[:-1] * \
+            self.center.units
 
     @property
     def last_position(self):
@@ -56,14 +58,9 @@ class GraphicalObject(object):
     def orientation(self):
         return self._orientation
 
-    @property
-    def transformation_matrix(self):
-        """Current transformation matrix."""
-        return self._trans_matrix
-
     def clear_transformation(self):
         """Clear all transformations."""
-        self._trans_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
+        self.transform_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
 
     @property
     def trajectory(self):
@@ -73,7 +70,16 @@ class GraphicalObject(object):
         """Apply transformation given by the transformation matrix
         *trans_matrix* on the current transformation matrix.
         """
-        self._trans_matrix = np.dot(trans_matrix, self._trans_matrix)
+        self.transform_matrix = np.dot(trans_matrix, self.transform_matrix)
+
+    def moved(self, t_0, t_1, pixel_size):
+        """Return True if the trajectory moved between time *t_0* and *t_1*
+        more than one pixel with respect to the given *pixel_size*.
+        """
+        p_0 = self.trajectory.get_point(t_0)
+        p_1 = self.trajectory.get_point(t_1)
+
+        return geom.length(p_1 - p_0) > pixel_size
 
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
@@ -92,21 +98,23 @@ class GraphicalObject(object):
 
     def translate(self, vec):
         """Translate the object by a vector *vec*."""
-        self._trans_matrix = np.dot(geom.translate(vec), self._trans_matrix)
+        self.transform_matrix = np.dot(
+            geom.translate(vec), self.transform_matrix)
 
     def rotate(self, angle, axis, total_start=None):
         """Rotate the object by *angle* around vector *axis*, where
         *total_start* is the center of rotation point which results in
         transformation TRT^-1.
         """
-        self._trans_matrix = np.dot(geom.rotate(angle, axis, total_start),
-                                    self._trans_matrix)
+        self.transform_matrix = np.dot(geom.rotate(angle, axis, total_start),
+                                       self.transform_matrix)
 
     def scale(self, scale_vec):
         """Scale the object by scaling coefficients (kx, ky, kz)
         given by *sc_vec*.
         """
-        self._trans_matrix = np.dot(geom.scale(scale_vec), self._trans_matrix)
+        self.transform_matrix = np.dot(
+            geom.scale(scale_vec), self.transform_matrix)
 
 
 class MetaObject(GraphicalObject):
@@ -146,9 +154,9 @@ class MetaObject(GraphicalObject):
     def get_transform_const(self):
         """Precompute the transformation constant which does not change for
         x,y position."""
-        a_x = self._trans_matrix[0][2]
-        a_y = self._trans_matrix[1][2]
-        a_z = self._trans_matrix[2][2]
+        a_x = self.transform_matrix[0][2]
+        a_y = self.transform_matrix[1][2]
+        a_z = self.transform_matrix[2][2]
         return a_x ** 2 + a_y ** 2 + a_z ** 2
 
     def pack(self):
@@ -159,7 +167,7 @@ class MetaObject(GraphicalObject):
                            self.blobbiness.magnitude,
                            self.get_falloff_const(),
                            self.get_transform_const(),
-                           *self._trans_matrix.flatten())
+                           *self.transform_matrix.flatten())
 
 
 class MetaBall(MetaObject):
@@ -175,36 +183,40 @@ class MetaBall(MetaObject):
     def get_falloff_const(self):
         """Precompute mataball falloff curve constant which are the same
         for all the x,y coordinates. It ensures that f(x) = 1 <=> x = r."""
-        influence = self._blobbiness + self._radius
+        influence = Quantity(self._blobbiness + self._radius).\
+            simplified.magnitude
         transformation_const = self.get_transform_const()
 
-        a_x = self._trans_matrix[0][2]
-        a_y = self._trans_matrix[1][2]
-        a_z = self._trans_matrix[2][2]
+        a_x = self.transform_matrix[0][2]
+        a_y = self.transform_matrix[1][2]
+        a_z = self.transform_matrix[2][2]
         # Calculate the 1/(influence^2 - r^2)^2 coefficient.
-        center_x = self._center[0]
-        center_y = self._center[1]
-        k_x = self._trans_matrix[0][0] * center_x + \
-            self._trans_matrix[0][1] * center_y + \
-            self._trans_matrix[0][3] * q.m
-        k_y = self._trans_matrix[1][0] * center_x + \
-            self._trans_matrix[1][1] * center_y + \
-            self._trans_matrix[1][3] * q.m
-        k_z = self._trans_matrix[2][0] * center_x + \
-            self._trans_matrix[2][1] * center_y + \
-            self._trans_matrix[2][3] * q.m
+        center_x = self._center[0].simplified.magnitude
+        center_y = self._center[1].simplified.magnitude
+        k_x = self.transform_matrix[0][0] * center_x + \
+            self.transform_matrix[0][1] * center_y + \
+            self.transform_matrix[0][3]
+        k_y = self.transform_matrix[1][0] * center_x + \
+            self.transform_matrix[1][1] * center_y + \
+            self.transform_matrix[1][3]
+        k_z = self.transform_matrix[2][0] * center_x + \
+            self.transform_matrix[2][1] * center_y + \
+            self.transform_matrix[2][3]
 
         roots = np.roots([transformation_const,
                           2 * k_x * a_x + 2 * k_y * a_y + 2 * k_z * a_z,
                           k_x * k_x + k_y * k_y + k_z * k_z - influence ** 2])
-        influence_0 = (roots[1] - roots[0]) / 2 * q.m
+        influence_0 = (roots[1] - roots[0]) / 2
+
         roots = np.roots([transformation_const,
                           2 * k_x * a_x + 2 * k_y * a_y + 2 * k_z * a_z,
                           k_x * k_x + k_y * k_y + k_z * k_z -
-                          self.radius ** 2])
-        r_0 = (roots[1] - roots[0]) / 2 * q.m
+                          self.radius.simplified.magnitude ** 2])
+        r_0 = (roots[1] - roots[0]) / 2
 
-        return 1.0 / (influence_0 ** 2 - r_0 ** 2) ** 2
+        res = 1.0 / (influence_0 ** 2 - r_0 ** 2) ** 2
+
+        return res.real
 
 
 class MetaCube(MetaObject):
@@ -227,17 +239,15 @@ class CompositeObject(GraphicalObject):
     """Class representing an object consisting of more sub-objects."""
 
     def __init__(self, trajectory, orientation=geom.Y_AX, gr_objects=[]):
-        """*gr_objects* are the graphical objects which is this object
-        composed of.
-        """
-        super(CompositeObject, self).__init__(self, trajectory, orientation)
+        """*gr_objects* is a list of :py:class:`GraphicalObject`."""
+        super(CompositeObject, self).__init__(trajectory, orientation)
         self._objects = gr_objects
         self._index = -1
 
     @property
     def objects(self):
         """All objects which are inside this composite object."""
-        return self._objects
+        return tuple(self._objects)
 
     def __len__(self):
         if self._objects:
@@ -264,25 +274,24 @@ class CompositeObject(GraphicalObject):
 
         return self._objects[self._index]
 
-    def primitive_len(self):
-        """Get number of graphical objects which are not composite objects."""
-        return self._primitive_len(primitive_objects=[])
-
-    def _primitive_len(self, primitive_objects=[]):
-        """Internal primitive objects counter. *primitive_objects* is the
-        accumulated list of primitive objects within this composite object."""
-        for obj in self._objects:
-            if obj.__class__ == CompositeObject:
-                obj._primitive_len(primitive_objects)
+    @property
+    def primitive_objects(self):
+        res = set()
+        for obj in self:
+            if obj.__class__ == self.__class__:
+                res.update(obj.primitive_objects)
             else:
-                if obj not in primitive_objects:
-                    primitive_objects.append(obj)
+                res.add(obj)
 
-        return len(primitive_objects)
+        return tuple(res)
 
-    def append(self, obj):
+    def add(self, obj):
         """Add a graphical object *obj*."""
-        self._objects.append(obj)
+        if obj.__class__ == CompositeObject and self in obj.objects:
+            raise ValueError("This instance is already inside the " +
+                             "composite objects you are trying to add.")
+        if obj not in self and obj is not self:
+            self._objects.append(obj)
 
     def remove(self, obj):
         """Remove graphical object *obj*."""
@@ -294,7 +303,7 @@ class CompositeObject(GraphicalObject):
 
     def clear_transformation(self):
         """Clear all transformations."""
-        super.clear_transformation(self)
+        GraphicalObject.clear_transformation(self)
         for obj in self:
             obj.clear_transformation()
 
@@ -353,13 +362,57 @@ class CompositeObject(GraphicalObject):
 
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
-        # First adjust the tranformation matrix.
+        # Move the whole object.
         GraphicalObject.move(self, abs_time)
         for gr_object in self:
-            # Then apply the transformation matrix on the sub-objects and
-            # move also them according to their relative trajectories.
-            gr_object.apply_transformation(self.transformation_matrix)
+            # Then move its sub-objects.
             gr_object.move(abs_time)
+
+    def moved(self, t_0, t_1, pixel_size):
+        """Return True if the trajectory moved between time *t_0* and *t_1*
+        more than one pixel with respect to the given *pixel_size*.
+        """
+        # We need to check all subobjects. Moreover, simple trajectory
+        # distance between points at t_0 and t_1 will not work because
+        # when the composite object moves more than one pixel, but the
+        # primitive graphical object moves the exact opposite it results
+        # in no movement. We are also interested only in primitive object
+        # movement changes, because the composite objects do not show in
+        # in the scene.
+        # Remember the current transformation matrices.
+        matrix = np.copy(self.transform_matrix)
+        matrices = {}
+        for obj in self:
+            matrices[obj] = np.copy(obj.transform_matrix)
+
+        # Clear the transformation matrix
+        self.clear_transformation()
+
+        # Move to t_0.
+        self.move(t_0)
+
+        # Remember all primitive object positions.
+        positions = {}
+        for obj in self.primitive_objects:
+            positions[obj] = obj.position
+
+        # Forget that movement and move to t_1.
+        self.clear_transformation()
+        self.move(t_1)
+
+        # Check the displacements of all primitive objects.
+        res = False
+        for obj in self.primitive_objects:
+            if geom.length(obj.position - positions[obj]) > pixel_size:
+                res = True
+                break
+
+        # Recover the transformation matrices.
+        self.transform_matrix = matrix
+        for obj in self:
+            obj.transform_matrix = matrices[obj]
+
+        return res
 
     def pack(self):
         """Pack all the sub-objects into a structure suitable for GPU
@@ -375,8 +428,8 @@ class CompositeObject(GraphicalObject):
         return "CompositeObject(%s)" % (str(self))
 
     def __str__(self):
-        return "center=" + repr(self._center) +\
-            ", subobjects=" + repr(len(self._objects))
+        return "Composite object(center=" + repr(self._center) +\
+            ", subobjects=" + repr(len(self._objects)) + ")"
 
 OBJECT_TYPES = {MetaCube.TYPE: "METACUBE",
                 MetaBall.TYPE: "METABALL"}

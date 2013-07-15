@@ -106,17 +106,3 @@ class Test(TestCase):
                                                  orig_times[1]))
         self.assertAlmostEqual(s_2, traj.get_distance(t_2))
         self.assertAlmostEqual(s_2_full, traj.get_distance(np.sum(orig_times)))
-
-    def test_moved(self):
-        c_points = get_control_points()
-        pixel_size = 1 * q.um
-        points, length = geom.interpolate_points(c_points, pixel_size)
-
-        traj = Trajectory(points, length, [(length, 5 * q.mm / q.s)])
-        t_0 = 0 * q.s
-        for t_1 in np.linspace(0, 0.1, 100) * q.s:
-            p_0 = traj.get_point(t_0)
-            p_1 = traj.get_point(t_1)
-            ground_truth = True if geom.length(p_1 - p_0) > pixel_size \
-                else False
-            self.assertEqual(traj.moved(t_0, t_1, pixel_size), ground_truth)
