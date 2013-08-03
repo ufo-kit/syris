@@ -6,6 +6,7 @@ __version__ = 0.1
 import atexit
 import syris.config as cfg
 import logging
+import numpy as np
 import pyopencl as cl
 from syris import profiling as prf
 from syris.profiling import Profiler, DummyProfiler
@@ -86,20 +87,26 @@ def _init_programs():
         g_util.get_source(["vcomplex.cl", "imageprocessing.cl"]))
 
 
-def init(queues=None):
-    """Initialize Syris by the command line arguments."""
-    import numpy as np
-
-    args = _get_arguments()
-    _init_gpus(args.profiler, queues)
-
-    # Single or double floating point precision settings.
-    if args.double:
-        # redefine floating point data types to double precision
+def _init_fp(double_prec):
+    if double_prec:
         cfg.NP_FLOAT = np.float64
         cfg.NP_CPLX = np.complex128
         cfg.CL_FLOAT = 8
         cfg.CL_CPLX = 16
+    else:
+        cfg.NP_FLOAT = np.float32
+        cfg.NP_CPLX = np.complex64
+        cfg.CL_FLOAT = 4
+        cfg.CL_CPLX = 8
+
+
+def init(queues=None):
+    """Initialize Syris by the command line arguments."""
+    args = _get_arguments()
+    _init_gpus(args.profiler, queues)
+
+    # Single or double floating point precision settings.
+    _init_fp(args.double)
 
     # Logging level and output file.
     if args.logging_level is not None:

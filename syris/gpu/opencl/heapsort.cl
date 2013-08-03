@@ -1,30 +1,31 @@
 /*
- * Heap sort for fast sorting in O(n log(n)) time in OpenCL.
+ * Fast sorting of vfloat arrays in O(n log(n)) time. Implemented
+ * by heapsort.
+ *
+ * Requires definition of vfloat data type, which defines single or double
+ * precision for vfloating point numbers.
  */
 
-typedef enum {
-	Y_SORT, X_SORT
-} sort_type;
+void vf_swap(vfloat *array, int i, int j) {
+	vfloat tmp;
 
+	tmp = array[i];
+	array[i] = array[j];
+	array[j] = tmp;
+}
 
-void sift_down(poly_object **heap, int start, int end, sort_type st) {
+void vf_sift_down(vfloat *heap, int start, int end) {
     int root = start;
     int child;
-    poly_object *tmp;
 
     while (root*2 + 1 <= end) {
         child = root*2 + 1;
-        if (child + 1 <= end && (st ?
-        		heap[child]->interval.x < heap[child + 1]->interval.x :
-        		heap[child]->interval.y < heap[child + 1]->interval.y)) {
+        if (child + 1 <= end && (heap[child] < heap[child + 1] ||
+        								isnan(heap[child + 1]))) {
             child++;
         }
-        if (child <= end && (st ?
-	    		heap[root]->interval.x < heap[child]->interval.x :
-	    		heap[root]->interval.y < heap[child]->interval.y)) {
-            tmp = heap[root];
-            heap[root] = heap[child];
-            heap[child] = tmp;
+        if (child <= end && (heap[root] < heap[child] || isnan(heap[child]))) {
+        	vf_swap(heap, root, child);
             root = child;
         } else {
             return;
@@ -32,35 +33,38 @@ void sift_down(poly_object **heap, int start, int end, sort_type st) {
     }
 }
 
-void sort(poly_object **heap, int size, sort_type st) {
+void vf_heapify(vfloat *array, int size) {
+	int start = (size - 2) / 2;
+
+	while (start >= 0) {
+		vf_sift_down(array, start, size - 1);
+		start--;
+	}
+}
+
+void vf_sort(vfloat *array, int size) {
+	vf_heapify(array, size);
     int end = size - 1;
-    poly_object *tmp;
 
     while (end > 0) {
-        tmp = heap[0];
-        heap[0] = heap[end];
-        heap[end] = tmp;
-        sift_down(heap, 0, end - 1, st);
+    	vf_swap(array, 0, end);
+        vf_sift_down(array, 0, end - 1);
         end--;
     }
 }
 
-int heap_parent(int index) {
-    return (index - 1)/2;
-}
 
-void add(poly_object **heap, poly_object *val, int next, sort_type st) {
-    heap[next] = val;
-    int parent_index;
-    poly_object *tmp;
+__kernel void sort_kernel(__global vfloat *array) {
+	vfloat ar[10];
+	int i;
 
-    while (next > 0 && (st ?
-    		heap[heap_parent(next)]->interval.x < val->interval.x :
-    		heap[heap_parent(next)]->interval.y < val->interval.y)) {
-        parent_index = heap_parent(next);
-        tmp = heap[parent_index];
-        heap[parent_index] = heap[next];
-        heap[next] = tmp;
-        next = parent_index;
-    }
+	for (i = 0; i < 10; i++) {
+		ar[i] = array[i];
+	}
+
+	vf_sort(ar, 10);
+
+	for (i = 0; i < 10; i++) {
+		array[i] = ar[i];
+	}
 }

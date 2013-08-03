@@ -35,7 +35,7 @@ __kernel void propagator(__global vcomplex *out,
 	 */
 	tmp = - M_PI * lam * distance * (i * i + j * j) /
 			(pixel_size * pixel_size);
-	if (phase_factor.x == 0 and phase_factor.y == 0) {
+	if (phase_factor.x == 0 && phase_factor.y == 0) {
 		result = (vcomplex)(cos(tmp), sin(tmp));
 	} else {
 		c_tmp = (vcomplex)(cos(tmp), sin(tmp));

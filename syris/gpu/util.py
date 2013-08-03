@@ -64,7 +64,8 @@ def get_metaobjects_source():
     """Get source string for metaobjects creation."""
     obj_types = _object_types_to_struct()
     source = get_source(["polyobject.cl", "heapsort.cl",
-                         "newtonraphson.cl", "metaobjects.cl"])
+                         "polynoms_heapsort.cl", "rootfinding.cl",
+                         "metaobjects.cl"])
 
     return obj_types + source
 

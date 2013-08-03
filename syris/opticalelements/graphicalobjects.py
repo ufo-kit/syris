@@ -66,6 +66,18 @@ class GraphicalObject(object):
     def trajectory(self):
         return self._trajectory
 
+    def get_rescaled_transform_matrix(self, units, coeff=1):
+        """The last column of the transformation matrix holds displacement
+        information has SI units, convert those to the *units* specified,
+        apply coefficient *coeff* and return a copy of the matrix.
+        """
+        trans_mat = np.copy(self.transform_matrix)
+        for i in range(3):
+            trans_mat[i, 3] = coeff * Quantity(trans_mat[i, 3] * q.m).\
+                rescale(units)
+
+        return trans_mat
+
     def apply_transformation(self, trans_matrix):
         """Apply transformation given by the transformation matrix
         *trans_matrix* on the current transformation matrix.
@@ -125,49 +137,47 @@ class MetaObject(GraphicalObject):
     # Object type.
     TYPE = None
 
-    def __init__(self, trajectory, radius, blobbiness=None,
-                 orientation=geom.Y_AX):
-        """Create a metaobject with *radius* and *blobbiness* defining the
-        distance after the object's radius until which it influences the
-        scene.
-        """
+    def __init__(self, trajectory, radius, orientation=geom.Y_AX):
+        """Create a metaobject with *radius*."""
         super(MetaObject, self).__init__(trajectory, orientation)
         if radius <= 0:
             raise ValueError("Blobbiness must be greater than zero.")
-        if blobbiness is None:
-            blobbiness = radius
-        elif blobbiness <= 0:
-            raise ValueError("Blobbiness must be greater than zero.")
 
         self._radius = radius.simplified
-        self._blobbiness = blobbiness.simplified
 
     @property
     def radius(self):
         return self._radius
 
-    @property
-    def blobbiness(self):
-        """Influence region behind the radius of the object."""
-        return self._blobbiness
-
     def get_transform_const(self):
-        """Precompute the transformation constant which does not change for
-        x,y position."""
+        """
+        Precompute the transformation constant which does not change for
+        x,y position.
+        """
         a_x = self.transform_matrix[0][2]
         a_y = self.transform_matrix[1][2]
         a_z = self.transform_matrix[2][2]
         return a_x ** 2 + a_y ** 2 + a_z ** 2
 
-    def pack(self):
-        """Pack the object into a structure suitable for OpenCL kernels."""
-        fmt = get_format_string("iffff" + 16 * "f")
+    def pack(self, units, coeff=1):
+        """Pack the object into a structure suitable for OpenCL kernels.
+        Rescale the object using *units* first. *coeff* is a normalization
+        factor for object's radius.
+        """
+        fmt = get_format_string("ifff" + 16 * "f")
 
-        return struct.pack(fmt, self.TYPE, self.radius.magnitude,
-                           self.blobbiness.magnitude,
-                           self.get_falloff_const(),
+        radius = coeff * self.radius.rescale(units).magnitude
+        # influence region = 2 * r, thus the coefficient guaranteeing
+        # f(r) = 1 is
+        # 1 / (R^2 - r^2)^2 = 1 / (4r^2 - r^2)^2 = 1 / 9r^4
+        falloff_coeff = 1.0 / (9 * radius ** 4)
+
+        trans_mat = self.get_rescaled_transform_matrix(units)
+        return struct.pack(fmt, self.TYPE,
+                           self.radius.rescale(units).magnitude,
+                           falloff_coeff,
                            self.get_transform_const(),
-                           *self.transform_matrix.flatten())
+                           *trans_mat.flatten())
 
 
 class MetaBall(MetaObject):
@@ -175,48 +185,8 @@ class MetaBall(MetaObject):
     """Metaball graphical object."""
     TYPE = OBJECT_ID()
 
-    def __init__(self, trajectory, radius, blobbiness=None,
-                 orientation=geom.Y_AX):
-        super(MetaBall, self).__init__(trajectory, radius, blobbiness,
-                                       orientation)
-
-    def get_falloff_const(self):
-        """Precompute mataball falloff curve constant which are the same
-        for all the x,y coordinates. It ensures that f(x) = 1 <=> x = r."""
-        influence = Quantity(self._blobbiness + self._radius).\
-            simplified.magnitude
-        transformation_const = self.get_transform_const()
-
-        a_x = self.transform_matrix[0][2]
-        a_y = self.transform_matrix[1][2]
-        a_z = self.transform_matrix[2][2]
-        # Calculate the 1/(influence^2 - r^2)^2 coefficient.
-        center_x = self._center[0].simplified.magnitude
-        center_y = self._center[1].simplified.magnitude
-        k_x = self.transform_matrix[0][0] * center_x + \
-            self.transform_matrix[0][1] * center_y + \
-            self.transform_matrix[0][3]
-        k_y = self.transform_matrix[1][0] * center_x + \
-            self.transform_matrix[1][1] * center_y + \
-            self.transform_matrix[1][3]
-        k_z = self.transform_matrix[2][0] * center_x + \
-            self.transform_matrix[2][1] * center_y + \
-            self.transform_matrix[2][3]
-
-        roots = np.roots([transformation_const,
-                          2 * k_x * a_x + 2 * k_y * a_y + 2 * k_z * a_z,
-                          k_x * k_x + k_y * k_y + k_z * k_z - influence ** 2])
-        influence_0 = (roots[1] - roots[0]) / 2
-
-        roots = np.roots([transformation_const,
-                          2 * k_x * a_x + 2 * k_y * a_y + 2 * k_z * a_z,
-                          k_x * k_x + k_y * k_y + k_z * k_z -
-                          self.radius.simplified.magnitude ** 2])
-        r_0 = (roots[1] - roots[0]) / 2
-
-        res = 1.0 / (influence_0 ** 2 - r_0 ** 2) ** 2
-
-        return res.real
+    def __init__(self, trajectory, radius, orientation=geom.Y_AX):
+        super(MetaBall, self).__init__(trajectory, radius, orientation)
 
 
 class MetaCube(MetaObject):
@@ -224,14 +194,8 @@ class MetaCube(MetaObject):
     """Metacube graphical object."""
     TYPE = OBJECT_ID()
 
-    def __init__(self, trajectory, radius, blobbiness=None,
-                 orientation=geom.Y_AX):
-        super(MetaCube, self).__init__(trajectory, radius, blobbiness,
-                                       orientation)
-
-    def get_falloff_const(self):
-        """There is no falloff constant for metacubes."""
-        return 0 * q.m
+    def __init__(self, trajectory, radius, orientation=geom.Y_AX):
+        super(MetaCube, self).__init__(trajectory, radius, orientation)
 
 
 class CompositeObject(GraphicalObject):
