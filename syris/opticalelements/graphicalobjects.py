@@ -277,10 +277,10 @@ class CompositeObject(GraphicalObject):
 
     """Class representing an object consisting of more sub-objects."""
 
-    def __init__(self, trajectory, orientation=geom.Y_AX, gr_objects=[]):
+    def __init__(self, trajectory, orientation=geom.Y_AX, gr_objects=None):
         """*gr_objects* is a list of :py:class:`GraphicalObject`."""
         super(CompositeObject, self).__init__(trajectory, orientation)
-        self._objects = gr_objects
+        self._objects = gr_objects if gr_objects is not None else []
         self._index = -1
 
     @property

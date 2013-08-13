@@ -6,7 +6,6 @@ Created on Jul 3, 2013
 import numpy as np
 import quantities as q
 from unittest import TestCase
-from syris.opticalelements import geometry as geom
 from syris.opticalelements.geometry import Trajectory
 from scipy import interpolate as interp
 

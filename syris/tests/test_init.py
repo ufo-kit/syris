@@ -6,7 +6,10 @@ from unittest import TestCase
 import sys
 
 
-def _get_queues(queue_kwargs={}):
+def _get_queues(queue_kwargs=None):
+    if queue_kwargs is None:
+        queue_kwargs = {}
+
     return g_util.get_command_queues(g_util.get_cuda_context(),
                                      queue_kwargs=queue_kwargs)
 

@@ -159,13 +159,17 @@ def get_cuda_context(devices=None, properties=None):
 
 
 def get_command_queues(context, devices=None,
-                       queue_args=(), queue_kwargs={}):
+                       queue_args=None, queue_kwargs=None):
     """Create command queues for each of the *devices* within a specified
     *context*. If *devices* is None, NVIDIA GPUs are automatically
     detected and used for creating the command queues.
     """
     if devices is None:
         devices = get_cuda_devices()
+    if queue_args is None:
+        queue_args = ()
+    if queue_kwargs is None:
+        queue_kwargs = {}
 
     LOGGER.debug("Creating %d command queues." % (len(devices)))
     queues = []
