@@ -8,7 +8,7 @@ from unittest import TestCase
 class TestDetector(TestCase):
 
     def setUp(self):
-        self.lens = Lens(1.0, 1.0, 3.0, (1 * q.um, 1 * q.um))
+        self.lens = Lens(1.4, 100.0 * q.mm, 3.0, 1.0, (1 * q.um, 1 * q.um))
         self.camera = Camera(10 * q.um, 0.1, 10, 1, 12, None)
         self.detector = Detector(self.lens, self.camera)
 

@@ -31,18 +31,18 @@ class MovingSample(object):
     def materials(self):
         """All sample materials."""
         return self._parts.keys()
-    
+
     @property
     def objects(self):
         """Return all objects."""
         objects = []
-        
+
         for mat in self._parts:
             for obj in self._parts[mat]:
                 objects.append(obj)
-                
+
         return objects
-    
+
     def get_objects(self, material):
         """Get graphical objects assigned with *material*."""
         return tuple(self._parts[material])
@@ -60,13 +60,13 @@ class MovingSample(object):
     def get_moved_materials(self, t_0, t_1):
         """Return materials which objects moved between *t_0* and *t_1*."""
         materials = []
-        
+
         for material in self._parts:
             for obj in self._parts[material]:
                 if obj.moved(t_0, t_1, self.pixel_size):
                     materials.append(material)
                     break
-        
+
         return materials
 
     def _compute_thickness(self, th_mem, abs_time, offset, gr_obj,
@@ -112,7 +112,6 @@ class MovingSample(object):
                             np.int32(clear))
 
         objects_mem.release()
-        
 
     def get_thickness(self, material, abs_time, offset):
         """
@@ -123,13 +122,13 @@ class MovingSample(object):
         self._logger.debug("Creating objects at time {0}.".format(abs_time))
 
         th_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                       size=self.shape[0] * self.shape[1] * cfg.CL_FLOAT)
+                           size=self.shape[0] * self.shape[1] * cfg.CL_FLOAT)
 
         i = 0
         for gr_obj in self._parts[material]:
             self._compute_thickness(th_mem, abs_time, offset, gr_obj, i == 0)
             i += 1
-        
+
         return th_mem
 
 

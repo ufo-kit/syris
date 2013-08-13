@@ -1,6 +1,9 @@
 Devices
 =======
 
+.. automodule:: syris.devices.lenses
+    :members:
+
 .. automodule:: syris.devices.cameras
     :members:
 

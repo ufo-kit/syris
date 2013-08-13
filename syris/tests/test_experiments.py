@@ -10,7 +10,7 @@ from unittest import TestCase
 class TestExperiments(TestCase):
 
     def setUp(self):
-        lens = Lens(1.0, 1.0, 3.0, (1 * q.um, 1 * q.um))
+        lens = Lens(1.4, 100 * q.mm, 3.0, 1.0, (1 * q.um, 1 * q.um))
         camera = Camera(1 * q.um, 0.1, 10, 1.0, 12, None, shape=(64, 64))
         detector = Detector(lens, camera)
         tiler = Tiler(camera.shape, (1, 1), outlier=True, supersampling=2)

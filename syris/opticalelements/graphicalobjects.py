@@ -35,7 +35,7 @@ class GraphicalObject(object):
         # Last position as tuple consisting of a 3D point and a vector giving
         # the object orientation.
         self._last_position = None
-        
+
     @property
     def furthest_point(self):
         """
@@ -93,19 +93,19 @@ class GraphicalObject(object):
         *trans_matrix* on the current transformation matrix.
         """
         self.transform_matrix = np.dot(trans_matrix, self.transform_matrix)
-        
+
     def get_combined_displacement(self, t_0, t_1):
         """
         Get the displacement traveled between times *t_0* and *t_1*.
         Take into account both translation and rotation of the object.
         """
-        trans_d = geom.length(self.trajectory.get_point(t_1) - \
-                    self.trajectory.get_point(t_0))
+        trans_d = geom.length(self.trajectory.get_point(t_1) -
+                              self.trajectory.get_point(t_0))
         rot_d = geom.get_rotation_displacement(
-                           self.trajectory.get_direction(t_0),
-                           self.trajectory.get_direction(t_1),
-                           self.furthest_point)
-    
+            self.trajectory.get_direction(t_0),
+            self.trajectory.get_direction(t_1),
+            self.furthest_point)
+
         return trans_d + rot_d
 
     def get_next_time(self, t_0, delta_distance):
@@ -116,19 +116,19 @@ class GraphicalObject(object):
         t_1 = self.trajectory.get_next_time(t_0, delta_distance)
         if t_1 is None:
             return None
-        
+
         rot_d = geom.get_rotation_displacement(
-                               self.trajectory.get_direction(t_0),
-                               self.trajectory.get_direction(t_1),
-                               self.furthest_point)
+            self.trajectory.get_direction(t_0),
+            self.trajectory.get_direction(t_1),
+            self.furthest_point)
 
         dist = rot_d + delta_distance
         d_t = (t_1 - t_0) / 2
-        
+
         while dist > delta_distance:
             dist = self.get_combined_displacement(t_0, t_0 + d_t)
             d_t /= 2.0
-            
+
         # Return the last bigger than *delta_distance*.
         return t_0 + 2 * d_t
 
@@ -174,7 +174,7 @@ class GraphicalObject(object):
         given by *sc_vec*.
         """
         self._scale_factor *= np.array(scale_vec)
-        
+
         self.transform_matrix = np.dot(
             geom.scale(scale_vec), self.transform_matrix)
 
@@ -254,7 +254,7 @@ class MetaBall(MetaObject):
 
     def __init__(self, trajectory, radius, orientation=geom.Y_AX):
         super(MetaBall, self).__init__(trajectory, radius, orientation)
-        
+
     @property
     def furthest_point(self):
         """
@@ -262,6 +262,7 @@ class MetaBall(MetaObject):
         region of the metaball.
         """
         return 2 * self.radius * max(self._scale_factor)
+
 
 class MetaCube(MetaObject):
 
@@ -286,10 +287,10 @@ class CompositeObject(GraphicalObject):
     def objects(self):
         """All objects which are inside this composite object."""
         return tuple(self._objects)
-    
+
     def _all_objects(self, primitive):
         res = set() if primitive else set([self])
-        
+
         for obj in self:
             if obj.__class__ == self.__class__:
                 res.update(obj._all_objects(primitive))
@@ -306,7 +307,7 @@ class CompositeObject(GraphicalObject):
     def all_objects(self):
         """Return all subobjects including self and composite subobjects."""
         return self._all_objects(False)
-    
+
     @property
     def total_time(self):
         """The total trajectory time of the object and all its subobjects."""
@@ -401,26 +402,26 @@ class CompositeObject(GraphicalObject):
         for gr_object in self:
             # Then move its sub-objects.
             gr_object.move(abs_time)
-            
+
     def get_next_time(self, t_0, delta_distance):
         """
         Get next time at which the object will have traveled
         *delta_distance*, the starting time is *t_0*.
         """
         t_1 = None
-        
+
         # Get the smallest time from the primitive objects needed to travel
         # more than delta_distance. It will serve as an initial guess.
         for obj in self.primitive_objects:
             tmp = obj.get_next_time(t_0, delta_distance)
             if tmp is not None and (t_1 is None or tmp < t_1):
                 t_1 = tmp
-                
+
         if t_1 is None:
             return None
-                
+
         d_t = t_1 - t_0
-        
+
         # It might happen that in combination with trajectories of
         # parent objects the t_1 from the guess is actually too small
         # and we need to move forward in time.
@@ -430,13 +431,13 @@ class CompositeObject(GraphicalObject):
                 # object stationary from t_0 on.
                 return None
             d_t *= 2
-            
+
         # After we have made sure some objects will move, minimize
         # the movement down to delta_distance.
         d_t /= 2
         while self.moved(t_0, t_0 + d_t, delta_distance):
             d_t /= 2
-            
+
         return t_0 + 2 * d_t
 
     def moved(self, t_0, t_1, delta_distance):
@@ -486,7 +487,7 @@ class CompositeObject(GraphicalObject):
                                                    orientations[obj],
                                                    obj.furthest_point)
             tran_d = geom.length(obj.position - positions[obj])
-            if  rot_d + tran_d > delta_distance:
+            if rot_d + tran_d > delta_distance:
                 res = True
                 break
 

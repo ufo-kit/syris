@@ -37,7 +37,7 @@ class Experiment(object):
         thicknesses = {}
         for material in self.sample.materials:
             thicknesses[material] = {}
-            
+
         return thicknesses
 
 #     def conduct(self):
@@ -45,15 +45,15 @@ class Experiment(object):
 #         d_t = self.detector.camera.exp_time
 #         times = np.arange(0, self.time + d_t, d_t)
 #         thicknesses = self._init_thickness_cache()
-# 
+#
 #         for time_i in times:
 #             sub_times = []
-#             # First cache the thicknesses for all materials.
+# First cache the thicknesses for all materials.
 #             for subtime_i in range(len(sub_times)):
-#                 
+#
 #                 for material in self.sample.materials:
 #                     thicknesses[material][subtime_i]
-#                     
+#
 #             thicknesses = self._init_thickness_cache()
 
     def create_geometry(self):

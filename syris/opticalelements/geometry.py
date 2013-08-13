@@ -125,10 +125,10 @@ class Trajectory(object):
         self._control_points = control_points.simplified
 
         if time_dist is not None and velocity is not None:
-            raise ValueError("Either times and distances or velocity " + \
+            raise ValueError("Either times and distances or velocity " +
                              "must be given, but not both at the same time.")
 
-        if len(self.control_points) == 1 or (time_dist is None and 
+        if len(self.control_points) == 1 or (time_dist is None and
                                              velocity is None):
             # Static trajectory or no velocity profile specified.
             self._tck = None
@@ -138,9 +138,9 @@ class Trajectory(object):
         else:
             # Positions.
             self._tck, self._u = \
-                        interp.splprep(zip(*control_points.simplified))
+                interp.splprep(zip(*control_points.simplified))
             self._length = self._get_length()
-        
+
             # Velocity profile.
             if velocity is not None:
                 # Constant velocity
@@ -157,19 +157,19 @@ class Trajectory(object):
                 raise ValueError("Time cannot be negative.")
             if np.any(s_0 < 0):
                 raise ValueError("Distance cannot be negative.")
-            
+
             t_units = time_dist[0][0].units
-            d_units = time_dist[0][1].units 
+            d_units = time_dist[0][1].units
             t_0 = Quantity(t_0 * t_units).simplified.magnitude
             s_0 = Quantity(s_0 * d_units).simplified.magnitude
             self._times, self._distances = interpolate_1d(t_0, s_0, 100)
             self._time_tck = interp.splrep(self._times, self._distances)
-        
+
     @property
     def control_points(self):
         """Control points used by the trajectory."""
         return tuple(self._control_points) * q.m
-        
+
     @property
     def length(self):
         """Trajectory length."""
@@ -190,23 +190,23 @@ class Trajectory(object):
         """
         t_0 = t_0.simplified.magnitude
         d_s = delta_distance.simplified.magnitude
-        
+
         def find_closest(up=1):
             # Get the distance at t_0, add the delta_distance and find t_1 by
             # which the trajectory moves the delta_distance. t_1 is the
             # closest spline root greater than t_0.
             s_1 = interp.splev(t_0, self._time_tck) + up * d_s
-            
+
             # Adjust height for finding the root at distance s_1.
             d_adj = self._distances - s_1
             tck = interp.splrep(self._times, d_adj)
-            
+
             # Find roots fitting f(s_1) = t_1. There can be many of them, so
             # pick the one which is greater and closest to the original t_0.
             # The closest root we found has the property that
             # |f(t_1) - f(t_0)| < delta_distance.
             return closest(interp.sproot(tck), t_0)
-        
+
         if t_0 < 0:
             raise ValueError("Time cannot be negative.")
 
@@ -220,12 +220,12 @@ class Trajectory(object):
             # Because the trajectory can reverse.
             top = find_closest()
             bottom = find_closest(-1)
-            
+
             result = top if top is not None and top < bottom or bottom \
-                        is None else bottom
+                is None else bottom
             if result is not None:
                 result = result * q.s
-            
+
         return result
 
     def get_point(self, abs_time):
@@ -234,7 +234,7 @@ class Trajectory(object):
             raise ValueError("Time cannot be negative.")
         if abs_time > self.time:
             abs_time = self.time
-        
+
         if self._tck is None:
             # Stationary trajectory.
             result = self._control_points[0]
@@ -244,7 +244,7 @@ class Trajectory(object):
                 result = self._control_points[0]
             else:
                 result = interp.splev(self._get_u(abs_time), self._tck) * q.m
-            
+
         return result
 
     def get_direction(self, abs_time):
@@ -256,10 +256,10 @@ class Trajectory(object):
             res = np.array((0, 0, 0))
         else:
             res = normalize(np.array(interp.splev(self._get_u(abs_time),
-                                         self._tck, der=1)))
-            
+                                                  self._tck, der=1)))
+
         return res * q.dimensionless
-            
+
     def _get_u(self, abs_time):
         """Get the spline parameter from the time *abs_time*."""
         dist = interp.splev(abs_time, self._time_tck)
@@ -267,9 +267,9 @@ class Trajectory(object):
         if u > 1:
             # If we go beyond the trajectory end, stay in it.
             u = 1
-        
+
         return u
-    
+
     def _get_length(self):
         """
         Get length of a parametric curve with knots, coefficients and spline
@@ -281,7 +281,7 @@ class Trajectory(object):
             # for a 3D parametric curve the length is
             # sqrt((d_x/d_u)^2 + (d_y/d_u)^2 + (d_z/d_u)^2).
             return np.sqrt(der[0] ** 2 + der[1] ** 2 + der[2] ** 2)
-        
+
         return integ.quad(part, self._u[0], self._u[-1])[0] * q.m
 
 
@@ -404,6 +404,7 @@ def angle(vec_0, vec_1):
     return math.atan2(length(np.cross(vec_0, vec_1) * q.dimensionless),
                       np.dot(vec_0, vec_1)) * q.rad
 
+
 def get_rotation_displacement(vec_0, vec_1, vec_length):
     """
     Get the displacement introduced by a rotation from vector *vec_0*
@@ -413,9 +414,10 @@ def get_rotation_displacement(vec_0, vec_1, vec_length):
     phi = angle(vec_0, vec_1)
     if phi > np.pi / 2 * q.rad:
         phi -= np.pi / 2 * q.rad
-        
+
     return vec_length * np.tan(phi)
-                      
+
+
 def interpolate_1d(x_0, y_0, size):
     """
     Interpolate function y = f(x) with *x_0*, *y_0* as control points
@@ -423,11 +425,12 @@ def interpolate_1d(x_0, y_0, size):
     """
     x_1 = np.linspace(x_0[0], x_0[-1], size)
     tck = interp.splrep(x_0, y_0)
-    
+
     return x_1, interp.splev(x_1, tck)
+
 
 def get_constant_velocity(v_0, duration):
     times = np.linspace(0 * duration.units, duration, 5)
     dist = v_0 * times
-    
+
     return zip(times, dist)

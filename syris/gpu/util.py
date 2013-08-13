@@ -96,7 +96,7 @@ def cache(mem, shape, dtype, cache_type):
         cl.enqueue_copy(cfg.QUEUE, result, mem)
     else:
         result = mem
-        
+
     return result
 
 
