@@ -12,6 +12,9 @@ NP_CPLX = np.complex64
 CL_FLOAT = 4
 CL_CPLX = 8
 
+numpy_to_opencl = {NP_FLOAT: CL_FLOAT, NP_CPLX: CL_CPLX}
+opencl_to_numpy = {CL_FLOAT: NP_FLOAT, CL_CPLX: NP_CPLX}
+
 # Refractive index calculation program path.
 PMASF_FILE = "pmasf"
 
@@ -26,6 +29,10 @@ QUEUE = None
 
 # OpenCL functions which are wrapped for profiling if profiling is enabled.
 PROFILED_CL_FUNCTIONS = [cl.enqueue_nd_range_kernel, cl.enqueue_copy]
+
+# Caching constants.
+CACHE_HOST = 1
+CACHE_DEVICE = 2
 
 
 def single_precision():

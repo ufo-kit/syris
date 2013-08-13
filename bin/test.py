@@ -29,7 +29,7 @@ def diff(ar):
     res = []
     for i in range(1, len(ar)):
         res.append(np.abs(ar[i] - ar[i - 1]))
-        
+
     return res 
     
 def print_array(ar):
@@ -59,7 +59,7 @@ def create_metaball_random(n, pixel_size, radius_range, coeff=1):
     metaball = MetaBall(trajectory, r)
     metaball.move(0 * q.s)
     
-    return metaball.pack(UNITS, coeff), \
+    return metaball.pack(UNITS, coeff * 1 / UNITS), \
         "({0}, {1}, {2}, {3}),\n".format(x, y, z.magnitude, r.magnitude)
 
 def create_metaballs(params, coeff=1.0):
@@ -85,7 +85,7 @@ def get_vfloat_mem_host(mem, size):
 if __name__ == '__main__':
     syris.init()
     
-    pixel_size = 5e-3 / SUPERSAMPLING * q.mm
+    pixel_size = 1e-3 / SUPERSAMPLING * q.mm
     
     prg = g_util.get_program(g_util.get_metaobjects_source())
     n = SUPERSAMPLING * 512
@@ -171,7 +171,6 @@ if __name__ == '__main__':
                       cfg.NP_FLOAT(mid),
                       g_util.make_vfloat2(pixel_size.rescale(UNITS).magnitude,
                                           pixel_size.rescale(UNITS).magnitude),
-                      cfg.NP_FLOAT(eps),
                       np.int32(True))
         objects_mem.release()
         

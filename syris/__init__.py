@@ -110,8 +110,7 @@ def init(queues=None):
 
     # Logging level and output file.
     if args.logging_level is not None:
-        _init_logging(logging.getLevelName(args.logging_level),
-                      args.logger_file)
+        _init_logging(args.logging_level.upper(), args.logger_file)
 
     # Profiling options, they depend on the created command queues.
     if args.profiler:

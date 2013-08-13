@@ -49,6 +49,15 @@ class Material(object):
             self.refractive_indices[energy_index],
             self.energies[energy_index])
 
+    def __eq__(self, other):
+        return self.__class__ == other.__class__ and self.name == other.name
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash(self.name)
+
 
 class PMASFMaterial(Material):
 

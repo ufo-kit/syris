@@ -8,20 +8,18 @@ class Experiment(object):
 
     """A virtual synchrotron experiment base class."""
 
-    def __init__(self, source, scintillator, detector, tiler, filters=[],
-                 samples=[], spatial_incoherence=True):
+    def __init__(self, sample, source, scintillator, detector, tiler,
+                 filters=None, spatial_incoherence=True):
         """
         """
-        if spatial_incoherence and len(samples) > 1:
-            raise ValueError("Spatial incoherence cannot be modeled for " +
-                             "experiments with more than one sample.")
         self.source = source
         self.filters = filters
-        self._samples = samples
+        self.sample = sample
         self.scintillator = scintillator
         self.detector = detector
         self.tiler = tiler
         self.spatial_incoherence = spatial_incoherence
+        self._time = None
 
     @property
     def super_pixel_size(self):
@@ -29,21 +27,34 @@ class Experiment(object):
         return self.detector.pixel_size / self.tiler.supersampling
 
     @property
-    def samples(self):
-        return tuple(self._samples)
+    def time(self):
+        if self._time is None:
+            self._time = max([gr_obj.trajectory.time
+                              for gr_obj in self.sample.objects])
+        return self._time
 
-    def add_sample(self, sample, propagation_distance):
-        """Add *sample* to experiment samples and set the
-        *propagation_distance* of the wavefield behind it.
-        """
-        if self.spatial_incoherence and len(self._samples) > 0:
-            raise ValueError("Spatial incoherence cannot be modeled for " +
-                             "experiments with more than one sample.")
-        self._samples.append((sample, propagation_distance.simplified))
+    def _init_thickness_cache(self):
+        thicknesses = {}
+        for material in self.sample.materials:
+            thicknesses[material] = {}
+            
+        return thicknesses
 
-    def conduct(self):
-        """Conduct the experiment."""
-        pass
+#     def conduct(self):
+#         """Conduct the experiment."""
+#         d_t = self.detector.camera.exp_time
+#         times = np.arange(0, self.time + d_t, d_t)
+#         thicknesses = self._init_thickness_cache()
+# 
+#         for time_i in times:
+#             sub_times = []
+#             # First cache the thicknesses for all materials.
+#             for subtime_i in range(len(sub_times)):
+#                 
+#                 for material in self.sample.materials:
+#                     thicknesses[material][subtime_i]
+#                     
+#             thicknesses = self._init_thickness_cache()
 
     def create_geometry(self):
         pass

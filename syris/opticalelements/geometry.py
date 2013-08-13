@@ -13,7 +13,7 @@ easily obtain x = T^{-1}x'.
 import numpy as np
 from numpy import linalg
 import quantities as q
-from scipy import interpolate, integrate
+from scipy import interpolate as interp, integrate as integ
 import itertools
 import logging
 import math
@@ -39,13 +39,21 @@ class BoundingBox(object):
     def __init__(self, points):
         """Create a bounding box from the object border *points*."""
         self._points = points.simplified
-        # 3D -> 2D for overlap
-        self._points_z_proj = np.array([x[:-1] for x in points]) * q.m
 
     @property
     def points(self):
         """The object border points."""
         return self._points
+
+    @property
+    def roi(self):
+        """
+        Return range of interest defined by the bounding box as
+        (y_0, x_0, y_1, x_1).
+        """
+
+        return self.get_min(Y), self.get_min(X), \
+            self.get_max(Y), self.get_max(X)
 
     def get_projected_points(self, axis):
         """Get the points projection by releasing the specified *axis*."""
@@ -64,19 +72,6 @@ class BoundingBox(object):
         """Get maximum along the specified *axis*."""
         return np.max(self._points.flatten()[axis::3])
 
-    def overlaps2d(self, fov):
-        """Determine whether the 2D projected bounding box overlaps a
-        given region specified by *fov* as ((y0, y1), (x0, x1)).
-        """
-        d_x, d_y = zip(*self._points_z_proj.simplified)
-        x_0, x_1 = min(d_x), max(d_x)
-        y_0, y_1 = min(d_y), max(d_y)
-        f_y, f_x = fov
-
-        # x and y coordinate interval tests.
-        return f_x[0] <= x_1 and f_x[1] >= x_0 and\
-            f_y[0] <= y_1 and f_y[1] >= y_0
-
     def merge(self, other):
         """Merge with *other* bounding box."""
         x_min = min(self.get_min(X), other.get_min(X))
@@ -89,8 +84,19 @@ class BoundingBox(object):
         self._points = np.array(list(itertools.product([x_min, x_max],
                                                        [y_min, y_max],
                                                        [z_min, z_max]))) * q.m
-        self._points_z_proj = np.array(
-            [x[:-1] for x in self._points]) * q.m
+
+    def overlaps(self, other):
+        """
+        Determine if the bounding box XY-projection overlaps XY-projection
+        of *other* bounding box.
+        """
+        x_interval_0 = self.get_min(X), self.get_max(X)
+        y_interval_0 = self.get_min(Y), self.get_max(Y)
+        x_interval_1 = other.get_min(X), other.get_max(X)
+        y_interval_1 = other.get_min(Y), other.get_max(Y)
+
+        return overlap(x_interval_0, x_interval_1) and \
+            overlap(y_interval_0, y_interval_1)
 
     def __repr__(self):
         return "BoundingBox(%s)" % (str(self))
@@ -112,99 +118,58 @@ class Trajectory(object):
     Trajectory is a spline interpolated from a set of points.
     """
 
-    def __init__(self, points, traj_length, velocities=None,
-                 v_0=0 * q.m / q.s):
-        """Create trajectory from given *points* which represent (x,y,z)
-        coordinates, *length* is the trajectory length, *velocities*
-        is a list of (length, velocity) tuples, where the first component
-        specifies the relative distance in which the object following
-        the trajectory will achieve the given velocity. *v_0* is the initial
-        velocity.
+    def __init__(self, control_points, time_dist=None, velocity=None):
         """
-        self._points = points.simplified
-        self._length = traj_length.simplified
-        self._v_0 = v_0.simplified
-        self._length_velos = velocities
+        TODO: describe when you are done!
+        """
+        self._control_points = control_points.simplified
 
-        if self._length_velos is not None:
-            self._length_velos = [(dist.simplified, velo.simplified)
-                                  for dist, velo in velocities]
-            sum_dists = np.sum(zip(*self._length_velos)[0]) * q.m
-            if sum_dists != self.length:
-                raise ValueError("Specified velocities do not match the " +
-                                 "trajectory length {0} != {1}".format(
-                                     self.length, sum_dists))
-            self._time_velos = self._distance_to_time()
-            self._time = np.sum([time_velo[0] for
-                                 time_velo in self._time_velos]) * q.s
+        if time_dist is not None and velocity is not None:
+            raise ValueError("Either times and distances or velocity " + \
+                             "must be given, but not both at the same time.")
+
+        if len(self.control_points) == 1 or (time_dist is None and 
+                                             velocity is None):
+            # Static trajectory or no velocity profile specified.
+            self._tck = None
+            self._u = None
+            self._length = 0 * q.m
+            self._times = self._distances = self._time_tck = None
         else:
-            self._time_velos = None
-            self._time = 0 * q.s
+            # Positions.
+            self._tck, self._u = \
+                        interp.splprep(zip(*control_points.simplified))
+            self._length = self._get_length()
+        
+            # Velocity profile.
+            if velocity is not None:
+                # Constant velocity
+                time_dist = get_constant_velocity(velocity,
+                                                  self.length / velocity)
 
-    def _get_point_index(self, abs_time):
-        """Get index of a point in the points list at the time *abs_time*."""
-        dist = self.get_distance(abs_time)
-        if dist == 0:
-            return 0
-
-        return int(round(dist / self.length * (len(self.points) - 1)))
-
-    def get_point(self, abs_time):
-        """Get a point on the trajectory at the time *abs_time*."""
-        return self.points[self._get_point_index(abs_time)]
-
-    def get_direction(self, abs_time):
-        """Get direction of the trajectory at the time *abs_time*. If p_0
-        is the point at which the trajectory resides at *abs_time* and p_1
-        is the point right after p_0, then the direction is defined as
-        vector p_1 - p_0.
-        """
-        index = self._get_point_index(abs_time)
-        if index == len(self.points) - 1:
-            # If we are at the end of the trajectory we use the same direction
-            # as for the previous point.
-            index -= 1
-
-        return normalize(self.points[index + 1] - self.points[index])
-
-    def get_distance(self, abs_time):
-        """Get distance from the beginning of the trajectory to the time
-        given by *abs_time*.
-        """
-        if self._length_velos is None:
-            return 0 * q.m
-        total_time = 0 * q.s
-        distance = 0 * q.m
-
-        for i in range(len(self._time_velos)):
-            t_1, v_1 = self._time_velos[i]
-            v_0 = self._v_0 if i == 0 else self._time_velos[i - 1][1]
-            total_time += t_1
-            t_x = t_1 if abs_time >= total_time else abs_time - \
-                total_time + t_1
-            distance += _get_distance(t_x, t_1, v_0, v_1)
-            if total_time >= abs_time:
-                break
-
-        return distance
-
-    def _distance_to_time(self):
-        """Convert (distance, velocity) pairs to (time, velocity) pairs."""
-        velocities = []
-
-        for i in range(len(self._length_velos)):
-            s_1, v_1 = self._length_velos[i]
-            v_0 = self._v_0 if i == 0 else self._length_velos[i - 1][1]
-            t_1 = _get_time(s_1, v_0, v_1)
-            velocities.append((t_1, v_1))
-
-        return velocities
-
+            t_0, s_0 = zip(*time_dist)
+            t_0 = np.array(t_0)
+            s_0 = np.array(s_0)
+            # Time must be monotonic and distances cannot be negative
+            if len(set(t_0)) != len(t_0) or np.any(t_0 != np.sort(t_0)):
+                raise ValueError("Time must be strictly monotonically rising.")
+            if np.any(t_0 < 0):
+                raise ValueError("Time cannot be negative.")
+            if np.any(s_0 < 0):
+                raise ValueError("Distance cannot be negative.")
+            
+            t_units = time_dist[0][0].units
+            d_units = time_dist[0][1].units 
+            t_0 = Quantity(t_0 * t_units).simplified.magnitude
+            s_0 = Quantity(s_0 * d_units).simplified.magnitude
+            self._times, self._distances = interpolate_1d(t_0, s_0, 100)
+            self._time_tck = interp.splrep(self._times, self._distances)
+        
     @property
-    def points(self):
-        """Points of the spline."""
-        return self._points
-
+    def control_points(self):
+        """Control points used by the trajectory."""
+        return tuple(self._control_points) * q.m
+        
     @property
     def length(self):
         """Trajectory length."""
@@ -213,85 +178,120 @@ class Trajectory(object):
     @property
     def time(self):
         """Total time needed to travel the whole trajectory."""
-        return self._time
+        if self._times is not None:
+            return (self._times[-1] - self._times[0]) * q.s
+        else:
+            return 0 * q.s
 
-    @property
-    def length_profile(self):
-        """Relative times and velocities as a list of tuples
-        (relative_time, velocity).
+    def get_next_time(self, t_0, delta_distance):
         """
-        return self._length_velos
-
-    @property
-    def time_profile(self):
-        """Relative times and velocities as a list of tuples
-        (relative_time, velocity).
+        Get next time at which the trajectory will have traveled
+        *delta_distance*, the starting time is *t_0*.
         """
-        return self._time_velos
+        t_0 = t_0.simplified.magnitude
+        d_s = delta_distance.simplified.magnitude
+        
+        def find_closest(up=1):
+            # Get the distance at t_0, add the delta_distance and find t_1 by
+            # which the trajectory moves the delta_distance. t_1 is the
+            # closest spline root greater than t_0.
+            s_1 = interp.splev(t_0, self._time_tck) + up * d_s
+            
+            # Adjust height for finding the root at distance s_1.
+            d_adj = self._distances - s_1
+            tck = interp.splrep(self._times, d_adj)
+            
+            # Find roots fitting f(s_1) = t_1. There can be many of them, so
+            # pick the one which is greater and closest to the original t_0.
+            # The closest root we found has the property that
+            # |f(t_1) - f(t_0)| < delta_distance.
+            return closest(interp.sproot(tck), t_0)
+        
+        if t_0 < 0:
+            raise ValueError("Time cannot be negative.")
+
+        if t_0 > self.time:
+            return None
+
+        if self._times is None:
+            result = 0 * q.s
+        else:
+            # Look for d_0 + delta_distance and also for d_0 - delta_distance,
+            # Because the trajectory can reverse.
+            top = find_closest()
+            bottom = find_closest(-1)
+            
+            result = top if top is not None and top < bottom or bottom \
+                        is None else bottom
+            if result is not None:
+                result = result * q.s
+            
+        return result
+
+    def get_point(self, abs_time):
+        """Get a point on the trajectory at the time *abs_time*."""
+        if abs_time < 0:
+            raise ValueError("Time cannot be negative.")
+        if abs_time > self.time:
+            abs_time = self.time
+        
+        if self._tck is None:
+            # Stationary trajectory.
+            result = self._control_points[0]
+        else:
+            if self._times is None:
+                # Stationary trajectory.
+                result = self._control_points[0]
+            else:
+                result = interp.splev(self._get_u(abs_time), self._tck) * q.m
+            
+        return result
+
+    def get_direction(self, abs_time):
+        """
+        Get direction of the trajectory at the time *abs_time*. It is the
+        derivative of the trajectory at *abs_time*.
+        """
+        if self._times is None:
+            res = np.array((0, 0, 0))
+        else:
+            res = normalize(np.array(interp.splev(self._get_u(abs_time),
+                                         self._tck, der=1)))
+            
+        return res * q.dimensionless
+            
+    def _get_u(self, abs_time):
+        """Get the spline parameter from the time *abs_time*."""
+        dist = interp.splev(abs_time, self._time_tck)
+        u = dist / self.length
+        if u > 1:
+            # If we go beyond the trajectory end, stay in it.
+            u = 1
+        
+        return u
+    
+    def _get_length(self):
+        """
+        Get length of a parametric curve with knots, coefficients and spline
+        degree tuple *tck* (most probably from scipy.interpolate.splprep). *u*
+        is the parameter of the curve.
+        """
+        def part(u):
+            der = interp.splev(u, self._tck, der=1)
+            # for a 3D parametric curve the length is
+            # sqrt((d_x/d_u)^2 + (d_y/d_u)^2 + (d_z/d_u)^2).
+            return np.sqrt(der[0] ** 2 + der[1] ** 2 + der[2] ** 2)
+        
+        return integ.quad(part, self._u[0], self._u[-1])[0] * q.m
 
 
-def interpolate_points(control_points, pixel_size):
-    """Create points by interpolating the *control_points*. Thanks to given
-    *pixel_size* the resulting sampling has sub-voxel precision. Return
-    a tuple (points, length), where length is the length of the created
-    trajectory.
-    """
-    control_points = control_points.simplified
-
-    if len(control_points) == 1:
-        return control_points, 0 * q.m
-
-    points = zip(*control_points)
-
-    tck, vals = interpolate.splprep([points[0], points[1], points[2]], s=0)
-    p_length = integrate.romberg(_length_curve_part,
-                                 vals[0], vals[len(vals) - 1],
-                                 args=(tck,)) * q.m
-
-    # Compute points of the curve based on the curve length and pixel size.
-    # sqrt(12) factor to make sure the length of a step is < 1 voxel
-    # the worst case is that two values are in the two most distanced
-    # ends of two voxels, vx_1 - 0.5 in all directions and vx_2 - 0.5
-    # in all directions (x,y,z), the distance between two such points is
-    # then sqrt(12) which is twice the voxel's diagonal.
-    # Assumes the distances are not larger then the diagonal.
-    size = p_length / pixel_size * np.sqrt(12)
-    x_new, y_new, z_new = interpolate.splev(np.linspace(0, 1,
-                                                        size.simplified), tck)
-
-    return zip(x_new, y_new, z_new) * q.m, p_length
-
-
-def _get_time(dist, v_0, v_1):
-    """Get time needed for traveling distance *dist* with initial velocity
-    *v_0* and ending velocity *v_1*.
-    """
-    if v_0 == v_1:
-        return dist / v_0
+def closest(values, min_value):
+    """Get the minimum greater value *min_value* from *values*."""
+    bigger = np.where(values > min_value)[0]
+    if len(bigger) == 0:
+        return None
     else:
-        return 2 * dist / (v_0 + v_1)
-
-
-def _get_distance(t_x, t_1, v_0, v_1):
-    """Get distance at time *t_x* in a window taking *t_1* time with starting
-    velocity *v_0* and ending with velocity *v_1*.
-    """
-    if v_0 == v_1:
-        # Constant velocity.
-        return v_0 * t_x
-    else:
-        accel = (v_1 - v_0) / t_1
-        # Acceleration if accel > 0, otherwise deceleration.
-        return v_0 * t_x + 0.5 * accel * t_x ** 2
-
-
-def _length_curve_part(param, tck):
-    """Compute length of a part of the parametrized curve with parameter
-    *param* and a tuple *tck* consisting of knots, b-spline coefficients
-    and the degree of the spline.
-    """
-    p_x, p_y, p_z = interpolate.splev(param, tck, der=1)
-    return np.sqrt(p_x ** 2 + p_y ** 2 + p_z ** 2)
+        return values[bigger[0]]
 
 
 def length(vector):
@@ -321,6 +321,11 @@ def transform_vector(trans_matrix, vector):
     vector = vector.simplified
 
     return np.dot(trans_matrix, np.append(vector, 1) * vector.units)[:-1]
+
+
+def overlap(interval_0, interval_1):
+    """Check if intervals *interval_0* and *interval_1* overlap."""
+    return interval_0[0] < interval_1[1] and interval_0[1] > interval_1[0]
 
 
 def translate(vec):
@@ -398,3 +403,31 @@ def angle(vec_0, vec_1):
 
     return math.atan2(length(np.cross(vec_0, vec_1) * q.dimensionless),
                       np.dot(vec_0, vec_1)) * q.rad
+
+def get_rotation_displacement(vec_0, vec_1, vec_length):
+    """
+    Get the displacement introduced by a rotation from vector *vec_0*
+    to *vec_1* taking into account the rotation of a vector of length
+    *vec_length*.
+    """
+    phi = angle(vec_0, vec_1)
+    if phi > np.pi / 2 * q.rad:
+        phi -= np.pi / 2 * q.rad
+        
+    return vec_length * np.tan(phi)
+                      
+def interpolate_1d(x_0, y_0, size):
+    """
+    Interpolate function y = f(x) with *x_0*, *y_0* as control points
+    and return the interpolated x_1 and y_1 arrays of *size*.
+    """
+    x_1 = np.linspace(x_0[0], x_0[-1], size)
+    tck = interp.splrep(x_0, y_0)
+    
+    return x_1, interp.splev(x_1, tck)
+
+def get_constant_velocity(v_0, duration):
+    times = np.linspace(0 * duration.units, duration, 5)
+    dist = v_0 * times
+    
+    return zip(times, dist)

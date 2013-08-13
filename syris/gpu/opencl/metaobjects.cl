@@ -97,7 +97,7 @@ void get_meta_ball_equation(vfloat *result, __constant object *o, vfloat2 *p,
 	/* determine R = r + influence for given x,y coordinates */
 	R_2 = coeff * (intersection.y - intersection.x) / 2.0;
 	/* now square it */
-	R_2 = R_2*R_2;
+	R_2 = R_2 * R_2;
 	/* shift center in z direction in order to minimize distance from 0.
 	 * Precomputation for all objects done by host. */
 	cz = coeff * (intersection.x + intersection.y)/2.0 - z_middle;
@@ -282,10 +282,9 @@ __kernel void thickness(__global vfloat *out,
 						const vfloat size_coeff,
 						const vfloat z_middle,
 						const vfloat2 pixel_size,
-						const vfloat eps,
 						const int clear) {
-	unsigned int ix = get_global_id(0);
-	unsigned int iy = get_global_id(1);
+	int ix = get_global_id(0);
+	int iy = get_global_id(1);
 	unsigned int mem_index = get_global_size(0) * iy + ix;
 
 	/* +2 for interval beginning and end, +1 for radius^2 storage
@@ -309,7 +308,8 @@ __kernel void thickness(__global vfloat *out,
 
 	vfloat2 obj_coords;
 
-	if (roi.x <= ix && ix < roi.z && roi.y <= iy && iy < roi.w) {
+	if (roi.x <= ix + gl_offset.x && ix + gl_offset.x < roi.z &&
+			roi.y <= iy + gl_offset.y && iy + gl_offset.y < roi.w) {
 		/* We are in the FOV. */
 		/* transform pixel to object point in mm first */
 		obj_coords.x = (ix + gl_offset.x) * pixel_size.x;
@@ -317,7 +317,7 @@ __kernel void thickness(__global vfloat *out,
 
 		for (i = 0; i < num_objects; i++) {
 			get_meta_object_equation(poly, &objects[i], &obj_coords,
-					z_middle, size_coeff, eps);
+					z_middle, size_coeff, pixel_size.x);
 			if (!isnan(poly[5])) {
 				init_poly_object(&pobjects[i], poly);
 				po_add(left, &pobjects[i], size, X_SORT);
@@ -375,7 +375,7 @@ __kernel void thickness(__global vfloat *out,
 									coeffs[current_index(index - 1)],
 									coeffs[right_index(index - 1)],
 									POLY_DEG, previous_end,
-									left_end, roots, eps);
+									left_end, roots, pixel_size.x);
 						thickness += get_thickness(
 								(const vfloat *)
 								coeffs[current_index(index - 1)],

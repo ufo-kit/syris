@@ -2,6 +2,7 @@
 Utility functions concerning GPU programming.
 """
 
+import numpy as np
 import pyopencl as cl
 from pyopencl.array import vec
 import time
@@ -68,6 +69,35 @@ def get_metaobjects_source():
                          "metaobjects.cl"])
 
     return obj_types + source
+
+
+def get_cache(buf):
+    """
+    Get a device memory object from cache *buf*, which can reside either
+    on host or on device.
+    """
+    if isinstance(buf, cl.MemoryObject):
+        result = buf
+    else:
+        result = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE |
+                           cl.mem_flags.COPY_HOST_PTR, hostbuf=buf)
+
+    return result
+
+
+def cache(mem, shape, dtype, cache_type):
+    """
+    Cache a device memory object *mem* with *shape* and numpy data type
+    *dtype* on host or device based on *cache_type*.
+    """
+    if cache_type == cfg.CACHE_HOST:
+        # We need to copy from device to host.
+        result = np.empty(shape, dtype=dtype)
+        cl.enqueue_copy(cfg.QUEUE, result, mem)
+    else:
+        result = mem
+        
+    return result
 
 
 def _object_types_to_struct():

@@ -4,6 +4,7 @@ import quantities as q
 from syris.opticalelements import geometry as geom
 from unittest import TestCase
 import itertools
+from syris.opticalelements.geometry import BoundingBox
 
 
 def get_base():
@@ -107,3 +108,26 @@ class Test(TestCase):
             diff = np.sum(normalized - geom.normalize(
                           geom.transform_vector(trans_mat, direction)))
             self.assertAlmostEqual(diff, 0)
+
+    def test_overlap(self):
+        self.assertTrue(geom.overlap((0, 2), (1, 3)))
+        self.assertFalse(geom.overlap((0, 2), (2, 3)))
+        self.assertFalse(geom.overlap((0, 2), (-1, 0)))
+        self.assertFalse(geom.overlap((0, 2), (-10, -5)))
+        self.assertFalse(geom.overlap((0, 2), (3, 10)))
+        self.assertTrue(geom.overlap((0, 1), (0, 1)))
+
+    def test_bounding_box_overlap(self):
+        def test(base, ground_truth):
+            b_1 = BoundingBox(list(itertools.product(base, base, base)) *
+                              q.m)
+            self.assertEqual(b_0.overlaps(b_1), ground_truth)
+
+        base_0 = -1, 1
+        b_0 = BoundingBox(list(itertools.product(base_0, base_0, base_0)) *
+                          q.m)
+        test((1, 2), False)
+        test((-10, -5), False)
+        test((0, 2), True)
+        test((-1, 0), True)
+        test((-1, 1), True)

@@ -45,3 +45,52 @@ __kernel void propagator(__global vcomplex *out,
 	/* Lowest frequencies are in the corners. */
 	out[n * ((iy + n / 2) % n) + ((ix + n / 2) % n)] = result;
 }
+
+
+/*
+ * Calculate the exponent of a transmission function T(x,y). The exponent
+ * will be evaluated when all coefficients and thicknesses are taken
+ * into account.
+ */
+__kernel void transmission_add(__global vcomplex *transmissions,
+								__global vfloat *thickness,
+								const vcomplex refractive_index,
+								const int clear) {
+	int ix = get_global_id(0);
+	int iy = get_global_id(1);
+	int mem_index = iy * get_global_size(0) + ix;
+
+	if (clear) {
+		transmissions[mem_index] = (vcomplex)(
+							thickness[mem_index] * refractive_index.x,
+							thickness[mem_index] * refractive_index.y);
+	} else {
+		transmissions[mem_index] = (vcomplex)(transmissions[mem_index].x +
+					thickness[mem_index] * refractive_index.x,
+					transmissions[mem_index].y +
+					thickness[mem_index] * refractive_index.y);
+	}
+}
+
+/*
+ * Transfer function T(x,y), which defines photon absorption
+ * and phase changes. It depends on wavelength and material.
+ */
+__kernel void transfer(__global vcomplex *transmission_coeffs,
+						const vfloat lambda) {
+	int ix = get_global_id(0);
+	int iy = get_global_id(1);
+	int width = get_global_size(0);
+
+	vfloat phase, absorp, e_a, k;
+	k = -2 * M_PI / lambda;
+
+	/* Imaginary part - phase. */
+	phase = k * (transmission_coeffs[iy * width + ix].x);
+	/* Real part - absorption. */
+	absorp = k * (transmission_coeffs[iy * width + ix].y);
+	e_a = exp(absorp);
+
+	transmission_coeffs[iy * width + ix] = (vcomplex)(e_a * cos(phase),
+														e_a * sin(phase));
+}

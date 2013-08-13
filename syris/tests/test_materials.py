@@ -2,7 +2,7 @@ import numpy as np
 import quantities as q
 from unittest import TestCase
 from syris import config as cfg
-from syris.opticalelements.materials import PMASFMaterial
+from syris.opticalelements.materials import PMASFMaterial, Material
 import os
 
 
@@ -36,3 +36,20 @@ class TestPMASFMaterial(TestCase):
     @pmasf_required
     def test_wrong_material(self):
         self.assertRaises(RuntimeError, PMASFMaterial, "asd", [0] * q.keV)
+
+    def test_comparison(self):
+        m_0 = Material("PMMA", None)
+        m_1 = Material("glass", None)
+        m_2 = Material("PMMA", None)
+
+        self.assertEqual(m_0, m_2)
+        self.assertNotEqual(m_0, m_1)
+        self.assertNotEqual(m_0, None)
+        self.assertNotEqual(m_0, 1)
+
+    def test_hashing(self):
+        m_0 = Material("PMMA", None)
+        m_1 = Material("glass", None)
+        m_2 = Material("PMMA", None)
+
+        self.assertEqual(len(set([m_1, m_0, m_1, m_2])), 2)

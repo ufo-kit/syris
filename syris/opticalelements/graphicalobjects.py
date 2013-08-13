@@ -25,20 +25,29 @@ class GraphicalObject(object):
         """
         self._trajectory = trajectory
         self._orientation = geom.normalize(orientation)
-        self._center = trajectory.points[0].simplified
+        self._center = trajectory.control_points[0].simplified
 
         # Matrix holding transformation.
         self.transform_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
+        # Maximum object enlargement in any direction.
+        self._scale_factor = np.ones(3)
 
         # Last position as tuple consisting of a 3D point and a vector giving
         # the object orientation.
         self._last_position = None
+        
+    @property
+    def furthest_point(self):
+        """
+        The furthest point from object's center with respect to the
+        scaling factor of the object.
+        """
+        raise NotImplementedError
 
     @property
     def position(self):
         """Current position."""
-        return np.dot(linalg.inv(self.transform_matrix), (0, 0, 0, 1))[:-1] * \
-            self.center.units
+        return linalg.inv(self.transform_matrix)[:3, -1] * q.m
 
     @property
     def last_position(self):
@@ -61,6 +70,7 @@ class GraphicalObject(object):
     def clear_transformation(self):
         """Clear all transformations."""
         self.transform_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
+        self._scale_factor = np.ones(3)
 
     @property
     def trajectory(self):
@@ -83,6 +93,44 @@ class GraphicalObject(object):
         *trans_matrix* on the current transformation matrix.
         """
         self.transform_matrix = np.dot(trans_matrix, self.transform_matrix)
+        
+    def get_combined_displacement(self, t_0, t_1):
+        """
+        Get the displacement traveled between times *t_0* and *t_1*.
+        Take into account both translation and rotation of the object.
+        """
+        trans_d = geom.length(self.trajectory.get_point(t_1) - \
+                    self.trajectory.get_point(t_0))
+        rot_d = geom.get_rotation_displacement(
+                           self.trajectory.get_direction(t_0),
+                           self.trajectory.get_direction(t_1),
+                           self.furthest_point)
+    
+        return trans_d + rot_d
+
+    def get_next_time(self, t_0, delta_distance):
+        """
+        Get next time at which the object will have traveled
+        *delta_distance*, the starting time is *t_0*.
+        """
+        t_1 = self.trajectory.get_next_time(t_0, delta_distance)
+        if t_1 is None:
+            return None
+        
+        rot_d = geom.get_rotation_displacement(
+                               self.trajectory.get_direction(t_0),
+                               self.trajectory.get_direction(t_1),
+                               self.furthest_point)
+
+        dist = rot_d + delta_distance
+        d_t = (t_1 - t_0) / 2
+        
+        while dist > delta_distance:
+            dist = self.get_combined_displacement(t_0, t_0 + d_t)
+            d_t /= 2.0
+            
+        # Return the last bigger than *delta_distance*.
+        return t_0 + 2 * d_t
 
     def moved(self, t_0, t_1, pixel_size):
         """Return True if the trajectory moved between time *t_0* and *t_1*
@@ -91,7 +139,7 @@ class GraphicalObject(object):
         p_0 = self.trajectory.get_point(t_0)
         p_1 = self.trajectory.get_point(t_1)
 
-        return geom.length(p_1 - p_0) > pixel_size
+        return geom.length(p_1 - p_0) > pixel_size / 2
 
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
@@ -125,6 +173,8 @@ class GraphicalObject(object):
         """Scale the object by scaling coefficients (kx, ky, kz)
         given by *sc_vec*.
         """
+        self._scale_factor *= np.array(scale_vec)
+        
         self.transform_matrix = np.dot(
             geom.scale(scale_vec), self.transform_matrix)
 
@@ -141,13 +191,28 @@ class MetaObject(GraphicalObject):
         """Create a metaobject with *radius*."""
         super(MetaObject, self).__init__(trajectory, orientation)
         if radius <= 0:
-            raise ValueError("Blobbiness must be greater than zero.")
+            raise ValueError("Radius must be greater than zero.")
 
         self._radius = radius.simplified
 
     @property
     def radius(self):
         return self._radius
+
+    @property
+    def bounding_box(self):
+        """Bounding box of the object."""
+        radius = self.radius.simplified.magnitude
+
+        base = -2 * radius, 2 * radius
+        points = list(itertools.product(base, base, base)) * q.m
+
+        # Transform by the current transformation matrix.
+        transformed = np.array([geom.transform_vector(
+            linalg.inv(self.transform_matrix), points[i])
+            for i in range(len(points))])
+
+        return BoundingBox(transformed * q.m)
 
     def get_transform_const(self):
         """
@@ -166,7 +231,9 @@ class MetaObject(GraphicalObject):
         """
         fmt = get_format_string("ifff" + 16 * "f")
 
-        radius = coeff * self.radius.rescale(units).magnitude
+        radius = coeff.rescale(1 / units).magnitude * \
+            self.radius.rescale(units).magnitude
+
         # influence region = 2 * r, thus the coefficient guaranteeing
         # f(r) = 1 is
         # 1 / (R^2 - r^2)^2 = 1 / (4r^2 - r^2)^2 = 1 / 9r^4
@@ -187,7 +254,14 @@ class MetaBall(MetaObject):
 
     def __init__(self, trajectory, radius, orientation=geom.Y_AX):
         super(MetaBall, self).__init__(trajectory, radius, orientation)
-
+        
+    @property
+    def furthest_point(self):
+        """
+        Furthest point is twice the radius because of the influence
+        region of the metaball.
+        """
+        return 2 * self.radius * max(self._scale_factor)
 
 class MetaCube(MetaObject):
 
@@ -212,6 +286,31 @@ class CompositeObject(GraphicalObject):
     def objects(self):
         """All objects which are inside this composite object."""
         return tuple(self._objects)
+    
+    def _all_objects(self, primitive):
+        res = set() if primitive else set([self])
+        
+        for obj in self:
+            if obj.__class__ == self.__class__:
+                res.update(obj._all_objects(primitive))
+            else:
+                res.add(obj)
+
+        return tuple(res)
+
+    @property
+    def primitive_objects(self):
+        return self._all_objects(True)
+
+    @property
+    def all_objects(self):
+        """Return all subobjects including self and composite subobjects."""
+        return self._all_objects(False)
+    
+    @property
+    def total_time(self):
+        """The total trajectory time of the object and all its subobjects."""
+        return max([obj.trajectory.time for obj in self.all_objects])
 
     def __len__(self):
         if self._objects:
@@ -238,17 +337,6 @@ class CompositeObject(GraphicalObject):
 
         return self._objects[self._index]
 
-    @property
-    def primitive_objects(self):
-        res = set()
-        for obj in self:
-            if obj.__class__ == self.__class__:
-                res.update(obj.primitive_objects)
-            else:
-                res.add(obj)
-
-        return tuple(res)
-
     def add(self, obj):
         """Add a graphical object *obj*."""
         if obj.__class__ == CompositeObject and self in obj.objects:
@@ -271,35 +359,17 @@ class CompositeObject(GraphicalObject):
         for obj in self:
             obj.clear_transformation()
 
-    def get_bounding_box(self):
+    @property
+    def bounding_box(self):
         """Get bounding box around all the graphical objects inside."""
+        b_box = None
         for i in range(len(self)):
-            b_box = self[i].get_bounding_box()
-            xmin = b_box.get_min(geom.X)
-            ymin = b_box.get_min(geom.Y)
-            zmin = b_box.get_min(geom.Z)
-            xmax = b_box.get_max(geom.X)
-            ymax = b_box.get_max(geom.Y)
-            zmax = b_box.get_max(geom.Z)
-            if i == 0:
-                bpoints = [[xmin, ymin, zmin], [xmax, ymax, zmax]]
+            if b_box is None:
+                b_box = self[i].bounding_box
             else:
-                if xmin < bpoints[0][0]:
-                    bpoints[0][0] = xmin
-                if ymin < bpoints[0][1]:
-                    bpoints[0][1] = ymin
-                if zmin < bpoints[0][2]:
-                    bpoints[0][2] = zmin
-                if xmax > bpoints[1][0]:
-                    bpoints[1][0] = xmax
-                if ymax > bpoints[1][1]:
-                    bpoints[1][1] = ymax
-                if zmax > bpoints[1][2]:
-                    bpoints[1][2] = zmax
+                b_box.merge(self[i].bounding_box)
 
-        return BoundingBox(list(itertools.product([xmin, xmax],
-                                                  [ymin, ymax],
-                                                  [zmin, zmax])))
+        return b_box
 
     def translate(self, vec):
         """Translate all sub-objects by a vector *vec*."""
@@ -331,18 +401,54 @@ class CompositeObject(GraphicalObject):
         for gr_object in self:
             # Then move its sub-objects.
             gr_object.move(abs_time)
-
-    def moved(self, t_0, t_1, pixel_size):
-        """Return True if the trajectory moved between time *t_0* and *t_1*
-        more than one pixel with respect to the given *pixel_size*.
+            
+    def get_next_time(self, t_0, delta_distance):
         """
-        # We need to check all subobjects. Moreover, simple trajectory
-        # distance between points at t_0 and t_1 will not work because
-        # when the composite object moves more than one pixel, but the
-        # primitive graphical object moves the exact opposite it results
-        # in no movement. We are also interested only in primitive object
-        # movement changes, because the composite objects do not show in
-        # in the scene.
+        Get next time at which the object will have traveled
+        *delta_distance*, the starting time is *t_0*.
+        """
+        t_1 = None
+        
+        # Get the smallest time from the primitive objects needed to travel
+        # more than delta_distance. It will serve as an initial guess.
+        for obj in self.primitive_objects:
+            tmp = obj.get_next_time(t_0, delta_distance)
+            if tmp is not None and (t_1 is None or tmp < t_1):
+                t_1 = tmp
+                
+        if t_1 is None:
+            return None
+                
+        d_t = t_1 - t_0
+        
+        # It might happen that in combination with trajectories of
+        # parent objects the t_1 from the guess is actually too small
+        # and we need to move forward in time.
+        while not self.moved(t_0, t_0 + d_t, delta_distance):
+            if t_0 + d_t > self.total_time:
+                # The superposition of all subtrajectories makes this
+                # object stationary from t_0 on.
+                return None
+            d_t *= 2
+            
+        # After we have made sure some objects will move, minimize
+        # the movement down to delta_distance.
+        d_t /= 2
+        while self.moved(t_0, t_0 + d_t, delta_distance):
+            d_t /= 2
+            
+        return t_0 + 2 * d_t
+
+    def moved(self, t_0, t_1, delta_distance):
+        """Return True if the trajectory moved between time *t_0* and *t_1*
+        more than one pixel with respect to the given *delta_distance*.
+        We need to check all subobjects. Moreover, simple trajectory
+        distance between points at t_0 and t_1 will not work because
+        when the composite object moves more than one pixel, but the
+        primitive graphical object moves the exact opposite it results
+        in no movement. We need to check also the composite object
+        movement because it may cause some subobjects to rotate.
+        """
         # Remember the current transformation matrices.
         matrix = np.copy(self.transform_matrix)
         matrices = {}
@@ -357,7 +463,10 @@ class CompositeObject(GraphicalObject):
 
         # Remember all primitive object positions.
         positions = {}
+        orientations = {}
         for obj in self.primitive_objects:
+            orientations[obj] = geom.transform_vector(obj.transform_matrix,
+                                                      obj.orientation)
             positions[obj] = obj.position
 
         # Forget that movement and move to t_1.
@@ -367,7 +476,17 @@ class CompositeObject(GraphicalObject):
         # Check the displacements of all primitive objects.
         res = False
         for obj in self.primitive_objects:
-            if geom.length(obj.position - positions[obj]) > pixel_size:
+            orientation = geom.transform_vector(obj.transform_matrix,
+                                                obj.orientation)
+            # Determine the maximum angle by which the object can move
+            # and not move by more than *delta_distance*. The object moved
+            # if the angle between the object pose at t_0 and t_1 combined
+            # with the translation is larger than *delta_distance*.
+            rot_d = geom.get_rotation_displacement(orientation,
+                                                   orientations[obj],
+                                                   obj.furthest_point)
+            tran_d = geom.length(obj.position - positions[obj])
+            if  rot_d + tran_d > delta_distance:
                 res = True
                 break
 
@@ -378,13 +497,13 @@ class CompositeObject(GraphicalObject):
 
         return res
 
-    def pack(self):
+    def pack(self, units, coeff=1):
         """Pack all the sub-objects into a structure suitable for GPU
         calculation.
         """
         string = ""
         for gr_object in self._objects:
-            string += gr_object.pack()
+            string += gr_object.pack(units, coeff)
 
         return string
 
