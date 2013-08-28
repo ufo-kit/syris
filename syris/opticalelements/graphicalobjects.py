@@ -263,6 +263,12 @@ class MetaBall(MetaObject):
         """
         return 2 * self.radius * max(self._scale_factor)
 
+    def __repr__(self):
+        return "MetaBall({0})".format(self.radius)
+
+    def __str__(self):
+        return repr(self)
+
 
 class MetaCube(MetaObject):
 
@@ -275,13 +281,36 @@ class MetaCube(MetaObject):
 
 class CompositeObject(GraphicalObject):
 
-    """Class representing an object consisting of more sub-objects."""
+    """
+    Class representing an object consisting of more sub-objects.
+    A composite object can be thought of as a tree structure with
+    children representing actual graphical objects (non-composite)
+    only in leafs. This means that all direct children of a composite
+    object are either all :py:class:`CompositeObject` instances
+    or are all not. An example of a :py:class:`CompositeObject`
+    and its children could be::
+
+                    C          (0)
+                   / \\
+                  C   C        (1)
+                 / \\   \\
+                P   P   P      (2)
+
+    We see that the root has only composite children on level (1) and
+    both its children have only primitive children on level (2).
+    """
 
     def __init__(self, trajectory, orientation=geom.Y_AX, gr_objects=None):
         """*gr_objects* is a list of :py:class:`GraphicalObject`."""
         super(CompositeObject, self).__init__(trajectory, orientation)
-        self._objects = gr_objects if gr_objects is not None else []
-        self._index = -1
+        if gr_objects is None:
+            gr_objects = []
+        self._objects = []
+
+        # Do not just assign gr_objects but let them all go through
+        # add method, so the list is checked for correct input.
+        for obj in gr_objects:
+            self.add(obj)
 
     @property
     def objects(self):
@@ -292,7 +321,7 @@ class CompositeObject(GraphicalObject):
         res = set() if primitive else set([self])
 
         for obj in self:
-            if obj.__class__ == self.__class__:
+            if obj.__class__ == CompositeObject:
                 res.update(obj._all_objects(primitive))
             else:
                 res.add(obj)
@@ -304,47 +333,34 @@ class CompositeObject(GraphicalObject):
         return self._all_objects(True)
 
     @property
-    def all_objects(self):
-        """Return all subobjects including self and composite subobjects."""
-        return self._all_objects(False)
-
-    @property
     def total_time(self):
         """The total trajectory time of the object and all its subobjects."""
         return max([obj.trajectory.time for obj in self.all_objects])
 
     def __len__(self):
-        if self._objects:
-            count = len(self._objects)
-        else:
-            count = 0
-
-        return count
+        return len(self._objects)
 
     def __getitem__(self, key):
         return self._objects[key]
 
     def __iter__(self):
-        return self
-
-    def next(self):  # @ReservedAssignment
-        """Method needed for iteration over the object."""
-        if (not self._objects or len(self._objects) == 0 or
-                self._index + 1 == len(self._objects)):
-            self._index = -1
-            raise StopIteration
-
-        self._index += 1
-
-        return self._objects[self._index]
+        return self._objects.__iter__()
 
     def add(self, obj):
         """Add a graphical object *obj*."""
-        if obj.__class__ == CompositeObject and self in obj.objects:
-            raise ValueError("This instance is already inside the " +
-                             "composite objects you are trying to add.")
-        if obj not in self and obj is not self:
-            self._objects.append(obj)
+        if obj is self:
+            raise ValueError("Cannot add self")
+        if obj in self._all_objects(False):
+            raise ValueError("Object {0} already contained".format(obj))
+        if len(self) != 0:
+            children_primitive = self[0].__class__ != CompositeObject
+            obj_primitive = obj.__class__ != CompositeObject
+
+            if children_primitive ^ obj_primitive:
+                raise TypeError("Composite object direct children " +
+                                "must be all of the same type")
+
+        self._objects.append(obj)
 
     def remove(self, obj):
         """Remove graphical object *obj*."""
@@ -509,18 +525,47 @@ class CompositeObject(GraphicalObject):
         return string
 
     def __repr__(self):
-        return "CompositeObject(%s)" % (str(self))
+        return "CompositeObject{0}".format(self.objects)
 
     def __str__(self):
-        return "Composite object(center=" + repr(self._center) +\
-            ", subobjects=" + repr(len(self._objects)) + ")"
+        return repr(self)
 
 OBJECT_TYPES = {MetaCube.TYPE: "METACUBE",
                 MetaBall.TYPE: "METABALL"}
 
 
+def get_last_composites(obj):
+    """
+    Traverse the tree structure of the composite object *obj* and
+    return a list of composite objects inside *obj* which have only
+    children of class :py:class:`GraphicalObject`.
+    """
+    result = []
+
+    def go_down(obj):
+        """
+        Go down in composite object's children list and look for
+        instances which have children of type :py:class:`GraphicalObject`.
+        Objects which are composed of purely primitive graphical objects
+        are appended to the *result* list.
+        """
+        primitive = set([subobj for subobj in obj
+                         if subobj.__class__ != CompositeObject])
+        if primitive:
+            result.append(obj)
+        else:
+            for comp_obj in set(obj) - primitive:
+                go_down(comp_obj)
+
+    go_down(obj)
+
+    return result
+
+
 def get_format_string(string):
-    """Get string in single or double precision floating point number
-    format."""
+    """
+    Get string in single or double precision floating point number
+    format.
+    """
     float_string = "f" if cfg.single_precision() else "d"
     return string.replace("vf", float_string)
