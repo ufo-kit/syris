@@ -2,9 +2,9 @@ import quantities as q
 from syris.devices.cameras import Camera
 from syris.devices.lenses import Lens
 from syris.devices.detectors import Detector
-from syris.experiments import Experiment
 from syris.imageprocessing import Tiler
 from syris.tests.base import SyrisTest
+from syris.experiments.base import Experiment
 
 
 class TestExperiments(SyrisTest):

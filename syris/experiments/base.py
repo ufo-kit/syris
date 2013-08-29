@@ -1,7 +1,4 @@
-"""Synchrotron radiation imaging experiments module. You will find
-radiography as well as tomography experiment classes here for conducting
-virtual experiments.
-"""
+"""Synchrotron radiation imaging experiments base module."""
 
 
 class Experiment(object):
