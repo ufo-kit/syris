@@ -33,6 +33,7 @@ PROFILED_CL_FUNCTIONS = [cl.enqueue_nd_range_kernel, cl.enqueue_copy]
 # Caching constants.
 CACHE_HOST = 1
 CACHE_DEVICE = 2
+DEFAULT_CACHE = CACHE_HOST
 
 
 def single_precision():

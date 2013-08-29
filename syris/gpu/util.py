@@ -85,7 +85,7 @@ def get_cache(buf):
     return result
 
 
-def cache(mem, shape, dtype, cache_type):
+def cache(mem, shape, dtype, cache_type=cfg.DEFAULT_CACHE):
     """
     Cache a device memory object *mem* with *shape* and numpy data type
     *dtype* on host or device based on *cache_type*.
