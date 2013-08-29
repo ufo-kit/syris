@@ -1,10 +1,10 @@
 import numpy as np
 import quantities as q
 from syris.devices.cameras import Camera, FPSError, is_fps_feasible
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
-class TestCamera(TestCase):
+class TestCamera(SyrisTest):
 
     def setUp(self):
         self.camera = Camera(1e-3 * q.um,

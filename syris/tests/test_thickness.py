@@ -1,13 +1,13 @@
 import numpy as np
 import pyopencl as cl
-from unittest import TestCase
 import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
 from graphics_util import derivative, f, sgn, Metaball
+from syris.tests.base import SyrisTest
 
 
-class TestThickness(TestCase):
+class TestThickness(SyrisTest):
 
     def setUp(self):
         syris.init()

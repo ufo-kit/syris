@@ -1,10 +1,10 @@
 import numpy as np
 import quantities as q
 from syris import math as smath
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
-class TestMath(TestCase):
+class TestMath(SyrisTest):
 
     def test_match_range(self):
         n = 6

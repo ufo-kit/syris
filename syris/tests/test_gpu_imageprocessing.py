@@ -5,11 +5,11 @@ import syris
 from syris.gpu import util as gpu_util
 from syris import config as cfg
 from syris import imageprocessing as ip
-from unittest import TestCase
 import itertools
+from syris.tests.base import SyrisTest
 
 
-class TestGPUImageProcessing(TestCase):
+class TestGPUImageProcessing(SyrisTest):
 
     def setUp(self):
         syris.init()

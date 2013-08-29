@@ -4,7 +4,7 @@ from syris.opticalelements import geometry as geom
 from syris.opticalelements.geometry import Trajectory
 from syris.opticalelements.graphicalobjects import MetaBall, CompositeObject,\
     get_last_composites
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
 def get_control_points():
@@ -25,7 +25,7 @@ def get_linear(direction, start=(0, 0, 0), num=4):
     return np.array(res) * q.mm
 
 
-class TestGraphicalObjects(TestCase):
+class TestGraphicalObjects(SyrisTest):
 
     def setUp(self):
         self.pixel_size = 1 * q.um

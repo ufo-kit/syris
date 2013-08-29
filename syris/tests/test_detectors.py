@@ -2,10 +2,10 @@ import quantities as q
 from syris.devices.cameras import Camera
 from syris.devices.detectors import Detector
 from syris.devices.lenses import Lens
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
-class TestDetector(TestCase):
+class TestDetector(SyrisTest):
 
     def setUp(self):
         self.lens = Lens(1.4, 100.0 * q.mm, 3.0, 1.0, (1 * q.um, 1 * q.um))

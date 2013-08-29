@@ -3,10 +3,10 @@ import pyopencl as cl
 import syris
 from syris import config as cfg
 from syris.gpu import util as gu
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
-class TestGPUUtil(TestCase):
+class TestGPUUtil(SyrisTest):
 
     def setUp(self):
         syris.init()

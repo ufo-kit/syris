@@ -1,13 +1,13 @@
 import numpy as np
 import quantities as q
 import syris
-from unittest import TestCase
 from syris.opticalelements.samples import MovingSample
 from syris.opticalelements.geometry import Trajectory
 from syris.opticalelements.graphicalobjects import MetaBall, CompositeObject
+from syris.tests.base import SyrisTest
 
 
-class TestSamples(TestCase):
+class TestSamples(SyrisTest):
 
     def setUp(self):
         syris.init()

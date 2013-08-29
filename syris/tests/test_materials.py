@@ -1,9 +1,9 @@
 import numpy as np
 import quantities as q
-from unittest import TestCase
 from syris import config as cfg
 from syris.opticalelements.materials import PMASFMaterial, Material
 import os
+from syris.tests.base import SyrisTest
 
 
 def pmasf_required(func):
@@ -11,7 +11,7 @@ def pmasf_required(func):
     return func
 
 
-class TestPMASFMaterial(TestCase):
+class TestPMASFMaterial(SyrisTest):
 
     def setUp(self):
         if not os.path.exists(cfg.PMASF_FILE):

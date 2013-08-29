@@ -2,10 +2,10 @@ import numpy as np
 import pyopencl as cl
 from syris.gpu import util as gpu_util
 from syris import config as cfg
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
-class TestVComplex(TestCase):
+class TestVComplex(SyrisTest):
 
     def _execute_kernel(self, kernel):
         kernel(self.queue, (1,), None, self.mem_0, self.mem_1, self.mem_out)

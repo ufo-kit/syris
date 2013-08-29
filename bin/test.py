@@ -54,8 +54,7 @@ def create_metaball_random(n, pixel_size, radius_range, coeff=1):
                                                 radius_range.units
     
     c_points = [(x, y, z)] * q.mm
-    points, length = geom.interpolate_points(c_points, pixel_size)
-    trajectory = Trajectory(points, length)
+    trajectory = Trajectory(c_points)
     metaball = MetaBall(trajectory, r)
     metaball.move(0 * q.s)
     

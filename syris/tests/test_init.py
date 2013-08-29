@@ -2,8 +2,8 @@ import pyopencl as cl
 import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
-from unittest import TestCase
 import sys
+from syris.tests.base import SyrisTest
 
 
 def _get_queues(queue_kwargs=None):
@@ -14,7 +14,7 @@ def _get_queues(queue_kwargs=None):
                                      queue_kwargs=queue_kwargs)
 
 
-class TestInit(TestCase):
+class TestInit(SyrisTest):
 
     def test_no_queues(self):
         syris.init()

@@ -5,12 +5,12 @@ Created on Jul 3, 2013
 '''
 import numpy as np
 import quantities as q
-from unittest import TestCase
 from syris.opticalelements.geometry import Trajectory
 from scipy import interpolate as interp
+from syris.tests.base import SyrisTest
 
 
-class TestTrajectory(TestCase):
+class TestTrajectory(SyrisTest):
 
     def setUp(self):
         self.n = 100

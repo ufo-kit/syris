@@ -4,10 +4,10 @@ from syris.devices.lenses import Lens
 from syris.devices.detectors import Detector
 from syris.experiments import Experiment
 from syris.imageprocessing import Tiler
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
-class TestExperiments(TestCase):
+class TestExperiments(SyrisTest):
 
     def setUp(self):
         lens = Lens(1.4, 100 * q.mm, 3.0, 1.0, (1 * q.um, 1 * q.um))

@@ -3,10 +3,10 @@ import pyopencl as cl
 import quantities as q
 import syris
 from syris import physics, config as cfg
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
-class TestPhysics(TestCase):
+class TestPhysics(SyrisTest):
 
     def setUp(self):
         syris.init()

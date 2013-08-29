@@ -2,9 +2,9 @@ import numpy as np
 from numpy import linalg
 import quantities as q
 from syris.opticalelements import geometry as geom
-from unittest import TestCase
 import itertools
 from syris.opticalelements.geometry import BoundingBox
+from syris.tests.base import SyrisTest
 
 
 def get_base():
@@ -26,7 +26,7 @@ def get_vec_0():
     return np.array([1.75, -3.89, 4.7]) * q.m
 
 
-class Test(TestCase):
+class TestGeometry(SyrisTest):
 
     def test_zero_angle(self):
         zero_vec = np.zeros(3) * q.m

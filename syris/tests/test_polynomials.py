@@ -1,13 +1,13 @@
 import numpy as np
 import pyopencl as cl
-from unittest import TestCase
 import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
 from graphics_util import f, derivative, filter_close, np_roots, Metaball
+from syris.tests.base import SyrisTest
 
 
-class TestPolynomials(TestCase):
+class TestPolynomials(SyrisTest):
 
     def setUp(self):
         syris.init()

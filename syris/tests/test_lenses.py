@@ -1,9 +1,9 @@
 import quantities as q
 from syris.devices.lenses import Lens
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
-class TestLenses(TestCase):
+class TestLenses(SyrisTest):
 
     def setUp(self):
         self.f_length = 100 * q.mm

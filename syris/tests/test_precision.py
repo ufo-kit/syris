@@ -2,13 +2,13 @@ import numpy as np
 import pyopencl as cl
 from syris import config as cfg
 from syris.gpu import util as gpu_util
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 ctx = gpu_util.get_cuda_context()
 queue = gpu_util.get_command_queues(ctx)[0]
 
 
-class TestPrecision(TestCase):
+class TestPrecision(SyrisTest):
 
     def setUp(self):
         self.n = 2

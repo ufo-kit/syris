@@ -3,7 +3,7 @@ import pyopencl as cl
 import syris
 from syris import config as cfg
 from syris.imageprocessing import Tiler
-from unittest import TestCase
+from syris.tests.base import SyrisTest
 
 
 def _get_image(y_range, x_range, ar_type=cfg.NP_FLOAT):
@@ -18,7 +18,7 @@ def _get_image(y_range, x_range, ar_type=cfg.NP_FLOAT):
     return result
 
 
-class TestImageTiling(TestCase):
+class TestImageTiling(SyrisTest):
 
     def setUp(self):
         self.data = []

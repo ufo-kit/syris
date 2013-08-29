@@ -1,7 +1,7 @@
 #!/bin/bash
 
 CMD="nosetests syris/tests"
-NO_PMASF="nosetests syris/tests -a '!pmasf_required'"
+NO_PMASF=$CMD" -a '!pmasf_required'"
 
 if [ $# -eq 0 ];
 then
