@@ -335,7 +335,7 @@ class CompositeObject(GraphicalObject):
     @property
     def total_time(self):
         """The total trajectory time of the object and all its subobjects."""
-        return max([obj.trajectory.time for obj in self.all_objects])
+        return max([obj.trajectory.time for obj in self._all_objects(False)])
 
     def __len__(self):
         return len(self._objects)
