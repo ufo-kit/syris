@@ -9,6 +9,9 @@ import logging
 from syris.opticalelements.graphicalobjects import CompositeObject
 
 
+LOGGER = logging.getLogger(__name__)
+
+
 class MovingSample(object):
 
     """A sample consisting of moving graphical objects."""
@@ -21,11 +24,9 @@ class MovingSample(object):
         """
         self.shape = shape
         self.pixel_size = pixel_size.simplified
-        # Transform the values to sets.
+        # Transform values to sets.
         self._parts = dict([(key, set(parts[key])) for key in parts])
         self._prg = g_util.get_program(g_util.get_metaobjects_source())
-        self._logger = logging.getLogger(__name__ + "." +
-                                         self.__class__.__name__)
 
     @property
     def materials(self):
@@ -119,7 +120,7 @@ class MovingSample(object):
         (y, x) is the spatial offset given by :py:class:`Tiler`.
         """
 
-        self._logger.debug("Creating objects at time {0}.".format(abs_time))
+        LOGGER.debug("Creating objects at time {0}.".format(abs_time))
 
         th_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
                            size=self.shape[0] * self.shape[1] * cfg.CL_FLOAT)
