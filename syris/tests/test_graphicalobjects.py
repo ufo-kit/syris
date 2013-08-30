@@ -132,10 +132,32 @@ class TestGraphicalObjects(SyrisTest):
                          "must be all of the same type",
                          ctx.exception.message)
         
-        # test composite parenting
+    def test_parents(self):
+        m_1 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 1 * q.mm)
+        m_2 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 2 * q.mm)
+        m_3 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 3 * q.mm)
+        
+        c_1 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
+                              gr_objects=[m_1])
+        c_2 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
+                              gr_objects=[m_2, m_3])
+        root = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
+                              gr_objects=[c_1, c_2])
+        
+        # parent links
         self.assertEqual(m_3.parent, c_2)
-        self.assertEqual(m_3.parent.parent, c_3)
-        self.assertEqual(m_3.parent.parent.parent, c_5)
+        self.assertEqual(m_3.parent.parent, root)
+        
+        # root parent finding
+        self.assertEqual(m_1.root, root)
+        self.assertEqual(m_3.root, root)
+        
+        # no root
+        m_4 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 4 * q.mm)
+        self.assertEqual(m_4.root, m_4)
+        c_3 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm))
+        self.assertEqual(c_3.root, c_3)
+        
  
     def test_composite_bounding_box(self):
         mb_0 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 0.5 * q.mm)

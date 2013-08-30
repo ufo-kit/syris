@@ -49,6 +49,16 @@ class GraphicalObject(object):
         self._last_position = None
 
     @property
+    def root(self):
+        """Return the topmost parent."""
+        obj = self
+        
+        while hasattr(obj, "parent"):
+            obj = obj.parent
+            
+        return obj
+
+    @property
     def furthest_point(self):
         """
         The furthest point from object's center with respect to the
