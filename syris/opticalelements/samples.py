@@ -35,7 +35,7 @@ class MovingSample(object):
 
     @property
     def objects(self):
-        """Return all objects."""
+        """Return all objects for all materials."""
         objects = []
 
         for mat in self._parts:
@@ -44,9 +44,17 @@ class MovingSample(object):
 
         return objects
     
-#     def _get_moved_groups(self):
-#         for mat in self._parts:
-#             
+    def _get_moved_groups(self, abs_time):
+        fastest = None
+        fastest_object = None
+        
+        for obj in self.objects:
+            next_t = obj.get_next_time(abs_time, self.pixel_size)
+            if fastest == None or fastest > next_t:
+                fastest = next_t
+                fastest_object = obj
+                
+        return fastest, fastest_object
     
     def move(self, abs_time):
         """
@@ -63,7 +71,7 @@ class MovingSample(object):
         """Get graphical objects assigned with *material*."""
         return tuple(self._parts[material])
 
-    def add_part(self, material, gr_obj):
+    def add(self, material, gr_obj):
         """
         Add graphical object *gr_obj* to the parts of the sample
         and assign *material* to it.

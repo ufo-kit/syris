@@ -17,20 +17,20 @@ class TestSamples(SyrisTest):
 
     def test_moving_sample_parts(self):
         self.assertEqual(self.moving.materials, [])
-        self.moving.add_part("PMMA", 1)
-        self.moving.add_part("PMMA", 2)
-        self.moving.add_part("glass", 3)
+        self.moving.add("PMMA", 1)
+        self.moving.add("PMMA", 2)
+        self.moving.add("glass", 3)
 
         # Immutability test.
         self.assertEqual(self.moving.get_objects("PMMA").__class__, tuple)
 
         # Adding objects.
         self.assertEqual(self.moving.get_objects("PMMA"), (1, 2))
-        self.moving.add_part("PMMA", 4)
+        self.moving.add("PMMA", 4)
         self.assertEqual(self.moving.get_objects("PMMA"), (1, 2, 4))
 
         # Adding new materials.
-        self.moving.add_part("new", 5)
+        self.moving.add("new", 5)
         self.assertEqual(self.moving.get_objects("new"), (5,))
 
         # Objects.
@@ -60,10 +60,10 @@ class TestSamples(SyrisTest):
         mat_2 = "PVC"
         mat_stat = "stat"
 
-        self.moving.add_part(mat_0, mb_0)
-        self.moving.add_part(mat_1, mb_1)
-        self.moving.add_part(mat_2, mb_2)
-        self.moving.add_part(mat_stat, mb_stat)
+        self.moving.add(mat_0, mb_0)
+        self.moving.add(mat_1, mb_1)
+        self.moving.add(mat_2, mb_2)
+        self.moving.add(mat_stat, mb_stat)
 
         ultra_fast = self.moving.get_moved_materials(0 * q.s, 1e-5 * q.s)
         fast = self.moving.get_moved_materials(0 * q.s, 1e-4 * q.s)
