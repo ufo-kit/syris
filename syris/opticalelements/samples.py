@@ -12,7 +12,7 @@ from syris.opticalelements.graphicalobjects import CompositeObject
 LOGGER = logging.getLogger(__name__)
 
 
-class MovingSample(object):
+class Sample(object):
 
     """A sample consisting of moving graphical objects."""
 

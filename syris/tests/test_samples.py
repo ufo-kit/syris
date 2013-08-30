@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 import syris
-from syris.opticalelements.samples import MovingSample
+from syris.opticalelements.samples import Sample
 from syris.opticalelements.geometry import Trajectory
 from syris.opticalelements.graphicalobjects import MetaBall, CompositeObject
 from syris.tests.base import SyrisTest
@@ -13,7 +13,7 @@ class TestSamples(SyrisTest):
         syris.init()
         self.shape = 2, 2
         self.pixel_size = 1e-3 * q.mm
-        self.moving = MovingSample({}, self.shape, self.pixel_size)
+        self.moving = Sample({}, self.shape, self.pixel_size)
 
     def test_moving_sample_parts(self):
         self.assertEqual(self.moving.materials, [])
@@ -78,7 +78,7 @@ class TestSamples(SyrisTest):
         # Also test composite, make it of the slow objects, thus
         # it starts moving later.
         comp = CompositeObject(t_stat, gr_objects=[mb_1, mb_2])
-        sample = MovingSample({mat_0: comp}, self.shape, self.pixel_size)
+        sample = Sample({mat_0: comp}, self.shape, self.pixel_size)
         ultra_fast = sample.get_moved_materials(0 * q.s, 1e-5 * q.s)
         fast = sample.get_moved_materials(0 * q.s, 1e-4 * q.s)
         slow = sample.get_moved_materials(0 * q.s, 1 * q.s)
