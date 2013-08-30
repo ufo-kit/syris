@@ -43,7 +43,7 @@ class Sample(object):
                 objects.append(obj)
 
         return objects
-    
+
     def _get_moved_groups(self, abs_time):
         """
         Get the shortest time and the fastest object which travels
@@ -51,24 +51,24 @@ class Sample(object):
         """
         shortest = None
         fastest_object = None
-        
+
         for obj in self.objects:
             next_t = obj.get_next_time(abs_time, self.pixel_size)
-            if shortest == None or shortest > next_t:
+            if shortest is None or shortest > next_t:
                 shortest = next_t
                 fastest_object = obj
-                
+
         return shortest, fastest_object
-    
+
     def move(self, abs_time):
         """
         Move from starting time *abs_time* and return the next time
         something within the sample moves.
         """
         next_t, obj = self._get_moved_groups(abs_time)
-        
+
         return next_t
-    
+
     def get_material_thickness(self, material):
         """Return projected thickness of the sample made of *material*."""
         pass

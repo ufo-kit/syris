@@ -98,12 +98,12 @@ class TestSamples(SyrisTest):
                                    velocity=2 * q.mm / q.s), 2 * q.mm)
         mb_3 = MetaBall(Trajectory(get_linear_points(geom.X),
                                    velocity=3 * q.mm / q.s), 3 * q.mm)
-        
+
         co_1.add(mb_1)
         co_2.add(mb_2)
         co_2.add(mb_3)
-        
+
         sample.add("pmma", co_1)
         sample.add("glass", co_2)
-        
+
         self.assertAlmostEqual(1e-3 / 3 * q.s, sample.move(0 * q.s))

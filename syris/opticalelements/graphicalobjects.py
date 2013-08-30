@@ -52,10 +52,10 @@ class GraphicalObject(object):
     def root(self):
         """Return the topmost parent."""
         obj = self
-        
+
         while hasattr(obj, "parent"):
             obj = obj.parent
-            
+
         return obj
 
     @property
@@ -381,10 +381,10 @@ class CompositeObject(GraphicalObject):
             if children_primitive ^ obj_primitive:
                 raise TypeError("Composite object direct children " +
                                 "must be all of the same type")
-        
+
         # enable bottom-up traversing
         obj.parent = self
-        
+
         self._objects.append(obj)
 
     def remove(self, obj):
@@ -394,7 +394,7 @@ class CompositeObject(GraphicalObject):
     def remove_all(self):
         """Remove all sub-objects."""
         self._objects = []
-        
+
     def get_last_composites(self):
         """
         Traverse the tree structure of the composite object and
@@ -402,7 +402,7 @@ class CompositeObject(GraphicalObject):
         primitive children.
         """
         result = []
-    
+
         def go_down(obj):
             """
             Go down in composite object's children list and look for
@@ -417,9 +417,9 @@ class CompositeObject(GraphicalObject):
             else:
                 for comp_obj in set(obj) - primitive:
                     go_down(comp_obj)
-    
+
         go_down(self)
-    
+
         return result
 
     def clear_transformation(self):
@@ -584,6 +584,7 @@ class CompositeObject(GraphicalObject):
 
 OBJECT_TYPES = {MetaCube.TYPE: "METACUBE",
                 MetaBall.TYPE: "METABALL"}
+
 
 def get_format_string(string):
     """

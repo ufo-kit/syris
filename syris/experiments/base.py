@@ -42,16 +42,16 @@ class Experiment(object):
             thicknesses[material] = {}
 
         return thicknesses
-    
+
     def make_x_ray_image(self, abs_time):
         r"""
         Make an X-ray image of a sample at a given *abs_time*. The result
         is a superposition of projections at all source energies.
         An X-ray image is calculated as follows
-        
+
         .. math::
             :nowrap:
-            
+
             \begin{eqnarray}
                 T(\vec{x},\lambda) & = & e^{-\frac{2 \pi}{\lambda}\sum_i
                 p_i(\vec{x}) \left [ \beta_i + i\delta_i\right ]} \\
@@ -63,7 +63,7 @@ class Experiment(object):
                 I(\vec{x}, d, t) & = & \sum_\lambda{|u(\vec{x},d,\lambda)|
                 ^ 2}.
             \end{eqnarray}
-            
+
         :math:`T(\vec{x},\lambda)` is the sample transfer function,
         :math:`p` is projected thickness for one material type,
         :math:`\delta` and :math:`\beta` form the refractive index,
@@ -72,7 +72,7 @@ class Experiment(object):
         :math:`I(\vec{x}, d, t)` are intensities and :math:`\vec{x}`
         and :math:`\vec{\eta}` are spatial coordinates on the detector
         and sample, respectively.
-            
+
         """
         for energy in self.source.energies:
             for material in self.sample.materials:
@@ -86,7 +86,7 @@ class Experiment(object):
             pass
             # add to result
             pass
-    
+
     def make_visible_light_image(self, x_ray_image):
         """
         Apply visible light path on an *x_ray_image*. It is
@@ -102,7 +102,6 @@ class Experiment(object):
         pass
         # add noise
         pass
-        
 
     def run(self):
         """Conduct the experiment."""
@@ -110,9 +109,9 @@ class Experiment(object):
         cur_t = 0 * q.s
         frame = 1
         num_frames = int(math.ceil(self.time / d_t))
-        
+
         image = None
-        
+
         while frame < num_frames:
             # Recalculate graphical objects which moved.
             next_t = self.sample.move(cur_t)
@@ -124,16 +123,14 @@ class Experiment(object):
                 pass
                 LOGGER.debug("Writing out image {0}".format(frame))
                 frame += 1
-                
+
             duration = next_t - cur_t
-            LOGGER.debug("Calculating image {0} in times {1} - {2}".\
+            LOGGER.debug("Calculating image {0} in times {1} - {2}".
                          format(frame, cur_t, next_t))
             # superimpose subpositions until the exposure time is over
             pass
-            
+
             cur_t = next_t
-            
-            
 
     def create_geometry(self):
         pass
