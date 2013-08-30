@@ -1,4 +1,5 @@
 import numpy as np
+import quantities as q
 
 
 def is_close(a, b, eps):
@@ -54,6 +55,16 @@ def f(coeffs, x):
 
 def sgn(val):
     return 0 if val == 0 else 1 if val > 0 else - 1
+
+
+def get_linear_points(direction, start=(0, 0, 0), num=4):
+    res = []
+    for i in range(num):
+        point = np.copy(start)
+        point[direction] += i
+        res.append(point)
+
+    return np.array(res) * q.mm
 
 
 class Metaball(object):

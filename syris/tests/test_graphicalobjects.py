@@ -6,6 +6,7 @@ from syris.opticalelements.graphicalobjects import MetaBall, CompositeObject
 from syris.tests.base import SyrisTest
 import itertools
 from numpy import linalg
+from syris.tests.graphics_util import get_linear_points
 
 
 def get_control_points():
@@ -16,27 +17,17 @@ def get_control_points():
                      (1, 1, 1)]) * q.mm
 
 
-def get_linear(direction, start=(0, 0, 0), num=4):
-    res = []
-    for i in range(num):
-        point = np.copy(start)
-        point[direction] += i
-        res.append(point)
-
-    return np.array(res) * q.mm
-
-
 class TestGraphicalObjects(SyrisTest):
 
     def setUp(self):
         self.pixel_size = 1 * q.um
 
-        control_points = get_linear(geom.X, start=(1, 1, 1))
+        control_points = get_linear_points(geom.X, start=(1, 1, 1))
 
         traj = Trajectory(control_points, velocity=1 * q.mm / q.s)
         self.metaball = MetaBall(traj, 1 * q.mm)
 
-        self.metaball_2 = MetaBall(Trajectory(get_linear(geom.Z)), 2 * q.mm)
+        self.metaball_2 = MetaBall(Trajectory(get_linear_points(geom.Z)), 2 * q.mm)
 
         self.composite = CompositeObject(traj,
                                          gr_objects=[self.metaball,
@@ -175,13 +166,13 @@ class TestGraphicalObjects(SyrisTest):
                                        composite.bounding_box.points)
   
     def test_move(self):
-        mb = MetaBall(Trajectory(get_linear(geom.Y), velocity=1 * q.mm / q.s),
-                      1 * q.mm)
+        mb = MetaBall(Trajectory(get_linear_points(geom.Y),
+                                 velocity=1 * q.mm / q.s), 1 * q.mm)
         self.assertAlmostEqual(mb.get_next_time(0 * q.s, self.pixel_size),
                                1e-3 * q.s)
   
     def test_trajectory_less_than_pixel(self):
-        points = get_linear(geom.Y) / 1e6
+        points = get_linear_points(geom.Y) / 1e6
         mb = MetaBall(Trajectory(points, velocity=1 * q.mm / q.s),
                       1 * q.mm)
         self.assertEqual(mb.get_next_time(0 * q.s, self.pixel_size), None)
@@ -240,7 +231,7 @@ class TestGraphicalObjects(SyrisTest):
                                               self.pixel_size), 1e-3 * q.s)
  
     def test_movement_negation(self):
-        s_pos = get_linear(geom.Y)
+        s_pos = get_linear_points(geom.Y)
         s_neg = -s_pos
   
         t_pos = Trajectory(s_pos, velocity=1 * q.mm / q.s)
