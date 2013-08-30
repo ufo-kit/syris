@@ -53,9 +53,9 @@ class TestSamples(SyrisTest):
         t_stat = Trajectory([(0, 0, 0)] * q.mm, 0 * q.mm)
 
         mb_0 = MetaBall(t_0, 1.0 * q.mm)
-        mb_1 = MetaBall(t_1, 1.0 * q.mm)
-        mb_2 = MetaBall(t_2, 1.0 * q.mm)
-        mb_stat = MetaBall(t_stat, 1 * q.mm)
+        mb_1 = MetaBall(t_1, 2.0 * q.mm)
+        mb_2 = MetaBall(t_2, 3.0 * q.mm)
+        mb_stat = MetaBall(t_stat, 4 * q.mm)
 
         mat_0 = "PMMA"
         mat_1 = "glass"

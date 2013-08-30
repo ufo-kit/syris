@@ -154,14 +154,14 @@ class GraphicalObject(object):
         # Return the last bigger than *delta_distance*.
         return t_0 + 2 * d_t
 
-    def moved(self, t_0, t_1, pixel_size):
-        """Return True if the trajectory moved between time *t_0* and *t_1*
-        more than one pixel with respect to the given *pixel_size*.
+    def moved(self, t_0, t_1, distance):
         """
-        p_0 = self.trajectory.get_point(t_0)
-        p_1 = self.trajectory.get_point(t_1)
+        Return True if the object moves more than *distance*
+        in time interval *t_0*, *t_1*.
+        """
+        next_t = self.get_next_time(t_0, distance)
 
-        return geom.length(p_1 - p_0) > pixel_size / 2
+        return False if next_t is None else next_t <= t_1
 
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
@@ -509,14 +509,15 @@ class CompositeObject(GraphicalObject):
         return t_0 + 2 * d_t
 
     def moved(self, t_0, t_1, delta_distance):
-        """Return True if the trajectory moved between time *t_0* and *t_1*
-        more than one pixel with respect to the given *delta_distance*.
-        We need to check all subobjects. Moreover, simple trajectory
-        distance between points at t_0 and t_1 will not work because
-        when the composite object moves more than one pixel, but the
-        primitive graphical object moves the exact opposite it results
-        in no movement. We need to check also the composite object
-        movement because it may cause some subobjects to rotate.
+        """
+        Return True if the object moves between time *t_0* and *t_1*
+        more than *delta_distance*. We need to check all subobjects.
+        Moreover, simple trajectory distance between points at t_0
+        and t_1 will not work because when the composite object moves
+        more than one pixel, but the primitive graphical object moves
+        the exact opposite it results in no movement. We need to check
+        also the composite object movement because it may cause some
+        subobjects to rotate.
         """
         # Remember the current transformation matrices.
         matrix = np.copy(self.transform_matrix)
@@ -589,7 +590,7 @@ OBJECT_TYPES = {MetaCube.TYPE: "METACUBE",
 def get_moved_groups(objects, t_0, t_1, distance):
     """
     Filter only *objects* which truly move in the time interval
-    *t_0*, *t_1* and *distance*. Return a set of moved groups,
+    *t_0*, *t_1* more than *distance*. Return a set of moved groups,
     where a group is defined by the last composite object which holds
     only primitive graphical objects. If a primitive object is in the
     *objects* it is included without further testing because if it

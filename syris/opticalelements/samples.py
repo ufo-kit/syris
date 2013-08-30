@@ -102,7 +102,7 @@ class Sample(object):
 
         for material in self._parts:
             for obj in self._parts[material]:
-                if obj.moved(t_0, t_1, self.pixel_size):
+                if obj.moved(t_0, t_1, self.pixel_size / 2):
                     materials.append(material)
                     break
 
