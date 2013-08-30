@@ -2,9 +2,11 @@ import numpy as np
 import quantities as q
 import syris
 from syris.opticalelements.samples import Sample
+from syris.opticalelements import geometry as geom
 from syris.opticalelements.geometry import Trajectory
 from syris.opticalelements.graphicalobjects import MetaBall, CompositeObject
 from syris.tests.base import SyrisTest
+from syris.tests.graphics_util import get_linear_points
 
 
 class TestSamples(SyrisTest):
@@ -85,3 +87,23 @@ class TestSamples(SyrisTest):
         self.assertEqual(set([]), set(ultra_fast))
         self.assertEqual(set([]), set(fast))
         self.assertEqual(set([mat_0]), set(slow))
+
+    def test_move(self):
+        sample = Sample({}, self.shape, self.pixel_size)
+        co_1 = CompositeObject(Trajectory([(0, 0, 0)] * q.m))
+        co_2 = CompositeObject(Trajectory([(0, 0, 0)] * q.m))
+        mb_1 = MetaBall(Trajectory(get_linear_points(geom.X),
+                                   velocity=1 * q.mm / q.s), 1 * q.mm)
+        mb_2 = MetaBall(Trajectory(get_linear_points(geom.X),
+                                   velocity=2 * q.mm / q.s), 2 * q.mm)
+        mb_3 = MetaBall(Trajectory(get_linear_points(geom.X),
+                                   velocity=3 * q.mm / q.s), 3 * q.mm)
+        
+        co_1.add(mb_1)
+        co_2.add(mb_2)
+        co_2.add(mb_3)
+        
+        sample.add("pmma", co_1)
+        sample.add("glass", co_2)
+        
+        self.assertAlmostEqual(1e-3 / 3 * q.s, sample.move(0 * q.s))
