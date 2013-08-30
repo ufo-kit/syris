@@ -6,7 +6,8 @@ from pyopencl.array import vec
 from syris import config as cfg
 from syris.gpu import util as g_util
 import logging
-from syris.opticalelements.graphicalobjects import CompositeObject
+from syris.opticalelements.graphicalobjects import CompositeObject,\
+    get_moved_groups
 
 
 LOGGER = logging.getLogger(__name__)
@@ -44,30 +45,36 @@ class Sample(object):
 
         return objects
 
-    def get_moved_groups(self, abs_time):
+    def get_moved_groups(self, t_0):
         """
-        Get the shortest time and the fastest object which travels
-        that time from start *abs_time*. Return a tuple (time, object).
+        Get the shortest time t_1 and fastest objects which move within
+        the t_1 - *t_0*. There can be more of these objects
+        because they might move with the same velocity.
         """
         shortest = None
         fastest_objects = []
 
         for obj in self.objects:
-            next_t = obj.get_next_time(abs_time, self.pixel_size)
-            if shortest is None or shortest > next_t:
-                shortest = next_t
+            t_1 = obj.get_next_time(t_0, self.pixel_size)
+            if shortest is None or shortest > t_1:
+                shortest = t_1
                 fastest_objects = [obj]
-            elif shortest == next_t:
+            elif shortest == t_1:
                 fastest_objects.append(obj)
 
-        return shortest, fastest_objects
+        return shortest, get_moved_groups(fastest_objects, t_0, t_1,
+                                          self.pixel_size)
 
     def move(self, abs_time):
         """
         Move from starting time *abs_time* and return the next time
         something within the sample moves.
         """
-        next_t, obj = self.get_moved_groups(abs_time)
+        next_t, groups = self.get_moved_groups(abs_time)
+
+        for obj in groups:
+            # Perform the actual calculation
+            pass
 
         return next_t
 

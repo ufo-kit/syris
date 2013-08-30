@@ -586,6 +586,31 @@ OBJECT_TYPES = {MetaCube.TYPE: "METACUBE",
                 MetaBall.TYPE: "METABALL"}
 
 
+def get_moved_groups(objects, t_0, t_1, distance):
+    """
+    Filter only *objects* which truly move in the time interval
+    *t_0*, *t_1* and *distance*. Return a set of moved groups,
+    where a group is defined by the last composite object which holds
+    only primitive graphical objects. If a primitive object is in the
+    *objects* it is included without further testing because if it
+    didn't move it wouldn't be in the list.
+    """
+    moved = set([])
+
+    for obj in objects:
+        # Iterate over all root objects.
+        if obj.__class__ == CompositeObject:
+            # Add all last composites which truly moved
+            moved.update([subobj for subobj in obj.get_last_composites()
+                          if subobj.moved(t_0, t_1, distance)])
+        else:
+            # A primitive object wouldn't be in the list if it
+            # didn't move.
+            moved.add(obj)
+
+    return moved
+
+
 def get_format_string(string):
     """
     Get string in single or double precision floating point number

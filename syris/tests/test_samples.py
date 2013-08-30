@@ -92,6 +92,7 @@ class TestSamples(SyrisTest):
         sample = Sample({}, self.shape, self.pixel_size)
         c_1 = CompositeObject(Trajectory([(0, 0, 0)] * q.m))
         c_2 = CompositeObject(Trajectory([(0, 0, 0)] * q.m))
+        c_3 = CompositeObject(Trajectory([(0, 0, 0)] * q.m))
         mb_1 = MetaBall(Trajectory(get_linear_points(geom.X),
                                    velocity=1 * q.mm / q.s), 1 * q.mm)
         mb_2 = MetaBall(Trajectory(get_linear_points(geom.X),
@@ -105,9 +106,10 @@ class TestSamples(SyrisTest):
         c_1.add(mb_4)
         c_2.add(mb_2)
         c_2.add(mb_3)
+        c_3.add(c_2)
 
         sample.add("pmma", c_1)
-        sample.add("glass", c_2)
+        sample.add("glass", c_3)
 
         next_t, objects = sample.get_moved_groups(0 * q.s)
         self.assertAlmostEqual(1e-3 / 3 * q.s, next_t)
