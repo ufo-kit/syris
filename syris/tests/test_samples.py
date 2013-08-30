@@ -90,20 +90,26 @@ class TestSamples(SyrisTest):
 
     def test_move(self):
         sample = Sample({}, self.shape, self.pixel_size)
-        co_1 = CompositeObject(Trajectory([(0, 0, 0)] * q.m))
-        co_2 = CompositeObject(Trajectory([(0, 0, 0)] * q.m))
+        c_1 = CompositeObject(Trajectory([(0, 0, 0)] * q.m))
+        c_2 = CompositeObject(Trajectory([(0, 0, 0)] * q.m))
         mb_1 = MetaBall(Trajectory(get_linear_points(geom.X),
                                    velocity=1 * q.mm / q.s), 1 * q.mm)
         mb_2 = MetaBall(Trajectory(get_linear_points(geom.X),
                                    velocity=2 * q.mm / q.s), 2 * q.mm)
         mb_3 = MetaBall(Trajectory(get_linear_points(geom.X),
                                    velocity=3 * q.mm / q.s), 3 * q.mm)
+        mb_4 = MetaBall(Trajectory(get_linear_points(geom.X),
+                                   velocity=3 * q.mm / q.s), 3 * q.mm)
 
-        co_1.add(mb_1)
-        co_2.add(mb_2)
-        co_2.add(mb_3)
+        c_1.add(mb_1)
+        c_1.add(mb_4)
+        c_2.add(mb_2)
+        c_2.add(mb_3)
 
-        sample.add("pmma", co_1)
-        sample.add("glass", co_2)
+        sample.add("pmma", c_1)
+        sample.add("glass", c_2)
 
-        self.assertAlmostEqual(1e-3 / 3 * q.s, sample.move(0 * q.s))
+        next_t, objects = sample.get_moved_groups(0 * q.s)
+        self.assertAlmostEqual(1e-3 / 3 * q.s, next_t)
+        # both c_1 and c_2 must be in the fastest objects list
+        self.assertEqual(set([c_1, c_2]), set(objects))

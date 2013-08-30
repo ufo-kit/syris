@@ -44,28 +44,30 @@ class Sample(object):
 
         return objects
 
-    def _get_moved_groups(self, abs_time):
+    def get_moved_groups(self, abs_time):
         """
         Get the shortest time and the fastest object which travels
         that time from start *abs_time*. Return a tuple (time, object).
         """
         shortest = None
-        fastest_object = None
+        fastest_objects = []
 
         for obj in self.objects:
             next_t = obj.get_next_time(abs_time, self.pixel_size)
             if shortest is None or shortest > next_t:
                 shortest = next_t
-                fastest_object = obj
+                fastest_objects = [obj]
+            elif shortest == next_t:
+                fastest_objects.append(obj)
 
-        return shortest, fastest_object
+        return shortest, fastest_objects
 
     def move(self, abs_time):
         """
         Move from starting time *abs_time* and return the next time
         something within the sample moves.
         """
-        next_t, obj = self._get_moved_groups(abs_time)
+        next_t, obj = self.get_moved_groups(abs_time)
 
         return next_t
 
