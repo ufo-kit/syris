@@ -140,47 +140,52 @@ class TestGraphicalObjects(SyrisTest):
         self.assertEqual("Composite object direct children " +
                          "must be all of the same type",
                          ctx.exception.message)
+        
+        # test composite parenting
+        self.assertEqual(m_3.parent, c_2)
+        self.assertEqual(m_3.parent.parent, c_3)
+        self.assertEqual(m_3.parent.parent.parent, c_5)
  
     def test_composite_bounding_box(self):
         mb_0 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 0.5 * q.mm)
         mb_1 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 1.5 * q.mm)
         composite = CompositeObject(Trajectory([(0, 0, 0)] * q.mm,),
                                     gr_objects=[mb_0, mb_1])
- 
+  
         transformed_0 = self._get_moved_bounding_box(mb_0, 90 * q.deg)
         transformed_1 = self._get_moved_bounding_box(mb_1, -90 * q.deg)
- 
+  
         def get_concatenated(t_0, t_1, index):
             return np.concatenate((zip(*t_0)[index], zip(*t_1)[index])) * \
                 t_0[0].units
- 
+  
         x_points = get_concatenated(transformed_0, transformed_1, 0)
         y_points = get_concatenated(transformed_0, transformed_1, 1)
         z_points = get_concatenated(transformed_0, transformed_1, 2)
- 
+  
         x_min_max = min(x_points), max(x_points)
         y_min_max = min(y_points), max(y_points)
         z_min_max = min(z_points), max(z_points)
- 
+  
         ground_truth = np.array(list(
                                 itertools.product(x_min_max,
                                                   y_min_max, z_min_max))) * q.m
- 
+  
         np.testing.assert_almost_equal(ground_truth,
                                        composite.bounding_box.points)
- 
+  
     def test_move(self):
         mb = MetaBall(Trajectory(get_linear(geom.Y), velocity=1 * q.mm / q.s),
                       1 * q.mm)
         self.assertAlmostEqual(mb.get_next_time(0 * q.s, self.pixel_size),
                                1e-3 * q.s)
- 
+  
     def test_trajectory_less_than_pixel(self):
         points = get_linear(geom.Y) / 1e6
         mb = MetaBall(Trajectory(points, velocity=1 * q.mm / q.s),
                       1 * q.mm)
         self.assertEqual(mb.get_next_time(0 * q.s, self.pixel_size), None)
- 
+  
     def test_composite_move(self):
         # Composite object movement must affect its subobjects.
         abs_time = 0 * q.s
@@ -189,28 +194,28 @@ class TestGraphicalObjects(SyrisTest):
                                        np.array([1, 1, 1]) * q.mm)
         np.testing.assert_almost_equal(self.metaball.position,
                                        np.array([2, 0, 2]) * q.mm)
- 
+  
         self.composite.clear_transformation()
- 
+  
         abs_time = self.composite.trajectory.time
         self.composite.move(abs_time)
         np.testing.assert_almost_equal(self.composite.position,
                                        np.array([4, 1, 1]) * q.mm)
         np.testing.assert_almost_equal(self.metaball.position,
                                        np.array([5, -3, 2]) * q.mm)
- 
+  
     def test_move_limits(self):
         self.metaball.clear_transformation()
         self.metaball.move(self.metaball.trajectory.time)
         pos_0 = self.metaball.position
- 
+  
         self.metaball.clear_transformation()
         # Beyond the trajectory end.
         self.metaball.move(2 * self.metaball.trajectory.time)
         pos_1 = self.metaball.position
- 
+  
         np.testing.assert_almost_equal(pos_0, pos_1)
- 
+  
     def test_moved_only_rotation(self):
         """
         Test for movement in a setting where an object stays at
@@ -220,32 +225,32 @@ class TestGraphicalObjects(SyrisTest):
         x = np.cos(base)
         y = np.sin(base)
         z = np.zeros(len(base))
- 
+  
         c_points = zip(x, y, z) * q.mm
- 
+  
         traj = Trajectory(c_points, velocity=1 * q.mm / q.s)
         metaball = MetaBall(Trajectory([-traj.control_points[0].magnitude] *
                                        traj.control_points.units), 1 * q.mm)
- 
+  
         comp = CompositeObject(traj, gr_objects=[metaball])
         self.assertTrue(comp.moved(0 * q.s, traj.time / 2, 100 * q.um))
-    
+     
     def test_composite_next_time(self):
         self.assertAlmostEqual(self.composite.get_next_time(0 * q.s,
                                               self.pixel_size), 1e-3 * q.s)
-
+ 
     def test_movement_negation(self):
         s_pos = get_linear(geom.Y)
         s_neg = -s_pos
- 
+  
         t_pos = Trajectory(s_pos, velocity=1 * q.mm / q.s)
         t_neg = Trajectory(s_neg, velocity=1 * q.mm / q.s)
- 
+  
         m_neg = MetaBall(t_neg, 1 * q.mm)
         co = CompositeObject(t_pos, gr_objects=[m_neg])
- 
+  
         self.assertEqual(co.get_next_time(0 * q.s, self.pixel_size), None)
- 
+  
     def test_complex_movement(self):
         """
         Translational movement combined with the movement coming from
@@ -254,9 +259,9 @@ class TestGraphicalObjects(SyrisTest):
         t = np.linspace(-np.pi / 2, np.pi / 2, 10)
         x = np.sin(t)
         y = np.cos(t)
- 
+  
         c_points = zip(x, y, len(x) * [0]) * q.mm
- 
+  
         mb = MetaBall(Trajectory(c_points, velocity=1 * q.mm / q.s), 1 * q.mm)
         self.assertNotEqual(mb.get_next_time(0 * q.s, self.pixel_size),
                             mb.trajectory.get_next_time(0 * q.s,

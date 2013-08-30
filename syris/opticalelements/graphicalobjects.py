@@ -371,7 +371,10 @@ class CompositeObject(GraphicalObject):
             if children_primitive ^ obj_primitive:
                 raise TypeError("Composite object direct children " +
                                 "must be all of the same type")
-
+        
+        # enable bottom-up traversing
+        obj.parent = self
+        
         self._objects.append(obj)
 
     def remove(self, obj):
