@@ -27,6 +27,7 @@ Application Programming Interface
    api/imageprocessing
    api/opticalelements
    api/physics
+   api/experiments
 
 Indices and tables
 ==================

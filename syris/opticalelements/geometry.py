@@ -209,8 +209,8 @@ class Trajectory(object):
 
         if t_0 < 0:
             raise ValueError("Time cannot be negative.")
-
-        if t_0 > self.time:
+        
+        if t_0 > self.time or self._times is None:
             return None
 
         if self._times is None:

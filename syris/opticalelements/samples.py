@@ -43,6 +43,21 @@ class MovingSample(object):
                 objects.append(obj)
 
         return objects
+    
+#     def _get_moved_groups(self):
+#         for mat in self._parts:
+#             
+    
+    def move(self, abs_time):
+        """
+        Move from starting time *abs_time* and return the next time
+        something within the sample moves.
+        """
+        pass
+    
+    def get_material_thickness(self, material):
+        """Return projected thickness of the sample made of *material*."""
+        pass
 
     def get_objects(self, material):
         """Get graphical objects assigned with *material*."""

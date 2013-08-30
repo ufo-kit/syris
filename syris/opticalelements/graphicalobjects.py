@@ -1,4 +1,16 @@
-"""Graphical objects."""
+"""
+Graphical objects
+=================
+
+There are two types of graphical objects:
+
+    * **primitive** - children of :py:class:`GraphicalObject` but *not* \
+        children of :py:class:`CompositeObject`
+    * **composite** - can hold other graphical objects, including \
+        another composites, these are the children of \
+        :py:class:`CompositeObject`
+
+"""
 import itertools
 import logging
 import numpy as np
@@ -284,17 +296,17 @@ class CompositeObject(GraphicalObject):
     """
     Class representing an object consisting of more sub-objects.
     A composite object can be thought of as a tree structure with
-    children representing actual graphical objects (non-composite)
-    only in leafs. This means that all direct children of a composite
+    children representing actual graphical objects (non-composite
+    only in leafs). This means that all direct children of a composite
     object are either all :py:class:`CompositeObject` instances
     or are all not. An example of a :py:class:`CompositeObject`
     and its children could be::
 
-                    C          (0)
-                   / \\
-                  C   C        (1)
-                 / \\   \\
-                P   P   P      (2)
+                            C          (0)
+                           / \\
+                          C   C        (1)
+                         / \\   \\
+                        P   P   P      (2)
 
     We see that the root has only composite children on level (1) and
     both its children have only primitive children on level (2).
@@ -369,6 +381,33 @@ class CompositeObject(GraphicalObject):
     def remove_all(self):
         """Remove all sub-objects."""
         self._objects = []
+        
+    def get_last_composites(self):
+        """
+        Traverse the tree structure of the composite object and
+        return a list of composite objects inside it which have only
+        primitive children.
+        """
+        result = []
+    
+        def go_down(obj):
+            """
+            Go down in composite object's children list and look for
+            instances which have children of type :py:class:`GraphicalObject`.
+            Objects which are composed of purely primitive graphical objects
+            are appended to the *result* list.
+            """
+            primitive = set([subobj for subobj in obj
+                             if subobj.__class__ != CompositeObject])
+            if primitive:
+                result.append(obj)
+            else:
+                for comp_obj in set(obj) - primitive:
+                    go_down(comp_obj)
+    
+        go_down(self)
+    
+        return result
 
     def clear_transformation(self):
         """Clear all transformations."""
@@ -532,35 +571,6 @@ class CompositeObject(GraphicalObject):
 
 OBJECT_TYPES = {MetaCube.TYPE: "METACUBE",
                 MetaBall.TYPE: "METABALL"}
-
-
-def get_last_composites(obj):
-    """
-    Traverse the tree structure of the composite object *obj* and
-    return a list of composite objects inside *obj* which have only
-    children of class :py:class:`GraphicalObject`.
-    """
-    result = []
-
-    def go_down(obj):
-        """
-        Go down in composite object's children list and look for
-        instances which have children of type :py:class:`GraphicalObject`.
-        Objects which are composed of purely primitive graphical objects
-        are appended to the *result* list.
-        """
-        primitive = set([subobj for subobj in obj
-                         if subobj.__class__ != CompositeObject])
-        if primitive:
-            result.append(obj)
-        else:
-            for comp_obj in set(obj) - primitive:
-                go_down(comp_obj)
-
-    go_down(obj)
-
-    return result
-
 
 def get_format_string(string):
     """
