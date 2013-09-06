@@ -243,7 +243,7 @@ class Trajectory(object):
 
         return res * q.dimensionless
 
-    def _get_next_time_angle(self, u_0, d_angle):
+    def get_next_time_angle(self, u_0, d_angle):
         """
         Get the next time when the trajectory will have rotated by
         more than *d_angle*. *u_0* defines the vector against which

@@ -156,17 +156,23 @@ class TestTrajectory(SyrisTest):
                                                           traj.length))
 
     def test_rotation_next_time(self):
+        def check(traj, u_0, angle):
+            u_1 = traj.get_next_time_angle(u_0, angle)
+
+            v_0 = traj.get_direction(u_0 * traj.time)
+            v_1 = traj.get_direction(u_1 * traj.time)
+            self.assertAlmostEqual(geom.angle(v_0, v_1).rescale(q.deg),
+                                   angle, places=4)
+
         x = np.linspace(0, 2 * np.pi, 100)
         y = np.sin(x)
         z = len(x) * [0]
-        angle = 12 * q.deg
+        angle = 13 * q.deg
 
-        tck, u = interp.splprep((x, y, z), s=0)
         traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
 
-        u_0 = 0.1
-        u_1 = traj._get_next_time_angle(u_0, angle)
+        # pi / 4 -> functions is ascending
+        check(traj, 0.125, angle)
 
-        v_0 = interp.splev(u_0, traj._tck, der=1) * q.m
-        v_1 = interp.splev(u_1, traj._tck, der=1) * q.m
-        print geom.angle(v_0, v_1).rescale(q.deg)
+        # 3 * pi / 4 -> functions is ascending
+        check(traj, 0.375, angle)
