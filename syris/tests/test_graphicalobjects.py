@@ -262,7 +262,6 @@ class TestGraphicalObjects(SyrisTest):
 
         m_neg = MetaBall(t_neg, 1 * q.mm)
         co = CompositeObject(t_pos, gr_objects=[m_neg])
-
         self.assertEqual(co.get_next_time(0 * q.s, self.pixel_size), None)
 
     def test_complex_movement(self):

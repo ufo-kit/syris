@@ -5,6 +5,7 @@ Created on Jul 3, 2013
 '''
 import numpy as np
 import quantities as q
+from syris.opticalelements import geometry as geom
 from syris.opticalelements.geometry import Trajectory
 from scipy import interpolate as interp
 from syris.tests.base import SyrisTest
@@ -69,6 +70,15 @@ class TestTrajectory(SyrisTest):
         self.assertRaises(ValueError, Trajectory, self.control_points,
                           time_dist)
 
+    def test_length(self):
+        u = np.linspace(0, 2 * np.pi, 100)
+        x = np.sin(u)
+        y = np.cos(u)
+        z = np.zeros(len(u))
+
+        traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
+        self.assertAlmostEqual(traj.length, 2 * np.pi * q.m, places=5)
+
     def test_get_next_time(self):
         d_s = 0.5 * q.m
         # Negative time is inadmissible.
@@ -123,7 +133,7 @@ class TestTrajectory(SyrisTest):
         np.testing.assert_equal(
             traj.get_point(1 * q.s), traj.control_points[0])
 
-        tck = interp.splprep(zip(*self.control_points))[0]
+        tck = interp.splprep(zip(*self.control_points), s=0)[0]
 
         def evaluate_point(t):
             if t > 1:
@@ -144,3 +154,19 @@ class TestTrajectory(SyrisTest):
             np.testing.assert_almost_equal(traj.get_point(times[i]),
                                            evaluate_point(dist[i] /
                                                           traj.length))
+
+    def test_rotation_next_time(self):
+        x = np.linspace(0, 2 * np.pi, 100)
+        y = np.sin(x)
+        z = len(x) * [0]
+        angle = 12 * q.deg
+
+        tck, u = interp.splprep((x, y, z), s=0)
+        traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
+
+        u_0 = 0.1
+        u_1 = traj._get_next_time_angle(u_0, angle)
+
+        v_0 = interp.splev(u_0, traj._tck, der=1) * q.m
+        v_1 = interp.splev(u_1, traj._tck, der=1) * q.m
+        print geom.angle(v_0, v_1).rescale(q.deg)

@@ -12,6 +12,7 @@ easily obtain x = T^{-1}x'.
 """
 import numpy as np
 from numpy import linalg
+from numpy.core.umath_tests import inner1d
 import quantities as q
 from scipy import interpolate as interp, integrate as integ
 import itertools
@@ -19,6 +20,7 @@ import logging
 import math
 from quantities.quantity import Quantity
 from syris import math as smath
+import time
 
 
 X = 0
@@ -139,12 +141,12 @@ class Trajectory(object):
         else:
             # Positions
             self._tck, self._u = \
-                interp.splprep(zip(*control_points.simplified))
-            self._length = self._get_length()
+                interp.splprep(zip(*control_points.simplified), s=0)
 
             # Derivatives of the spline
             x_d, y_d, z_d = interp.splev(self._u, self._tck, der=1)
             self._derivatives = np.array(zip(x_d, y_d, z_d))
+            self._length = self._get_length(x_d, y_d, z_d)
 
             # Velocity profile
             if velocity is not None:
@@ -244,16 +246,25 @@ class Trajectory(object):
     def _get_next_time_angle(self, u_0, d_angle):
         """
         Get the next time when the trajectory will have rotated by
-        more than d_angle.
+        more than *d_angle*. *u_0* defines the vector against which
+        the angle deviations are checked.
         """
-        x_s, y_s, z_s = interp.splev(u_0, self._tck, der=1)
+        def get_tangents(v_0, vecs):
+            dots = inner1d(v_0, vecs)
+            lengths = np.sqrt(np.sum(np.cross(v_0, vecs) ** 2, axis=1))
 
-        angles = vec_angle_fast((x_s, y_s, z_s), data) - d_angle
-        angle_tck = interp.splrep(self._u, angles)
+            return lengths / dots
 
-        u_1 = closest(interp.sproot(angle_tck), u_0)
-#         if u_1 is not None:
-#
+        # v_0 is the vector against which we test the angle deviations.
+        v_0 = np.array(interp.splev(u_0, self._tck, der=1))
+
+        # Get tangents with respect to v_0.
+        tangents = get_tangents(v_0, self._derivatives) - \
+            math.tan(d_angle.rescale(q.rad))
+        # Get new spline based on the tangents.
+        tan_tck = interp.splrep(self._u, tangents)
+
+        return smath.closest(interp.sproot(tan_tck), u_0)
 
     def _get_u(self, abs_time):
         """Get the spline parameter from the time *abs_time*."""
@@ -265,19 +276,18 @@ class Trajectory(object):
 
         return u
 
-    def _get_length(self):
+    def _get_length(self, x_d, y_d, z_d):
         """
-        Get length of a parametric curve with knots, coefficients and spline
-        degree tuple *tck* (most probably from scipy.interpolate.splprep). *u*
-        is the parameter of the curve.
+        Get length of a spline with given derivatives *x_d*, *y_d*, *z_d*.
         """
-        def part(u):
-            der = interp.splev(u, self._tck, der=1)
+        def part(x_d, y_d, z_d):
             # for a 3D parametric curve the length is
             # sqrt((d_x/d_u)^2 + (d_y/d_u)^2 + (d_z/d_u)^2).
-            return np.sqrt(der[0] ** 2 + der[1] ** 2 + der[2] ** 2)
+            return np.sqrt(x_d ** 2 + y_d ** 2 + z_d ** 2)
 
-        return integ.quad(part, self._u[0], self._u[-1])[0] * q.m
+        der_tck = interp.splrep(self._u, part(x_d, y_d, z_d))
+
+        return interp.splint(0, 1, der_tck) * q.m
 
 
 def closest(values, min_value):
