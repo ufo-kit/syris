@@ -2,6 +2,8 @@ import numpy as np
 import quantities as q
 from syris import math as smath
 from syris.tests.base import SyrisTest
+from scipy import interpolate as interp
+import math
 
 
 class TestMath(SyrisTest):
@@ -17,3 +19,29 @@ class TestMath(SyrisTest):
 
         self.assertEqual(y_0.units, y_1.units)
         self.assertAlmostEqual(np.sum(y_1 - y_1_def), 0 * y_1.units)
+
+    def test_closest(self):
+        values = np.array([1, 2, 3, 4])
+        self.assertEqual(smath.closest(values, 2), 3)
+        self.assertEqual(smath.closest(values, -10), 1)
+        self.assertEqual(smath.closest(values, 10), None)
+
+    def test_difference_root(self):
+        x = np.linspace(0, 2 * np.pi, 100)
+        y = np.sin(x)
+
+        tck = interp.splrep(x, y)
+
+        y_d = 0.2
+        places = 5
+
+        # f ascending
+        x_0 = np.pi / 4
+        self.assertAlmostEqual(smath.difference_root(x_0, tck, y_d),
+                               math.asin(y_d + math.sin(x_0)), places=places)
+
+        # f descending
+        x_0 = 3 * np.pi / 4
+        self.assertAlmostEqual(smath.difference_root(x_0, tck, y_d),
+                               np.pi - math.asin(math.sin(x_0) - y_d),
+                               places=places)

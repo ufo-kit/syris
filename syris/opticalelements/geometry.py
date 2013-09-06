@@ -18,6 +18,7 @@ import itertools
 import logging
 import math
 from quantities.quantity import Quantity
+from syris import math as smath
 
 
 X = 0
@@ -136,12 +137,16 @@ class Trajectory(object):
             self._length = 0 * q.m
             self._times = self._distances = self._time_tck = None
         else:
-            # Positions.
+            # Positions
             self._tck, self._u = \
                 interp.splprep(zip(*control_points.simplified))
             self._length = self._get_length()
 
-            # Velocity profile.
+            # Derivatives of the spline
+            x_d, y_d, z_d = interp.splev(self._u, self._tck, der=1)
+            self._derivatives = np.array(zip(x_d, y_d, z_d))
+
+            # Velocity profile
             if velocity is not None:
                 # Constant velocity
                 time_dist = get_constant_velocity(velocity,
@@ -191,40 +196,16 @@ class Trajectory(object):
         t_0 = t_0.simplified.magnitude
         d_s = delta_distance.simplified.magnitude
 
-        def find_closest(up=1):
-            # Get the distance at t_0, add the delta_distance and find t_1 by
-            # which the trajectory moves the delta_distance. t_1 is the
-            # closest spline root greater than t_0.
-            s_1 = interp.splev(t_0, self._time_tck) + up * d_s
-
-            # Adjust height for finding the root at distance s_1.
-            d_adj = self._distances - s_1
-            tck = interp.splrep(self._times, d_adj)
-
-            # Find roots fitting f(s_1) = t_1. There can be many of them, so
-            # pick the one which is greater and closest to the original t_0.
-            # The closest root we found has the property that
-            # |f(t_1) - f(t_0)| < delta_distance.
-            return closest(interp.sproot(tck), t_0)
-
         if t_0 < 0:
             raise ValueError("Time cannot be negative.")
 
         if t_0 > self.time or self._times is None:
             return None
 
-        if self._times is None:
-            result = 0 * q.s
-        else:
-            # Look for d_0 + delta_distance and also for d_0 - delta_distance,
-            # Because the trajectory can reverse.
-            top = find_closest()
-            bottom = find_closest(-1)
+        result = smath.difference_root(t_0, self._time_tck, d_s)
 
-            result = top if top is not None and top < bottom or bottom \
-                is None else bottom
-            if result is not None:
-                result = result * q.s
+        if result is not None:
+            result = result * q.s
 
         return result
 
@@ -259,6 +240,20 @@ class Trajectory(object):
                                                   self._tck, der=1)))
 
         return res * q.dimensionless
+
+    def _get_next_time_angle(self, u_0, d_angle):
+        """
+        Get the next time when the trajectory will have rotated by
+        more than d_angle.
+        """
+        x_s, y_s, z_s = interp.splev(u_0, self._tck, der=1)
+
+        angles = vec_angle_fast((x_s, y_s, z_s), data) - d_angle
+        angle_tck = interp.splrep(self._u, angles)
+
+        u_1 = closest(interp.sproot(angle_tck), u_0)
+#         if u_1 is not None:
+#
 
     def _get_u(self, abs_time):
         """Get the spline parameter from the time *abs_time*."""

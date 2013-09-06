@@ -232,7 +232,7 @@ class TestGraphicalObjects(SyrisTest):
     def test_moved_only_rotation(self):
         """
         Test for movement in a setting where an object stays at
-        one position but its "up" vector moved (object only rotates).
+        one position but its "up" vector moves (object only rotates).
         """
         base = np.linspace(0, np.pi, 10)
         x = np.cos(base)

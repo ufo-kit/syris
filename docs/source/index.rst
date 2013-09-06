@@ -26,6 +26,7 @@ Application Programming Interface
    api/gpu
    api/imageprocessing
    api/opticalelements
+   api/math
    api/physics
    api/experiments
 
