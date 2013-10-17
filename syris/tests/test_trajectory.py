@@ -5,9 +5,8 @@ Created on Jul 3, 2013
 '''
 import numpy as np
 import quantities as q
-from syris.opticalelements import geometry as geom
-from syris.opticalelements.geometry import Trajectory
 from scipy import interpolate as interp
+from syris.opticalelements.geometry import Trajectory
 from syris.tests.base import SyrisTest
 
 
@@ -81,51 +80,51 @@ class TestTrajectory(SyrisTest):
 
     def test_get_next_time(self):
         d_s = 0.5 * q.m
+
+        def check(t_0, t_1):
+            self.assertAlmostEqual(np.max(np.abs(self.traj.get_point(t_0) -
+                                                 self.traj.get_point(t_1))),
+                                   d_s, places=4)
+
         # Negative time is inadmissible.
         self.assertRaises(ValueError, self.traj.get_next_time,
-                          -0.2 * q.s, 0.5 * q.m)
+                          -0.2 * q.s, 0.5 * q.m, 0 * q.m)
         # No movement, we are at the end of the trajectory.
-        t_1 = self.traj.get_next_time(self.traj.time, 0.5 * q.m)
+        t_1 = self.traj.get_next_time(self.traj.time, 0.5 * q.m, 0 * q.m)
         self.assertEqual(t_1, None)
         # No movement, d_s too big.
-        t_1 = self.traj.get_next_time(0.2 * q.s, 50.5 * q.m)
+        t_1 = self.traj.get_next_time(0.2 * q.s, 50.5 * q.m, 0 * q.m)
         self.assertEqual(t_1, None)
 
         # No extrema in the way, d_s positive.
         t_0 = 0.2 * q.s
-        t_1 = self.traj.get_next_time(t_0, d_s)
-        truth = np.arcsin(np.sin(t_0.magnitude) + d_s.magnitude)
-        self.assertAlmostEqual(t_1.magnitude, truth)
+        t_1 = self.traj.get_next_time(t_0, d_s, 0 * q.m)
+        check(t_0, t_1)
 
         # Maximum between t_0 and t_1.
         t_0 = 3 * np.pi / 8 * q.s
-        t_1 = self.traj.get_next_time(t_0, d_s)
-        truth = np.pi - np.arcsin(np.sin(t_0.magnitude) - d_s.magnitude)
-        self.assertAlmostEqual(t_1.magnitude, truth)
+        t_1 = self.traj.get_next_time(t_0, d_s, 0 * q.m)
+        check(t_0, t_1)
 
         # Minimum between t_0 and t_1.
         t_0 = 11 * np.pi / 8 * q.s
-        t_1 = self.traj.get_next_time(t_0, d_s)
-        truth = 2 * np.pi + np.arcsin(np.sin(t_0.magnitude) + d_s.magnitude)
-        self.assertAlmostEqual(t_1.magnitude, truth)
+        t_1 = self.traj.get_next_time(t_0, d_s, 0 * q.m)
+        check(t_0, t_1)
 
         # No extrema in the way, d_s negative.
         t_0 = np.pi * q.s
-        t_1 = self.traj.get_next_time(t_0, d_s)
-        truth = np.pi + np.arcsin(d_s.magnitude)
-        self.assertAlmostEqual(t_1.magnitude, truth)
+        t_1 = self.traj.get_next_time(t_0, d_s, 0 * q.m)
+        check(t_0, t_1)
 
         # t_0 in maximum.
         t_0 = np.pi / 2 * q.s
-        t_1 = self.traj.get_next_time(t_0, d_s)
-        truth = np.pi - np.arcsin(0.5)
-        self.assertAlmostEqual(t_1.magnitude, truth)
+        t_1 = self.traj.get_next_time(t_0, d_s, 0 * q.m)
+        check(t_0, t_1)
 
         # t_0 in minimum.
         t_0 = 3 * np.pi / 2 * q.s
-        t_1 = self.traj.get_next_time(t_0, d_s)
-        truth = 2 * np.pi + np.arcsin(-0.5)
-        self.assertAlmostEqual(t_1.magnitude, truth)
+        t_1 = self.traj.get_next_time(t_0, d_s, 0 * q.m)
+        check(t_0, t_1)
 
     def test_get_point(self):
         # Stationary trajectory
@@ -156,23 +155,26 @@ class TestTrajectory(SyrisTest):
                                                           traj.length))
 
     def test_rotation_next_time(self):
-        def check(traj, u_0, angle):
-            u_1 = traj.get_next_time_angle(u_0, angle)
-
-            v_0 = traj.get_direction(u_0 * traj.time)
-            v_1 = traj.get_direction(u_1 * traj.time)
-            self.assertAlmostEqual(geom.angle(v_0, v_1).rescale(q.deg),
-                                   angle, places=4)
-
         x = np.linspace(0, 2 * np.pi, 100)
         y = np.sin(x)
         z = len(x) * [0]
-        angle = 13 * q.deg
-
+        radius = 0.2 * q.m
+        d_s = 0.5 * q.m
         traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
 
-        # pi / 4 -> functions is ascending
-        check(traj, 0.125, angle)
+        def check(t_0):
+            t_1 = traj.get_next_time(t_0, d_s, radius)
+            p_0 = traj.get_point(t_0)
+            p_1 = traj.get_point(t_1)
+            # In this case, the x dimension breaks the threshold
+            d_0 = traj.get_direction(t_0, norm=False)[0]
+            d_1 = traj.get_direction(t_1, norm=False)[0]
+            translated = np.abs(p_1 - p_0)[0]
+            self.assertAlmostEqual(translated + radius * (d_1 - d_0), d_s,
+                                   places=4)
 
-        # 3 * pi / 4 -> functions is ascending
-        check(traj, 0.375, angle)
+        # pi / 4 -> function is ascending
+        check(0.125 * q.s)
+
+        # 3 * pi / 4 -> function is ascending
+        check(0.375 * q.s)

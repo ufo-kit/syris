@@ -130,29 +130,14 @@ class GraphicalObject(object):
 
         return trans_d + rot_d
 
-    def get_next_time(self, t_0, delta_distance):
+    def get_next_time(self, t_0, distance):
         """
-        Get next time at which the object will have traveled
-        *delta_distance*, the starting time is *t_0*.
+        Get next time at which the object has different position or
+        pose (rotation), *t_0* is the start time and *distance*
+        is the threshold for movement distance.
         """
-        t_1 = self.trajectory.get_next_time(t_0, delta_distance)
-        if t_1 is None:
-            return None
-
-        rot_d = geom.get_rotation_displacement(
-            self.trajectory.get_direction(t_0),
-            self.trajectory.get_direction(t_1),
-            self.furthest_point)
-
-        dist = rot_d + delta_distance
-        d_t = (t_1 - t_0) / 2
-
-        while dist > delta_distance:
-            dist = self.get_combined_displacement(t_0, t_0 + d_t)
-            d_t /= 2.0
-
-        # Return the last bigger than *delta_distance*.
-        return t_0 + 2 * d_t
+        return self.trajectory.get_next_time(t_0, distance,
+                                             self.furthest_point)
 
     def moved(self, t_0, t_1, distance):
         """
@@ -339,6 +324,11 @@ class CompositeObject(GraphicalObject):
         """All objects which are inside this composite object."""
         return tuple(self._objects)
 
+    @property
+    def all_objects(self):
+        """All objects inside this object recursively."""
+        return self._all_objects(False)
+
     def _all_objects(self, primitive):
         res = set() if primitive else set([self])
 
@@ -478,10 +468,14 @@ class CompositeObject(GraphicalObject):
         """
         t_1 = None
 
-        # Get the smallest time from the primitive objects needed to travel
+        # Get the smallest time from subobjects needed to travel
         # more than delta_distance. It will serve as an initial guess.
-        for obj in self.primitive_objects:
-            tmp = obj.get_next_time(t_0, delta_distance)
+        for obj in self.all_objects:
+            if obj.__class__ == self.__class__:
+                tmp = obj.trajectory.get_next_time(t_0, delta_distance,
+                                                   0 * q.m)
+            else:
+                tmp = obj.get_next_time(t_0, delta_distance)
             if tmp is not None and (t_1 is None or tmp < t_1):
                 t_1 = tmp
 
@@ -550,8 +544,9 @@ class CompositeObject(GraphicalObject):
                                                 obj.orientation)
             # Determine the maximum angle by which the object can move
             # and not move by more than *delta_distance*. The object moved
-            # if the angle between the object pose at t_0 and t_1 combined
-            # with the translation is larger than *delta_distance*.
+            # if the angular movement between the object pose at t_0
+            # and t_1 combined with the translation is larger than
+            # *delta_distance*.
             rot_d = geom.get_rotation_displacement(orientation,
                                                    orientations[obj],
                                                    obj.furthest_point)

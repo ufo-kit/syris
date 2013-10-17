@@ -37,6 +37,21 @@ def closest(values, min_value):
         return values[bigger[0]]
 
 
+def get_surrounding_points(points, threshold):
+    """
+    Get the closest points around a *threshold* from both sides, left
+    and right. If one of the sides is empty than None is returned
+    on its place.
+    """
+    left_points = points[np.where(points < threshold)]
+    right_points = points[np.where(points > threshold)]
+
+    left = None if len(left_points) == 0 else np.max(left_points)
+    right = None if len(right_points) == 0 else np.min(right_points)
+
+    return left, right
+
+
 def match_range(x_points, y_points, x_target):
     """Match the curve :math:`f(x) = y` to *x_target* points by interpolation
     of *x_points* and *y_points*.
