@@ -136,8 +136,7 @@ class GraphicalObject(object):
         pose (rotation), *t_0* is the start time and *distance*
         is the threshold for movement distance.
         """
-        return self.trajectory.get_next_time(t_0, distance,
-                                             self.furthest_point)
+        return self.trajectory.get_next_time(t_0, distance, self.furthest_point)
 
     def moved(self, t_0, t_1, distance):
         """
@@ -466,41 +465,7 @@ class CompositeObject(GraphicalObject):
         Get next time at which the object will have traveled
         *delta_distance*, the starting time is *t_0*.
         """
-        t_1 = None
-
-        # Get the smallest time from subobjects needed to travel
-        # more than delta_distance. It will serve as an initial guess.
-        for obj in self.all_objects:
-            if obj.__class__ == self.__class__:
-                tmp = obj.trajectory.get_next_time(t_0, delta_distance,
-                                                   0 * q.m)
-            else:
-                tmp = obj.get_next_time(t_0, delta_distance)
-            if tmp is not None and (t_1 is None or tmp < t_1):
-                t_1 = tmp
-
-        if t_1 is None:
-            return None
-
-        d_t = t_1 - t_0
-
-        # It might happen that in combination with trajectories of
-        # parent objects the t_1 from the guess is actually too small
-        # and we need to move forward in time.
-        while not self.moved(t_0, t_0 + d_t, delta_distance):
-            if t_0 + d_t > self.total_time:
-                # The superposition of all subtrajectories makes this
-                # object stationary from t_0 on.
-                return None
-            d_t *= 2
-
-        # After we have made sure some objects will move, minimize
-        # the movement down to delta_distance.
-        d_t /= 2
-        while self.moved(t_0, t_0 + d_t, delta_distance):
-            d_t /= 2
-
-        return t_0 + 2 * d_t
+        pass
 
     def moved(self, t_0, t_1, delta_distance):
         """
@@ -513,54 +478,7 @@ class CompositeObject(GraphicalObject):
         also the composite object movement because it may cause some
         subobjects to rotate.
         """
-        # Remember the current transformation matrices.
-        matrix = np.copy(self.transform_matrix)
-        matrices = {}
-        for obj in self:
-            matrices[obj] = np.copy(obj.transform_matrix)
-
-        # Clear the transformation matrix
-        self.clear_transformation()
-
-        # Move to t_0.
-        self.move(t_0)
-
-        # Remember all primitive object positions.
-        positions = {}
-        orientations = {}
-        for obj in self.primitive_objects:
-            orientations[obj] = geom.transform_vector(obj.transform_matrix,
-                                                      obj.orientation)
-            positions[obj] = obj.position
-
-        # Forget that movement and move to t_1.
-        self.clear_transformation()
-        self.move(t_1)
-
-        # Check the displacements of all primitive objects.
-        res = False
-        for obj in self.primitive_objects:
-            orientation = geom.transform_vector(obj.transform_matrix,
-                                                obj.orientation)
-            # Determine the maximum angle by which the object can move
-            # and not move by more than *delta_distance*. The object moved
-            # if the angular movement between the object pose at t_0
-            # and t_1 combined with the translation is larger than
-            # *delta_distance*.
-            rot_d = geom.get_rotation_displacement(orientation,
-                                                   orientations[obj],
-                                                   obj.furthest_point)
-            tran_d = geom.length(obj.position - positions[obj])
-            if rot_d + tran_d > delta_distance:
-                res = True
-                break
-
-        # Recover the transformation matrices.
-        self.transform_matrix = matrix
-        for obj in self:
-            obj.transform_matrix = matrices[obj]
-
-        return res
+        pass
 
     def pack(self, units, coeff=1):
         """Pack all the sub-objects into a structure suitable for GPU

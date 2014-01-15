@@ -150,8 +150,7 @@ class Trajectory(object):
             # Velocity profile
             if velocity is not None:
                 # Constant velocity
-                time_dist = get_constant_velocity(velocity,
-                                                  self.length / velocity)
+                time_dist = get_constant_velocity(velocity, self.length / velocity)
 
             t_0, s_0 = zip(*time_dist)
             t_0 = np.array(t_0)
@@ -189,83 +188,6 @@ class Trajectory(object):
         else:
             return 0 * q.s
 
-    def get_next_time(self, t_0, delta_distance, adjacent_length):
-        r"""
-        Get the next time at which the trajectory travels more than
-        *delta_distance* by translation in combination with rotation
-        given by the adjacent side *adjacent_length* of a right triangle.
-        The maximum angle by which the trajectory can move
-        is given by :math:`\tan^{-1}(\phi) = ds / a`, where
-        :math:`ds` is *delta_distance* and :math:`a` is
-        *adjacent_length*. The starting time is *t_0*. If
-        *adjacent_length* is 0 the rotational movement is not checked.
-        """
-        t_0 = t_0.simplified.magnitude
-        d_s = delta_distance.simplified.magnitude
-
-        if t_0 < 0 * q.s:
-            raise ValueError("Time cannot be negative.")
-
-        if t_0 > self.time or self._times is None:
-            return None
-
-        # Get translational and angular displacements
-        radius = adjacent_length.simplified.magnitude
-        u_0 = self._get_u(t_0)
-        tran_points = self.get_translational_displacement(u_0)
-        rot_points = self.get_angular_displacement(u_0, radius)
-
-        def get_next_coordinate_time(points, derivatives):
-            # Where the translational displacement is positive, add rotational
-            # displacement, where negative, subtract it.
-            neg = np.where(points < 0)
-            pos = np.where(points >= 0)
-            points[pos] += derivatives[pos]
-            points[neg] -= derivatives[neg]
-
-            # Check for +/- pixel size roots because the trajectory cen be
-            # traversed backwards.
-            tck_neg = interp.splrep(self._u, points + d_s)
-            tck_pos = interp.splrep(self._u, points - d_s)
-            roots = np.concatenate((interp.sproot(tck_neg),
-                                    interp.sproot(tck_pos)))
-
-            # Extract roots which are closest to the left and right
-            left, right = smath.get_surrounding_points(roots, u_0)
-
-            # Get arc length to the left and right
-            left_len = None if left is None else \
-                self._get_length(param_start=0.0, param_end=left)
-            right_len = None if right is None else \
-                self._get_length(param_start=0.0, param_end=right)
-
-            # Get next time from the distance travelled either in the positive
-            # or negative direction (could be any, because the object can move
-            # backwards)
-            tck_dist_neg = [] if left_len is None else \
-                interp.splrep(self._times, self._distances - left_len)
-            tck_dist_pos = [] if right_len is None else \
-                interp.splrep(self._times, self._distances - right_len)
-            left_dist = [] if tck_dist_neg == [] else \
-                interp.sproot(tck_dist_neg)
-            right_dist = [] if tck_dist_pos == [] else \
-                interp.sproot(tck_dist_pos)
-            dist_roots = np.concatenate((left_dist, right_dist))
-
-            return smath.closest(dist_roots, t_0)
-
-        # Determine parameter at which the combined movement exceeds the
-        # threshold
-        times = [get_next_coordinate_time(tran_points[i], rot_points[i]) for i
-                 in range(3)]
-        times = [item for item in times if item is not None]
-
-        result = np.min(times) if len(times) > 0 else None
-        if result is not None:
-            result *= q.s
-
-        return result
-
     def get_point(self, abs_time):
         """Get a point on the trajectory at the time *abs_time*."""
         if abs_time < 0:
@@ -300,19 +222,6 @@ class Trajectory(object):
                 res = normalize(res)
 
         return res * q.dimensionless
-
-    def get_translational_displacement(self, u_0):
-        """TODO: docs!"""
-        p_0 = interp.splev(u_0, self._tck)
-
-        return [self._points[i] - p_0[i] for i in range(3)]
-
-    def get_angular_displacement(self, u_0, radius):
-        """TODO: Add docs!"""
-        p_0 = interp.splev(u_0, self._tck, der=1)
-
-        return [np.abs(radius * (self._derivatives[i] - p_0[i]))
-                for i in range(3)]
 
     def _get_u(self, abs_time):
         """Get the spline parameter from the time *abs_time*."""
