@@ -389,6 +389,28 @@ def interpolate_1d(x_0, y_0, size):
 
     return x_1, interp.splev(x_1, tck)
 
+def maximum_derivative_parameter(tck, u, max_distance):
+    """Get the maximum possible du, for which holds that dx < *max_distance*."""
+    derivatives = interp.splev(u, tck, der=1)
+    du = np.gradient(u)
+    distances = np.array([np.abs(derivative * du) for derivative in derivatives])
+    max_indices = np.argmax(distances, axis=1)
+    # The desired du is given by max_distance / f'
+    return min([max_distance / derivatives[i][max_indices[i]] for i in range(3)])
+
+
+def derivative_fit(tck, u, max_distance):
+    """
+    Reinterpolate curve in a way that all the f' * du are smaller than *max_distance*.
+    The original spline is given by *tck* and parameter *u*.
+    """
+    n = 1 / maximum_derivative_parameter(tck, u, max_distance)
+    if n > len(u):
+        # Do not downsample
+        x, y, z = interp.splev(np.linspace(0, 1, n), tck)
+        tck, u = interp.splprep((x, y, z), s=0)
+
+    return tck, u
 
 def get_constant_velocity(v_0, duration):
     times = np.linspace(0 * duration.units, duration, 5)
