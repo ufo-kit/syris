@@ -1,5 +1,7 @@
 *.pyc
 *~
+dist/
+syris.egg-info/
 docs/build/
 *.dat
 *.log
