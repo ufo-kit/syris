@@ -421,17 +421,6 @@ def angle(vec_0, vec_1):
                       np.dot(vec_0, vec_1)) * q.rad
 
 
-def get_rotation_displacement(vec_0, vec_1, vec_length):
-    """
-    Get the displacement introduced by a rotation from vector *vec_0*
-    to *vec_1* taking into account the rotation of a vector of length
-    *vec_length*.
-    """
-    phi = angle(vec_0, vec_1)
-
-    return vec_length * np.abs(np.tan(phi))
-
-
 def interpolate_1d(x_0, y_0, size):
     """
     Interpolate function y = f(x) with *x_0*, *y_0* as control points
@@ -478,3 +467,13 @@ def get_constant_velocity(v_0, duration):
     dist = v_0 * times
 
     return zip(times, dist)
+
+
+def get_rotation_displacement(d_0, d_1, length):
+    """
+    Return the displacement cause by rotation of a vector of some
+    *length*. The *d_0* and *d_1* are the tangents at different
+    points.
+    """
+    return np.abs(length * np.tan(np.arctan(d_1) - np.arctan(d_0)))
+

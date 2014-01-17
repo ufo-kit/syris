@@ -17,7 +17,7 @@ import numpy as np
 from numpy import linalg
 import quantities as q
 from syris import config as cfg
-from syris.opticalelements.geometry import BoundingBox
+from syris.opticalelements.geometry import BoundingBox, get_rotation_displacement
 import syris.opticalelements.geometry as geom
 import struct
 from quantities.quantity import Quantity
@@ -116,20 +116,6 @@ class GraphicalObject(object):
         """
         self.transform_matrix = np.dot(trans_matrix, self.transform_matrix)
 
-    def get_combined_displacement(self, t_0, t_1):
-        """
-        Get the displacement traveled between times *t_0* and *t_1*.
-        Take into account both translation and rotation of the object.
-        """
-        trans_d = geom.length(self.trajectory.get_point(t_1) -
-                              self.trajectory.get_point(t_0))
-        rot_d = geom.get_rotation_displacement(
-            self.trajectory.get_direction(t_0),
-            self.trajectory.get_direction(t_1),
-            self.furthest_point)
-
-        return trans_d + rot_d
-
     def get_next_time(self, t_0, distance):
         """
         Get next time at which the object has different position or
@@ -143,9 +129,16 @@ class GraphicalObject(object):
         Return True if the object moves more than *distance*
         in time interval *t_0*, *t_1*.
         """
-        next_t = self.get_next_time(t_0, distance)
+        p_0 = self.trajectory.get_point(t_0)
+        p_1 = self.trajectory.get_point(t_1)
+        trans_displacement = np.abs(p_1 - p_0)
 
-        return False if next_t is None else next_t <= t_1
+        d_0 = self.trajectory.get_direction(t_0, norm=False)
+        d_1 = self.trajectory.get_direction(t_1, norm=False)
+        rot_displacement = get_rotation_displacement(d_0, d_1, self.furthest_point)
+        total_displacement = trans_displacement + rot_displacement
+
+        return max(total_displacement) > distance
 
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
