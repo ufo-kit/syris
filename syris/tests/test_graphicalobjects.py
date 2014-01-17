@@ -193,3 +193,26 @@ class TestGraphicalObjects(SyrisTest):
         np.testing.assert_almost_equal(ground_truth,
                                        composite.bounding_box.points)
 
+    def test_composite_furthest_point(self):
+        n = 100
+        t = np.linspace(0, 2 * np.pi, n)
+
+        x_points_0 = t
+        y_points_0 = np.cos(t)
+        z_points_0 = np.zeros(n)
+        traj_0 = Trajectory(zip(x_points_0, y_points_0, z_points_0) * q.m, velocity=1 * q.m / q.s)
+
+        x_points_1 = t
+        y_points_1 = 1 + np.cos(t)
+        z_points_1 = np.zeros(n)
+        traj_1 = Trajectory(zip(x_points_1, y_points_1, z_points_1) * q.m, velocity=1 * q.m / q.s)
+
+        mb_0 = MetaBall(traj_0, 1 * q.m)
+        mb_1 = MetaBall(traj_1, 1 * q.m)
+        composite = CompositeObject(Trajectory([(0, 0, 0)] * q.m), gr_objects=[mb_0, mb_1])
+
+        # We know the maximum distance for cosine in this case, it's corresponding x and y are
+        # x = 2Pi, y = 2
+        furthest = np.sqrt(4 * np.pi ** 2 + 4) * q.m + mb_1.furthest_point
+        self.assertAlmostEqual(furthest, composite.furthest_point)
+
