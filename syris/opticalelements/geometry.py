@@ -134,15 +134,17 @@ class Trajectory(object):
             # Static trajectory or no velocity profile specified.
             self._tck = None
             self._u = None
+            self._points = control_points[0].simplified
             self._length = 0 * q.m
             self._times = self._distances = self._time_tck = None
         else:
             # Extract x, y, z points
-            self._points = zip(*control_points.simplified)
+            points = zip(*control_points.simplified)
 
             # Positions
-            tck, u = interp.splprep(self._points, s=0)
+            tck, u = interp.splprep(points, s=0)
             self._tck, self._u = reinterpolate(tck, u, 1000)
+            self._points = np.array(interp.splev(self._u, self._tck)) * q.m
 
             # Derivatives of the spline (x_d, y_d, z_d tuple)
             self._derivatives = interp.splev(self._u, self._tck, der=1)
@@ -175,6 +177,11 @@ class Trajectory(object):
     def control_points(self):
         """Control points used by the trajectory."""
         return tuple(self._control_points) * q.m
+
+    @property
+    def points(self):
+        """Return interpolated points."""
+        return self._points
 
     @property
     def length(self):

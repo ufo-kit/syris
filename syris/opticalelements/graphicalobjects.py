@@ -318,6 +318,8 @@ class CompositeObject(GraphicalObject):
         for obj in gr_objects:
             self.add(obj)
 
+        self._furthest_point = None
+
     @property
     def objects(self):
         """All objects which are inside this composite object."""
@@ -347,6 +349,31 @@ class CompositeObject(GraphicalObject):
     def total_time(self):
         """The total trajectory time of the object and all its subobjects."""
         return max([obj.trajectory.time for obj in self._all_objects(False)])
+
+    @property
+    def furthest_point(self):
+        """Furthest point is the greatest achievable distance to some primitive
+        object plus the furthest point of the primitive object. This way we can
+        put an upper bound on the distance travelled by any primitive object.
+        """
+        if self._furthest_point is None:
+            self._determine_furthest_point()
+        return self._furthest_point
+
+    def _determine_furthest_point(self):
+        """Calculate the furthest point based on all primitive objects."""
+        furthest = None
+
+        for obj in self.primitive_objects:
+            traj_dist = np.sqrt(np.sum(obj.trajectory.points ** 2, axis=0))
+            if len(obj.trajectory.points.shape) == 2:
+                # For non-stationary trajectory we take the maximum
+                traj_dist = max(traj_dist)
+            dist = traj_dist + obj.furthest_point
+            if furthest is None or dist > furthest:
+                furthest = dist
+
+        self._furthest_point = furthest
 
     def __len__(self):
         return len(self._objects)
