@@ -141,7 +141,8 @@ class Trajectory(object):
             self._points = zip(*control_points.simplified)
 
             # Positions
-            self._tck, self._u = interp.splprep(self._points, s=0)
+            tck, u = interp.splprep(self._points, s=0)
+            self._tck, self._u = reinterpolate(tck, u, 1000)
 
             # Derivatives of the spline (x_d, y_d, z_d tuple)
             self._derivatives = interp.splev(self._u, self._tck, der=1)
@@ -167,7 +168,7 @@ class Trajectory(object):
             d_units = time_dist[0][1].units
             t_0 = Quantity(t_0 * t_units).simplified.magnitude
             s_0 = Quantity(s_0 * d_units).simplified.magnitude
-            self._times, self._distances = interpolate_1d(t_0, s_0, 100)
+            self._times, self._distances = interpolate_1d(t_0, s_0, 1000)
             self._time_tck = interp.splrep(self._times, self._distances)
 
     @property
@@ -222,6 +223,51 @@ class Trajectory(object):
                 res = normalize(res)
 
         return res * q.dimensionless
+
+    def get_maximum_dt(self, furthest_point, distance):
+        """
+        Get the maximum time difference which moves the object no more than
+        *distance*. Consider both rotational and translational displacement,
+        when by the rotational one the *furhtest_point* is the most distant
+        point from the center of the rotation.
+        """
+        ds = self.get_maximum_du(furthest_point, distance) * self.length.simplified.magnitude
+        # f' = ds / dt, f' = const. => dt = ds / f'
+        derivative = max(np.abs(interp.splev(self._times, self._time_tck, der=1)))
+        return ds / (derivative * self._times[-1])
+
+    def get_maximum_du(self, furthest_point, distance):
+        """
+        Get the maximum parameter difference which moves the object no more than
+        *distance*. Consider both rotational and translational displacement,
+        when by the rotational one the *furhtest_point* is the most distant
+        point from the center of the rotation.
+        """
+        return min(self._get_translation_du(distance),
+                   self._get_rotation_du(furthest_point, distance))
+
+    def _get_translation_du(self, distance):
+        """Get the maximum du in order not to move more than *distance*."""
+        return maximum_derivative_parameter(self._tck, self._u, distance.simplified.magnitude)
+
+    def _get_rotation_du(self, furthest_point, distance):
+        """
+        Get the maximum du in order not to move angularly more than *distance*.
+        *furthest_point* is the furthest point from the middle of the rotation
+        which must not move more than *distance*.
+        """
+        furthest_point = furthest_point.simplified.magnitude
+        distance = distance.simplified.magnitude
+
+        du = np.gradient(self._u)
+        max_tg = distance / furthest_point
+        derivatives = interp.splev(self._u, self._tck, der=1)
+        tgs = np.array([np.abs(np.tan(np.gradient(np.arctan(der)))) for der in derivatives])
+        dim = np.argmax(tgs.max(axis=1))
+        index = np.argmax(tgs[dim])
+        k = max_tg / tgs[dim, index]
+
+        return k * du[index]
 
     def _get_u(self, abs_time):
         """Get the spline parameter from the time *abs_time*."""
@@ -389,14 +435,23 @@ def interpolate_1d(x_0, y_0, size):
 
     return x_1, interp.splev(x_1, tck)
 
+def reinterpolate(tck, u, n):
+    """
+    Arc length reinterpolation spline given by *tck* and parameter *u*
+    to have *n* data points
+    """
+    x, y, z = interp.splev(np.linspace(0, 1, n), tck)
+    return interp.splprep((x, y, z), s=0)
+
 def maximum_derivative_parameter(tck, u, max_distance):
     """Get the maximum possible du, for which holds that dx < *max_distance*."""
     derivatives = interp.splev(u, tck, der=1)
     du = np.gradient(u)
     distances = np.array([np.abs(derivative * du) for derivative in derivatives])
     max_indices = np.argmax(distances, axis=1)
+    max_derivative = max([np.abs(derivatives[i][max_indices[i]]) for i in range(3)])
     # The desired du is given by max_distance / f'
-    return min([max_distance / derivatives[i][max_indices[i]] for i in range(3)])
+    return max_distance / max_derivative
 
 
 def derivative_fit(tck, u, max_distance):
@@ -406,11 +461,10 @@ def derivative_fit(tck, u, max_distance):
     """
     n = 1 / maximum_derivative_parameter(tck, u, max_distance)
     if n > len(u):
-        # Do not downsample
-        x, y, z = interp.splev(np.linspace(0, 1, n), tck)
-        tck, u = interp.splprep((x, y, z), s=0)
+        tck, u = reinterpolate(tck, u, n)
 
     return tck, u
+
 
 def get_constant_velocity(v_0, duration):
     times = np.linspace(0 * duration.units, duration, 5)
