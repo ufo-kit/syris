@@ -62,3 +62,25 @@ def match_range(x_points, y_points, x_target):
 
     return interp.splev(x_target.rescale(x_points.units), tck) * \
         y_points.units
+
+
+def supremum(x_0, data):
+    """Return the smallest point from *data* which is greater than *x_0*."""
+    srt = np.copy(data)
+    srt.sort()
+    greater_indices = np.where(srt - x_0 > 0)[0]
+
+    if len(greater_indices) == 0:
+        return None
+    return srt[min(greater_indices)]
+
+
+def infimum(x_0, data):
+    """Return the greatest point from *data* which is less than *x_0*."""
+    srt = np.copy(data)
+    srt.sort()
+    smaller_indices = np.where(srt - x_0 < 0)[0]
+
+    if len(smaller_indices) == 0:
+        return None
+    return srt[max(smaller_indices)]
