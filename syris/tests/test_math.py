@@ -45,3 +45,27 @@ class TestMath(SyrisTest):
         self.assertAlmostEqual(smath.difference_root(x_0, tck, y_d),
                                np.pi - math.asin(math.sin(x_0) - y_d),
                                places=places)
+
+
+def test_supremum():
+    # Normal flow
+    data = np.array([1, 0, 3, 2])
+    assert smath.supremum(1, data) == 2
+
+    # Doesn't exist
+    assert smath.supremum(3, data) is None
+
+    # Empty data
+    assert smath.supremum(1, np.array([])) is None
+
+
+def test_infimum():
+    # Normal flow
+    data = np.array([1, 0, 3, 2])
+    assert smath.infimum(2, data) == 1
+
+    # Doesn't exist
+    assert smath.infimum(0, data) is None
+
+    # Empty data
+    assert smath.infimum(1, np.array([])) is None
