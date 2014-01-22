@@ -299,7 +299,7 @@ class Trajectory(object):
 
     def get_parameter(self, abs_time):
         """Get the spline parameter from the time *abs_time*."""
-        dist = interp.splev(abs_time, self._time_tck)
+        dist = interp.splev(abs_time.simplified.magnitude, self._time_tck)
         u = dist / self.length.magnitude
         if u > 1:
             # If we go beyond the trajectory end, stay in it.
