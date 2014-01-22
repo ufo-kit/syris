@@ -196,6 +196,10 @@ class Trajectory(object):
         else:
             return 0 * q.s
 
+    @property
+    def parameter(self):
+        return self._u
+
     def get_point(self, abs_time):
         """Get a point on the trajectory at the time *abs_time*."""
         if abs_time < 0:
