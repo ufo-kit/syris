@@ -211,7 +211,7 @@ class Trajectory(object):
                 # Stationary trajectory.
                 result = self._control_points[0]
             else:
-                result = interp.splev(self._get_u(abs_time), self._tck) * q.m
+                result = interp.splev(self.get_parameter(abs_time), self._tck) * q.m
 
         return result
 
@@ -224,7 +224,7 @@ class Trajectory(object):
         if self._times is None:
             res = np.array((0, 0, 0))
         else:
-            res = np.array(interp.splev(self._get_u(abs_time),
+            res = np.array(interp.splev(self.get_parameter(abs_time),
                                         self._tck, der=1))
             if norm:
                 res = normalize(res)
@@ -293,7 +293,7 @@ class Trajectory(object):
 
         return k * du[index]
 
-    def _get_u(self, abs_time):
+    def get_parameter(self, abs_time):
         """Get the spline parameter from the time *abs_time*."""
         dist = interp.splev(abs_time, self._time_tck)
         u = dist / self.length.magnitude
