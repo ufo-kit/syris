@@ -286,6 +286,20 @@ class Trajectory(object):
 
         return u
 
+    def get_next_time(self, t_0, u_0):
+        """
+        Get the next time when the trajectory parameter will be at position *u_0*.
+        There can be multiple results but only the closest one is returned.
+        """
+        t, c, k = self._time_tck
+        c = c - (self.length.magnitude * u_0)
+        shifted_tck = t, c, k
+        roots = interp.sproot(shifted_tck, mest=100)
+
+        if len(roots) == 0:
+            return None
+        return smath.supremum(t_0.simplified.magnitude, roots)
+
     def _get_length(self, param_start=0, param_end=1):
         """
         Get spline length on the spline parameter interval *param_start*,
