@@ -231,6 +231,23 @@ class Trajectory(object):
 
         return res * q.dimensionless
 
+    def get_distances(self, distance):
+        """Get the distances from the trajectory beginning to every consecutive
+        point defined by the parameter. Take into account translation and rotation
+        of an object with the furthest point from its center given by *distance*.
+        """
+        points = np.array(interp.splev(self._u, self._tck))
+        angles = np.arctan(np.array(interp.splev(self._u, self._tck, der=1)))
+        initial_point = np.array(interp.splev(0, self._tck))
+        initial_angle = np.arctan(np.array(interp.splev(0, self._tck, der=1)))
+
+        translation = points - initial_point[:, np.newaxis]
+        angle_diff = angles - initial_angle[:, np.newaxis]
+        # sin(phi) = dx / distance => dx = distance * sin(phi)
+        rotation = distance * np.sin(angle_diff)
+
+        return translation + rotation
+
     def get_maximum_dt(self, furthest_point, distance):
         """
         Get the maximum time difference which moves the object no more than
