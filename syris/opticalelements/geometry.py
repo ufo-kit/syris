@@ -471,7 +471,7 @@ def reinterpolate(tck, u, n):
     Arc length reinterpolation spline given by *tck* and parameter *u*
     to have *n* data points
     """
-    x, y, z = interp.splev(np.linspace(0, 1, n), tck)
+    x, y, z = interp.splev(u, tck)
     return interp.splprep((x, y, z), s=0)
 
 def maximum_derivative_parameter(tck, u, max_distance):
