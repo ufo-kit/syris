@@ -179,6 +179,12 @@ class GraphicalObject(object):
 
         return closest_time * q.s
 
+    def get_maximum_dt(self, distance):
+        """Get the maximum delta time for which the object will not
+        move more than *distance* between any two time points.
+        """
+        return self.trajectory.get_maximum_dt(self.furthest_point, distance)
+
     def moved(self, t_0, t_1, distance):
         """
         Return True if the object moves more than *distance*
@@ -367,6 +373,8 @@ class CompositeObject(GraphicalObject):
             self.add(obj)
 
         self._furthest_point = None
+        self._dt = None
+        self._saved_matrices = {}
 
     @property
     def objects(self):
@@ -535,17 +543,44 @@ class CompositeObject(GraphicalObject):
             # Then move its sub-objects.
             gr_object.move(abs_time)
 
-    def get_next_time(self, t_0, delta_distance):
+    def save_transformation_matrices(self):
+        """Save transformation matrices of all objects and return
+        them in a dictionary {object: transform_matrix}.
+        """
+        for obj in self.all_objects:
+            self._saved_matrices[obj] = np.copy(obj.transform_matrix)
+
+    def restore_transformation_matrices(self):
+        """Restore transformation matrices of all objects."""
+        for obj, matrix in self._saved_matrices.iteritems():
+            obj.transform_matrix = matrix
+
+        self._saved_matrices = {}
+
+    def get_next_time(self, t_0, distance):
         """
         Get next time at which the object will have traveled
-        *delta_distance*, the starting time is *t_0*.
+        *distance*, the starting time is *t_0*.
         """
-        pass
+        # First deterimne the real distance which is smaller by the
+        # given one because the combination of object movements might
+        # exceed the distance if the motion of objects adds up
+        # constructively.
+        if self._dt is None:
+            # Initialize
+            self._dt = np.min([obj.get_maximum_dt(distance / len(self.all_objects))
+                               for obj in self.all_objects]) * q.s
 
-    def moved(self, t_0, t_1, delta_distance):
+        for current_time in np.arange(t_0, self.total_time + self._dt, self._dt) * q.s:
+            if self.moved(t_0, current_time, distance):
+                return current_time
+
+        return None
+
+    def moved(self, t_0, t_1, distance):
         """
         Return True if the object moves between time *t_0* and *t_1*
-        more than *delta_distance*. We need to check all subobjects.
+        more than *distance*. We need to check all subobjects.
         Moreover, simple trajectory distance between points at t_0
         and t_1 will not work because when the composite object moves
         more than one pixel, but the primitive graphical object moves
@@ -553,7 +588,26 @@ class CompositeObject(GraphicalObject):
         also the composite object movement because it may cause some
         subobjects to rotate.
         """
-        pass
+        def move_and_save(abs_time):
+            """Move primitive objects to time *abs_time* and return
+            their positions.
+            """
+            primitive = self.primitive_objects
+            self.clear_transformation()
+            self.move(abs_time)
+
+            positions = np.zeros((len(primitive), 3))
+            for i in range(len(primitive)):
+                positions[i] = primitive[i].position.simplified.magnitude
+
+            return positions
+
+        self.save_transformation_matrices()
+        orig_positions = move_and_save(t_0)
+        positions = move_and_save(t_1)
+        self.restore_transformation_matrices()
+
+        return np.max(np.abs(positions - orig_positions)) > distance.simplified.magnitude
 
     def pack(self, units, coeff=1):
         """Pack all the sub-objects into a structure suitable for GPU
