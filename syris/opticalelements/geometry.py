@@ -288,12 +288,12 @@ class Trajectory(object):
         distance = distance.simplified.magnitude
 
         du = np.gradient(self._u)
-        max_tg = distance / furthest_point
+        max_sin = distance / furthest_point
         derivatives = interp.splev(self._u, self._tck, der=1)
-        tgs = np.array([np.abs(np.tan(np.gradient(np.arctan(der)))) for der in derivatives])
-        dim = np.argmax(tgs.max(axis=1))
-        index = np.argmax(tgs[dim])
-        k = max_tg / tgs[dim, index]
+        sines = np.array([np.abs(np.sin(np.gradient(np.arctan(der)))) for der in derivatives])
+        dim = np.argmax(sines.max(axis=1))
+        index = np.argmax(sines[dim])
+        k = max_sin / sines[dim, index]
 
         return k * du[index]
 
@@ -514,5 +514,5 @@ def get_rotation_displacement(d_0, d_1, length):
     *length*. The *d_0* and *d_1* are the tangents at different
     points.
     """
-    return np.abs(length * np.tan(np.arctan(d_1) - np.arctan(d_0)))
+    return np.abs(length * np.sin(np.arctan(d_1) - np.arctan(d_0)))
 
