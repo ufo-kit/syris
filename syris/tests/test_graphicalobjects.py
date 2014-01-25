@@ -16,6 +16,22 @@ def get_control_points():
                      (0, 0, 1),
                      (1, 1, 1)]) * q.mm
 
+def check_distances(graphical_object, distance, decimal_points=3):
+    t_0 = 0 * q.s
+    max_distances = []
+    while t_0 <= graphical_object.trajectory.time:
+        t_1 = graphical_object.get_next_time(t_0, distance)
+        if t_1 is None:
+            break
+        if t_0 is not None and t_1 is not None:
+            diff = np.abs(graphical_object.trajectory.get_point(t_1) -
+                    graphical_object.trajectory.get_point(t_0))
+            max_distances.append(np.max(diff).magnitude)
+        t_0 = t_1
+
+    distance = distance.simplified.magnitude
+    np.testing.assert_almost_equal(max_distances, distance, decimal=decimal_points)
+
 
 class TestGraphicalObjects(SyrisTest):
 
@@ -215,4 +231,15 @@ class TestGraphicalObjects(SyrisTest):
         # x = 2Pi, y = 2
         furthest = np.sqrt(4 * np.pi ** 2 + 4) * q.m + mb_1.furthest_point
         self.assertAlmostEqual(furthest, composite.furthest_point)
+
+    def test_get_displacement(self):
+        p = np.linspace(1, 10, 100)
+        x = p
+        y = p ** 2
+        z = np.zeros(len(p))
+
+        traj = Trajectory(zip(x, y, z) * q.m, velocity= 1 * q.m / q.s)
+        ball = MetaBall(traj, 1 * q.mm)
+
+        check_distances(ball, 100 * q.mm, 3)
 
