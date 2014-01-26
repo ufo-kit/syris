@@ -96,12 +96,10 @@ class TestTrajectory(SyrisTest):
         # max(sin(x)) = trajectory.length
         times = np.linspace(0, 2 * np.pi, self.n) * q.s
         # Normalize for not going below zero.
-        dist = (self.traj.length + self.traj.length *
-                np.sin(times.magnitude)) * q.m
+        dist = (self.traj.length + self.traj.length * np.sin(times.magnitude)) * q.m
 
         traj = Trajectory(self.control_points, zip(times, dist))
 
         for i in range(len(times)):
             np.testing.assert_almost_equal(traj.get_point(times[i]),
-                                           evaluate_point(dist[i] /
-                                                          traj.length))
+                                           evaluate_point(dist[i] / traj.length), decimal=4)
