@@ -243,3 +243,38 @@ class TestGraphicalObjects(SyrisTest):
 
         check_distances(ball, 100 * q.mm, 3)
 
+    def test_get_next_time(self):
+        def move_and_get_position(composite, primitive, abs_time):
+            composite.clear_transformation()
+            composite.move(abs_time)
+
+            return primitive.position
+
+        n = 100
+        p = np.linspace(0, np.pi, n)
+        x = np.cos(p)
+        y = np.sin(p)
+        z = np.zeros(n)
+        x_m = 1 + p
+
+        y_m = np.zeros(n)
+        z_m = np.zeros(n)
+        traj_m = Trajectory(zip(x_m, y_m, z_m) * q.m, velocity=1 * q.m / q.s)
+        ball = MetaBall(traj_m, 1 * q.mm)
+
+        traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
+        comp = CompositeObject(traj, gr_objects=[ball])
+
+        t_0 = 0 * q.s
+        distance = 1000 * q.mm
+        while True:
+            t_1 = comp.get_next_time(t_0, distance)
+            if t_1 is None:
+                break
+
+            pos_0 = move_and_get_position(comp, ball, t_0)
+            pos_1 = move_and_get_position(comp, ball, t_1)
+            diff = np.round(np.max(np.abs(pos_1 - pos_0)).rescale(q.mm) / distance)
+            # distance represents a pixel, thus we must less than
+            self.assertLessEqual(diff, 1)
+            t_0 = t_1
