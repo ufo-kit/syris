@@ -16,6 +16,7 @@ def get_control_points():
                      (0, 0, 1),
                      (1, 1, 1)]) * q.mm
 
+
 def check_distances(graphical_object, distance, decimal_points=3):
     t_0 = 0 * q.s
     max_distances = []
@@ -25,7 +26,7 @@ def check_distances(graphical_object, distance, decimal_points=3):
             break
         if t_0 is not None and t_1 is not None:
             diff = np.abs(graphical_object.trajectory.get_point(t_1) -
-                    graphical_object.trajectory.get_point(t_0))
+                          graphical_object.trajectory.get_point(t_0))
             max_distances.append(np.max(diff).magnitude)
         t_0 = t_1
 
@@ -247,7 +248,7 @@ class TestGraphicalObjects(SyrisTest):
         y = p ** 2
         z = np.zeros(len(p))
 
-        traj = Trajectory(zip(x, y, z) * q.m, velocity= 1 * q.m / q.s)
+        traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
         ball = MetaBall(traj, 1 * q.mm)
 
         check_distances(ball, 100 * q.mm, 3)

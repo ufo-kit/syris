@@ -466,6 +466,7 @@ def interpolate_1d(x_0, y_0, size):
 
     return x_1, interp.splev(x_1, tck)
 
+
 def reinterpolate(tck, u, n):
     """
     Arc length reinterpolation of a spline given by *tck* and parameter *u*
@@ -477,6 +478,7 @@ def reinterpolate(tck, u, n):
 
     x, y, z = interp.splev(new_u, tck)
     return interp.splprep((x, y, z), s=0)
+
 
 def maximum_derivative_parameter(tck, u, max_distance):
     """Get the maximum possible du, for which holds that dx < *max_distance*."""
@@ -515,4 +517,3 @@ def get_rotation_displacement(d_0, d_1, length):
     points.
     """
     return np.abs(length * np.sin(np.arctan(d_1) - np.arctan(d_0)))
-

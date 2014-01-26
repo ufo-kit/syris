@@ -105,4 +105,3 @@ class TestTrajectory(SyrisTest):
             np.testing.assert_almost_equal(traj.get_point(times[i]),
                                            evaluate_point(dist[i] /
                                                           traj.length))
-
