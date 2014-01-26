@@ -402,7 +402,7 @@ class CompositeObject(GraphicalObject):
         return self._all_objects(True)
 
     @property
-    def total_time(self):
+    def time(self):
         """The total trajectory time of the object and all its subobjects."""
         return max([obj.trajectory.time for obj in self._all_objects(False)])
 
@@ -571,7 +571,7 @@ class CompositeObject(GraphicalObject):
             self._dt = np.min([obj.get_maximum_dt(distance / len(self.all_objects))
                                for obj in self.all_objects]) * q.s
 
-        for current_time in np.arange(t_0, self.total_time + self._dt, self._dt) * q.s:
+        for current_time in np.arange(t_0, self.time + self._dt, self._dt) * q.s:
             if self.moved(t_0, current_time, distance):
                 return current_time
 
