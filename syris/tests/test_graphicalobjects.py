@@ -232,6 +232,15 @@ class TestGraphicalObjects(SyrisTest):
         furthest = np.sqrt(4 * np.pi ** 2 + 4) * q.m + mb_1.furthest_point
         self.assertAlmostEqual(furthest, composite.furthest_point)
 
+    def test_save_transformation_matrix(self):
+        old = self.composite.transform_matrix
+        self.composite.save_transformation_matrices()
+
+        self.composite.move(1 * q.s)
+        self.composite.restore_transformation_matrices()
+
+        np.testing.assert_equal(old, self.composite.transform_matrix)
+
     def test_get_displacement(self):
         p = np.linspace(1, 10, 100)
         x = p
