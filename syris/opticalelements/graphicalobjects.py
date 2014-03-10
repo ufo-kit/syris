@@ -41,6 +41,8 @@ class GraphicalObject(object):
         self._orientation = geom.normalize(orientation)
         self._center = trajectory.control_points[0].simplified
 
+        self.parent = None
+
         # Matrix holding transformation.
         self.transform_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
         # Maximum object enlargement in any direction.
@@ -59,7 +61,7 @@ class GraphicalObject(object):
         """Return the topmost parent."""
         obj = self
 
-        while hasattr(obj, "parent"):
+        while obj.parent:
             obj = obj.parent
 
         return obj
