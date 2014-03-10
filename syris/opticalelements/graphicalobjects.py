@@ -344,20 +344,7 @@ class CompositeObject(GraphicalObject):
     """
     Class representing an object consisting of more sub-objects.
     A composite object can be thought of as a tree structure with
-    children representing actual graphical objects (non-composite
-    only in leafs). This means that all direct children of a composite
-    object are either all :py:class:`CompositeObject` instances
-    or are all not. An example of a :py:class:`CompositeObject`
-    and its children could be::
-
-                            C          (0)
-                           / \\
-                          C   C        (1)
-                         / \\   \\
-                        P   P   P      (2)
-
-    We see that the root has only composite children on level (1) and
-    both its children have only primitive children on level (2).
+    children representing another graphical objects.
     """
 
     def __init__(self, trajectory, orientation=geom.Y_AX, gr_objects=None):
@@ -400,6 +387,20 @@ class CompositeObject(GraphicalObject):
     @property
     def primitive_objects(self):
         return self._all_objects(True)
+
+    @property
+    def direct_primitive_objects(self):
+        """
+        Return primitive objects on the level immediately after
+        this object's level.
+        """
+        primitive = []
+
+        for obj in self._objects:
+            if obj.__class__ != CompositeObject:
+                primitive.append(obj)
+
+        return primitive
 
     @property
     def time(self):
@@ -446,17 +447,9 @@ class CompositeObject(GraphicalObject):
             raise ValueError("Cannot add self")
         if obj in self._all_objects(False):
             raise ValueError("Object {0} already contained".format(obj))
-        if len(self) != 0:
-            children_primitive = self[0].__class__ != CompositeObject
-            obj_primitive = obj.__class__ != CompositeObject
-
-            if children_primitive ^ obj_primitive:
-                raise TypeError("Composite object direct children " +
-                                "must be all of the same type")
 
         # enable bottom-up traversing
         obj.parent = self
-
         self._objects.append(obj)
 
     def remove(self, obj):
@@ -466,33 +459,6 @@ class CompositeObject(GraphicalObject):
     def remove_all(self):
         """Remove all sub-objects."""
         self._objects = []
-
-    def get_last_composites(self):
-        """
-        Traverse the tree structure of the composite object and
-        return a list of composite objects inside it which have only
-        primitive children.
-        """
-        result = []
-
-        def go_down(obj):
-            """
-            Go down in composite object's children list and look for
-            instances which have children of type :py:class:`GraphicalObject`.
-            Objects which are composed of purely primitive graphical objects
-            are appended to the *result* list.
-            """
-            primitive = set([subobj for subobj in obj
-                             if subobj.__class__ != CompositeObject])
-            if primitive:
-                result.append(obj)
-            else:
-                for comp_obj in set(obj) - primitive:
-                    go_down(comp_obj)
-
-        go_down(self)
-
-        return result
 
     def clear_transformation(self):
         """Clear all transformations."""

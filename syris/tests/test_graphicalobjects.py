@@ -84,6 +84,8 @@ class TestGraphicalObjects(SyrisTest):
         m_3 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 3 * q.mm)
         m_4 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 4 * q.mm)
         m_5 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 5 * q.mm)
+        m_6 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 6 * q.mm)
+        m_7 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 7 * q.mm)
 
         c_1 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
                               gr_objects=[m_1, m_2])
@@ -94,29 +96,18 @@ class TestGraphicalObjects(SyrisTest):
         c_4 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
                               gr_objects=[m_4, m_5])
         c_5 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
-                              gr_objects=[c_3, c_4])
+                              gr_objects=[c_3, c_4, m_6, m_7])
 
         # empty object
         CompositeObject(Trajectory([(0, 0, 0)] * q.mm))
 
-        # non-uniform objects list in the constructor
-        with self.assertRaises(TypeError) as ctx:
-            CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
-                            gr_objects=[m_1, c_1])
-        self.assertEqual("Composite object direct children " +
-                         "must be all of the same type",
-                         ctx.exception.message)
-
-        # Last composite objects which have only primitive children.
-        g_t = [c_1, c_2, c_4]
-        self.assertEqual(set(g_t), set(c_5.get_last_composites()))
-
-        # Only one composite object and one child.
-        self.assertEqual(c_2, c_2.get_last_composites()[0])
-
         # Empty composite object.
         c_empty = CompositeObject(Trajectory([(0, 0, 0)] * q.mm))
-        self.assertEqual([], c_empty.get_last_composites())
+        self.assertEqual(c_empty.direct_primitive_objects, [])
+
+        # Test direct subobjects
+        self.assertEqual(c_5.direct_primitive_objects, [m_6, m_7])
+        self.assertEqual(c_3.direct_primitive_objects, [])
 
         # Add self.
         with self.assertRaises(ValueError) as ctx:
@@ -132,23 +123,6 @@ class TestGraphicalObjects(SyrisTest):
         with self.assertRaises(ValueError) as ctx:
             c_5.add(c_2)
         self.assertTrue(ctx.exception.message.endswith("already contained"))
-
-        # Add primitive to composite node.
-        m_6 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 5 * q.mm)
-        with self.assertRaises(TypeError) as ctx:
-            c_5.add(m_6)
-        self.assertEqual("Composite object direct children " +
-                         "must be all of the same type",
-                         ctx.exception.message)
-
-        # Add composite to primitive node.
-        c_6 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
-                              gr_objects=[m_6])
-        with self.assertRaises(TypeError) as ctx:
-            c_2.add(c_6)
-        self.assertEqual("Composite object direct children " +
-                         "must be all of the same type",
-                         ctx.exception.message)
 
         # Test all subobjects.
         self.assertEqual(set(c_3.all_objects),
