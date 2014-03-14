@@ -58,6 +58,9 @@ class Material(object):
     def __hash__(self):
         return hash(self.name)
 
+    def __str__(self):
+        return str(self.name)
+
 
 class PMASFMaterial(Material):
 
