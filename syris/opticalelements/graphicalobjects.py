@@ -33,11 +33,13 @@ class GraphicalObject(object):
 
     """Class representing an abstract graphical object."""
 
-    def __init__(self, trajectory, orientation=geom.Y_AX):
-        """Create a graphical object with a *trajectory* and *orientation*,
-        which is an (x, y, z) vector specifying object's "up" vector
+    def __init__(self, trajectory, material=None, orientation=geom.Y_AX):
+        """Create a graphical object with a *trajectory*, *material* and
+        *orientation*, which is an (x, y, z) vector specifying object's "up"
+        vector.
         """
         self._trajectory = trajectory
+        self._material = material
         self._orientation = geom.normalize(orientation)
         self._center = trajectory.control_points[0].simplified
 
@@ -65,6 +67,33 @@ class GraphicalObject(object):
             obj = obj.parent
 
         return obj
+
+    @property
+    def material(self):
+        """Return the object's material."""
+        return self._material
+
+    @material.setter
+    def material(self, material):
+        """Set the object's *material*."""
+        if not self.can_set_material(material):
+            raise ValueError('Cannot set material to \'{}\''.format(material))
+
+        self._material = material
+        # If there is a parent it needs to be set too because
+        # it will propagate the material to all it's children,
+        # which are all the objects on this and lower levels.
+        if self.parent and self.parent.material != material:
+            self.parent.material = material
+
+    def can_set_material(self, material):
+        """Return True if the *material* can be set for this graphical object."""
+        if self.parent:
+            # If the object is a part of the ensemble then the
+            # material has to be compatible with it
+            return self.parent.can_set_material(material)
+
+        return True
 
     @property
     def furthest_point(self):
@@ -249,9 +278,9 @@ class MetaObject(GraphicalObject):
     # Object type.
     TYPE = None
 
-    def __init__(self, trajectory, radius, orientation=geom.Y_AX):
+    def __init__(self, trajectory, radius, material=None, orientation=geom.Y_AX):
         """Create a metaobject with *radius*."""
-        super(MetaObject, self).__init__(trajectory, orientation)
+        super(MetaObject, self).__init__(trajectory, material=material, orientation=orientation)
         if radius <= 0:
             raise ValueError("Radius must be greater than zero.")
 
@@ -314,8 +343,9 @@ class MetaBall(MetaObject):
     """Metaball graphical object."""
     TYPE = OBJECT_ID()
 
-    def __init__(self, trajectory, radius, orientation=geom.Y_AX):
-        super(MetaBall, self).__init__(trajectory, radius, orientation)
+    def __init__(self, trajectory, radius, material=None, orientation=geom.Y_AX):
+        super(MetaBall, self).__init__(trajectory, radius, material=material,
+                                       orientation=orientation)
 
     @property
     def furthest_point(self):
@@ -337,8 +367,8 @@ class MetaCube(MetaObject):
     """Metacube graphical object."""
     TYPE = OBJECT_ID()
 
-    def __init__(self, trajectory, radius, orientation=geom.Y_AX):
-        super(MetaCube, self).__init__(trajectory, radius, orientation)
+    def __init__(self, trajectory, radius, material=None, orientation=geom.Y_AX):
+        super(MetaCube, self).__init__(trajectory, radius, material=None, orientation=orientation)
 
 
 class CompositeObject(GraphicalObject):
@@ -349,9 +379,10 @@ class CompositeObject(GraphicalObject):
     children representing another graphical objects.
     """
 
-    def __init__(self, trajectory, orientation=geom.Y_AX, gr_objects=None):
+    def __init__(self, trajectory, material=None, orientation=geom.Y_AX, gr_objects=None):
         """*gr_objects* is a list of :py:class:`GraphicalObject`."""
-        super(CompositeObject, self).__init__(trajectory, orientation)
+        super(CompositeObject, self).__init__(trajectory, material=material,
+                                              orientation=orientation)
         if gr_objects is None:
             gr_objects = []
         self._objects = []
@@ -403,6 +434,44 @@ class CompositeObject(GraphicalObject):
                 primitive.append(obj)
 
         return primitive
+
+    @GraphicalObject.material.setter
+    def material(self, material):
+        """Set the object's *material*. It propagates to the children
+        as well.
+        """
+        # Do not call the super because we do not want to
+        # propagate the material to upper levels
+        if not self.can_set_material(material):
+            raise ValueError('Cannot set material to \'{}\''.format(material))
+
+        self._material = material
+
+        # Now set also the children accordingly
+        for obj in self.objects:
+            if obj.material != material:
+                obj.material = material
+
+    def can_set_material(self, material):
+        """Return True if the *material* can be set for this graphical object."""
+        # We can clear any time
+        if not material:
+            return True
+
+        # First check the parents
+        obj = self
+        while obj.parent:
+            obj = obj.parent
+            if obj.material is not None and obj.material != material:
+                return False
+
+        # If the parents are compatible we still need to check if also
+        # the children are compatible
+        for obj in self.all_objects:
+            if obj.material is not None and obj.material != material:
+                return False
+
+        return True
 
     @property
     def time(self):
