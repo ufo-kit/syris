@@ -3,6 +3,7 @@ import quantities as q
 from syris.opticalelements import geometry as geom
 from syris.opticalelements.geometry import Trajectory
 from syris.opticalelements.graphicalobjects import MetaBall, CompositeObject
+from syris.opticalelements.materials import Material
 from syris.tests.base import SyrisTest
 import itertools
 from numpy import linalg
@@ -262,3 +263,65 @@ class TestGraphicalObjects(SyrisTest):
             # distance represents a pixel, thus we must less than
             self.assertLessEqual(diff, 1)
             t_0 = t_1
+
+    def test_material(self):
+        # Create the testing structure as follows:
+        #           C       (root)
+        #          / \
+        #         C   C     (left, right)
+        #        /   / \
+        #       M   M   M   (m_1, m_2, m_3)
+        def test_exception(obj, material):
+            with self.assertRaises(ValueError):
+                obj.material = material
+
+        control_points = get_linear_points(geom.X, start=(1, 1, 1))
+        traj = Trajectory(control_points, velocity=1 * q.mm / q.s)
+        m_1 = MetaBall(traj, 3 * q.mm)
+        m_2 = self.metaball
+        m_3 = self.metaball_2
+        left = CompositeObject(traj, gr_objects=[m_1])
+        right = self.composite
+        root = CompositeObject(traj, gr_objects=[left, right])
+
+        pmma = Material('pmma', None)
+        si = Material('Si', None)
+
+        # A change in one primitive object changes
+        # the first top level composite object and all
+        # its subobjects
+        m_2.material = pmma
+        for obj in right.all_objects:
+            self.assertEqual(obj.material, pmma)
+        # But it cannot change the parent of the closest composite object
+        # or the parent's other children
+        self.assertEqual(root.material, None)
+        self.assertEqual(left.material, None)
+
+        # The same for clearing the material
+        m_2.material = None
+        for obj in right.all_objects:
+            self.assertEqual(obj.material, None)
+
+        # One level of primitive subobjects must have the
+        # same material
+        m_2.material = pmma
+        test_exception(m_3, si)
+
+        # Clear from top must propagate to all subobjects
+        root.material = None
+        for obj in root.all_objects:
+            self.assertEqual(obj.material, None)
+
+        # Set all materials except root
+        m_1.material = si
+        m_2.material = pmma
+        self.assertEqual(root.material, None)
+        self.assertEqual(left.material, si)
+        self.assertEqual(right.material, pmma)
+        self.assertEqual(m_2.material, pmma)
+        self.assertEqual(m_3.material, pmma)
+
+        # Root can be set to neither
+        test_exception(root, si)
+        test_exception(root, pmma)
