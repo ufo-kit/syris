@@ -22,20 +22,20 @@ def ifft_2(data, plan, wait_for_finish=False):
     plan.execute(data, inverse=True, wait_for_finish=wait_for_finish)
 
 
-def get_gauss_2_f(shape, sigma, pixel_shape):
-    """Get 2D Gaussian of *shape* (*shape*, *shape*) in Fourier Space
-    with standard deviation *sigma* specified as (y, x) and *pixel_shape*.
+def get_gauss_2_f(shape, sigma, pixel_size):
+    """Get 2D Gaussian of *shape* (y, x) in Fourier Space
+    with standard deviation *sigma* specified as (y, x) and *pixel_size*.
     """
     mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                    shape=shape ** 2 * cfg.PRECISION.cl_cplx)
+                    size=shape[0] * shape[1] * cfg.PRECISION.cl_cplx)
 
     cfg.OPENCL.program.gauss_2_f(cfg.OPENCL.queue,
-                     (shape, shape),
+                     shape,
                      None,
                      mem,
                      g_util.make_vfloat2(sigma[1].simplified,
                                          sigma[0].simplified),
-                     cfg.PRECISION.np_float(pixel_shape.simplified))
+                     cfg.PRECISION.np_float(pixel_size.simplified))
 
     return mem
 
