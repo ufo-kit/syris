@@ -7,8 +7,6 @@ import quantities.constants.quantum as cq
 from syris.gpu import util as g_util
 from syris import config as cfg
 
-CL_PRG = None
-
 
 def get_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
                    copy_to_host=False):
@@ -18,26 +16,24 @@ def get_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
     *copy_to_host* is True, copy the propagator to host. If command *queue*
     is specified, execute the kernel on it.
     """
-    mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_ONLY,
-                    size=size ** 2 * cfg.CL_CPLX)
+    mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY, size=size ** 2 * cfg.PRECISION.cl_cplx)
     if apply_phase_factor:
-        phase_factor = np.exp(2 * np.pi * distance.simplified /
-                              lam.simplified * 1j)
+        phase_factor = np.exp(2 * np.pi * distance.simplified / lam.simplified * 1j)
     else:
         phase_factor = 0 + 0j
 
-    CL_PRG.propagator(cfg.QUEUE,
+    cfg.OPENCL.program.propagator(cfg.OPENCL.queue,
                       (size, size),
                       None,
                       mem,
-                      cfg.NP_FLOAT(distance.simplified),
-                      cfg.NP_FLOAT(lam.simplified),
-                      cfg.NP_FLOAT(pixel_size.simplified),
+                      cfg.PRECISION.np_float(distance.simplified),
+                      cfg.PRECISION.np_float(lam.simplified),
+                      cfg.PRECISION.np_float(pixel_size.simplified),
                       g_util.make_vcomplex(phase_factor))
 
     if copy_to_host:
-        res = np.empty((size, size), dtype=cfg.NP_CPLX)
-        cl.enqueue_copy(cfg.QUEUE, res, mem)
+        res = np.empty((size, size), dtype=cfg.PRECISION.np_cplx)
+        cl.enqueue_copy(cfg.OPENCL.queue, res, mem)
     else:
         res = mem
 

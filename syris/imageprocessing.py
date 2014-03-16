@@ -6,8 +6,6 @@ from pyopencl.array import vec
 from syris import config as cfg
 from syris.gpu import util as g_util
 
-CL_PRG = None
-
 
 def fft_2(data, plan, wait_for_finish=False):
     """2D FFT executed on *data* by a *plan*. *wait_for_finish* specifies
@@ -28,16 +26,16 @@ def get_gauss_2_f(shape, sigma, pixel_shape):
     """Get 2D Gaussian of *shape* (*shape*, *shape*) in Fourier Space
     with standard deviation *sigma* specified as (y, x) and *pixel_shape*.
     """
-    mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                    shape=shape ** 2 * cfg.CL_CPLX)
+    mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                    shape=shape ** 2 * cfg.PRECISION.cl_cplx)
 
-    CL_PRG.gauss_2_f(cfg.QUEUE,
+    cfg.OPENCL.program.gauss_2_f(cfg.OPENCL.queue,
                      (shape, shape),
                      None,
                      mem,
                      g_util.make_vfloat2(sigma[1].simplified,
                                          sigma[0].simplified),
-                     cfg.NP_FLOAT(pixel_shape.simplified))
+                     cfg.PRECISION.np_float(pixel_shape.simplified))
 
     return mem
 
@@ -54,10 +52,10 @@ def sum(orig_shape, summed_shape, mem, region, offset,
     """
     if out_mem is None:
         bpp = mem.size / (orig_shape[0] * orig_shape[1])
-        out_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
+        out_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
                             size=summed_shape[0] * summed_shape[1] * bpp)
 
-    CL_PRG.sum(cfg.QUEUE,
+    cfg.OPENCL.program.sum(cfg.OPENCL.queue,
               (summed_shape[::-1]),
                None,
                out_mem,
@@ -101,7 +99,7 @@ class Tiler(object):
         self.shape = (shape[0] * self.supersampling,
                       shape[1] * self.supersampling)
 
-        ar_type = cfg.NP_CPLX if cplx else cfg.NP_FLOAT
+        ar_type = cfg.PRECISION.np_cplx if cplx else cfg.PRECISION.np_float
 
         self._overall = np.empty((self.shape[0] / self.supersampling,
                                   self.shape[1] / self.supersampling),

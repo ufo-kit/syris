@@ -16,18 +16,18 @@ class TestGPUSorting(SyrisTest):
                               precision_sensitive=True))
         self.num = 10
         self.data = np.array([1, 8, np.nan, -1, np.nan, 8, 680, 74, 2, 0]).\
-            astype(cfg.NP_FLOAT)
-        self.mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE |
+            astype(cfg.PRECISION.np_float)
+        self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                              cl.mem_flags.COPY_HOST_PTR, hostbuf=self.data)
 
     def _sorted(self):
-        self.prg.sort_kernel(cfg.QUEUE,
+        self.prg.sort_kernel(cfg.OPENCL.queue,
                              (1,),
                              None,
                              self.mem)
 
-        res = np.empty(self.num, cfg.NP_FLOAT)
-        cl.enqueue_copy(cfg.QUEUE, res, self.mem)
+        res = np.empty(self.num, cfg.PRECISION.np_float)
+        cl.enqueue_copy(cfg.OPENCL.queue, res, self.mem)
 
         return res
 

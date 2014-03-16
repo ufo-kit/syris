@@ -12,19 +12,19 @@ class TestPolynomials(SyrisTest):
     def setUp(self):
         syris.init()
         self.poly_deg = 4
-        self.coeffs = np.array([5, 87, -2, 37, 17], dtype=cfg.NP_FLOAT)
+        self.coeffs = np.array([5, 87, -2, 37, 17], dtype=cfg.PRECISION.np_float)
 
-        self.coeffs_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_ONLY |
+        self.coeffs_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                                     cl.mem_flags.COPY_HOST_PTR,
                                     hostbuf=self.coeffs)
-        self.scalar_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                                    size=cfg.CL_FLOAT)
+        self.scalar_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                                    size=cfg.PRECISION.cl_float)
 
         self.pixel_size = 1e-3
         self.precision_places = int(np.log10(1 / self.pixel_size))
         self.prg = g_util.get_program(g_util.get_metaobjects_source())
-        self.roots_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                                   size=(self.poly_deg + 1) * cfg.CL_FLOAT)
+        self.roots_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                                   size=(self.poly_deg + 1) * cfg.PRECISION.cl_float)
 
     def get_roots(self, coeffs, interval, previous_coeffs=None,
                   next_coeffs=None):
@@ -36,7 +36,7 @@ class TestPolynomials(SyrisTest):
             next_coeffs = (self.poly_deg + 1) * [np.nan]
         next_coeffs_mem = get_coeffs_mem(next_coeffs)
 
-        self.prg.roots_kernel(cfg.QUEUE,
+        self.prg.roots_kernel(cfg.OPENCL.queue,
                               (1,),
                               None,
                               self.roots_mem,
@@ -44,10 +44,10 @@ class TestPolynomials(SyrisTest):
                               get_coeffs_mem(coeffs),
                               next_coeffs_mem,
                               g_util.make_vfloat2(interval[0], interval[1]),
-                              cfg.NP_FLOAT(self.pixel_size))
+                              cfg.PRECISION.np_float(self.pixel_size))
 
-        res = np.empty(5, dtype=cfg.NP_FLOAT)
-        cl.enqueue_copy(cfg.QUEUE, res, self.roots_mem)
+        res = np.empty(5, dtype=cfg.PRECISION.np_float)
+        cl.enqueue_copy(cfg.OPENCL.queue, res, self.roots_mem)
 
         return res
 
@@ -295,18 +295,18 @@ class TestPolynomials(SyrisTest):
         interleaved with some other method.
         """
         coeffs = np.array([233.1961669922, -17.0919075012, -18.3071880341,
-                           3.6484642029, -0.0150656402], dtype=cfg.NP_FLOAT)
+                           3.6484642029, -0.0150656402], dtype=cfg.PRECISION.np_float)
         interval = -0.01, 0.2012305856
         self._test_result(coeffs, interval, *np_roots(coeffs, interval))
 
     def test_non_continuous_transition(self):
         coeffs_0 = np.array([6618.19824219, -12948.47167969, 9326.49609375,
-                             -2927.98315430, 337.40744019], dtype=cfg.NP_FLOAT)
+                             -2927.98315430, 337.40744019], dtype=cfg.PRECISION.np_float)
         interval_0 = 0.38356042, 0.45985207
 
         coeffs_1 = np.array([245280.20312500, -500687.46875000,
                              381868.15625000, -128970.43750000,
-                             16275.70703125], dtype=cfg.NP_FLOAT)
+                             16275.70703125], dtype=cfg.PRECISION.np_float)
 
         roots = self.get_roots(coeffs_0, interval_0, next_coeffs=coeffs_1)
         np.testing.assert_almost_equal(0.45985207, roots[0])
@@ -325,53 +325,53 @@ class TestPolynomials(SyrisTest):
         np.testing.assert_almost_equal(roots, (self.poly_deg + 1) * [np.nan])
 
     def test_polynomial_evaluation(self):
-        x = cfg.NP_FLOAT(18.75)
-        res = np.empty(1, dtype=cfg.NP_FLOAT)
+        x = cfg.PRECISION.np_float(18.75)
+        res = np.empty(1, dtype=cfg.PRECISION.np_float)
         for i in range(self.poly_deg + 1):
-            self.prg.polynomial_eval_kernel(cfg.QUEUE,
+            self.prg.polynomial_eval_kernel(cfg.OPENCL.queue,
                                            (1,),
                                             None,
                                             self.scalar_mem,
                                             self.coeffs_mem,
                                             np.int32(i),
                                             x)
-            cl.enqueue_copy(cfg.QUEUE, res, self.scalar_mem)
+            cl.enqueue_copy(cfg.OPENCL.queue, res, self.scalar_mem)
             self.assertAlmostEqual(res[0], f(self.coeffs[:i + 1], x), places=1)
 
     def test_derivative_evaluation(self):
-        x = cfg.NP_FLOAT(18.75)
-        res = np.empty(1, dtype=cfg.NP_FLOAT)
+        x = cfg.PRECISION.np_float(18.75)
+        res = np.empty(1, dtype=cfg.PRECISION.np_float)
         for degree in range(self.poly_deg + 1):
-            self.prg.derivative_eval_kernel(cfg.QUEUE,
+            self.prg.derivative_eval_kernel(cfg.OPENCL.queue,
                                            (1,),
                                             None,
                                             self.scalar_mem,
                                             self.coeffs_mem,
                                             np.int32(degree),
                                             x)
-            cl.enqueue_copy(cfg.QUEUE, res, self.scalar_mem)
+            cl.enqueue_copy(cfg.OPENCL.queue, res, self.scalar_mem)
             self.assertAlmostEqual(res,
                                    f(derivative(self.coeffs[: degree + 1])
                                      [:degree], x))
 
     def test_derivate(self):
-        out_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                            size=(self.poly_deg + 1) * cfg.CL_FLOAT)
-        res = np.empty(self.poly_deg + 1, dtype=cfg.NP_FLOAT)
+        out_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                            size=(self.poly_deg + 1) * cfg.PRECISION.cl_float)
+        res = np.empty(self.poly_deg + 1, dtype=cfg.PRECISION.np_float)
         for degree in range(0, self.poly_deg + 1):
-            self.prg.derivate_kernel(cfg.QUEUE,
+            self.prg.derivate_kernel(cfg.OPENCL.queue,
                                      (1,),
                                      None,
                                      out_mem,
                                      self.coeffs_mem,
                                      np.int32(degree))
-            cl.enqueue_copy(cfg.QUEUE, res, out_mem)
+            cl.enqueue_copy(cfg.OPENCL.queue, res, out_mem)
             np.testing.assert_almost_equal(res[:degree],
                                            derivative(self.coeffs[:degree + 1])
                                            [:degree])
 
 
 def get_coeffs_mem(coeffs):
-    return cl.Buffer(cfg.CTX, cl.mem_flags.READ_ONLY |
+    return cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                      cl.mem_flags.COPY_HOST_PTR,
-                     hostbuf=np.array(coeffs, dtype=cfg.NP_FLOAT))
+                     hostbuf=np.array(coeffs, dtype=cfg.PRECISION.np_float))

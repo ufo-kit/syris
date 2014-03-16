@@ -13,9 +13,9 @@ class TestPhysics(SyrisTest):
         self.energy = 20 * q.keV
         self.lam = 6.19920937165e-11 * q.m
         self.size = 64
-        self.mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                             size=self.size ** 2 * cfg.CL_CPLX)
-        self.res = np.empty((self.size, self.size), dtype=cfg.NP_CPLX)
+        self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                             size=self.size ** 2 * cfg.PRECISION.cl_cplx)
+        self.res = np.empty((self.size, self.size), dtype=cfg.PRECISION.np_cplx)
         self.distance = 1 * q.m
         self.pixel_size = 1 * q.um
 
@@ -46,9 +46,9 @@ class TestPhysics(SyrisTest):
 
     def _cpu_propagator(self, phase_factor=1):
         j, i = np.mgrid[-0.5:0.5:1.0 / self.size, -0.5:0.5:1.0 / self.size].\
-            astype(cfg.NP_FLOAT)
+            astype(cfg.PRECISION.np_float)
 
-        return cfg.NP_CPLX(phase_factor) * \
+        return cfg.PRECISION.np_cplx(phase_factor) * \
             np.fft.fftshift(np.exp(- np.pi * self.lam.simplified *
                                    self.distance.simplified *
                                    (i ** 2 + j ** 2) /

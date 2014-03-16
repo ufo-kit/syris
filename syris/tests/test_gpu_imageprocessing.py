@@ -15,11 +15,11 @@ class TestGPUImageProcessing(SyrisTest):
         syris.init()
         src = gpu_util.get_source(["vcomplex.cl",
                                    "imageprocessing.cl"])
-        self.prg = cl.Program(cfg.CTX, src).build()
+        self.prg = cl.Program(cfg.OPENCL.ctx, src).build()
         self.size = 256
-        self.mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                             size=self.size ** 2 * cfg.CL_CPLX)
-        self.res = np.empty((self.size, self.size), dtype=cfg.NP_CPLX)
+        self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                             size=self.size ** 2 * cfg.PRECISION.cl_cplx)
+        self.res = np.empty((self.size, self.size), dtype=cfg.PRECISION.np_cplx)
         self.distance = 1 * q.m
         self.lam = 4.9594e-11 * q.m
         self.pixel_size = 1 * q.um
@@ -39,14 +39,14 @@ class TestGPUImageProcessing(SyrisTest):
         the same as Fourier transform of a gauss in real space.
         """
         sigma = 10 * self.pixel_size.simplified, 5 * self.pixel_size.simplified
-        self.prg.gauss_2_f(cfg.QUEUE,
+        self.prg.gauss_2_f(cfg.OPENCL.queue,
                           (self.size, self.size),
                            None,
                            self.mem,
                            gpu_util.make_vfloat2(sigma[0], sigma[1]),
-                           cfg.NP_FLOAT(self.pixel_size.simplified))
+                           cfg.PRECISION.np_float(self.pixel_size.simplified))
 
-        cl.enqueue_copy(cfg.QUEUE, self.res, self.mem)
+        cl.enqueue_copy(cfg.OPENCL.queue, self.res, self.mem)
 
         cpu = np.fft.fftshift(self._gauss_2d((sigma[1], sigma[0])))
         cpu_f = np.fft.fft2(cpu)
@@ -77,8 +77,8 @@ class TestGPUImageProcessing(SyrisTest):
                     tile = np.arange(region[0] * region[1]).reshape(region)
                     im = np.tile(tile, (shape[0] / region[0],
                                         shape[1] / region[1])).\
-                        astype(cfg.NP_FLOAT)
-                    mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE |
+                        astype(cfg.PRECISION.np_float)
+                    mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                                     cl.mem_flags.COPY_HOST_PTR, hostbuf=im)
 
                     if coeff:
@@ -86,8 +86,8 @@ class TestGPUImageProcessing(SyrisTest):
                     else:
                         offset = 0, 0
                     out_mem = ip.sum(shape, summed_shape, mem, region, offset)
-                    res = np.empty(summed_shape, dtype=cfg.NP_FLOAT)
-                    cl.enqueue_copy(cfg.QUEUE, res, out_mem)
+                    res = np.empty(summed_shape, dtype=cfg.PRECISION.np_float)
+                    cl.enqueue_copy(cfg.OPENCL.queue, res, out_mem)
                     mem.release()
                     out_mem.release()
 
@@ -97,12 +97,12 @@ class TestGPUImageProcessing(SyrisTest):
         shape = 16, 16
         summed_shape = 2, 2
         region = 8, 8
-        im = np.ones(shape, dtype=cfg.NP_FLOAT)
-        mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE |
+        im = np.ones(shape, dtype=cfg.PRECISION.np_float)
+        mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                         cl.mem_flags.COPY_HOST_PTR, hostbuf=im)
         out_mem = ip.sum(shape, summed_shape, mem, region,
                          (0, 0), average=True)
-        res = np.empty(summed_shape, dtype=cfg.NP_FLOAT)
-        cl.enqueue_copy(cfg.QUEUE, res, out_mem)
-        ground_truth = np.ones(summed_shape, dtype=cfg.NP_FLOAT)
+        res = np.empty(summed_shape, dtype=cfg.PRECISION.np_float)
+        cl.enqueue_copy(cfg.OPENCL.queue, res, out_mem)
+        ground_truth = np.ones(summed_shape, dtype=cfg.PRECISION.np_float)
         np.testing.assert_almost_equal(res, ground_truth)

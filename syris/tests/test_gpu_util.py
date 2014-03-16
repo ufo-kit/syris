@@ -10,12 +10,12 @@ class TestGPUUtil(SyrisTest):
 
     def setUp(self):
         syris.init()
-        self.data = np.arange(10).astype(cfg.NP_FLOAT)
-        self.mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE |
+        self.data = np.arange(10).astype(cfg.PRECISION.np_float)
+        self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                              cl.mem_flags.COPY_HOST_PTR, hostbuf=self.data)
 
     def test_cache(self):
-        self.assertEqual(gu.cache(self.mem, self.data.shape, cfg.NP_FLOAT,
+        self.assertEqual(gu.cache(self.mem, self.data.shape, cfg.PRECISION.np_float,
                                   cfg.CACHE_DEVICE), self.mem)
         host_cache = gu.cache(self.mem, self.data.shape, self.data.dtype,
                               cfg.CACHE_HOST)
@@ -27,5 +27,5 @@ class TestGPUUtil(SyrisTest):
 
         mem = gu.get_cache(self.data)
         res = np.empty(self.data.shape, dtype=self.data.dtype)
-        cl.enqueue_copy(cfg.QUEUE, res, mem)
+        cl.enqueue_copy(cfg.OPENCL.queue, res, mem)
         np.testing.assert_equal(self.data, res)

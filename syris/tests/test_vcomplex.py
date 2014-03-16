@@ -13,17 +13,14 @@ class TestVComplex(SyrisTest):
     def setUp(self):
         self.ctx = gpu_util.get_cuda_context()
         self.queue = gpu_util.get_command_queues(self.ctx)[0]
-        self.num_0 = np.array([17 - 38j], dtype=cfg.NP_CPLX)
-        self.num_1 = np.array([-135 + 563j], dtype=cfg.NP_CPLX)
+        self.num_0 = np.array([17 - 38j], dtype=cfg.PRECISION.np_cplx)
+        self.num_1 = np.array([-135 + 563j], dtype=cfg.PRECISION.np_cplx)
         self.mem_0 = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE |
-                               cl.mem_flags.COPY_HOST_PTR,
-                               hostbuf=self.num_0)
+                               cl.mem_flags.COPY_HOST_PTR, hostbuf=self.num_0)
         self.mem_1 = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE |
-                               cl.mem_flags.COPY_HOST_PTR,
-                               hostbuf=self.num_1)
-        self.mem_out = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE,
-                                 cfg.CL_CPLX)
-        self.host_array = np.empty(1, cfg.NP_CPLX)
+                               cl.mem_flags.COPY_HOST_PTR, hostbuf=self.num_1)
+        self.mem_out = cl.Buffer(self.ctx, cl.mem_flags.READ_WRITE, cfg.PRECISION.cl_cplx)
+        self.host_array = np.empty(1, cfg.PRECISION.np_cplx)
         src = gpu_util.get_source(["vcomplex.cl"])
         self.prg = cl.Program(self.ctx, src).build()
 

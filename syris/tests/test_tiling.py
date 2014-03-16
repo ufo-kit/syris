@@ -2,14 +2,15 @@ import numpy as np
 import pyopencl as cl
 import syris
 from syris import config as cfg
+from syris.gpu.util import make_opencl_defaults
 from syris.imageprocessing import Tiler
 from syris.tests.base import SyrisTest
 
 
-def _get_image(y_range, x_range, ar_type=cfg.NP_FLOAT):
+def _get_image(y_range, x_range, ar_type=cfg.PRECISION.np_float):
     y_points, x_points = np.mgrid[y_range[0]:y_range[1],
                                   x_range[0]:x_range[1]]
-    if ar_type == cfg.NP_CPLX:
+    if ar_type == cfg.PRECISION.np_cplx:
         result = np.cast[ar_type](
             x_points * y_points + x_points * y_points * 1j)
     else:
@@ -146,11 +147,11 @@ class TestImageTiling(SyrisTest):
         syris.init()
         for shape, tiles_count in self.data:
             tiler = Tiler(shape, tiles_count, outlier=False, supersampling=4)
-            ones = np.ones(tiler.tile_shape, dtype=cfg.NP_FLOAT)
-            mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_ONLY |
+            ones = np.ones(tiler.tile_shape, dtype=cfg.PRECISION.np_float)
+            mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                             cl.mem_flags.COPY_HOST_PTR, hostbuf=ones)
             out_mem = tiler.average(mem)
-            res = np.empty(tiler.result_tile_shape, dtype=cfg.NP_FLOAT)
-            cl.enqueue_copy(cfg.QUEUE, res, out_mem)
+            res = np.empty(tiler.result_tile_shape, dtype=cfg.PRECISION.np_float)
+            cl.enqueue_copy(cfg.OPENCL.queue, res, out_mem)
             np.testing.assert_almost_equal(res, ones[::tiler.supersampling,
                                                      ::tiler.supersampling])

@@ -46,7 +46,7 @@ class GraphicalObject(object):
         self.parent = None
 
         # Matrix holding transformation.
-        self.transform_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
+        self.transform_matrix = np.identity(4, dtype=cfg.PRECISION.np_float)
         # Maximum object enlargement in any direction.
         self._scale_factor = np.ones(3)
 
@@ -128,7 +128,7 @@ class GraphicalObject(object):
 
     def clear_transformation(self):
         """Clear all transformations."""
-        self.transform_matrix = np.identity(4, dtype=cfg.NP_FLOAT)
+        self.transform_matrix = np.identity(4, dtype=cfg.PRECISION.np_float)
         self._scale_factor = np.ones(3)
 
     @property
@@ -696,5 +696,5 @@ def get_format_string(string):
     Get string in single or double precision floating point number
     format.
     """
-    float_string = "f" if cfg.single_precision() else "d"
+    float_string = "f" if cfg.PRECISION.is_single() else "d"
     return string.replace("vf", float_string)

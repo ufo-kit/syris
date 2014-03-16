@@ -15,31 +15,31 @@ class TestThickness(SyrisTest):
         self.precision_places = int(np.log10(1 / self.pixel_size))
         self.prg = g_util.get_program(g_util.get_metaobjects_source())
         self.poly_deg = 4
-        self.roots_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                                   size=(self.poly_deg + 1) * cfg.CL_FLOAT)
+        self.roots_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                                   size=(self.poly_deg + 1) * cfg.PRECISION.cl_float)
 
     def get_thickness_addition(self, coeffs, roots, previous,
                                last_derivative_sgn):
-        out_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE,
-                            size=self.poly_deg * cfg.CL_FLOAT)
-        roots_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE |
+        out_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                            size=self.poly_deg * cfg.PRECISION.cl_float)
+        roots_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                               cl.mem_flags.COPY_HOST_PTR,
-                              hostbuf=np.array(roots, dtype=cfg.NP_FLOAT))
-        coeffs_mem = cl.Buffer(cfg.CTX, cl.mem_flags.READ_ONLY |
+                              hostbuf=np.array(roots, dtype=cfg.PRECISION.np_float))
+        coeffs_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                                cl.mem_flags.COPY_HOST_PTR,
-                               hostbuf=np.array(coeffs, dtype=cfg.NP_FLOAT))
+                               hostbuf=np.array(coeffs, dtype=cfg.PRECISION.np_float))
 
-        self.prg.thickness_add_kernel(cfg.QUEUE,
+        self.prg.thickness_add_kernel(cfg.OPENCL.queue,
                                       (1,),
                                       None,
                                       out_mem,
                                       coeffs_mem,
                                       roots_mem,
-                                      cfg.NP_FLOAT(previous),
+                                      cfg.PRECISION.np_float(previous),
                                       np.int32(last_derivative_sgn))
 
-        res = np.empty(4, dtype=cfg.NP_FLOAT)
-        cl.enqueue_copy(cfg.QUEUE, res, out_mem)
+        res = np.empty(4, dtype=cfg.PRECISION.np_float)
+        cl.enqueue_copy(cfg.OPENCL.queue, res, out_mem)
 
         return res[:-1]
 

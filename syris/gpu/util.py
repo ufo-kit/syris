@@ -37,10 +37,30 @@ typedef double16 vfloat16;
 """
 
 
+def init_program():
+    """Initialize all OpenCL kernels needed by syris."""
+    cfg.OPENCL.program = get_program(get_source(['vcomplex.cl', 'physics.cl',
+                                     'imageprocessing.cl']))
+
+
+def make_opencl_defaults(profiling=True):
+    """Create default OpenCL runtime."""
+    if profiling:
+        kwargs = {"properties": cl.command_queue_properties.PROFILING_ENABLE}
+    else:
+        kwargs = {}
+    cfg.OPENCL.ctx = get_cuda_context()
+    cfg.OPENCL.devices = get_cuda_devices()
+    cfg.OPENCL.queues = get_command_queues(cfg.OPENCL.ctx, cfg.OPENCL.devices, queue_kwargs=kwargs)
+    cfg.OPENCL.queue = cfg.OPENCL.queues[0]
+
+
 def get_program(src):
     """Create and build an OpenCL program from source string *src*."""
-    if cfg.CTX is not None:
-        return cl.Program(cfg.CTX, src).build()
+    if cfg.OPENCL.ctx is not None:
+        return cl.Program(cfg.OPENCL.ctx, src).build()
+    else:
+        raise RuntimeError('OpenCL context has not been set yet')
 
 
 def get_source(file_names, precision_sensitive=True):
@@ -50,12 +70,11 @@ def get_source(file_names, precision_sensitive=True):
     """
     string = ""
     for file_name in file_names:
-        path = os.path.join(os.path.dirname(__file__),
-                            cfg.KERNELS_FOLDER, file_name)
+        path = os.path.join(os.path.dirname(__file__), cfg.OPENCL.kernels_dir, file_name)
         string += open(path, "r").read()
 
     if precision_sensitive:
-        header = _SINGLE_HEADER if cfg.single_precision() else _DOUBLE_HEADER
+        header = _SINGLE_HEADER if cfg.PRECISION.is_single() else _DOUBLE_HEADER
         string = header + string
 
     return string
@@ -79,7 +98,7 @@ def get_cache(buf):
     if isinstance(buf, cl.MemoryObject):
         result = buf
     else:
-        result = cl.Buffer(cfg.CTX, cl.mem_flags.READ_WRITE |
+        result = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                            cl.mem_flags.COPY_HOST_PTR, hostbuf=buf)
 
     return result
@@ -93,7 +112,7 @@ def cache(mem, shape, dtype, cache_type=cfg.DEFAULT_CACHE):
     if cache_type == cfg.CACHE_HOST:
         # We need to copy from device to host.
         result = np.empty(shape, dtype=dtype)
-        cl.enqueue_copy(cfg.QUEUE, result, mem)
+        cl.enqueue_copy(cfg.OPENCL.queue, result, mem)
     else:
         result = mem
 
@@ -189,7 +208,7 @@ def _make_vfloat_functions():
     """
     def _wrapper(i):
         def make_vfloat(*args):
-            if cfg.single_precision():
+            if cfg.PRECISION.is_single():
                 return getattr(vec, "make_float%d" % (i))(*args)
             else:
                 return getattr(vec, "make_double%d" % (i))(*args)

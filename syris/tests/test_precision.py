@@ -1,6 +1,6 @@
 import numpy as np
 import pyopencl as cl
-from syris import config as cfg
+from syris.config import PRECISION
 from syris.gpu import util as gpu_util
 from syris.tests.base import SyrisTest
 
@@ -14,14 +14,9 @@ class TestPrecision(SyrisTest):
         self.n = 2
         self.kernel_fn = "vfloat_test.cl"
 
-    def tearDown(self):
-        # Cleanup.
-        cfg.CL_FLOAT = 4
-        cfg.NP_FLOAT = np.float32
-
     def _create_mem_objs(self, ctx, n):
-        mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n * cfg.CL_FLOAT)
-        ar = np.empty(n, dtype=cfg.NP_FLOAT)
+        mem = cl.Buffer(ctx, cl.mem_flags.READ_WRITE, size=n * PRECISION.cl_float)
+        ar = np.empty(n, dtype=PRECISION.np_float)
 
         return mem, ar
 
@@ -33,13 +28,12 @@ class TestPrecision(SyrisTest):
                        None,
                        mem)
         cl.enqueue_copy(queue, ar, mem)
-        res = ar == np.array([0, 1], dtype=cfg.NP_FLOAT)
+        res = ar == np.array([0, 1], dtype=PRECISION.np_float)
         self.assertTrue(res.all())
 
     def test_float(self):
         self._execute_and_check()
 
     def test_double(self):
-        cfg.CL_FLOAT = 8
-        cfg.NP_FLOAT = np.float64
+        PRECISION.set_precision(True)
         self._execute_and_check()
