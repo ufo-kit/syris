@@ -30,12 +30,12 @@ def get_gauss_2_f(shape, sigma, pixel_size):
                     size=shape[0] * shape[1] * cfg.PRECISION.cl_cplx)
 
     cfg.OPENCL.program.gauss_2_f(cfg.OPENCL.queue,
-                     shape,
-                     None,
-                     mem,
-                     g_util.make_vfloat2(sigma[1].simplified,
-                                         sigma[0].simplified),
-                     cfg.PRECISION.np_float(pixel_size.simplified))
+                                 shape,
+                                 None,
+                                 mem,
+                                 g_util.make_vfloat2(sigma[1].simplified,
+                                                     sigma[0].simplified),
+                                 cfg.PRECISION.np_float(pixel_size.simplified))
 
     return mem
 
@@ -56,14 +56,14 @@ def sum(orig_shape, summed_shape, mem, region, offset,
                             size=summed_shape[0] * summed_shape[1] * bpp)
 
     cfg.OPENCL.program.sum(cfg.OPENCL.queue,
-              (summed_shape[::-1]),
-               None,
-               out_mem,
-               mem,
-               vec.make_int2(*region[::-1]),
-               np.int32(orig_shape[1]),
-               vec.make_int2(*offset[::-1]),
-               np.int32(average))
+                          (summed_shape[::-1]),
+                           None,
+                           out_mem,
+                           mem,
+                           vec.make_int2(*region[::-1]),
+                           np.int32(orig_shape[1]),
+                           vec.make_int2(*offset[::-1]),
+                           np.int32(average))
 
     return out_mem
 

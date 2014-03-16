@@ -113,4 +113,4 @@ class PMASFMaterial(Material):
                 delta, beta = ref_ind.split(" ")
                 self._refractive_indices.append(
                     cfg.PRECISION.np_cplx(cfg.PRECISION.np_float(delta) +
-                                cfg.PRECISION.np_float(beta) * 1j))
+                                          cfg.PRECISION.np_float(beta) * 1j))

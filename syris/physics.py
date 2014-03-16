@@ -23,13 +23,13 @@ def get_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
         phase_factor = 0 + 0j
 
     cfg.OPENCL.program.propagator(cfg.OPENCL.queue,
-                      (size, size),
-                      None,
-                      mem,
-                      cfg.PRECISION.np_float(distance.simplified),
-                      cfg.PRECISION.np_float(lam.simplified),
-                      cfg.PRECISION.np_float(pixel_size.simplified),
-                      g_util.make_vcomplex(phase_factor))
+                                 (size, size),
+                                  None,
+                                  mem,
+                                  cfg.PRECISION.np_float(distance.simplified),
+                                  cfg.PRECISION.np_float(lam.simplified),
+                                  cfg.PRECISION.np_float(pixel_size.simplified),
+                                  g_util.make_vcomplex(phase_factor))
 
     if copy_to_host:
         res = np.empty((size, size), dtype=cfg.PRECISION.np_cplx)

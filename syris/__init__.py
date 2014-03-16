@@ -3,8 +3,7 @@ import atexit
 import logging
 import pyopencl as cl
 from syris.config import OPENCL, PROFILED_CL_FUNCTIONS, init_logging
-from syris.gpu.util import (make_opencl_defaults, get_program, get_source, init_program,
-                            execute_profiled)
+from syris.gpu.util import make_opencl_defaults, init_program, execute_profiled
 from syris import profiling as prf
 
 

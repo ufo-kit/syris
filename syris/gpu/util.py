@@ -15,6 +15,7 @@ import os
 
 LOGGER = logging.getLogger(__name__)
 
+
 _SINGLE_HEADER = """
 typedef float vfloat;
 typedef float2 vfloat2;

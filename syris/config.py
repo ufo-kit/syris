@@ -10,9 +10,11 @@ LOG = logging.getLogger()
 
 
 class Precision(object):
+
     """A precision object holds information about the precision
     of the floating point and complex numpy and OpenCL data types.
     """
+
     def __init__(self):
         self.set_precision(False)
 
@@ -38,7 +40,9 @@ class Precision(object):
 
 
 class OpenCL(object):
+
     """OpenCL runtime information holder."""
+
     def __init__(self):
         self.kernels_dir = 'opencl'
         self.ctx = None

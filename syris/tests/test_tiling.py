@@ -2,7 +2,6 @@ import numpy as np
 import pyopencl as cl
 import syris
 from syris import config as cfg
-from syris.gpu.util import make_opencl_defaults
 from syris.imageprocessing import Tiler
 from syris.tests.base import SyrisTest
 
