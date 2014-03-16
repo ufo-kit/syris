@@ -26,8 +26,6 @@ from quantities.quantity import Quantity
 
 LOGGER = logging.getLogger(__name__)
 
-OBJECT_ID = itertools.count().next
-
 
 class GraphicalObject(object):
 
@@ -260,15 +258,6 @@ class GraphicalObject(object):
         self.transform_matrix = np.dot(geom.rotate(angle, axis, total_start),
                                        self.transform_matrix)
 
-    def scale(self, scale_vec):
-        """Scale the object by scaling coefficients (kx, ky, kz)
-        given by *sc_vec*.
-        """
-        self._scale_factor *= np.array(scale_vec)
-
-        self.transform_matrix = np.dot(
-            geom.scale(scale_vec), self.transform_matrix)
-
 
 class MetaObject(GraphicalObject):
 
@@ -315,33 +304,21 @@ class MetaObject(GraphicalObject):
         a_z = self.transform_matrix[2][2]
         return a_x ** 2 + a_y ** 2 + a_z ** 2
 
-    def pack(self, units, coeff=1):
+    def pack(self, units):
         """Pack the object into a structure suitable for OpenCL kernels.
-        Rescale the object using *units* first. *coeff* is a normalization
-        factor for object's radius.
+        Rescale the object using *units* first.
         """
-        fmt = get_format_string("ifff" + 16 * "f")
+        fmt = get_format_string("ffff")
 
-        radius = coeff.rescale(1 / units).magnitude * \
-            self.radius.rescale(units).magnitude
-
-        # influence region = 2 * r, thus the coefficient guaranteeing
-        # f(r) = 1 is
-        # 1 / (R^2 - r^2)^2 = 1 / (4r^2 - r^2)^2 = 1 / 9r^4
-        falloff_coeff = 1.0 / (9 * radius ** 4)
-
-        trans_mat = self.get_rescaled_transform_matrix(units)
-        return struct.pack(fmt, self.TYPE,
-                           self.radius.rescale(units).magnitude,
-                           falloff_coeff,
-                           self.get_transform_const(),
-                           *trans_mat.flatten())
+        return struct.pack(fmt, self.position[0].rescale(units).magnitude,
+                           self.position[1].rescale(units).magnitude,
+                           self.position[2].rescale(units).magnitude,
+                           self.radius.rescale(units).magnitude)
 
 
 class MetaBall(MetaObject):
 
     """Metaball graphical object."""
-    TYPE = OBJECT_ID()
 
     def __init__(self, trajectory, radius, material=None, orientation=geom.Y_AX):
         super(MetaBall, self).__init__(trajectory, radius, material=material,
@@ -360,15 +337,6 @@ class MetaBall(MetaObject):
 
     def __str__(self):
         return repr(self)
-
-
-class MetaCube(MetaObject):
-
-    """Metacube graphical object."""
-    TYPE = OBJECT_ID()
-
-    def __init__(self, trajectory, radius, material=None, orientation=geom.Y_AX):
-        super(MetaCube, self).__init__(trajectory, radius, material=None, orientation=orientation)
 
 
 class CompositeObject(GraphicalObject):
@@ -564,14 +532,6 @@ class CompositeObject(GraphicalObject):
         for obj in self:
             obj.rotate(angle, vec, total_start)
 
-    def scale(self, scale_vec):
-        """Scale all sub-objects by scaling coefficients (kx, ky, kz)
-        given by *sc_vec*.
-        """
-        GraphicalObject.scale(self, scale_vec)
-        for obj in self:
-            obj.scale(scale_vec)
-
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
         # Move the whole object.
@@ -661,9 +621,6 @@ class CompositeObject(GraphicalObject):
 
     def __str__(self):
         return repr(self)
-
-OBJECT_TYPES = {MetaCube.TYPE: "METACUBE",
-                MetaBall.TYPE: "METABALL"}
 
 
 def get_moved_groups(objects, t_0, t_1, distance):

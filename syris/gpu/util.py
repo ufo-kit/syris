@@ -83,12 +83,11 @@ def get_source(file_names, precision_sensitive=True):
 
 def get_metaobjects_source():
     """Get source string for metaobjects creation."""
-    obj_types = _object_types_to_struct()
     source = get_source(["polyobject.cl", "heapsort.cl",
                          "polynoms_heapsort.cl", "rootfinding.cl",
                          "metaobjects.cl"])
 
-    return obj_types + source
+    return source
 
 
 def get_cache(buf):
@@ -118,16 +117,6 @@ def cache(mem, shape, dtype, cache_type=cfg.DEFAULT_CACHE):
         result = mem
 
     return result
-
-
-def _object_types_to_struct():
-    string = "typedef enum _OBJECT_TYPE {"
-    for i in range(len(gro.OBJECT_TYPES) - 1):
-        string += gro.OBJECT_TYPES[i] + ","
-    string += gro.OBJECT_TYPES[len(gro.OBJECT_TYPES) - 1]
-    string += "} OBJECT_TYPE;"
-
-    return string
 
 
 def execute_profiled(function):

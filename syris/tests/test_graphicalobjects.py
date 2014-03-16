@@ -53,7 +53,6 @@ class TestGraphicalObjects(SyrisTest):
                                                      self.metaball_2])
 
     def _get_moved_bounding_box(self, obj, angle):
-        obj.scale((0.75, 0.5, 1.2))
         obj.translate((1, 0, 0) * q.mm)
         obj.rotate(angle, np.array((0, 0, 1)))
         obj.translate((1, 0, 0) * q.mm)

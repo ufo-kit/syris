@@ -12,15 +12,6 @@
 #define current_index(a) ((a) % 3)
 #define right_index(a) (((a) + 1) % 3)
 
-typedef struct _object {
-	OBJECT_TYPE type;
-	vfloat radius;
-	/* CPU pre-computed constants. */
-	vfloat2 constants;
-	/* Backward affine transformation matrix. */
-	vfloat16 trans_matrix;
-} __attribute__((packed)) object;
-
 
 /**
  * Get squared radius based on quadratic equation. First compute
@@ -58,83 +49,56 @@ void subtract_coeffs(vfloat *result, vfloat *src, vfloat *tosub, int size) {
 
 /* Meta objects equations. */
 
-void get_meta_ball_equation(vfloat *result, __constant object *o, vfloat2 *p,
+void get_meta_ball_equation(vfloat *result, __constant vfloat4 *object, vfloat2 *p,
 								vfloat z_middle, vfloat coeff, vfloat eps) {
 	vfloat r_2, R_2;				/* outer squared radius */
 	vfloat cz; 				/* z-center of the fallof curve */
 	vfloat2 intersection;	/* intersection of the influence area (R_2 is the
 							 * radius) and a ray */
+	vfloat dist_2, tmp, falloff_const;
 
-
-	vfloat ax = o->trans_matrix.s2;
-	vfloat ay = o->trans_matrix.s6;
-	vfloat az = o->trans_matrix.sa;
-
-	// TODO: use dot() instead?
-	vfloat kx = o->trans_matrix.s0*p->x + o->trans_matrix.s1*p->y +
-				o->trans_matrix.s3;
-	vfloat ky = o->trans_matrix.s4*p->x + o->trans_matrix.s5*p->y +
-				o->trans_matrix.s7;
-	vfloat kz = o->trans_matrix.s8*p->x + o->trans_matrix.s9*p->y +
-				o->trans_matrix.sb;
-
-	/* We need to calculate real intersection points, not just radius because
-	 * thanks to object scaling and rotating the center of the falloff curve
-	 * might be different than the one of the whole object. */
-	intersection = solve_quadric(o->constants.y,
-						2*kx*ax + 2*ky*ay + 2*kz*az,
-						kx*kx + ky*ky + kz*kz -
-						4 * o->radius * o->radius);
-
-	if (isnan(intersection.x) ||
-			is_close(intersection.y - intersection.x, 0.0, eps)) {
+    dist_2 = (object->x - p->x) * (object->x - p->x) +
+            (object->y - p->y) * (object->y - p->y);
+    if (dist_2 > 4 * object->w * object->w) {
 		/* no influence in this pixel */
-		result[5] = NAN; /* for further tests for intersection */
-		return;
-	}
+        result[5] = NAN;
+        return;
+    }
+
+    tmp = sqrt(4 * object->w * object->w - dist_2);
+    intersection.x = object->z - tmp;
+    intersection.y = object->z + tmp;
+
+    /* influence region = 2 * r, thus the coefficient guaranteeing
+     * f(r) = 1 is
+     * 1 / (R^2 - r^2)^2 = 1 / (4r^2 - r^2)^2 = 1 / 9r^4 */
+
+    falloff_const = 1.0 / (9 * object->w * object->w * object->w * object->w *
+                           coeff * coeff * coeff * coeff);
 
 	z_middle *= coeff;
 	/* determine R = r + influence for given x,y coordinates */
 	R_2 = coeff * (intersection.y - intersection.x) / 2.0;
 	/* now square it */
 	R_2 = R_2 * R_2;
+	r_2 = object->w * object->w - dist_2;
 	/* shift center in z direction in order to minimize distance from 0.
 	 * Precomputation for all objects done by host. */
-	cz = coeff * (intersection.x + intersection.y)/2.0 - z_middle;
+	cz = coeff * (intersection.x + intersection.y) / 2.0 - z_middle;
 	result[5] = coeff * intersection.x - z_middle;
 	result[6] = coeff * intersection.y - z_middle;
 
-	/* Determine r for given x,y coordinates. This cannot be a regular quadric
-	 * solver because r can be negative in order to correctly model
-	 * the falloff. */
-	r_2 = get_squared_radius(o->constants.y,
-						2*kx*ax + 2*ky*ay + 2*kz*az,
-						kx*kx + ky*ky + kz*kz - o->radius*o->radius);
 
 	/* since (R^2 - r^2)^2 = c, r^2 = R^2 - sqrt(1/c),
 	 * where c = 1/(R^2 - r^2)^2 calculated to fit f(r) = 1.0. */
 	result[7] = r_2;//R_2 - sqrt(1.0/o->constants.x);
 
 	/* final quartic coefficients */
-	result[0] = o->constants.x;
-	result[1] = o->constants.x*(-4*cz);
-	result[2] = o->constants.x*(-2*R_2 + 6*cz*cz);
-	result[3] = o->constants.x*(4*R_2*cz - 4*cz*cz*cz);
-	result[4] = o->constants.x*(R_2*R_2 - 2*R_2*cz*cz + cz*cz*cz*cz);
-}
-
-void get_meta_object_equation(vfloat *result, __constant object *o,
-			vfloat2 *p, const vfloat z_middle, vfloat coeff, vfloat eps) {
-	switch (o->type) {
-		case METABALL:
-			get_meta_ball_equation(result, o, p, z_middle, coeff, eps);
-			break;
-		case METACUBE:
-//			get_meta_cube_equation(result, o, p, z_middle, eps);
-			break;
-		default:
-			break;
-	}
+	result[0] = falloff_const;
+	result[1] = falloff_const*(-4*cz);
+	result[2] = falloff_const*(-2*R_2 + 6*cz*cz);
+	result[3] = falloff_const*(4*R_2*cz - 4*cz*cz*cz);
+	result[4] = falloff_const*(R_2*R_2 - 2*R_2*cz*cz + cz*cz*cz*cz);
 }
 
 bool is_root_valid(const vfloat *coeffs, unsigned int degree,
@@ -275,7 +239,7 @@ void update_coefficients(vfloat coeffs[3][POLY_DEG + 1],
 }
 
 __kernel void thickness(__global vfloat *out,
-						__constant object *objects,
+						__constant vfloat4 *objects,
 						const int num_objects,
 						const int2 gl_offset,
 						const int4 roi,
@@ -316,8 +280,8 @@ __kernel void thickness(__global vfloat *out,
 		obj_coords.y = (iy + gl_offset.y) * pixel_size.y;
 
 		for (i = 0; i < num_objects; i++) {
-			get_meta_object_equation(poly, &objects[i], &obj_coords,
-					z_middle, size_coeff, pixel_size.x);
+			get_meta_ball_equation(poly, &objects[i], &obj_coords,
+			                       z_middle, size_coeff, pixel_size.x);
 			if (!isnan(poly[5])) {
 				init_poly_object(&pobjects[i], poly);
 				po_add(left, &pobjects[i], size, X_SORT);

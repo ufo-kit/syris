@@ -96,7 +96,7 @@ def print_array(ar):
     print res
 
 
-def create_metaball_random(n, pixel_size, radius_range, coeff=1):
+def create_metaball_random(n, pixel_size, radius_range):
     x = np.random.uniform(0, n * pixel_size)
     y = np.random.uniform(0, n * pixel_size)
     z = np.random.uniform(radius_range[0], radius_range[1]) * radius_range.units
@@ -107,8 +107,7 @@ def create_metaball_random(n, pixel_size, radius_range, coeff=1):
     metaball = MetaBall(trajectory, r)
     metaball.move(0 * q.s)
 
-    return metaball.pack(UNITS, coeff * 1 / UNITS), \
-        "({0}, {1}, {2}, {3}),\n".format(x, y, z.magnitude, r.magnitude)
+    return metaball.pack(UNITS), "({0}, {1}, {2}, {3}),\n".format(x, y, z.magnitude, r.magnitude)
 
 
 def load_params(file_name):
@@ -129,7 +128,7 @@ def load_params(file_name):
     return params
 
 
-def create_metaballs(params, coeff=1.0):
+def create_metaballs(params):
     x, y, z, r = zip(*params)
 
     objects = ""
@@ -140,7 +139,7 @@ def create_metaballs(params, coeff=1.0):
         metaball = MetaBall(trajectory, r[i] * q.mm)
         metaball.move(0 * q.s)
         metaballs.append(metaball)
-        objects += metaball.pack(UNITS, coeff * 1 / UNITS)
+        objects += metaball.pack(UNITS)
 
     return metaballs, objects
 
@@ -166,7 +165,7 @@ def create_metaballs_random(num_objects):
     print "mid, coeff, eps:", mid, coeff, eps
     print "objects:", num_objects
     for j in range(num_objects):
-        objects, params = create_metaball_random(n, pixel_size, radius_range, coeff)
+        objects, params = create_metaball_random(n, pixel_size, radius_range)
         objects_all += objects
         params_all += params
 
@@ -205,7 +204,7 @@ if __name__ == '__main__':
     mid, coeff, eps = 0.0275, 36.3636363636, 0.001
     params = load_params('/home/farago/data/params.txt')
     num_objects = len(params)
-    balls, objects_all = create_metaballs(params, coeff=coeff)
+    balls, objects_all = create_metaballs(params)
 
     dprg = cl.Program(cfg.OPENCL.ctx, dummy_metaballs_kernel()).build()
     z_min, z_max = get_z_range(balls)
