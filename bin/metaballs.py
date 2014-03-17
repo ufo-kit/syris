@@ -273,7 +273,6 @@ if __name__ == '__main__':
 
     res = np.empty((n, VECTOR_WIDTH * n), dtype=cfg.PRECISION.np_float)
     cl.enqueue_copy(cfg.OPENCL.queue, res, thickness_mem)
-    print res[0, 0], res.max()
 
     TIFF.open("/home/farago/data/thickness/radio.tif", "w").\
         write_image(res[:, ::VECTOR_WIDTH].astype(np.float32))
