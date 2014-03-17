@@ -395,3 +395,56 @@ __kernel void thickness(__global vfloat *out,
 		out[mem_index] = 0;
 	}
 }
+
+
+/**
+ * A naive metaballs projections calculation kernel.
+ * @thickness: the projected thickness 2D buffer
+ * @objects: (x, y, z, radius) tuples representing the metaballs
+ * @num_objects: number of metaballs
+ * @z_range: start and end of the ray in the z-direction in physical units
+ * @pixel_size: pixel size in physical units
+ */
+
+__kernel void naive_thickness(__global vfloat *thickness,
+                        __constant vfloat4 *objects,
+                        const uint num_objects,
+                        const vfloat2 z_range,
+                        const vfloat pixel_size) {
+    int ix = get_global_id(0);
+    int iy = get_global_id(1);
+    int width = get_global_size(0);
+    int m, inside, num_transitions;
+    vfloat z, isosurface, dist, start, result;
+    vfloat4 point;
+
+    point.x = ix * pixel_size;
+    point.y = iy * pixel_size;
+    inside = 0;
+    result = 0.0;
+
+    for (z = z_range.x; z <= z_range.y; z += pixel_size) {
+        isosurface = 0.0;
+        point.z = z;
+        for (m = 0; m < num_objects; m++) {
+            dist = sqrt((objects[m].x - point.x) * (objects[m].x - point.x) +
+                        (objects[m].y - point.y) * (objects[m].y - point.y) +
+                        (objects[m].z - point.z) * (objects[m].z - point.z));
+            if (dist <= 2 * objects[m].w) {
+                isosurface += (4 * objects[m].w * objects[m].w - dist * dist) *
+                            (4 * objects[m].w * objects[m].w - dist * dist) /
+                            (9 * objects[m].w * objects[m].w * objects[m].w * objects[m].w);
+            }
+        }
+        if (inside == 0 && isosurface >= 1.0) {
+            inside = 1;
+            start = z;
+        }
+        if (inside == 1 && isosurface < 1.0) {
+            inside = 0;
+            result += z - start;
+        }
+    }
+
+    thickness[iy * width + ix] = result;
+}
