@@ -9,21 +9,21 @@ typedef enum {
 } sort_type;
 
 
-void po_sift_down(poly_object **heap, int start, int end, sort_type st) {
+void po_sift_down(ushort *heap, poly_object *objects, int start, int end, sort_type st) {
     int root = start;
     int child;
-    poly_object *tmp;
+    ushort tmp;
 
-    while (root*2 + 1 <= end) {
-        child = root*2 + 1;
+    while (2 * root + 1 <= end) {
+        child = 2 * root + 1;
         if (child + 1 <= end && (st ?
-        		heap[child]->interval.x < heap[child + 1]->interval.x :
-        		heap[child]->interval.y < heap[child + 1]->interval.y)) {
+            objects[heap[child]].interval.x < objects[heap[child + 1]].interval.x :
+            objects[heap[child]].interval.y < objects[heap[child + 1]].interval.y)) {
             child++;
         }
         if (child <= end && (st ?
-	    		heap[root]->interval.x < heap[child]->interval.x :
-	    		heap[root]->interval.y < heap[child]->interval.y)) {
+            objects[heap[root]].interval.x < objects[heap[child]].interval.x :
+            objects[heap[root]].interval.y < objects[heap[child]].interval.y)) {
             tmp = heap[root];
             heap[root] = heap[child];
             heap[child] = tmp;
@@ -34,15 +34,15 @@ void po_sift_down(poly_object **heap, int start, int end, sort_type st) {
     }
 }
 
-void po_sort(poly_object **heap, int size, sort_type st) {
+void po_sort(ushort *heap, poly_object *objects, int size, sort_type st) {
     int end = size - 1;
-    poly_object *tmp;
+    ushort tmp;
 
     while (end > 0) {
         tmp = heap[0];
         heap[0] = heap[end];
         heap[end] = tmp;
-        po_sift_down(heap, 0, end - 1, st);
+        po_sift_down(heap, objects, 0, end - 1, st);
         end--;
     }
 }
@@ -51,14 +51,14 @@ int heap_parent(int index) {
     return (index - 1)/2;
 }
 
-void po_add(poly_object **heap, poly_object *val, int next, sort_type st) {
-    heap[next] = val;
-    int parent_index;
-    poly_object *tmp;
+void po_add(ushort *heap, poly_object *objects, int index, sort_type st) {
+    int parent_index, next = index;
+    ushort tmp;
+    heap[next] = index;
 
     while (next > 0 && (st ?
-    		heap[heap_parent(next)]->interval.x < val->interval.x :
-    		heap[heap_parent(next)]->interval.y < val->interval.y)) {
+           objects[heap[heap_parent(next)]].interval.x < objects[index].interval.x :
+           objects[heap[heap_parent(next)]].interval.y < objects[index].interval.y)) {
         parent_index = heap_parent(next);
         tmp = heap[parent_index];
         heap[parent_index] = heap[next];

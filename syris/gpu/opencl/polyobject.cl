@@ -10,7 +10,7 @@
 typedef struct _poly_object {
 	vfloat coeffs[POLY_COEFFS_NUM];
 	vfloat2 interval;
-} poly_object;
+} __attribute__((packed)) poly_object;
 
 
 /*
@@ -24,6 +24,5 @@ void init_poly_object(poly_object *po, vfloat coeffs[POLY_COEFFS_NUM+2]) {
 	for (i = 0; i < POLY_COEFFS_NUM; i++) {
 		po->coeffs[i] = coeffs[i];
 	}
-	po->interval = (vfloat2)(coeffs[POLY_COEFFS_NUM],
-							coeffs[POLY_COEFFS_NUM+1]);
+	po->interval = (vfloat2)(coeffs[POLY_COEFFS_NUM], coeffs[POLY_COEFFS_NUM+1]);
 }
