@@ -223,6 +223,14 @@ if __name__ == '__main__':
     # objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
     #                         hostbuf=objects_all)
 
+
+    # Random metaballs creation
+    # num_objects = np.random.randint(1, 100)
+    # objects_all, coeff, mid = create_metaballs_random(num_objects)
+
+    objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
+                            cl.mem_flags.COPY_HOST_PTR, hostbuf=objects_all)
+
     # ev = dprg.thickness(cfg.OPENCL.queue,
     #                     (n, n),
     #                     None,
@@ -233,14 +241,9 @@ if __name__ == '__main__':
     #                                         z_max.rescale(UNITS).magnitude),
     #                     np.float32(pixel_size.rescale(UNITS)))
     # cl.wait_for_events([ev])
+    # objects_mem.release()
     # print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
 
-    # Random metaballs creation
-    # num_objects = np.random.randint(1, 100)
-    # objects_all, coeff, mid = create_metaballs_random(num_objects)
-
-    objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
-                            cl.mem_flags.COPY_HOST_PTR, hostbuf=objects_all)
     pobjects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
                              size=n ** 2 * MAX_OBJECTS * 4 * 7)
     left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
@@ -253,6 +256,9 @@ if __name__ == '__main__':
                        None,
                        thickness_mem,
                        objects_mem,
+                       pobjects_mem,
+                       left_mem,
+                       right_mem,
                        np.int32(num_objects),
                        vec.make_int2(0, 0),
                        vec.make_int4(0, 0, n, n),
@@ -261,9 +267,8 @@ if __name__ == '__main__':
                        g_util.make_vfloat2(pixel_size.rescale(UNITS).magnitude,
                                            pixel_size.rescale(UNITS).magnitude),
                        np.int32(True))
-    objects_mem.release()
-
     cl.wait_for_events([ev])
+    objects_mem.release()
     print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
 
     res = np.empty((n, VECTOR_WIDTH * n), dtype=cfg.PRECISION.np_float)
