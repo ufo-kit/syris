@@ -8,7 +8,6 @@ from pyopencl.array import vec
 import time
 from syris import profiling as prf
 from syris import config as cfg
-from syris.opticalelements import graphicalobjects as gro
 import logging
 import os
 
