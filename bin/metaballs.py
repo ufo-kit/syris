@@ -22,61 +22,6 @@ SUPERSAMPLING = 1
 MAX_OBJECTS = 30
 
 
-def dummy_metaballs_kernel():
-    return """
-    int influences(const float4 *ball, const float4 *point) {
-        return 1;
-    }
-
-    float point_distance(__constant float4 *ball, float4 *point) {
-        return sqrt((ball->x - point->x) * (ball->x - point->x) +
-                    (ball->y - point->y) * (ball->y - point->y) +
-                    (ball->z - point->z) * (ball->z - point->z));
-    }
-
-    __kernel void thickness(__global float *thickness,
-                            __constant float4 *balls,
-                            const unsigned int num_balls,
-                            const float2 z_range,
-                            const float pixel_size) {
-        int ix = get_global_id(0);
-        int iy = get_global_id(1);
-        int width = get_global_size(0);
-        int m, inside, num_transitions;
-        float z, isosurface, dist, start, result;
-        float4 point;
-
-        point.x = ix * pixel_size;
-        point.y = iy * pixel_size;
-        inside = 0;
-        result = 0.0;
-
-        for (z = z_range.x; z <= z_range.y; z += pixel_size) {
-            isosurface = 0.0;
-            point.z = z;
-            for (m = 0; m < num_balls; m++) {
-                dist = point_distance(&balls[m], &point);
-                if (dist <= 2 * balls[m].w) {
-                    isosurface += (4 * balls[m].w * balls[m].w - dist * dist) *
-                                (4 * balls[m].w * balls[m].w - dist * dist) /
-                                (9 * balls[m].w * balls[m].w * balls[m].w * balls[m].w);
-                }
-            }
-            if (inside == 0 && isosurface >= 1.0) {
-                inside = 1;
-                start = z;
-            }
-            if (inside == 1 && isosurface < 1.0) {
-                inside = 0;
-                result += z - start;
-            }
-        }
-
-        thickness[iy * width + ix] = result;
-    }
-    """
-
-
 def diff(ar):
     res = []
     for i in range(1, len(ar)):
@@ -208,7 +153,6 @@ if __name__ == '__main__':
     num_objects = len(params)
     balls, objects_all = create_metaballs(params)
 
-    dprg = cl.Program(cfg.OPENCL.ctx, dummy_metaballs_kernel()).build()
     z_min, z_max = get_z_range(balls)
     print 'Z steps:', ((z_max - z_min) / pixel_size).simplified
 
@@ -231,7 +175,7 @@ if __name__ == '__main__':
     objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                             cl.mem_flags.COPY_HOST_PTR, hostbuf=objects_all)
 
-    # ev = dprg.thickness(cfg.OPENCL.queue,
+    # ev = prg.naive_thickness(cfg.OPENCL.queue,
     #                     (n, n),
     #                     None,
     #                     thickness_mem,
