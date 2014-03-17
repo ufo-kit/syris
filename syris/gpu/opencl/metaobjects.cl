@@ -7,7 +7,7 @@
 
 /* Maximum number of objects. They are passed in constant memory block
  * so their number is limited. */
-#define MAX_OBJECTS 100
+#define MAX_OBJECTS 30
 #define left_index(a) (((a) == 0) ? 2 : (((a) - 1) % 3))
 #define current_index(a) ((a) % 3)
 #define right_index(a) (((a) + 1) % 3)
@@ -31,7 +31,7 @@ vfloat2 solve_quadric(vfloat a, vfloat b, vfloat c) {
 	return (vfloat2)((-b - sqrt(d))/(2*a), (-b + sqrt(d))/(2*a));
 }
 
-void add_coeffs(vfloat *result, vfloat *src, vfloat *toadd, int size) {
+void add_coeffs(vfloat *result, vfloat *src, global vfloat *toadd, int size) {
 	int i;
 
 	for (i = 0; i < size; i++) {
@@ -39,7 +39,7 @@ void add_coeffs(vfloat *result, vfloat *src, vfloat *toadd, int size) {
 	}
 }
 
-void subtract_coeffs(vfloat *result, vfloat *src, vfloat *tosub, int size) {
+void subtract_coeffs(vfloat *result, vfloat *src, global vfloat *tosub, int size) {
 	int i;
 
 	for (i = 0; i < size; i++) {
@@ -192,22 +192,22 @@ __kernel void thickness_add_kernel(__global vfloat4 *out,
 }
 
 vfloat *adjust_coefficients(vfloat coeffs[3][POLY_DEG + 1],
-		vfloat *source_coeffs, poly_object *objects,
-		ushort *sorted, vfloat left_end, unsigned int *object_index,
-		uint index, unsigned int size, bool addition) {
+		vfloat *source_coeffs, global poly_object *objects,
+		global ushort *sorted, vfloat left_end, unsigned int *object_index,
+		uint offset, uint index, unsigned int size, bool addition) {
 	/*
 	 * Add or subtract coefficients from current coefficients.
 	 */
 	while (*object_index < size &&
-			(addition ? objects[sorted[*object_index]].interval.x :
-						objects[sorted[*object_index]].interval.y) <= left_end) {
+			(addition ? objects[offset + sorted[offset + *object_index]].interval.x :
+						objects[offset + sorted[offset + *object_index]].interval.y) <= left_end) {
 		if (addition) {
 			add_coeffs(coeffs[index == 0 ? 0 : current_index(index)],
-					source_coeffs, objects[sorted[*object_index]].coeffs,
+					source_coeffs, objects[offset + sorted[offset + *object_index]].coeffs,
 					POLY_COEFFS_NUM);
 		} else {
 			subtract_coeffs(coeffs[index == 0 ? 0 : current_index(index)],
-					source_coeffs, objects[sorted[*object_index]].coeffs,
+					source_coeffs, objects[offset + sorted[offset + *object_index]].coeffs,
 					POLY_COEFFS_NUM);
 		}
 		/* Source coefficient are current coefficients from now on. */
@@ -220,7 +220,8 @@ vfloat *adjust_coefficients(vfloat coeffs[3][POLY_DEG + 1],
 
 
 void update_coefficients(vfloat coeffs[3][POLY_DEG + 1],
-			ushort *left, ushort *right, poly_object *objects,
+			global ushort *left, global ushort *right, global poly_object *objects,
+			uint offset,
 			vfloat left_end, unsigned int *left_index,
 			unsigned int *right_index, unsigned int index,
 			unsigned int size) {
@@ -233,13 +234,16 @@ void update_coefficients(vfloat coeffs[3][POLY_DEG + 1],
 	/* If we add some coefficient, current coefficients become the source
 	 * coefficients, otherwise we would discard the changes in addition. */
 	src_coeffs = adjust_coefficients(coeffs, src_coeffs, objects, left, left_end,
-											left_index, index, size, true);
+											left_index, offset, index, size, true);
 	adjust_coefficients(coeffs, src_coeffs, objects, right, left_end, right_index,
-														index, size, false);
+														offset, index, size, false);
 }
 
 __kernel void thickness(__global vfloat *out,
 						__constant vfloat4 *objects,
+						global poly_object *pobjects,
+						global ushort *left,
+						global ushort *right,
 						const int num_objects,
 						const int2 gl_offset,
 						const int4 roi,
@@ -250,6 +254,7 @@ __kernel void thickness(__global vfloat *out,
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
 	unsigned int mem_index = get_global_size(0) * iy + ix;
+	uint obj_offset = mem_index * MAX_OBJECTS;
 
 	/* +2 for interval beginning and end, +1 for radius^2 storage
 	 * for case there is only one metaobject at this pixel.
@@ -263,9 +268,6 @@ __kernel void thickness(__global vfloat *out,
 	int last_derivative_sgn = -2;
 	unsigned int left_index = 0, right_index = 0, size = 0, i, index = 0;
 	vfloat2 obj_coords;
-	poly_object pobjects[MAX_OBJECTS];
-	ushort left[MAX_OBJECTS];
-	ushort right[MAX_OBJECTS];
 
     coeffs[0][0] = NAN;
     coeffs[1][0] = NAN;
@@ -282,11 +284,16 @@ __kernel void thickness(__global vfloat *out,
 			get_meta_ball_equation(poly, &objects[i], &obj_coords,
 			                       z_middle, size_coeff, pixel_size.x);
 			if (!isnan(poly[5])) {
-				init_poly_object(&pobjects[size], poly);
-				po_add(left, pobjects, size, X_SORT);
-				po_add(right, pobjects, size, Y_SORT);
+				init_poly_object(&pobjects[obj_offset + size], poly);
+				po_add(left, pobjects, obj_offset, size, X_SORT);
+				po_add(right, pobjects, obj_offset, size, Y_SORT);
 				size++;
 			}
+            /* If the size is greater than the maximum supported object size return NAN */
+            if (size == MAX_OBJECTS) {
+                out[mem_index] = NAN;
+                return;
+            }
 		}
 
 		switch (size) {
@@ -309,8 +316,8 @@ __kernel void thickness(__global vfloat *out,
 				break;
 			default:
 				/* more than one metaobject, we need to solve the quartic */
-				po_sort(left, pobjects, size, X_SORT);
-				po_sort(right, pobjects, size, Y_SORT);
+				po_sort(left, pobjects, obj_offset, size, X_SORT);
+				po_sort(right, pobjects, obj_offset, size, Y_SORT);
 
 				for (i = 0; i < POLY_DEG + 1; i++) {
 					coeffs[0][i] = 0.0;
@@ -318,17 +325,18 @@ __kernel void thickness(__global vfloat *out,
 				coeffs[0][4] = -1;
 
 				/* intervals */
-				left_end = pobjects[left[left_index]].interval.x;
+				left_end = pobjects[obj_offset + left[obj_offset + left_index]].interval.x;
 				previous_end = left_end;
 				while (right_index < size) {
-					update_coefficients(coeffs, left, right, pobjects, left_end, &left_index, &right_index, index, size);
+					update_coefficients(coeffs, left, right, pobjects, obj_offset,
+					                    left_end, &left_index, &right_index, index, size);
 
 					if (left_index < size &&
-					    pobjects[left[left_index]].interval.x <
-						pobjects[right[right_index]].interval.y) {
-						right_end = pobjects[left[left_index]].interval.x;
+					    pobjects[obj_offset + left[obj_offset + left_index]].interval.x <
+						pobjects[obj_offset + right[obj_offset + right_index]].interval.y) {
+						right_end = pobjects[obj_offset + left[obj_offset + left_index]].interval.x;
 					} else if(right_index < size) {
-						right_end = pobjects[right[right_index]].interval.y;
+						right_end = pobjects[obj_offset + right[obj_offset + right_index]].interval.y;
 					} else {
 						coeffs[right_index(index - 1)][0] = NAN;
 					}
@@ -352,7 +360,7 @@ __kernel void thickness(__global vfloat *out,
 //						out[mem_index].s1 = left_end;
 //						unsigned int j = current_index(index - 1);
 //						vfloat *cfs = coeffs[j];
-////						cfs = pobjects[right[right_index]].coeffs;
+////						cfs = pobjects[obj_offset + right[obj_offset + right_index]].coeffs;
 //						out[mem_index].s2 = cfs[0];
 //						out[mem_index].s3 = cfs[1];
 //						out[mem_index].s4 = cfs[2];

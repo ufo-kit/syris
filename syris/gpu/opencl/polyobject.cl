@@ -18,7 +18,7 @@ typedef struct _poly_object {
  * of the object influence (last 2).
  *
  */
-void init_poly_object(poly_object *po, vfloat coeffs[POLY_COEFFS_NUM+2]) {
+void init_poly_object(global poly_object *po, vfloat coeffs[POLY_COEFFS_NUM+2]) {
 	int i;
 
 	for (i = 0; i < POLY_COEFFS_NUM; i++) {
