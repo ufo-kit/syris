@@ -19,6 +19,7 @@ LOG = logging.getLogger(__name__)
 UNITS = q.mm
 VECTOR_WIDTH = 1
 SUPERSAMPLING = 1
+MAX_OBJECTS = 30
 
 
 def dummy_metaballs_kernel():
@@ -151,7 +152,7 @@ def get_vfloat_mem_host(mem, size):
     return res
 
 
-def create_metaballs_random(num_objects):
+def create_metaballs_random(num_objects, write_parameters=False):
     objects_all = ""
     params_all = ""
     min_r = SUPERSAMPLING * 5 * pixel_size.rescale(UNITS).magnitude
@@ -169,8 +170,9 @@ def create_metaballs_random(num_objects):
         objects_all += objects
         params_all += params
 
-    with open("/home/farago/data/params.txt", "w") as f:
-        f.write(params_all + "\n")
+    if write_parameters:
+        with open("/home/farago/data/params.txt", "w") as f:
+            f.write(params_all + "\n")
 
     return objects_all, coeff, mid
 
@@ -239,6 +241,12 @@ if __name__ == '__main__':
 
     objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                             cl.mem_flags.COPY_HOST_PTR, hostbuf=objects_all)
+    pobjects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                             size=n ** 2 * MAX_OBJECTS * 4 * 7)
+    left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                         size=n ** 2 * 2 * MAX_OBJECTS)
+    right_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                         size=n ** 2 * 2 * MAX_OBJECTS)
 
     ev = prg.thickness(cfg.OPENCL.queue,
                       (n, n),
@@ -260,7 +268,7 @@ if __name__ == '__main__':
 
     res = np.empty((n, VECTOR_WIDTH * n), dtype=cfg.PRECISION.np_float)
     cl.enqueue_copy(cfg.OPENCL.queue, res, thickness_mem)
-    print res[0, 0]
+    print res[0, 0], res.max()
 
     TIFF.open("/home/farago/data/thickness/radio.tif", "w").\
         write_image(res[:, ::VECTOR_WIDTH].astype(np.float32))
