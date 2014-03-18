@@ -264,7 +264,7 @@ __kernel void thickness(__global vfloat *out,
 	vfloat left_end, right_end, previous_end;
 	/* + 1 root for non-continuous function compensation. */
 	vfloat roots[POLY_DEG + 1];
-	vfloat previous = NAN, thickness = 0;
+	vfloat previous = NAN, total_thickness = 0;
 	int last_derivative_sgn = -2;
 	unsigned int left_index = 0, right_index = 0, size = 0, i, index = 0;
 	vfloat2 obj_coords;
@@ -347,7 +347,7 @@ __kernel void thickness(__global vfloat *out,
 									coeffs[right_index(index - 1)],
 									POLY_DEG, previous_end,
 									left_end, roots, pixel_size.x);
-						thickness += get_thickness(
+						total_thickness += get_thickness(
 								(const vfloat *)
 								coeffs[current_index(index - 1)],
 								POLY_DEG, roots, &previous,
@@ -371,7 +371,7 @@ __kernel void thickness(__global vfloat *out,
 //						out[mem_index].s9 = roots[2];
 //						out[mem_index].sA = roots[3];
 //						out[mem_index].sB = roots[4];
-//						out[mem_index].sC = thickness;
+//						out[mem_index].sC = total_thickness;
 //						out[mem_index].sD = last_derivative_sgn;
 //						out[mem_index].sE = size;
 //						break;
@@ -385,9 +385,9 @@ __kernel void thickness(__global vfloat *out,
 					index++;
 				}
 			if (clear) {
-				out[mem_index] = thickness;
+				out[mem_index] = total_thickness;
 			} else {
-				out[mem_index] = out[mem_index] + thickness;
+				out[mem_index] = out[mem_index] + total_thickness;
 			}
 		}
 	} else if (clear) {
