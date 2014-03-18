@@ -53,7 +53,7 @@ def create_metaball_random(n, pixel_size, radius_range):
     metaball = MetaBall(trajectory, r)
     metaball.move(0 * q.s)
 
-    return metaball.pack(UNITS), "({0}, {1}, {2}, {3}),\n".format(x, y, z.magnitude, r.magnitude)
+    return metaball, "({0}, {1}, {2}, {3}),\n".format(x, y, z.magnitude, r.magnitude)
 
 
 def load_params(file_name):
@@ -100,6 +100,7 @@ def get_vfloat_mem_host(mem, size):
 def create_metaballs_random(num_objects, write_parameters=False):
     objects_all = ""
     params_all = ""
+    metaballs = []
     min_r = SUPERSAMPLING * 5 * pixel_size.rescale(UNITS).magnitude
     radius_range = (min_r,
                     SUPERSAMPLING * 50 *
@@ -111,15 +112,16 @@ def create_metaballs_random(num_objects, write_parameters=False):
     print "mid, coeff, eps:", mid, coeff, eps
     print "objects:", num_objects
     for j in range(num_objects):
-        objects, params = create_metaball_random(n, pixel_size, radius_range)
-        objects_all += objects
+        metaball, params = create_metaball_random(n, pixel_size, radius_range)
+        objects_all += metaball.pack(UNITS)
         params_all += params
+        metaballs.append(metaball)
 
     if write_parameters:
         with open("/home/farago/data/params.txt", "w") as f:
             f.write(params_all + "\n")
 
-    return objects_all, coeff, mid
+    return metaballs, objects_all, coeff, mid
 
 
 def get_z_range(metaballs):
@@ -136,6 +138,56 @@ def get_z_range(metaballs):
             z_max = z_end
 
     return z_min, z_max
+
+def slow_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size):
+    ev = prg.naive_thickness(cfg.OPENCL.queue,
+                        (n, n),
+                        None,
+                        thickness_mem,
+                        objects_mem,
+                        np.uint32(num_objects),
+                        g_util.make_vfloat2(z_min.rescale(UNITS).magnitude,
+                                            z_max.rescale(UNITS).magnitude),
+                        np.float32(pixel_size.rescale(UNITS)))
+    cl.wait_for_events([ev])
+    print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
+
+    res = np.empty((n, VECTOR_WIDTH * n), dtype=cfg.PRECISION.np_float)
+    cl.enqueue_copy(cfg.OPENCL.queue, res, thickness_mem)
+
+    return res
+
+
+
+def fast_metaballs(n, mid, coeff, objects_mem, thickness_mem, num_objects, pixel_size):
+    pobjects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                             size=n ** 2 * MAX_OBJECTS * 4 * 7)
+    left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                         size=n ** 2 * 2 * MAX_OBJECTS)
+    right_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                         size=n ** 2 * 2 * MAX_OBJECTS)
+
+    ev = prg.thickness(cfg.OPENCL.queue,
+                      (n, n),
+                       None,
+                       thickness_mem,
+                       objects_mem,
+                       pobjects_mem,
+                       left_mem,
+                       right_mem,
+                       np.int32(num_objects),
+                       vec.make_int2(0, 0),
+                       vec.make_int4(0, 0, n, n),
+                       g_util.make_vfloat2(pixel_size.rescale(UNITS).magnitude,
+                                           pixel_size.rescale(UNITS).magnitude),
+                       np.int32(True))
+    cl.wait_for_events([ev])
+    print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
+
+    res = np.empty((n, VECTOR_WIDTH * n), dtype=cfg.PRECISION.np_float)
+    cl.enqueue_copy(cfg.OPENCL.queue, res, thickness_mem)
+
+    return res
 
 
 if __name__ == '__main__':
@@ -156,73 +208,29 @@ if __name__ == '__main__':
     z_min, z_max = get_z_range(balls)
     print 'Z steps:', ((z_max - z_min) / pixel_size).simplified
 
-    # objects_all = np.empty(4 * num_objects, dtype=cfg.PRECISION.np_float)
-    # for i, ball in enumerate(balls):
-    #     position = ball.position
-    #     objects_all[4 * i] = position[0].rescale(UNITS).magnitude
-    #     objects_all[4 * i + 1] = position[1].rescale(UNITS).magnitude
-    #     objects_all[4 * i + 2] = position[2].rescale(UNITS).magnitude
-    #     objects_all[4 * i + 3] = ball.radius.rescale(UNITS).magnitude
-
-    # objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
-    #                         hostbuf=objects_all)
-
-
     # Random metaballs creation
     # num_objects = np.random.randint(1, 100)
-    # objects_all, coeff, mid = create_metaballs_random(num_objects)
+    # metaballs, objects_all, coeff, mid = create_metaballs_random(num_objects)
+    # z_min, z_max = get_z_range(metaballs)
+    # print coeff, mid
 
     objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                             cl.mem_flags.COPY_HOST_PTR, hostbuf=objects_all)
 
-    # ev = prg.naive_thickness(cfg.OPENCL.queue,
-    #                     (n, n),
-    #                     None,
-    #                     thickness_mem,
-    #                     objects_mem,
-    #                     np.uint32(num_objects),
-    #                     g_util.make_vfloat2(z_min.rescale(UNITS).magnitude,
-    #                                         z_max.rescale(UNITS).magnitude),
-    #                     np.float32(pixel_size.rescale(UNITS)))
-    # cl.wait_for_events([ev])
-    # objects_mem.release()
-    # print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
-
-    pobjects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                             size=n ** 2 * MAX_OBJECTS * 4 * 7)
-    left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                         size=n ** 2 * 2 * MAX_OBJECTS)
-    right_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                         size=n ** 2 * 2 * MAX_OBJECTS)
-
-    ev = prg.thickness(cfg.OPENCL.queue,
-                      (n, n),
-                       None,
-                       thickness_mem,
-                       objects_mem,
-                       pobjects_mem,
-                       left_mem,
-                       right_mem,
-                       np.int32(num_objects),
-                       vec.make_int2(0, 0),
-                       vec.make_int4(0, 0, n, n),
-                       cfg.PRECISION.np_float(coeff),
-                       cfg.PRECISION.np_float(mid),
-                       g_util.make_vfloat2(pixel_size.rescale(UNITS).magnitude,
-                                           pixel_size.rescale(UNITS).magnitude),
-                       np.int32(True))
-    cl.wait_for_events([ev])
+    res = fast_metaballs(n, mid, coeff, objects_mem, thickness_mem, num_objects, pixel_size)
+    res1 = slow_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size)
     objects_mem.release()
-    print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
-
-    res = np.empty((n, VECTOR_WIDTH * n), dtype=cfg.PRECISION.np_float)
-    cl.enqueue_copy(cfg.OPENCL.queue, res, thickness_mem)
 
     TIFF.open("/home/farago/data/thickness/radio.tif", "w").\
         write_image(res[:, ::VECTOR_WIDTH].astype(np.float32))
 
     plt.figure()
     plt.imshow(res[:, ::VECTOR_WIDTH], origin="lower", cmap=cm.get_cmap("gray"),
+               interpolation="nearest")
+    plt.colorbar()
+
+    plt.figure()
+    plt.imshow(res1[:, ::VECTOR_WIDTH], origin="lower", cmap=cm.get_cmap("gray"),
                interpolation="nearest")
     plt.colorbar()
     plt.show()
