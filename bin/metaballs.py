@@ -139,16 +139,17 @@ def get_z_range(metaballs):
 
     return z_min, z_max
 
+
 def slow_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size):
-    ev = prg.naive_thickness(cfg.OPENCL.queue,
-                        (n, n),
-                        None,
-                        thickness_mem,
-                        objects_mem,
-                        np.uint32(num_objects),
-                        g_util.make_vfloat2(z_min.rescale(UNITS).magnitude,
-                                            z_max.rescale(UNITS).magnitude),
-                        np.float32(pixel_size.rescale(UNITS)))
+    ev = prg.naive_metaballs(cfg.OPENCL.queue,
+                            (n, n),
+                             None,
+                             thickness_mem,
+                             objects_mem,
+                             np.uint32(num_objects),
+                             g_util.make_vfloat2(z_min.rescale(UNITS).magnitude,
+                                                 z_max.rescale(UNITS).magnitude),
+                             np.float32(pixel_size.rescale(UNITS)))
     cl.wait_for_events([ev])
     print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
 
@@ -158,16 +159,15 @@ def slow_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size):
     return res
 
 
-
-def fast_metaballs(n, mid, coeff, objects_mem, thickness_mem, num_objects, pixel_size):
+def fast_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size):
     pobjects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
                              size=n ** 2 * MAX_OBJECTS * 4 * 7)
     left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
                          size=n ** 2 * 2 * MAX_OBJECTS)
     right_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                         size=n ** 2 * 2 * MAX_OBJECTS)
+                          size=n ** 2 * 2 * MAX_OBJECTS)
 
-    ev = prg.thickness(cfg.OPENCL.queue,
+    ev = prg.metaballs(cfg.OPENCL.queue,
                       (n, n),
                        None,
                        thickness_mem,
@@ -179,8 +179,7 @@ def fast_metaballs(n, mid, coeff, objects_mem, thickness_mem, num_objects, pixel
                        vec.make_int2(0, 0),
                        vec.make_int4(0, 0, n, n),
                        g_util.make_vfloat2(pixel_size.rescale(UNITS).magnitude,
-                                           pixel_size.rescale(UNITS).magnitude),
-                       np.int32(True))
+                                           pixel_size.rescale(UNITS).magnitude))
     cl.wait_for_events([ev])
     print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
 
@@ -200,7 +199,6 @@ if __name__ == '__main__':
     thickness_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
                               size=n ** 2 * VECTOR_WIDTH * cfg.PRECISION.cl_float)
 
-    mid, coeff, eps = 0.0275, 36.3636363636, 0.001
     params = load_params('/home/farago/data/params.txt')
     num_objects = len(params)
     balls, objects_all = create_metaballs(params)
@@ -217,7 +215,7 @@ if __name__ == '__main__':
     objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                             cl.mem_flags.COPY_HOST_PTR, hostbuf=objects_all)
 
-    res = fast_metaballs(n, mid, coeff, objects_mem, thickness_mem, num_objects, pixel_size)
+    res = fast_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size)
     res1 = slow_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size)
     objects_mem.release()
 
