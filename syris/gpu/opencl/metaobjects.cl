@@ -56,8 +56,7 @@ void get_meta_ball_equation(vfloat *result, __constant vfloat4 *object, vfloat2 
 							 * radius) and a ray */
 	vfloat dist_2, tmp, falloff_const;
 
-    dist_2 = (object->x - p->x) * (object->x - p->x) +
-            (object->y - p->y) * (object->y - p->y);
+    dist_2 = (object->x - p->x) * (object->x - p->x) + (object->y - p->y) * (object->y - p->y);
     if (dist_2 > 4 * object->w * object->w) {
 		/* no influence in this pixel */
         result[5] = NAN;
@@ -78,23 +77,21 @@ void get_meta_ball_equation(vfloat *result, __constant vfloat4 *object, vfloat2 
 	R_2 = (intersection.y - intersection.x) / 2.0;
 	/* now square it */
 	R_2 = R_2 * R_2;
-	r_2 = object->w * object->w - dist_2;
-	/* shift center in z direction in order to minimize distance from 0.
-	 * Precomputation for all objects done by host. */
 	result[5] = intersection.x;
 	result[6] = intersection.y;
 
 
 	/* since (R^2 - r^2)^2 = c, r^2 = R^2 - sqrt(1/c),
 	 * where c = 1/(R^2 - r^2)^2 calculated to fit f(r) = 1.0. */
-	result[7] = r_2;//R_2 - sqrt(1.0/o->constants.x);
-
 	/* final quartic coefficients */
 	result[0] = falloff_const;
 	result[1] = falloff_const*(-4 * cz);
 	result[2] = falloff_const*(-2 * R_2 + 6 * cz * cz);
 	result[3] = falloff_const*(4 * R_2 * cz - 4 * cz * cz * cz);
 	result[4] = falloff_const*(R_2 * R_2 - 2 * R_2 * cz * cz + cz * cz * cz * cz);
+	/* Keep the squared distance for fast intersection calculation in case there is only
+	 * one object which intersects the ray. */
+	result[7] = dist_2;
 }
 
 bool is_root_valid(const vfloat *coeffs, unsigned int degree,
@@ -261,7 +258,7 @@ void update_coefficients(vfloat coeffs[3][POLY_DEG + 1],
 														offset, index, size, false);
 }
 
-__kernel void thickness(__global vfloat *out,
+__kernel void metaballs(__global vfloat *out,
 						__constant vfloat4 *objects,
 						global poly_object *pobjects,
 						global ushort *left,
@@ -269,8 +266,7 @@ __kernel void thickness(__global vfloat *out,
 						const int num_objects,
 						const int2 gl_offset,
 						const int4 roi,
-						const vfloat2 pixel_size,
-						const int clear) {
+						const vfloat2 pixel_size) {
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
 	unsigned int mem_index = get_global_size(0) * iy + ix;
@@ -284,8 +280,8 @@ __kernel void thickness(__global vfloat *out,
 	vfloat left_end, right_end, previous_end;
 	/* + 1 root for non-continuous function compensation. */
 	vfloat roots[POLY_DEG + 1], intersections[POLY_DEG + 1];
-	vfloat previous = NAN, total_thickness = 0;
-	int last_derivative_sgn = -2;
+	vfloat previous = NAN, thickness = 0, radius;
+	int last_derivative_sgn = -2, last_valid_object;
 	unsigned int left_index = 0, right_index = 0, size = 0, i, index = 0;
 	vfloat2 obj_coords;
 
@@ -306,6 +302,7 @@ __kernel void thickness(__global vfloat *out,
 				init_poly_object(&pobjects[obj_offset + size], poly);
 				po_add(left, pobjects, obj_offset, size, X_SORT);
 				po_add(right, pobjects, obj_offset, size, Y_SORT);
+				last_valid_object = i;
 				size++;
 			}
             /* If the size is greater than the maximum supported object size return NAN */
@@ -318,20 +315,15 @@ __kernel void thickness(__global vfloat *out,
 		switch (size) {
 			case 0:
 				/* nothing in this pixel */
-				if (clear) {
-					out[mem_index] = 0.0;
-				}
+                out[mem_index] = 0.0;
 				break;
 			case 1:
 				/* only one metaobject in this pixel */
-				if (poly[7] < 0.0) {
-					poly[7] = 0.0;
+				radius = objects[last_valid_object].w * objects[last_valid_object].w - poly[7];
+				if (radius < 0.0) {
+					radius = 0.0;
 				}
-				if (clear) {
-					out[mem_index] = sqrt(poly[7])*2;
-				} else {
-					out[mem_index] = out[mem_index] + 2 * sqrt(poly[7]);
-				}
+                out[mem_index] = 2 * sqrt(radius);
 				break;
 			default:
 				/* more than one metaobject, we need to solve the quartic */
@@ -371,31 +363,8 @@ __kernel void thickness(__global vfloat *out,
 								coeffs[current_index(index - 1)],
 								POLY_DEG, roots, &previous,
 								&last_derivative_sgn);
-						total_thickness += get_thickness(intersections);
+						thickness += get_thickness(intersections);
 					}
-
-//					if (index == 9) {
-//						out[mem_index].s0 = previous_end;
-//						out[mem_index].s1 = left_end;
-//						unsigned int j = current_index(index - 1);
-//						vfloat *cfs = coeffs[j];
-////						cfs = pobjects[obj_offset + right[obj_offset + right_index]].coeffs;
-//						out[mem_index].s2 = cfs[0];
-//						out[mem_index].s3 = cfs[1];
-//						out[mem_index].s4 = cfs[2];
-//						out[mem_index].s5 = cfs[3];
-//						out[mem_index].s6 = cfs[4];
-//						out[mem_index].s7 = roots[0];
-//						out[mem_index].s8 = roots[1];
-//						out[mem_index].s9 = roots[2];
-//						out[mem_index].sA = roots[3];
-//						out[mem_index].sB = roots[4];
-//						out[mem_index].sC = total_thickness;
-//						out[mem_index].sD = last_derivative_sgn;
-//						out[mem_index].sE = size;
-//						break;
-//					}
-
 					if (index > 0) {
 						previous_end = left_end;
 					}
@@ -403,13 +372,9 @@ __kernel void thickness(__global vfloat *out,
 					left_end = right_end;
 					index++;
 				}
-			if (clear) {
-				out[mem_index] = total_thickness;
-			} else {
-				out[mem_index] = out[mem_index] + total_thickness;
-			}
+            out[mem_index] = thickness;
 		}
-	} else if (clear) {
+	} else {
 		/* No geometry calculation in this pixel but we want it to be zero. */
 		out[mem_index] = 0;
 	}
@@ -425,7 +390,7 @@ __kernel void thickness(__global vfloat *out,
  * @pixel_size: pixel size in physical units
  */
 
-__kernel void naive_thickness(__global vfloat *thickness,
+__kernel void naive_metaballs(__global vfloat *thickness,
                         __constant vfloat4 *objects,
                         const uint num_objects,
                         const vfloat2 z_range,
