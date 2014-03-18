@@ -135,42 +135,65 @@ int next_root(const vfloat *coeffs, unsigned int degree,
 	return index;
 }
 
-vfloat get_thickness(const vfloat *coeffs, unsigned int degree,
+/**
+ * Get ray-metaballs intersections based on given roots.
+ * @intersections is the array where the intersections will be stored
+ * @coeffs are the polynomial coefficients
+ * @degree is the polynomial degree
+ * @roots are the polynomial roots
+ * @previous is the leftover root from previous runs
+ * @last_derivative_sgn is the sign of the last derivative
+ */
+void get_intersections(vfloat intersections[POLY_DEG + 1], const vfloat *coeffs, unsigned int degree,
 				vfloat *roots, vfloat *previous, int *last_derivative_sgn) {
-	/*
-	 * Get the projected thickness from give *roots*. *previous* is the
-	 * root index has not yet been coupled with another one, saved
-	 * from passed intervals. *last_derivative_sgn* is the sign of the
-	 * derivative of the polynomial at the last processed root.
-	 * The *roots* are extrema-free.
-	 */
-	vfloat thickness = 0.0;
+	uint j;
 	unsigned int next;
 	unsigned int i = next_root(coeffs, degree, 0, roots, last_derivative_sgn);
 
+	for (j = 0; j < POLY_DEG + 1; j++) {
+	    intersections[j] = NAN;
+	}
+	j = 0;
+
 	if (i == degree) {
-		return 0.0;
+	    return;
 	}
 
-	if (!isnan(*previous) && !isnan(roots[i])) {
-		thickness += roots[i] - *previous;
-		*previous = NAN;
-		i = next_root(coeffs, degree, i + 1, roots, last_derivative_sgn);
-	}
+    if (!isnan(*previous) && !isnan(roots[i])) {
+        intersections[j++] = *previous;
+        intersections[j++] = roots[i];
+        *previous = NAN;
+        i = next_root(coeffs, degree, i + 1, roots, last_derivative_sgn);
+    }
 
-	while (i < degree + 1 && !isnan(roots[i])) {
-		next = next_root(coeffs, degree, i + 1, roots, last_derivative_sgn);
-		if (next < degree + 1 && !isnan(roots[next])) {
-			thickness += roots[next] - roots[i];
-			*previous = NAN;
-		} else {
-			*previous = roots[i];
-			break;
-		}
-		i = next_root(coeffs, degree, next + 1, roots, last_derivative_sgn);
-	}
+    while (i < degree + 1 && !isnan(roots[i])) {
+        next = next_root(coeffs, degree, i + 1, roots, last_derivative_sgn);
+        if (next < degree + 1 && !isnan(roots[next])) {
+            intersections[j++] = roots[i];
+            intersections[j++] = roots[next];
+            *previous = NAN;
+        } else {
+            *previous = roots[i];
+            break;
+        }
+        i = next_root(coeffs, degree, next + 1, roots, last_derivative_sgn);
+    }
+}
 
-	return thickness;
+/**
+ * Get the projected thickness based on ray-metaball intersections.
+ * @intersections are the ray-metaball intersections
+ */
+vfloat get_thickness(vfloat intersections[POLY_DEG + 1]) {
+    int i = 0;
+    vfloat thickness = 0.0;
+
+    while (!isnan(intersections[i])) {
+        thickness += intersections[i + 1] - intersections[i];
+        i += 2;
+    }
+
+    return thickness;
 }
 
 __kernel void thickness_add_kernel(__global vfloat4 *out,
@@ -180,13 +203,16 @@ __kernel void thickness_add_kernel(__global vfloat4 *out,
 									int last_derivative_sgn) {
 	vfloat l_roots[POLY_DEG + 1];
 	vfloat l_coeffs[POLY_DEG + 1];
+	vfloat intersections[POLY_DEG + 1];
+	vfloat thickness;
 	unsigned int i;
 
 	_copy_global_local(roots, l_roots, POLY_DEG + 1, true);
 	_copy_global_local(coeffs, l_coeffs, POLY_DEG + 1, true);
 
-	vfloat thickness = get_thickness(l_coeffs, POLY_DEG, l_roots,
+	get_intersections(intersections, l_coeffs, POLY_DEG, l_roots,
 			&previous, &last_derivative_sgn);
+	thickness = get_thickness(intersections);
 
 	out[0] = (vfloat4)(thickness, previous, last_derivative_sgn, 0);
 }
@@ -263,7 +289,7 @@ __kernel void thickness(__global vfloat *out,
 	vfloat coeffs[3][POLY_DEG + 1];
 	vfloat left_end, right_end, previous_end;
 	/* + 1 root for non-continuous function compensation. */
-	vfloat roots[POLY_DEG + 1];
+	vfloat roots[POLY_DEG + 1], intersections[POLY_DEG + 1];
 	vfloat previous = NAN, total_thickness = 0;
 	int last_derivative_sgn = -2;
 	unsigned int left_index = 0, right_index = 0, size = 0, i, index = 0;
@@ -347,12 +373,12 @@ __kernel void thickness(__global vfloat *out,
 									coeffs[right_index(index - 1)],
 									POLY_DEG, previous_end,
 									left_end, roots, pixel_size.x);
-						total_thickness += get_thickness(
+						get_intersections(intersections,
 								(const vfloat *)
 								coeffs[current_index(index - 1)],
 								POLY_DEG, roots, &previous,
-								&last_derivative_sgn) /
-								size_coeff;
+								&last_derivative_sgn);
+						total_thickness += get_thickness(intersections) / size_coeff;
 					}
 
 //					if (index == 9) {
