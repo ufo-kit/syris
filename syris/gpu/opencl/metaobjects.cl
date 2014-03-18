@@ -49,10 +49,9 @@ void subtract_coeffs(vfloat *result, vfloat *src, global vfloat *tosub, int size
 
 /* Meta objects equations. */
 
-void get_meta_ball_equation(vfloat *result, __constant vfloat4 *object, vfloat2 *p,
-								vfloat z_middle, vfloat coeff, vfloat eps) {
+void get_meta_ball_equation(vfloat *result, __constant vfloat4 *object, vfloat2 *p, vfloat eps) {
 	vfloat r_2, R_2;				/* outer squared radius */
-	vfloat cz; 				/* z-center of the fallof curve */
+	vfloat cz = object->z; 				/* z-center of the fallof curve */
 	vfloat2 intersection;	/* intersection of the influence area (R_2 is the
 							 * radius) and a ray */
 	vfloat dist_2, tmp, falloff_const;
@@ -73,20 +72,17 @@ void get_meta_ball_equation(vfloat *result, __constant vfloat4 *object, vfloat2 
      * f(r) = 1 is
      * 1 / (R^2 - r^2)^2 = 1 / (4r^2 - r^2)^2 = 1 / 9r^4 */
 
-    falloff_const = 1.0 / (9 * object->w * object->w * object->w * object->w *
-                           coeff * coeff * coeff * coeff);
+    falloff_const = 1.0 / (9 * object->w * object->w * object->w * object->w);
 
-	z_middle *= coeff;
 	/* determine R = r + influence for given x,y coordinates */
-	R_2 = coeff * (intersection.y - intersection.x) / 2.0;
+	R_2 = (intersection.y - intersection.x) / 2.0;
 	/* now square it */
 	R_2 = R_2 * R_2;
 	r_2 = object->w * object->w - dist_2;
 	/* shift center in z direction in order to minimize distance from 0.
 	 * Precomputation for all objects done by host. */
-	cz = coeff * (intersection.x + intersection.y) / 2.0 - z_middle;
-	result[5] = coeff * intersection.x - z_middle;
-	result[6] = coeff * intersection.y - z_middle;
+	result[5] = intersection.x;
+	result[6] = intersection.y;
 
 
 	/* since (R^2 - r^2)^2 = c, r^2 = R^2 - sqrt(1/c),
@@ -95,10 +91,10 @@ void get_meta_ball_equation(vfloat *result, __constant vfloat4 *object, vfloat2 
 
 	/* final quartic coefficients */
 	result[0] = falloff_const;
-	result[1] = falloff_const*(-4*cz);
-	result[2] = falloff_const*(-2*R_2 + 6*cz*cz);
-	result[3] = falloff_const*(4*R_2*cz - 4*cz*cz*cz);
-	result[4] = falloff_const*(R_2*R_2 - 2*R_2*cz*cz + cz*cz*cz*cz);
+	result[1] = falloff_const*(-4 * cz);
+	result[2] = falloff_const*(-2 * R_2 + 6 * cz * cz);
+	result[3] = falloff_const*(4 * R_2 * cz - 4 * cz * cz * cz);
+	result[4] = falloff_const*(R_2 * R_2 - 2 * R_2 * cz * cz + cz * cz * cz * cz);
 }
 
 bool is_root_valid(const vfloat *coeffs, unsigned int degree,
@@ -273,8 +269,6 @@ __kernel void thickness(__global vfloat *out,
 						const int num_objects,
 						const int2 gl_offset,
 						const int4 roi,
-						const vfloat size_coeff,
-						const vfloat z_middle,
 						const vfloat2 pixel_size,
 						const int clear) {
 	int ix = get_global_id(0);
@@ -307,8 +301,7 @@ __kernel void thickness(__global vfloat *out,
 		obj_coords.y = (iy + gl_offset.y) * pixel_size.y;
 
 		for (i = 0; i < num_objects; i++) {
-			get_meta_ball_equation(poly, &objects[i], &obj_coords,
-			                       z_middle, size_coeff, pixel_size.x);
+			get_meta_ball_equation(poly, &objects[i], &obj_coords, pixel_size.x);
 			if (!isnan(poly[5])) {
 				init_poly_object(&pobjects[obj_offset + size], poly);
 				po_add(left, pobjects, obj_offset, size, X_SORT);
@@ -378,7 +371,7 @@ __kernel void thickness(__global vfloat *out,
 								coeffs[current_index(index - 1)],
 								POLY_DEG, roots, &previous,
 								&last_derivative_sgn);
-						total_thickness += get_thickness(intersections) / size_coeff;
+						total_thickness += get_thickness(intersections);
 					}
 
 //					if (index == 9) {
