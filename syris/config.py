@@ -44,7 +44,6 @@ class OpenCL(object):
     """OpenCL runtime information holder."""
 
     def __init__(self):
-        self.kernels_dir = 'opencl'
         self.ctx = None
         self.queues = []
         self.devices = []

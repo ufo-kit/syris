@@ -2,6 +2,7 @@
 Utility functions concerning GPU programming.
 """
 
+import pkg_resources
 import numpy as np
 import pyopencl as cl
 from pyopencl.array import vec
@@ -9,7 +10,6 @@ import time
 from syris import profiling as prf
 from syris import config as cfg
 import logging
-import os
 
 
 LOGGER = logging.getLogger(__name__)
@@ -70,8 +70,7 @@ def get_source(file_names, precision_sensitive=True):
     """
     string = ""
     for file_name in file_names:
-        path = os.path.join(os.path.dirname(__file__), cfg.OPENCL.kernels_dir, file_name)
-        string += open(path, "r").read()
+        string += pkg_resources.resource_string(__name__, 'opencl/{}'.format(file_name))
 
     if precision_sensitive:
         header = _SINGLE_HEADER if cfg.PRECISION.is_single() else _DOUBLE_HEADER
