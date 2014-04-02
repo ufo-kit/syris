@@ -9,6 +9,7 @@ setup(
     author_email='tomas.farago@kit.edu',
     license='LGPL',
     packages=find_packages(exclude=['*.tests']),
+    package_data={'syris': ['gpu/opencl/*.cl']},
     # exclude_package_data={'': ['README.rst']},
     description="X-ray imaging simulation",
     # long_description=open('README.rst').read(),
