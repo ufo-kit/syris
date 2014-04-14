@@ -258,6 +258,15 @@ void update_coefficients(vfloat coeffs[3][POLY_DEG + 1],
 														offset, index, size, false);
 }
 
+
+/*
+ * Metaballs calculation via polynomial root finding. One can either
+ * calculate the projected thickness or the real intersections. The output
+ * buffer must have correct size depending on the output type, i.e. for
+ * intersections w x h x MAX_OBJECTS x 2. In case the output are the
+ * intersections, after the last valid intersection INFINITY follows.
+ * @out_thickness: 1 for projected thickness, 0 for intersections.
+ */
 __kernel void metaballs(__global vfloat *out,
 						__constant vfloat4 *objects,
 						global poly_object *pobjects,
@@ -266,7 +275,8 @@ __kernel void metaballs(__global vfloat *out,
 						const int num_objects,
 						const int2 gl_offset,
 						const int4 roi,
-						const vfloat2 pixel_size) {
+						const vfloat2 pixel_size,
+						const int out_thickness) {
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
 	unsigned int mem_index = get_global_size(0) * iy + ix;
@@ -283,6 +293,7 @@ __kernel void metaballs(__global vfloat *out,
 	vfloat previous = NAN, thickness = 0, radius;
 	int last_derivative_sgn = -2, last_valid_object;
 	unsigned int left_index = 0, right_index = 0, size = 0, i, index = 0;
+	unsigned int intersection_index = 0, inter_i;
 	vfloat2 obj_coords;
 
     coeffs[0][0] = NAN;
@@ -307,7 +318,12 @@ __kernel void metaballs(__global vfloat *out,
 			}
             /* If the size is greater than the maximum supported object size return NAN */
             if (size == MAX_OBJECTS) {
-                out[mem_index] = NAN;
+                if (out_thickness) {
+                    out[mem_index] = NAN;
+                }
+                else {
+                    out[2 * obj_offset] = NAN;
+                }
                 return;
             }
 		}
@@ -315,7 +331,12 @@ __kernel void metaballs(__global vfloat *out,
 		switch (size) {
 			case 0:
 				/* nothing in this pixel */
-                out[mem_index] = 0.0;
+				if (out_thickness) {
+                    out[mem_index] = 0.0;
+                }
+                else {
+                    out[2 * obj_offset] = INFINITY;
+                }
 				break;
 			case 1:
 				/* only one metaobject in this pixel */
@@ -323,7 +344,18 @@ __kernel void metaballs(__global vfloat *out,
 				if (radius < 0.0) {
 					radius = 0.0;
 				}
-                out[mem_index] = 2 * sqrt(radius);
+                if (out_thickness) {
+                    out[mem_index] = 2 * sqrt(radius);
+                }
+                else {
+                    if (objects[last_valid_object].z + sqrt(radius) > 0) {
+                        out[2 * obj_offset] = objects[last_valid_object].z - sqrt(radius);
+                        out[2 * obj_offset + 1] = objects[last_valid_object].z + sqrt(radius);
+                    }
+                    else {
+                        out[2 * obj_offset] = INFINITY;
+                    }
+                }
 				break;
 			default:
 				/* more than one metaobject, we need to solve the quartic */
@@ -363,7 +395,17 @@ __kernel void metaballs(__global vfloat *out,
 								coeffs[current_index(index - 1)],
 								POLY_DEG, roots, &previous,
 								&last_derivative_sgn);
-						thickness += get_thickness(intersections);
+						if (out_thickness) {
+                            thickness += get_thickness(intersections);
+                        }
+                        else {
+                            inter_i = 0;
+                            while(!isnan(intersections[inter_i])) {
+                                out[2 * obj_offset + intersection_index] = intersections[inter_i];
+                                inter_i++;
+                                intersection_index++;
+                            }
+                        }
 					}
 					if (index > 0) {
 						previous_end = left_end;
@@ -372,11 +414,21 @@ __kernel void metaballs(__global vfloat *out,
 					left_end = right_end;
 					index++;
 				}
-            out[mem_index] = thickness;
+			if (out_thickness) {
+                out[mem_index] = thickness;
+            }
+            else {
+                out[2 * obj_offset + intersection_index] = INFINITY;
+            }
 		}
 	} else {
 		/* No geometry calculation in this pixel but we want it to be zero. */
-		out[mem_index] = 0;
+		if (out_thickness) {
+            out[mem_index] = 0;
+        }
+        else {
+            out[2 * obj_offset] = INFINITY;
+        }
 	}
 }
 
