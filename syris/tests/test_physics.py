@@ -68,3 +68,16 @@ class TestPhysics(SyrisTest):
         cpu = self._cpu_propagator(phase)
 
         np.testing.assert_almost_equal(self.res, cpu, 5)
+
+    def test_transfer(self):
+        thickness = np.linspace(0, 0.01, 16).reshape(4, 4) * q.mm
+        energy = 10 * q.keV
+        wavelength = physics.energy_to_wavelength(energy)
+        refractive_index = 1e-6 + 1e-9j
+        wavefield_mem = physics.transfer(thickness, refractive_index, wavelength)
+        wavefield = np.empty((4, 4), dtype=cfg.PRECISION.np_cplx)
+        cl.enqueue_copy(cfg.OPENCL.queue, wavefield, wavefield_mem)
+
+        exponent = - 2 * np.pi * thickness.simplified / wavelength.simplified
+        truth = np.exp(exponent * np.complex(refractive_index.imag, refractive_index.real))
+        np.testing.assert_almost_equal(truth, wavefield)
