@@ -49,7 +49,9 @@ class OpenCL(object):
         self.devices = []
         # Default command queue
         self.queue = None
-        self.program = None
+        self.programs = {'improc': None,
+                         'physics': None,
+                         'geometry': None}
 
 
 def init_logging(level=logging.DEBUG, logger_file=None):

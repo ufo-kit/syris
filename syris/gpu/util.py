@@ -37,10 +37,11 @@ typedef double16 vfloat16;
 """
 
 
-def init_program():
+def init_programs():
     """Initialize all OpenCL kernels needed by syris."""
-    cfg.OPENCL.program = get_program(get_source(['vcomplex.cl', 'physics.cl',
-                                     'imageprocessing.cl']))
+    cfg.OPENCL.programs['improc'] = get_program(get_source(['vcomplex.cl', 'imageprocessing.cl']))
+    cfg.OPENCL.programs['physics'] = get_program(get_source(['vcomplex.cl', 'physics.cl']))
+    cfg.OPENCL.programs['geometry'] = get_program(get_metaobjects_source())
 
 
 def make_opencl_defaults(profiling=True):

@@ -29,7 +29,7 @@ def get_gauss_2_f(shape, sigma, pixel_size):
     mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
                     size=shape[0] * shape[1] * cfg.PRECISION.cl_cplx)
 
-    cfg.OPENCL.program.gauss_2_f(cfg.OPENCL.queue,
+    cfg.OPENCL.programs['improc'].gauss_2_f(cfg.OPENCL.queue,
                                  shape,
                                  None,
                                  mem,
@@ -55,7 +55,7 @@ def sum(orig_shape, summed_shape, mem, region, offset,
         out_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
                             size=summed_shape[0] * summed_shape[1] * bpp)
 
-    cfg.OPENCL.program.sum(cfg.OPENCL.queue,
+    cfg.OPENCL.programs['improc'].sum(cfg.OPENCL.queue,
                           (summed_shape[::-1]),
                            None,
                            out_mem,

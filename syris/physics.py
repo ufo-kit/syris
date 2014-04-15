@@ -28,7 +28,7 @@ def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False
     else:
         phase_factor = 0 + 0j
 
-    cfg.OPENCL.program.propagator(queue,
+    cfg.OPENCL.programs['physics'].propagator(queue,
                                  (size, size),
                                   None,
                                   mem,
