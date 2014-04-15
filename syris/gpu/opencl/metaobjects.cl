@@ -507,3 +507,33 @@ __kernel void naive_metaballs(__global vfloat *thickness,
         thickness[2 * obj_offset + intersection_index] = INFINITY;
     }
 }
+
+
+/**
+  * Metaball intersections to slice conversion kernel.
+  */
+__kernel void intersections_to_slice(__global uchar *slice,
+                                     __global vfloat *intersections,
+                                     const uint height,
+                                     const vfloat z_start,
+                                     const vfloat pixel_size) {
+    int ix = get_global_id(0);
+    int iy = get_global_id(1);
+    int width = get_global_size(0);
+	uint mem_index = width * iy + ix;
+	uint offset = (height * width + ix) * 2 * MAX_OBJECTS;
+	uint i = 0;
+	uchar inside = 0;
+	vfloat value = intersections[offset + i];
+    vfloat point = iy * pixel_size + z_start;
+
+    while (!isinf(value) && i < 2 * MAX_OBJECTS) {
+        if (value <= point && point <= intersections[offset + i + 1]) {
+            inside = 1;
+        }
+        i += 2;
+        value = intersections[offset + i];
+    }
+
+    slice[mem_index] = inside;
+}
