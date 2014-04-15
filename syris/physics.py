@@ -8,21 +8,27 @@ from syris.gpu import util as g_util
 from syris import config as cfg
 
 
-def get_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
-                   copy_to_host=False):
+def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
+                   copy_to_host=False, ctx=None, queue=None):
     """Create a propagator with (*size*, *size*) dimensions for propagation
     *distance*, wavelength *lam*, *pixel_size* and if *apply_phase_factor*
     is True, apply the phase factor defined by Fresne approximation. If
     *copy_to_host* is True, copy the propagator to host. If command *queue*
-    is specified, execute the kernel on it.
+    is specified, execute the kernel on it. *ctx* is OpenCL context and
+    *queue* is a CommandQueue.
     """
-    mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY, size=size ** 2 * cfg.PRECISION.cl_cplx)
+    if ctx is None:
+        ctx = cfg.OPENCL.ctx
+    if queue is None:
+        queue = cfg.OPENCL.queue
+
+    mem = cl.Buffer(ctx, cl.mem_flags.READ_ONLY, size=size ** 2 * cfg.PRECISION.cl_cplx)
     if apply_phase_factor:
         phase_factor = np.exp(2 * np.pi * distance.simplified / lam.simplified * 1j)
     else:
         phase_factor = 0 + 0j
 
-    cfg.OPENCL.program.propagator(cfg.OPENCL.queue,
+    cfg.OPENCL.program.propagator(queue,
                                  (size, size),
                                   None,
                                   mem,
@@ -33,7 +39,7 @@ def get_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
 
     if copy_to_host:
         res = np.empty((size, size), dtype=cfg.PRECISION.np_cplx)
-        cl.enqueue_copy(cfg.OPENCL.queue, res, mem)
+        cl.enqueue_copy(queue, res, mem)
     else:
         res = mem
 
