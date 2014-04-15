@@ -45,7 +45,9 @@ def print_array(ar):
 def create_metaball_random(n, pixel_size, radius_range):
     x = np.random.uniform(0, n * pixel_size)
     y = np.random.uniform(0, n * pixel_size)
-    z = np.random.uniform(radius_range[0], radius_range[1]) * radius_range.units
+    # z = np.random.uniform(-1 * q.mm, 1 * q.mm) * radius_range.units
+    z = np.random.uniform(- n / 2 * pixel_size + radius_range[1], n / 2 * pixel_size - radius_range[1])
+    # z = np.random.uniform(radius_range[0], radius_range[1]) * radius_range.units
     r = np.random.uniform(radius_range[0], radius_range[1]) * radius_range.units
 
     c_points = [(x, y, z)] * q.mm
@@ -53,7 +55,7 @@ def create_metaball_random(n, pixel_size, radius_range):
     metaball = MetaBall(trajectory, r)
     metaball.move(0 * q.s)
 
-    return metaball, "({0}, {1}, {2}, {3}),\n".format(x, y, z.magnitude, r.magnitude)
+    return metaball, "({0}, {1}, {2}, {3}),\n".format(x, y, z, r.magnitude)
 
 
 def load_params(file_name):
@@ -139,34 +141,7 @@ def get_z_range(metaballs):
 
     return z_min, z_max
 
-
-def slow_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size):
-    ev = prg.naive_metaballs(cfg.OPENCL.queue,
-                            (n, n),
-                             None,
-                             thickness_mem,
-                             objects_mem,
-                             np.uint32(num_objects),
-                             g_util.make_vfloat2(z_min.rescale(UNITS).magnitude,
-                                                 z_max.rescale(UNITS).magnitude),
-                             np.float32(pixel_size.rescale(UNITS)))
-    cl.wait_for_events([ev])
-    print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
-
-    res = np.empty((n, VECTOR_WIDTH * n), dtype=cfg.PRECISION.np_float)
-    cl.enqueue_copy(cfg.OPENCL.queue, res, thickness_mem)
-
-    return res
-
-
-def fast_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size, thickness=True,
-                   intersection_index=0):
-    pobjects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                             size=n ** 2 * MAX_OBJECTS * 4 * 7)
-    left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                         size=n ** 2 * 2 * MAX_OBJECTS)
-    right_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                          size=n ** 2 * 2 * MAX_OBJECTS)
+def create_metaball_buffers(n, thickness):
     if thickness:
         res = np.empty((n, VECTOR_WIDTH * n), dtype=cfg.PRECISION.np_float)
         result_mem_size = n ** 2 * cfg.PRECISION.cl_float
@@ -175,9 +150,44 @@ def fast_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size, thick
     else:
         result_mem_size = n ** 2 * 2 * MAX_OBJECTS * cfg.PRECISION.cl_float
         res = np.empty(MAX_OBJECTS * 2 * n * VECTOR_WIDTH * n, dtype=cfg.PRECISION.np_float)
-        res[:] = np.Infinity
+        res[:] = np.inf
         result_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                                cl.mem_flags.COPY_HOST_PTR, hostbuf=res)
+
+    return result_mem, res
+
+def slow_metaballs(n, objects_mem, num_objects, z_range, pixel_size, thickness=True):
+    result_mem, res = create_metaball_buffers(n, thickness)
+    ev = prg.naive_metaballs(cfg.OPENCL.queue,
+                            (n, n),
+                             None,
+                             result_mem,
+                             objects_mem,
+                             np.uint32(num_objects),
+                             g_util.make_vfloat2(z_range[0].rescale(UNITS).magnitude,
+                                                 z_range[1].rescale(UNITS).magnitude),
+                             np.float32(pixel_size.rescale(UNITS)),
+                             np.uint32(thickness))
+    cl.wait_for_events([ev])
+    print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
+
+    cl.enqueue_copy(cfg.OPENCL.queue, res, result_mem)
+
+    if thickness:
+        return res
+    else:
+        return result_mem
+
+
+def fast_metaballs(n, objects_mem, num_objects, pixel_size, thickness=True,
+                   intersection_index=0):
+    pobjects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                             size=n ** 2 * MAX_OBJECTS * 4 * 7)
+    left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                         size=n ** 2 * 2 * MAX_OBJECTS)
+    right_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                          size=n ** 2 * 2 * MAX_OBJECTS)
+    result_mem, res = create_metaball_buffers(n, thickness)
 
     ev = prg.metaballs(cfg.OPENCL.queue,
                       (n, n),
@@ -201,7 +211,26 @@ def fast_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size, thick
     if thickness:
         return res
     else:
-        return res[intersection_index::2 * MAX_OBJECTS].reshape(n, n)
+        return result_mem
+
+
+def intersections_to_slice(n, height, intersections_mem, z_start, pixel_size, program):
+    slice_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE, size=n ** 2)
+    slice = np.empty((n, n), dtype=np.uint8)
+
+    ev = program.intersections_to_slice(cfg.OPENCL.queue,
+                                        (n, n),
+                                        None,
+                                        slice_mem,
+                                        intersections_mem,
+                                        np.uint32(height),
+                                        cfg.PRECISION.np_float(z_start.rescale(UNITS).magnitude),
+                                        cfg.PRECISION.np_float(pixel_size.rescale(UNITS).magnitude))
+    ev.wait()
+    print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
+
+    cl.enqueue_copy(cfg.OPENCL.queue, slice, slice_mem)
+    return slice
 
 
 if __name__ == '__main__':
@@ -211,37 +240,40 @@ if __name__ == '__main__':
 
     prg = g_util.get_program(g_util.get_metaobjects_source())
     n = SUPERSAMPLING * 512
-    thickness_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                              size=n ** 2 * VECTOR_WIDTH * cfg.PRECISION.cl_float)
 
-    params = load_params('/home/farago/data/params.txt')
-    # params = [(0.25, 0.25, 0.0, 0.05), (0.35, 0.35, 0.0, 0.1)]
-    num_objects = len(params)
-    balls, objects_all = create_metaballs(params)
-
-    z_min, z_max = get_z_range(balls)
-    print 'Z steps:', ((z_max - z_min) / pixel_size).simplified
+    # params = load_params('/home/farago/data/params.txt')
+    # # params = [(0.25, 0.25, 0.0, 0.05), (0.35, 0.35, 0.0, 0.1)]
+    # num_objects = len(params)
+    # balls, objects_all = create_metaballs(params)
+    # z_min, z_max = get_z_range(balls)
 
     # Random metaballs creation
-    # num_objects = np.random.randint(1, 100)
-    # metaballs, objects_all, coeff, mid = create_metaballs_random(num_objects)
-    # z_min, z_max = get_z_range(metaballs)
-    # print coeff, mid
+    num_objects = np.random.randint(1, 100)
+    metaballs, objects_all, coeff, mid = create_metaballs_random(num_objects)
+    z_min, z_max = get_z_range(metaballs)
+    print coeff, mid
+    print 'z min, max:', z_min, z_max, n * pixel_size + z_min, UNITS
+    print 'Z steps:', ((z_max - z_min) / pixel_size).simplified
 
     objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                             cl.mem_flags.COPY_HOST_PTR, hostbuf=objects_all)
 
-    res = fast_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size, thickness=True,
-            intersection_index=0)
-    print res[354,349]
-    # res1 = slow_metaballs(n, objects_mem, thickness_mem, num_objects, pixel_size)
+    thickness = fast_metaballs(n, objects_mem, num_objects, pixel_size, thickness=True)
+    # thickness = slow_metaballs(n, objects_mem, num_objects, (z_min, z_max), pixel_size)
+    TIFF.open("/home/farago/data/thickness/thickness.tif", "w").\
+        write_image(thickness[:, ::VECTOR_WIDTH].astype(np.float32))
+
+    res_mem = slow_metaballs(n, objects_mem, num_objects, (z_min, z_max), pixel_size,
+            thickness=False)
     objects_mem.release()
 
-    TIFF.open("/home/farago/data/thickness/radio.tif", "w").\
-        write_image(res[:, ::VECTOR_WIDTH].astype(np.float32))
+    # for h in range(n):
+    #     res = intersections_to_slice(n, h, res_mem, z_min, pixel_size, prg)
+    #     TIFF.open("/home/farago/data/thickness/radio_{:>05}.tif".format(h), "w").\
+    #         write_image(res[:, ::VECTOR_WIDTH].astype(np.float32))
 
     plt.figure()
-    plt.imshow(res[:, ::VECTOR_WIDTH], origin="lower", cmap=cm.get_cmap("gray"),
+    plt.imshow(thickness[:, ::VECTOR_WIDTH], origin="lower", cmap=cm.get_cmap("gray"),
                interpolation="nearest")
     plt.colorbar()
 
