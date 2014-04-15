@@ -39,7 +39,7 @@ class TestPhysics(SyrisTest):
                                ref_index, lam))
 
     def _get_propagator(self, apply_phase_factor=False):
-        return physics.get_propagator(self.size, self.distance,
+        return physics.compute_propagator(self.size, self.distance,
                                       self.lam, self.pixel_size,
                                       apply_phase_factor,
                                       copy_to_host=True)
