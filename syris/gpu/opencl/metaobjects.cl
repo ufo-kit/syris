@@ -446,11 +446,13 @@ __kernel void naive_metaballs(__global vfloat *thickness,
                         __constant vfloat4 *objects,
                         const uint num_objects,
                         const vfloat2 z_range,
-                        const vfloat pixel_size) {
+                        const vfloat pixel_size,
+                        uint out_thickness) {
     int ix = get_global_id(0);
     int iy = get_global_id(1);
-    int width = get_global_size(0);
-    int m, inside, num_transitions;
+	uint mem_index = get_global_size(0) * iy + ix;
+	uint obj_offset = mem_index * MAX_OBJECTS;
+    int m, inside, num_transitions, intersection_index = 0;
     vfloat z, isosurface, dist, start, result;
     vfloat4 point;
 
@@ -474,13 +476,34 @@ __kernel void naive_metaballs(__global vfloat *thickness,
         }
         if (inside == 0 && isosurface >= 1.0) {
             inside = 1;
-            start = z;
+            if (out_thickness) {
+                start = z;
+            }
+            else {
+                thickness[2 * obj_offset + intersection_index] = z;
+                intersection_index++;
+                if (intersection_index == 2 * MAX_OBJECTS) {
+                    thickness[2 * obj_offset] = NAN;
+                    return;
+                }
+            }
         }
         if (inside == 1 && isosurface < 1.0) {
             inside = 0;
-            result += z - start;
+            if (out_thickness) {
+                result += z - start;
+            }
+            else {
+                thickness[2 * obj_offset + intersection_index] = z;
+                intersection_index++;
+            }
         }
     }
 
-    thickness[iy * width + ix] = result;
+    if (out_thickness) {
+        thickness[mem_index] = result;
+    }
+    else if (intersection_index < 2 * MAX_OBJECTS) {
+        thickness[2 * obj_offset + intersection_index] = INFINITY;
+    }
 }
