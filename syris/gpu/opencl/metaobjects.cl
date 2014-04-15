@@ -417,7 +417,7 @@ __kernel void metaballs(__global vfloat *out,
 			if (out_thickness) {
                 out[mem_index] = thickness;
             }
-            else {
+            else if (intersection_index < 2 * MAX_OBJECTS) {
                 out[2 * obj_offset + intersection_index] = INFINITY;
             }
 		}
