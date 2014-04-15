@@ -47,6 +47,29 @@ __kernel void propagator(__global vcomplex *out,
 }
 
 
+/**
+  * Compute object transfer function.
+  * @wavefield: resulting complex wavefield
+  * @thickness: projected thickness
+  * @refractive_index: refractive index of the material
+  * @wavelength: wavelength of the refractive index
+  */
+__kernel void transfer(__global vcomplex *wavefield,
+                       __global vfloat *thickness,
+                       const vcomplex refractive_index,
+                       const vfloat wavelength) {
+	int ix = get_global_id(0);
+	int iy = get_global_id(1);
+	int mem_index = iy * get_global_size(0) + ix;
+    vfloat exponent = - 2 * M_PI * thickness[mem_index] / wavelength;
+    vfloat exp_absorp = exp(exponent * refractive_index.y);
+    vfloat phase = exponent * refractive_index.x;
+
+    wavefield[mem_index] = (vcomplex)(exp_absorp * cos(phase),
+                                      exp_absorp * sin(phase));
+}
+
+
 /*
  * Calculate the exponent of a transmission function T(x,y). The exponent
  * will be evaluated when all coefficients and thicknesses are taken
@@ -76,7 +99,7 @@ __kernel void transmission_add(__global vcomplex *transmissions,
  * Transfer function T(x,y), which defines photon absorption
  * and phase changes. It depends on wavelength and material.
  */
-__kernel void transfer(__global vcomplex *transmission_coeffs,
+__kernel void transfer_coeffs(__global vcomplex *transmission_coeffs,
 						const vfloat lambda) {
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
