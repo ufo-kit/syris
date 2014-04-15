@@ -25,7 +25,7 @@ def transfer(thickness, refractive_index, wavelength, shape=None, ctx=None,
     else:
         thickness_mem = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
                                   hostbuf=thickness.simplified.magnitude.astype(
-                                          cfg.PRECISION.np_float))
+                                  cfg.PRECISION.np_float))
         shape = thickness.shape[::-1]
 
     if out_memory is None:
@@ -44,9 +44,8 @@ def transfer(thickness, refractive_index, wavelength, shape=None, ctx=None,
     return out_memory
 
 
-
 def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
-                   copy_to_host=False, ctx=None, queue=None):
+                       copy_to_host=False, ctx=None, queue=None):
     """Create a propagator with (*size*, *size*) dimensions for propagation
     *distance*, wavelength *lam*, *pixel_size* and if *apply_phase_factor*
     is True, apply the phase factor defined by Fresne approximation. If
@@ -66,13 +65,13 @@ def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False
         phase_factor = 0 + 0j
 
     cfg.OPENCL.programs['physics'].propagator(queue,
-                                 (size, size),
-                                  None,
-                                  mem,
-                                  cfg.PRECISION.np_float(distance.simplified),
-                                  cfg.PRECISION.np_float(lam.simplified),
-                                  cfg.PRECISION.np_float(pixel_size.simplified),
-                                  g_util.make_vcomplex(phase_factor))
+                                              (size, size),
+                                              None,
+                                              mem,
+                                              cfg.PRECISION.np_float(distance.simplified),
+                                              cfg.PRECISION.np_float(lam.simplified),
+                                              cfg.PRECISION.np_float(pixel_size.simplified),
+                                              g_util.make_vcomplex(phase_factor))
 
     if copy_to_host:
         res = np.empty((size, size), dtype=cfg.PRECISION.np_cplx)
