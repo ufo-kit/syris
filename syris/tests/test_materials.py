@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 from syris import config as cfg
-from syris.opticalelements.materials import PMASFMaterial, Material, HenkeMaterial, MaterialError
+from syris.opticalelements.materials import Material, MaterialError, make_pmasf, make_henke
 import os
 from syris.tests.base import SyrisTest
 
@@ -20,27 +20,27 @@ class TestPMASFMaterial(SyrisTest):
 
     @pmasf_required
     def test_one_energy(self):
-        material = PMASFMaterial("PMMA", [20] * q.keV)
+        material = make_pmasf("PMMA", [20] * q.keV)
         self.assertEqual(len(material.refractive_indices), 1)
 
     @pmasf_required
     def test_multiple_energies(self):
         energies = np.linspace(15, 25, 10) * q.keV
-        material = PMASFMaterial("PMMA", energies)
+        material = make_pmasf("PMMA", energies)
         self.assertEqual(len(material.refractive_indices), 10)
 
     @pmasf_required
     def test_wrong_energy(self):
-        self.assertRaises(RuntimeError, PMASFMaterial, "PMMA", [0] * q.keV)
+        self.assertRaises(RuntimeError, make_pmasf, "PMMA", [0] * q.keV)
 
     @pmasf_required
     def test_wrong_material(self):
-        self.assertRaises(RuntimeError, PMASFMaterial, "asd", [0] * q.keV)
+        self.assertRaises(RuntimeError, make_pmasf, "asd", [0] * q.keV)
 
     def test_comparison(self):
-        m_0 = Material("PMMA", None)
-        m_1 = Material("glass", None)
-        m_2 = Material("PMMA", None)
+        m_0 = Material("PMMA", None, None)
+        m_1 = Material("glass", None, None)
+        m_2 = Material("PMMA", None, None)
 
         self.assertEqual(m_0, m_2)
         self.assertNotEqual(m_0, m_1)
@@ -48,9 +48,9 @@ class TestPMASFMaterial(SyrisTest):
         self.assertNotEqual(m_0, 1)
 
     def test_hashing(self):
-        m_0 = Material("PMMA", None)
-        m_1 = Material("glass", None)
-        m_2 = Material("PMMA", None)
+        m_0 = Material("PMMA", None, None)
+        m_1 = Material("glass", None, None)
+        m_2 = Material("PMMA", None, None)
 
         self.assertEqual(len(set([m_1, m_0, m_1, m_2])), 2)
 
@@ -59,17 +59,17 @@ class TestHenkeMaterial(SyrisTest):
 
     def test_creation(self):
         energies = [100, 1000] * q.eV
-        HenkeMaterial('foo', energies, formula='H')
+        make_henke('foo', energies, formula='H')
 
     def test_out_of_range(self):
         # Minimum too small
         energies = [10, 1000] * q.eV
-        self.assertRaises(ValueError, HenkeMaterial, 'foo', energies, formula='H')
+        self.assertRaises(ValueError, make_henke, 'foo', energies, formula='H')
 
         # Maximum too big
         energies = [100, 1e7] * q.eV
-        self.assertRaises(ValueError, HenkeMaterial, 'foo', energies, formula='H')
+        self.assertRaises(ValueError, make_henke, 'foo', energies, formula='H')
 
     def test_wrong_formula(self):
         energies = [100, 1000] * q.eV
-        self.assertRaises(MaterialError, HenkeMaterial, 'foo', energies, formula='xxx')
+        self.assertRaises(MaterialError, make_henke, 'foo', energies, formula='xxx')
