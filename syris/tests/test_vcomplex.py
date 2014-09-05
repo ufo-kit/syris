@@ -2,9 +2,10 @@ import numpy as np
 import pyopencl as cl
 from syris.gpu import util as gpu_util
 from syris import config as cfg
-from syris.tests import SyrisTest
+from syris.tests import SyrisTest, slow
 
 
+@slow
 class TestVComplex(SyrisTest):
 
     def _execute_kernel(self, kernel):

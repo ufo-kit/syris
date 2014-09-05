@@ -1,11 +1,12 @@
 import numpy as np
 import quantities as q
 from syris.devices.sources import BendingMagnet
-from syris.tests import SyrisTest
+from syris.tests import SyrisTest, slow
 
 
 class TestSources(SyrisTest):
 
+    @slow
     def test_bending_magnet_approx(self):
         angle_step = 10
         ps = 10 * q.um

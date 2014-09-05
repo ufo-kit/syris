@@ -4,7 +4,7 @@ from syris.opticalelements import geometry as geom
 from syris.opticalelements.geometry import Trajectory
 from syris.opticalelements.graphicalobjects import MetaBall, CompositeObject
 from syris.opticalelements.materials import Material
-from syris.tests import SyrisTest
+from syris.tests import SyrisTest, slow
 import itertools
 from numpy import linalg
 from syris.tests.graphics_util import get_linear_points
@@ -216,6 +216,7 @@ class TestGraphicalObjects(SyrisTest):
 
         np.testing.assert_equal(old, self.composite.transform_matrix)
 
+    @slow
     def test_get_displacement(self):
         p = np.linspace(1, 10, 100)
         x = p
@@ -227,6 +228,7 @@ class TestGraphicalObjects(SyrisTest):
 
         check_distances(ball, 100 * q.mm, 3)
 
+    @slow
     def test_get_next_time(self):
         def move_and_get_position(composite, primitive, abs_time):
             composite.clear_transformation()

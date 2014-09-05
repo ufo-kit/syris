@@ -12,3 +12,9 @@ def pmasf_required(func):
     """
     func.pmasf_required = 1
     return func
+
+
+def slow(func):
+    """Mark a test as slow."""
+    func.slow = 1
+    return func
