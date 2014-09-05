@@ -285,8 +285,10 @@ class TestGraphicalObjects(SyrisTest):
         right = self.composite
         root = CompositeObject(traj, gr_objects=[left, right])
 
-        pmma = Material('pmma', None, None)
-        si = Material('Si', None, None)
+        energies = [0] * q.eV
+        indices = [0 + 0j]
+        pmma = Material('pmma', indices, energies)
+        si = Material('Si', indices, energies)
 
         # A change in one primitive object changes
         # the first top level composite object and all
