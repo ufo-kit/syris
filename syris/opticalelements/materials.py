@@ -108,8 +108,7 @@ def make_pmasf(name, energies):
         if line != "":
             ref_ind = line.split("\t")[1]
             delta, beta = ref_ind.split(" ")
-            indices.append(cfg.PRECISION.np_cplx(cfg.PRECISION.np_float(delta) +
-                                                 cfg.PRECISION.np_float(beta) * 1j))
+            indices.append(cfg.PRECISION.np_cplx(float(delta) + float(beta) * 1j))
 
     return Material(name, indices, energies)
 
