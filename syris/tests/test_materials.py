@@ -6,38 +6,11 @@ import os
 from syris.tests import SyrisTest, pmasf_required, slow
 
 
-class TestPMASFMaterial(SyrisTest):
+class TestMaterial(SyrisTest):
 
     def setUp(self):
         self.energies = np.arange(1, 5, 1) * q.keV
         self.refractive_indices = np.array([i + i * 1j for i in range(1, len(self.energies) + 1)])
-
-        if not os.path.exists(cfg.PMASF_FILE):
-            # Remote access.
-            cfg.PMASF_FILE = "ssh ufo /home/ws/jd2392/software/asf/pmasf"
-
-    @slow
-    @pmasf_required
-    def test_one_energy(self):
-        material = make_pmasf("PMMA", [20] * q.keV)
-        self.assertEqual(len(material.refractive_indices), 1)
-
-    @slow
-    @pmasf_required
-    def test_multiple_energies(self):
-        energies = np.linspace(15, 25, 10) * q.keV
-        material = make_pmasf("PMMA", energies)
-        self.assertEqual(len(material.refractive_indices), 10)
-
-    @slow
-    @pmasf_required
-    def test_wrong_energy(self):
-        self.assertRaises(RuntimeError, make_pmasf, "PMMA", [0] * q.keV)
-
-    @slow
-    @pmasf_required
-    def test_wrong_material(self):
-        self.assertRaises(RuntimeError, make_pmasf, "asd", [0] * q.keV)
 
     def test_comparison(self):
         m_0 = Material("PMMA", self.refractive_indices, self.energies)
@@ -74,14 +47,41 @@ class TestPMASFMaterial(SyrisTest):
         self.assertRaises(MaterialError, material.get_refractive_index, 1 * q.eV)
 
 
+@slow
+@pmasf_required
+class TestPMASFMaterial(SyrisTest):
+
+    def setUp(self):
+        self.energies = np.arange(1, 5, 1) * q.keV
+        self.refractive_indices = np.array([i + i * 1j for i in range(1, len(self.energies) + 1)])
+
+        if not os.path.exists(cfg.PMASF_FILE):
+            # Remote access.
+            cfg.PMASF_FILE = "ssh ufo /home/ws/jd2392/software/asf/pmasf"
+
+    def test_one_energy(self):
+        material = make_pmasf("PMMA", [20] * q.keV)
+        self.assertEqual(len(material.refractive_indices), 1)
+
+    def test_multiple_energies(self):
+        energies = np.linspace(15, 25, 10) * q.keV
+        material = make_pmasf("PMMA", energies)
+        self.assertEqual(len(material.refractive_indices), 10)
+
+    def test_wrong_energy(self):
+        self.assertRaises(RuntimeError, make_pmasf, "PMMA", [0] * q.keV)
+
+    def test_wrong_material(self):
+        self.assertRaises(RuntimeError, make_pmasf, "asd", [0] * q.keV)
+
+
+@slow
 class TestHenkeMaterial(SyrisTest):
 
-    @slow
     def test_creation(self):
         energies = np.arange(1, 10, 1) * q.keV
         make_henke('foo', energies, formula='H')
 
-    @slow
     def test_out_of_range(self):
         # Minimum too small
         energies = np.arange(1, 1000, 1) * q.eV
@@ -91,7 +91,6 @@ class TestHenkeMaterial(SyrisTest):
         energies = np.arange(1, 1000, 1) * q.keV
         self.assertRaises(ValueError, make_henke, 'foo', energies, formula='H')
 
-    @slow
     def test_wrong_formula(self):
         energies = np.arange(1, 10, 1) * q.keV
         self.assertRaises(MaterialError, make_henke, 'foo', energies, formula='xxx')
