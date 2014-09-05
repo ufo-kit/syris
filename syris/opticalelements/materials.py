@@ -18,14 +18,14 @@ LOGGER = logging.getLogger(__name__)
 
 class Material(object):
 
-    """Abstract class representing materials."""
+    """A material represented by its *name* and *refractive_indices* calculated for *energies*."""
 
-    def __init__(self, name, energies):
-        """Create material with *name* store its complex refractive indices
+    def __init__(self, name, refractive_indices, energies):
+        """Create material with *name* and store its complex *refractive_indices* (delta + ibeta)
         for all given *energies*.
         """
         self._name = name
-        self._refractive_indices = []
+        self._refractive_indices = refractive_indices
         # To keep track which energies were used.
         self._energies = energies
 
@@ -57,7 +57,7 @@ class Material(object):
             self.energies[energy_index])
 
     def __eq__(self, other):
-        return self.__class__ == other.__class__ and self.name == other.name
+        return isinstance(other, Material) and self.name == other.name
 
     def __ne__(self, other):
         return not self == other
@@ -69,63 +69,61 @@ class Material(object):
         return str(self.name)
 
 
-class PMASFMaterial(Material):
+def make_pmasf(name, energies):
+    """Make a material based on the PMASF program.
 
-    """Class representing materials based on their complex refractive
-    indices calculated by PMASF program written by Petr Mikulik.
+    * *name* - compund name defined in "compound.dat"
+    * *energies* - list of energies which will be taken
+        into account [keV]
+    * *steps* - number of intervals between the energies
+
+    Return a list of refractive indices.
     """
+    # determine if we are executing pmasf remotely and extract executable
+    # name.
+    if cfg.PMASF_FILE.startswith("ssh"):
+        executable = cfg.PMASF_FILE.split()[-1]
+    else:
+        executable = cfg.PMASF_FILE
 
-    def __init__(self, name, energies):
-        """Create material with *name* for given *energies*."""
-        Material.__init__(self, name, energies)
-        self._create_refractive_indices(name, energies)
+    cmd = "%s -C %s -E %f %f -p %d -+l%s -w Ed" % \
+        (cfg.PMASF_FILE, name, energies[0].rescale(q.eV),
+         energies[-1].rescale(q.eV), len(energies),
+         os.path.dirname(executable))
 
-    def _create_refractive_indices(self, name, energies):
-        """Calculate refractive indices with pmasf program, where
+    # Execute the pmasf program and get the text results
+    # via a pipe.
+    pipe = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
+    out, err = pipe.communicate()
+    if pipe.returncode != 0:
+        raise RuntimeError("pmasf error (code: {0}, message: {1})".
+                           format(pipe.returncode, err))
 
-        * *name* - compund name defined in "compound.dat"
-        * *energies* - list of energies which will be taken
-            into account [keV]
-        * *steps* - number of intervals between the energies
+    # Parse the text output to obtain the refractive indices.
+    lines = out.split("\n")
+    i_0 = lines.index("# Columns: Energy[eV]\tdelta") + 1
+    indices = []
+    for line in lines[i_0:]:
+        line = line.strip()
+        if line != "":
+            ref_ind = line.split("\t")[1]
+            delta, beta = ref_ind.split(" ")
+            indices.append(cfg.PRECISION.np_cplx(cfg.PRECISION.np_float(delta) +
+                                                 cfg.PRECISION.np_float(beta) * 1j))
 
-        Return a list of refractive indices.
-        """
-        # determine if we are executing pmasf remotely and extract executable
-        # name.
-        if cfg.PMASF_FILE.startswith("ssh"):
-            executable = cfg.PMASF_FILE.split()[-1]
-        else:
-            executable = cfg.PMASF_FILE
-
-        cmd = "%s -C %s -E %f %f -p %d -+l%s -w Ed" % \
-            (cfg.PMASF_FILE, name, energies[0].rescale(q.eV),
-             energies[-1].rescale(q.eV), len(energies),
-             os.path.dirname(executable))
-
-        # Execute the pmasf program and get the text results
-        # via a pipe.
-        pipe = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
-        out, err = pipe.communicate()
-        if pipe.returncode != 0:
-            raise RuntimeError("pmasf error (code: {0}, message: {1})".
-                               format(pipe.returncode, err))
-
-        # Parse the text output to obtain the refractive indices.
-        lines = out.split("\n")
-        i_0 = lines.index("# Columns: Energy[eV]\tdelta") + 1
-        for line in lines[i_0:]:
-            line = line.strip()
-            if line != "":
-                ref_ind = line.split("\t")[1]
-                delta, beta = ref_ind.split(" ")
-                self._refractive_indices.append(
-                    cfg.PRECISION.np_cplx(cfg.PRECISION.np_float(delta) +
-                                          cfg.PRECISION.np_float(beta) * 1j))
+    return Material(name, indices, energies)
 
 
-class HenkeMaterial(Material):
+def make_henke(name, energies, formula=None, density=-1):
+    """Make a material *name* for *energies*, use the spcified chemical *formula* and *density*."""
+    indices = _HenkeQuery(name, energies, formula=formula, density=density).refractive_indices
 
-    """Material with refractive index obtained from `The Center For X-ray Optics`_.
+    return Material(name, indices, energies)
+
+
+class _HenkeQuery(object):
+
+    """Class for obtaining refractive indices obtained from `The Center For X-ray Optics`_.
 
     .. _The Center For X-ray Optics: http://henke.lbl.gov/optical_constants/getdb2.html
     """
@@ -148,7 +146,6 @@ class HenkeMaterial(Material):
         """Create material with *name* for given *energies*, use the specified *formula* and
         material *density*.
         """
-        Material.__init__(self, name, energies)
         if not formula:
             formula = name
         if energies[0] < 30 * q.eV:
@@ -156,10 +153,12 @@ class HenkeMaterial(Material):
         if energies[-1] > 30 * q.keV:
             raise ValueError('Maximum acceptable energy is 30 keV')
 
-        parser = HenkeMaterial.HenkeHTMLParser()
+        self.energies = energies
+        self.formula = formula
+        parser = _HenkeQuery.HenkeHTMLParser()
 
         try:
-            response = self._query_server(energies, formula, density)
+            response = self._query_server(formula, density)
             if 'error' in response.lower():
                 raise MaterialError('Error finding refractive index')
             parser.feed(response)
@@ -167,20 +166,20 @@ class HenkeMaterial(Material):
             # First two lines are description
             values = urllib2.urlopen(link).readlines()[2:]
             energies_henke, indices = _parse_henke(values)
-            final_indices = _interpolate_henke(energies_henke, indices, energies)
+            self.refractive_indices = self._interpolate(energies_henke, indices)
         except urllib2.URLError:
             print >> sys.stderr, 'Cannot contact server, please check your Internet connection'
             raise
 
-    def _query_server(self, energies, formula, density):
+    def _query_server(self, formula, density):
         """Get the indices from the server."""
         data = {}
         data['Material'] = 'Enter Formula'
         data['Formula'] = formula
         data['Density'] = str(density)
         data['Scan'] = 'Energy'
-        data['Min'] = str(energies[0].rescale(q.eV).magnitude)
-        data['Max'] = str(energies[-1].rescale(q.eV).magnitude)
+        data['Min'] = str(self.energies[0].rescale(q.eV).magnitude)
+        data['Max'] = str(self.energies[-1].rescale(q.eV).magnitude)
         # Get the maximum number of points and interpolate because the website output doesn't have
         # to be spaced like we want
         data['Npts'] = str(500)
@@ -194,22 +193,21 @@ class HenkeMaterial(Material):
 
         return response.read()
 
+    def _interpolate(self, energies, refractive_indices):
+        """Interpolate arbitrary *energies* and *refractive_indices* into the ones
+        desired by the user.
+        """
+        delta = refractive_indices.real
+        beta = refractive_indices.imag
+        desired_energies = self.energies.rescale(q.eV).magnitude
 
-def _interpolate_henke(energies, refractive_indices, desired_energies):
-    """Interpolate arbitrary *energies* and *refractive_indices* into the ones
-    desired by the user *desired_energies*.
-    """
-    delta = refractive_indices.real
-    beta = refractive_indices.imag
-    desired_energies = desired_energies.rescale(q.eV).magnitude
+        tck = interp.splrep(energies, delta, k=1)
+        idelta = interp.splev(desired_energies, tck)
 
-    tck = interp.splrep(energies, delta, k=1)
-    idelta = interp.splev(desired_energies, tck)
+        tck = interp.splrep(energies, beta, k=1)
+        ibeta = interp.splev(desired_energies, tck)
 
-    tck = interp.splrep(energies, beta, k=1)
-    ibeta = interp.splev(desired_energies, tck)
-
-    return (idelta + ibeta * 1j).astype(cfg.PRECISION.np_cplx)
+        return (idelta + ibeta * 1j).astype(cfg.PRECISION.np_cplx)
 
 
 def _parse_henke(response):
