@@ -16,7 +16,7 @@ class TestPMASFMaterial(SyrisTest):
     def setUp(self):
         if not os.path.exists(cfg.PMASF_FILE):
             # Remote access.
-            cfg.PMASF_FILE = "ssh hopped_ufo /home/farago/software/asf/pmasf"
+            cfg.PMASF_FILE = "ssh ufo /home/ws/jd2392/software/asf/pmasf"
 
     @pmasf_required
     def test_one_energy(self):
