@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 from syris import config as cfg
-from syris.opticalelements.materials import PMASFMaterial, Material
+from syris.opticalelements.materials import PMASFMaterial, Material, HenkeMaterial, MaterialError
 import os
 from syris.tests.base import SyrisTest
 
@@ -53,3 +53,23 @@ class TestPMASFMaterial(SyrisTest):
         m_2 = Material("PMMA", None)
 
         self.assertEqual(len(set([m_1, m_0, m_1, m_2])), 2)
+
+
+class TestHenkeMaterial(SyrisTest):
+
+    def test_creation(self):
+        energies = [100, 1000] * q.eV
+        HenkeMaterial('foo', energies, formula='H')
+
+    def test_out_of_range(self):
+        # Minimum too small
+        energies = [10, 1000] * q.eV
+        self.assertRaises(ValueError, HenkeMaterial, 'foo', energies, formula='H')
+
+        # Maximum too big
+        energies = [100, 1e7] * q.eV
+        self.assertRaises(ValueError, HenkeMaterial, 'foo', energies, formula='H')
+
+    def test_wrong_formula(self):
+        energies = [100, 1000] * q.eV
+        self.assertRaises(MaterialError, HenkeMaterial, 'foo', energies, formula='xxx')
