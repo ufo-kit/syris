@@ -1,16 +1,16 @@
 """Sample material represented by a complex refractive index."""
-import urllib
-import urllib2
-import sys
-from HTMLParser import HTMLParser
-from urlparse import urljoin
-import numpy as np
-from scipy import interpolate as interp
-from syris import config as cfg, physics
 import logging
 import os
+import sys
+import urllib
+import urllib2
+from HTMLParser import HTMLParser
 from subprocess import Popen, PIPE
+from urlparse import urljoin
+import numpy as np
 import quantities as q
+from scipy import interpolate as interp
+from syris import config as cfg, physics
 
 
 LOGGER = logging.getLogger(__name__)
