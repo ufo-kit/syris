@@ -3,7 +3,7 @@ import pyopencl as cl
 import syris
 from syris import config as cfg
 from syris.gpu import util as gu
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 class TestGPUUtil(SyrisTest):

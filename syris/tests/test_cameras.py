@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 from syris.devices.cameras import Camera, FPSError, is_fps_feasible
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 class TestCamera(SyrisTest):

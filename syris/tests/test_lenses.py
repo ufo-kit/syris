@@ -1,6 +1,6 @@
 import quantities as q
 from syris.devices.lenses import Lens
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 class TestLenses(SyrisTest):

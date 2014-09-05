@@ -4,7 +4,7 @@ from syris.opticalelements import geometry as geom
 from syris.opticalelements.geometry import Trajectory
 from syris.opticalelements.graphicalobjects import MetaBall, CompositeObject
 from syris.opticalelements.materials import Material
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 import itertools
 from numpy import linalg
 from syris.tests.graphics_util import get_linear_points

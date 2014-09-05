@@ -2,7 +2,7 @@ import numpy as np
 import pyopencl as cl
 from syris.config import PRECISION
 from syris.gpu import util as gpu_util
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 ctx = gpu_util.get_cuda_context()
 queue = gpu_util.get_command_queues(ctx)[0]

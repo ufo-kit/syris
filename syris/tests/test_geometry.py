@@ -4,7 +4,7 @@ import quantities as q
 from syris.opticalelements import geometry as geom
 import itertools
 from syris.opticalelements.geometry import BoundingBox
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 def get_base():

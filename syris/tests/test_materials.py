@@ -3,12 +3,7 @@ import quantities as q
 from syris import config as cfg
 from syris.opticalelements.materials import Material, MaterialError, make_pmasf, make_henke
 import os
-from syris.tests.base import SyrisTest
-
-
-def pmasf_required(func):
-    func.pmasf_required = 1
-    return func
+from syris.tests import SyrisTest, pmasf_required
 
 
 class TestPMASFMaterial(SyrisTest):

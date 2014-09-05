@@ -6,7 +6,7 @@ from syris.gpu import util as gpu_util
 from syris import config as cfg
 from syris import imageprocessing as ip
 import itertools
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 class TestGPUImageProcessing(SyrisTest):

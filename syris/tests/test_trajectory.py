@@ -7,7 +7,7 @@ import numpy as np
 import quantities as q
 from scipy import interpolate as interp
 from syris.opticalelements.geometry import Trajectory
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 class TestTrajectory(SyrisTest):

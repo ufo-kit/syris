@@ -3,7 +3,7 @@ import pyopencl as cl
 import syris
 from syris import config as cfg
 from syris.imageprocessing import Tiler
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 def _get_image(y_range, x_range, ar_type=cfg.PRECISION.np_float):

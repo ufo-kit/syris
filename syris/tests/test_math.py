@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 from syris import math as smath
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 from scipy import interpolate as interp
 import math
 

@@ -3,7 +3,7 @@ import pyopencl as cl
 import quantities as q
 import syris
 from syris import physics, config as cfg
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 class TestPhysics(SyrisTest):

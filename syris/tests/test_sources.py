@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 from syris.devices.sources import BendingMagnet
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 class TestSources(SyrisTest):

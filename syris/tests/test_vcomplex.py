@@ -2,7 +2,7 @@ import numpy as np
 import pyopencl as cl
 from syris.gpu import util as gpu_util
 from syris import config as cfg
-from syris.tests.base import SyrisTest
+from syris.tests import SyrisTest
 
 
 class TestVComplex(SyrisTest):
