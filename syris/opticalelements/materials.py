@@ -1,4 +1,11 @@
 """Sample material represented by a complex refractive index."""
+import urllib
+import urllib2
+import sys
+from HTMLParser import HTMLParser
+from urlparse import urljoin
+import numpy as np
+from scipy import interpolate as interp
 from syris import config as cfg, physics
 import logging
 import os
@@ -114,3 +121,112 @@ class PMASFMaterial(Material):
                 self._refractive_indices.append(
                     cfg.PRECISION.np_cplx(cfg.PRECISION.np_float(delta) +
                                           cfg.PRECISION.np_float(beta) * 1j))
+
+
+class HenkeMaterial(Material):
+
+    """Material with refractive index obtained from `The Center For X-ray Optics`_.
+
+    .. _The Center For X-ray Optics: http://henke.lbl.gov/optical_constants/getdb2.html
+    """
+
+    _URL = 'http://henke.lbl.gov'
+
+    class HenkeHTMLParser(HTMLParser):
+
+        """HTML parser for obtaining the link with refractive indices after form submission."""
+
+        def __init__(self):
+            HTMLParser.__init__(self)
+            self.link = None
+
+        def handle_starttag(self, tag, attrs):
+            if attrs and attrs[0][0] == 'href':
+                self.link = attrs[0][1]
+
+    def __init__(self, name, energies, formula=None, density=-1):
+        """Create material with *name* for given *energies*, use the specified *formula* and
+        material *density*.
+        """
+        Material.__init__(self, name, energies)
+        if not formula:
+            formula = name
+        if energies[0] < 30 * q.eV:
+            raise ValueError('Minimum acceptable energy is 30 eV')
+        if energies[-1] > 30 * q.keV:
+            raise ValueError('Maximum acceptable energy is 30 keV')
+
+        parser = HenkeMaterial.HenkeHTMLParser()
+
+        try:
+            response = self._query_server(energies, formula, density)
+            if 'error' in response.lower():
+                raise MaterialError('Error finding refractive index')
+            parser.feed(response)
+            link = urljoin(self._URL, parser.link)
+            # First two lines are description
+            values = urllib2.urlopen(link).readlines()[2:]
+            energies_henke, indices = _parse_henke(values)
+            final_indices = _interpolate_henke(energies_henke, indices, energies)
+        except urllib2.URLError:
+            print >> sys.stderr, 'Cannot contact server, please check your Internet connection'
+            raise
+
+    def _query_server(self, energies, formula, density):
+        """Get the indices from the server."""
+        data = {}
+        data['Material'] = 'Enter Formula'
+        data['Formula'] = formula
+        data['Density'] = str(density)
+        data['Scan'] = 'Energy'
+        data['Min'] = str(energies[0].rescale(q.eV).magnitude)
+        data['Max'] = str(energies[-1].rescale(q.eV).magnitude)
+        # Get the maximum number of points and interpolate because the website output doesn't have
+        # to be spaced like we want
+        data['Npts'] = str(500)
+        data['Output'] = 'Text File'
+        url_values = urllib.urlencode(data)
+
+        url = urljoin(self._URL, '/cgi-bin/getdb.pl')
+
+        req = urllib2.Request(url, url_values)
+        response = urllib2.urlopen(req)
+
+        return response.read()
+
+
+def _interpolate_henke(energies, refractive_indices, desired_energies):
+    """Interpolate arbitrary *energies* and *refractive_indices* into the ones
+    desired by the user *desired_energies*.
+    """
+    delta = refractive_indices.real
+    beta = refractive_indices.imag
+    desired_energies = desired_energies.rescale(q.eV).magnitude
+
+    tck = interp.splrep(energies, delta, k=1)
+    idelta = interp.splev(desired_energies, tck)
+
+    tck = interp.splrep(energies, beta, k=1)
+    ibeta = interp.splev(desired_energies, tck)
+
+    return (idelta + ibeta * 1j).astype(cfg.PRECISION.np_cplx)
+
+
+def _parse_henke(response):
+    """Parse server response *response* for energies, delta and beta and return a tuple
+    (energies, ref_indices).
+    """
+    split = [line.split() for line in response]
+    energies, delta, beta = zip(*split)
+    delta = np.array(delta).astype(np.float)
+    beta = np.array(beta).astype(np.float)
+    energies = np.array(energies).astype(np.float)
+
+    return energies, (delta + beta * 1j).astype(cfg.PRECISION.np_cplx)
+
+
+class MaterialError(Exception):
+
+    """Material errors"""
+
+    pass
