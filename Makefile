@@ -7,7 +7,10 @@ RUNTEST = nosetests syris
 all: build
 
 install: clean build
-	$(SETUP) install
+	$(SETUP) install --record install_manifest.txt
+
+uninstall:
+	cat install_manifest.txt | xargs rm -rf
 
 build:
 	$(SETUP) build
