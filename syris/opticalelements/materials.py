@@ -25,9 +25,12 @@ class Material(object):
         for all given *energies*.
         """
         self._name = name
-        self._refractive_indices = refractive_indices
+        self._refractive_indices = np.array(refractive_indices)
         # To keep track which energies were used.
         self._energies = energies
+        if len(self._energies) > 3:
+            self._tckr = interp.splrep(self._energies, self.refractive_indices.real)
+            self._tcki = interp.splrep(self._energies, self.refractive_indices.imag)
 
     @property
     def name(self):
@@ -55,6 +58,20 @@ class Material(object):
         return physics.ref_index_to_attenuation(
             self.refractive_indices[energy_index],
             self.energies[energy_index])
+
+    def get_refractive_index(self, energy):
+        """Interpolate refractive indices to obtain the one at *energy*."""
+        if len(self.energies) < 4:
+            raise MaterialError('Number of energy points \'{}\' '.format(len(self.energies)) +
+                                'is too few for interpolation')
+        if energy < self._energies[0] or energy > self._energies[-1]:
+            raise ValueError('Energy \'{}\' not within limits \'[{}, {}]\''.
+                             format(energy, self._energies[0], self._energies[1]))
+        energy = energy.rescale(self._energies.units).magnitude
+        real = interp.splev(energy, self._tckr)
+        imag = interp.splev(energy, self._tcki)
+
+        return cfg.PRECISION.np_cplx(real + imag * 1j)
 
     def __eq__(self, other):
         return isinstance(other, Material) and self.name == other.name
