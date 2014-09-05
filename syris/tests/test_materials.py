@@ -9,6 +9,9 @@ from syris.tests import SyrisTest, pmasf_required, slow
 class TestPMASFMaterial(SyrisTest):
 
     def setUp(self):
+        self.energies = np.arange(1, 5, 1) * q.keV
+        self.refractive_indices = np.array([i + i * 1j for i in range(1, len(self.energies) + 1)])
+
         if not os.path.exists(cfg.PMASF_FILE):
             # Remote access.
             cfg.PMASF_FILE = "ssh ufo /home/ws/jd2392/software/asf/pmasf"
@@ -37,9 +40,9 @@ class TestPMASFMaterial(SyrisTest):
         self.assertRaises(RuntimeError, make_pmasf, "asd", [0] * q.keV)
 
     def test_comparison(self):
-        m_0 = Material("PMMA", None, None)
-        m_1 = Material("glass", None, None)
-        m_2 = Material("PMMA", None, None)
+        m_0 = Material("PMMA", self.refractive_indices, self.energies)
+        m_1 = Material("glass", self.refractive_indices, self.energies)
+        m_2 = Material("PMMA", self.refractive_indices, self.energies)
 
         self.assertEqual(m_0, m_2)
         self.assertNotEqual(m_0, m_1)
@@ -47,31 +50,48 @@ class TestPMASFMaterial(SyrisTest):
         self.assertNotEqual(m_0, 1)
 
     def test_hashing(self):
-        m_0 = Material("PMMA", None, None)
-        m_1 = Material("glass", None, None)
-        m_2 = Material("PMMA", None, None)
+        m_0 = Material("PMMA", self.refractive_indices, self.energies)
+        m_1 = Material("glass", self.refractive_indices, self.energies)
+        m_2 = Material("PMMA", self.refractive_indices, self.energies)
 
         self.assertEqual(len(set([m_1, m_0, m_1, m_2])), 2)
+
+    def test_interpolation(self):
+        mat = Material('foo', self.refractive_indices, self.energies)
+        index = mat.get_refractive_index(2400 * q.eV)
+        self.assertAlmostEqual(2.4, index.real, places=5)
+        self.assertAlmostEqual(2.4, index.imag, places=5)
+
+    def test_interpolation_out_of_bounds(self):
+        mat = Material('foo', self.refractive_indices, self.energies)
+        self.assertRaises(ValueError, mat.get_refractive_index, 1 * q.eV)
+        self.assertRaises(ValueError, mat.get_refractive_index, 1 * q.MeV)
+
+    def test_interpolation_few_points(self):
+        energies = [0] * q.eV
+        indices = [1 + 1j]
+        material = Material('foo', indices, energies)
+        self.assertRaises(MaterialError, material.get_refractive_index, 1 * q.eV)
 
 
 class TestHenkeMaterial(SyrisTest):
 
     @slow
     def test_creation(self):
-        energies = [100, 1000] * q.eV
+        energies = np.arange(1, 10, 1) * q.keV
         make_henke('foo', energies, formula='H')
 
     @slow
     def test_out_of_range(self):
         # Minimum too small
-        energies = [10, 1000] * q.eV
+        energies = np.arange(1, 1000, 1) * q.eV
         self.assertRaises(ValueError, make_henke, 'foo', energies, formula='H')
 
         # Maximum too big
-        energies = [100, 1e7] * q.eV
+        energies = np.arange(1, 1000, 1) * q.keV
         self.assertRaises(ValueError, make_henke, 'foo', energies, formula='H')
 
     @slow
     def test_wrong_formula(self):
-        energies = [100, 1000] * q.eV
+        energies = np.arange(1, 10, 1) * q.keV
         self.assertRaises(MaterialError, make_henke, 'foo', energies, formula='xxx')
