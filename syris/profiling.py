@@ -15,7 +15,7 @@ from matplotlib import pyplot as plt
 from optparse import OptionParser
 import os
 
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 # Singleton.
 PROFILER = None
@@ -115,14 +115,14 @@ class Profiler(Thread):
             except Empty:
                 pass
             except Exception as exc:
-                LOGGER.error(exc)
+                LOG.error(exc)
         self._profile_file.close()
 
     def shutdown(self):
         """Wait for all events to finish and then stop the PROFILER loop."""
         self.finish = True
         self.join()
-        LOGGER.debug("Profiler finished.")
+        LOG.debug("Profiler finished.")
 
     def add(self, event, func_name=""):
         """Add an OpenCL *event* and function with name *func_name*

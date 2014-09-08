@@ -13,7 +13,7 @@ from scipy import interpolate as interp
 from syris import config as cfg, physics
 
 
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 class Material(object):

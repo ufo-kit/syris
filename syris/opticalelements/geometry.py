@@ -30,7 +30,7 @@ Z_AX = np.array([0, 0, 1]) * q.dimensionless
 
 AXES = {X: X_AX, Y: Y_AX, Z: Z_AX}
 
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 class BoundingBox(object):

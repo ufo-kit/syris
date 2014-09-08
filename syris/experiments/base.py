@@ -4,7 +4,7 @@ import logging
 import math
 
 
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 class Experiment(object):
@@ -121,11 +121,11 @@ class Experiment(object):
             while frame * d_t <= next_t:
                 # yield a visible light image
                 pass
-                LOGGER.debug("Writing out image {0}".format(frame))
+                LOG.debug("Writing out image {0}".format(frame))
                 frame += 1
 
             duration = next_t - cur_t
-            LOGGER.debug("Calculating image {0} in times {1} - {2}".
+            LOG.debug("Calculating image {0} in times {1} - {2}".
                          format(frame, cur_t, next_t))
             # superimpose subpositions until the exposure time is over
             pass

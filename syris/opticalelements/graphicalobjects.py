@@ -24,7 +24,7 @@ from syris import math as smath
 import struct
 from quantities.quantity import Quantity
 
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 class GraphicalObject(object):

@@ -12,7 +12,7 @@ from syris import config as cfg
 import logging
 
 
-LOGGER = logging.getLogger(__name__)
+LOG = logging.getLogger(__name__)
 
 
 _SINGLE_HEADER = """
@@ -158,10 +158,10 @@ def get_cuda_context(devices=None, properties=None):
     if devices is None:
         devices = get_cuda_platform(cl.get_platforms()).get_devices()
 
-    LOGGER.debug("Creating OpenCL context for %d devices." % (len(devices)))
+    LOG.debug("Creating OpenCL context for %d devices." % (len(devices)))
     start = time.time()
     ctx = cl.Context(devices, properties)
-    LOGGER.debug("OpenCL context created in %g s." % (time.time() - start))
+    LOG.debug("OpenCL context created in %g s." % (time.time() - start))
 
     return ctx
 
@@ -179,13 +179,13 @@ def get_command_queues(context, devices=None,
     if queue_kwargs is None:
         queue_kwargs = {}
 
-    LOGGER.debug("Creating %d command queues." % (len(devices)))
+    LOG.debug("Creating %d command queues." % (len(devices)))
     queues = []
     for device in devices:
         queues.append(cl.CommandQueue(context, device,
                                       *queue_args, **queue_kwargs))
 
-    LOGGER.debug("%d command queues created." % (len(devices)))
+    LOG.debug("%d command queues created." % (len(devices)))
 
     return queues
 
