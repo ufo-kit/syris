@@ -66,7 +66,7 @@ class Material(object):
                                 'is too few for interpolation')
         if energy < self._energies[0] or energy > self._energies[-1]:
             raise ValueError('Energy \'{}\' not within limits \'[{}, {}]\''.
-                             format(energy, self._energies[0], self._energies[1]))
+                             format(energy, self._energies[0], self._energies[-1]))
         energy = energy.rescale(self._energies.units).magnitude
         real = interp.splev(energy, self._tckr)
         imag = interp.splev(energy, self._tcki)
