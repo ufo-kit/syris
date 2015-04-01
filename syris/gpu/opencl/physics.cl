@@ -18,7 +18,7 @@ __kernel void propagator(__global vcomplex *out,
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
 	int n = get_global_size(0);
-	vfloat i, j, tmp;
+	vfloat i, j, tmp, sine, cosine;
 	vcomplex result, c_tmp;
 
 	/* Map image coordinates to Fourier coordinates. */
@@ -35,10 +35,11 @@ __kernel void propagator(__global vcomplex *out,
 	 */
 	tmp = - M_PI * lam * distance * (i * i + j * j) /
 			(pixel_size * pixel_size);
+    sine = sincos(tmp, &cosine);
 	if (phase_factor.x == 0 && phase_factor.y == 0) {
-		result = (vcomplex)(cos(tmp), sin(tmp));
+		result = (vcomplex)(cosine, sine);
 	} else {
-		c_tmp = (vcomplex)(cos(tmp), sin(tmp));
+		c_tmp = (vcomplex)(cosine, sine);
 		result = vc_mul(&phase_factor, &c_tmp);
 	}
 
@@ -61,12 +62,14 @@ __kernel void transfer(__global vcomplex *wavefield,
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
 	int mem_index = iy * get_global_size(0) + ix;
+    vfloat sine, cosine;
     vfloat exponent = - 2 * M_PI * thickness[mem_index] / wavelength;
     vfloat exp_absorp = exp(exponent * refractive_index.y);
     vfloat phase = exponent * refractive_index.x;
 
-    wavefield[mem_index] = (vcomplex)(exp_absorp * cos(phase),
-                                      exp_absorp * sin(phase));
+    sine = sincos(phase, &cosine);
+    wavefield[mem_index] = (vcomplex)(exp_absorp * cosine,
+                                      exp_absorp * sine);
 }
 
 
@@ -104,6 +107,7 @@ __kernel void transfer_coeffs(__global vcomplex *transmission_coeffs,
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
 	int width = get_global_size(0);
+    vfloat sine, cosine;
 
 	vfloat phase, absorp, e_a, k;
 	k = -2 * M_PI / lambda;
@@ -113,7 +117,8 @@ __kernel void transfer_coeffs(__global vcomplex *transmission_coeffs,
 	/* Real part - absorption. */
 	absorp = k * (transmission_coeffs[iy * width + ix].y);
 	e_a = exp(absorp);
+    sine = sincos(phase, &cosine);
 
-	transmission_coeffs[iy * width + ix] = (vcomplex)(e_a * cos(phase),
-														e_a * sin(phase));
+	transmission_coeffs[iy * width + ix] = (vcomplex)(e_a * cosine,
+														e_a * sine);
 }
