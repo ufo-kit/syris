@@ -53,6 +53,8 @@ def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False
     is specified, execute the kernel on it. *ctx* is OpenCL context and
     *queue* is a CommandQueue.
     """
+    if size % 2:
+        raise ValueError('Only even sizes are supported')
     if ctx is None:
         ctx = cfg.OPENCL.ctx
     if queue is None:
@@ -65,7 +67,7 @@ def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False
         phase_factor = 0 + 0j
 
     cfg.OPENCL.programs['physics'].propagator(queue,
-                                              (size, size),
+                                              (size / 2 + 1, size / 2 + 1),
                                               None,
                                               mem,
                                               cfg.PRECISION.np_float(distance.simplified),

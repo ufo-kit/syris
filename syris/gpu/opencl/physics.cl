@@ -17,13 +17,15 @@ __kernel void propagator(__global vcomplex *out,
 
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
-	int n = get_global_size(0);
+    int patch = get_global_size (0) - 1;
+	int n = 2 * patch;
 	vfloat i, j, tmp, sine, cosine;
 	vcomplex result, c_tmp;
 
-	/* Map image coordinates to Fourier coordinates. */
-	i = -0.5 + ((vfloat) ix) / n;
-	j = -0.5 + ((vfloat) iy) / n;
+	/* Map image coordinates to Fourier coordinates. Sign doesn't matter
+     * because of the square in the computation. */
+	i = (vfloat) ix / n;
+	j = (vfloat) iy / n;
 
 	/*
 	 * Fresnel propagator in the Fourier domain:
@@ -43,8 +45,17 @@ __kernel void propagator(__global vcomplex *out,
 		result = vc_mul(&phase_factor, &c_tmp);
 	}
 
-	/* Lowest frequencies are in the corners. */
-	out[n * ((iy + n / 2) % n) + ((ix + n / 2) % n)] = result;
+    /* Fill all quadrants */
+	out[iy * n + ix] = result;
+    if (0 < ix && ix < patch) {
+        out[iy * n + n - ix] = result;
+        if (0 < iy && iy < patch) {
+            out[(n - iy) * n + n - ix] = result;
+        }
+    }
+    if (0 < iy && iy < patch) {
+	    out[(n - iy) * n + ix] = result;
+    }
 }
 
 
