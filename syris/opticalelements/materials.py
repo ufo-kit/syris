@@ -55,9 +55,8 @@ class Material(object):
         """Get the linear attenuation coefficient baseo on *energy_index*
         to the energies for which the material was defined.
         """
-        return physics.ref_index_to_attenuation(
-            self.refractive_indices[energy_index],
-            self.energies[energy_index])
+        return physics.ref_index_to_attenuation_coeff(self.refractive_indices[energy_index],
+                                                      self.energies[energy_index])
 
     def get_refractive_index(self, energy):
         """Interpolate refractive indices to obtain the one at *energy*."""
