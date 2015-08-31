@@ -6,6 +6,9 @@ import quantities as q
 import quantities.constants.quantum as cq
 from pyopencl.array import Array
 from syris.gpu import util as g_util
+from syris.imageprocessing import get_gauss_2d
+from syris.math import fwnm_to_sigma
+from syris.util import make_tuple
 from syris import config as cfg
 
 
@@ -43,10 +46,13 @@ def transfer(thickness, refractive_index, wavelength, shape=None, queue=None, ou
     return out
 
 
-def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False, queue=None):
+def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase_factor=False,
+                       mollified=True, queue=None):
     """Create a propagator with (*size*, *size*) dimensions for propagation *distance*, wavelength
-    *lam*, *pixel_size* and if *apply_phase_factor* is True, apply the phase factor defined by
-    Fresne approximation. If command *queue* is specified, execute the kernel on it.
+    *lam* and *pixel_size*. *region* is the diameter of the the wavefront area which is capable of
+    interference. If *apply_phase_factor* is True, apply the phase factor defined by Fresnel
+    approximation. If *mollified* is True the aliased frequencies are suppressed. If command *queue*
+    is specified, execute the kernel on it.
     """
     if size % 2:
         raise ValueError('Only even sizes are supported')
@@ -67,6 +73,16 @@ def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False
                                               cfg.PRECISION.np_float(lam.simplified),
                                               cfg.PRECISION.np_float(pixel_size.simplified),
                                               g_util.make_vcomplex(phase_factor))
+
+    if mollified:
+        fwtm = compute_aliasing_limit(size, lam, pixel_size, size * pixel_size, distance)
+        if region is not None:
+            fwtm_region = compute_aliasing_limit(size, lam, pixel_size, region, distance)
+            fwtm = min(fwtm_region, fwtm)
+
+        sigma = fwnm_to_sigma(fwtm * size * pixel_size, n=10)
+        mollifier = get_gauss_2d(size, sigma, pixel_size, fourier=False, queue=queue)
+        out = out * mollifier
 
     return out
 
