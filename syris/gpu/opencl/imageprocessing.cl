@@ -17,7 +17,8 @@ __kernel void gauss_2d(__global vfloat *out, const vfloat2 sigma, const vfloat2 
     vfloat x = (ix - width / 2) * pixel_size.x;
     vfloat y = (iy - height / 2) * pixel_size.y;
 
-    out[iy * width + ix] = exp (- x * x / (2 * sigma.x * sigma.x) - y * y / (2 * sigma.y * sigma.y));
+    out[width * ((iy + height / 2) % height) + ((ix + width / 2) % width)] =
+            exp (- x * x / (2 * sigma.x * sigma.x) - y * y / (2 * sigma.y * sigma.y));
 }
 
 /*
