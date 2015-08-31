@@ -43,23 +43,17 @@ def transfer(thickness, refractive_index, wavelength, shape=None, queue=None, ou
     return out
 
 
-def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
-                       copy_to_host=False, ctx=None, queue=None):
-    """Create a propagator with (*size*, *size*) dimensions for propagation
-    *distance*, wavelength *lam*, *pixel_size* and if *apply_phase_factor*
-    is True, apply the phase factor defined by Fresne approximation. If
-    *copy_to_host* is True, copy the propagator to host. If command *queue*
-    is specified, execute the kernel on it. *ctx* is OpenCL context and
-    *queue* is a CommandQueue.
+def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False, queue=None):
+    """Create a propagator with (*size*, *size*) dimensions for propagation *distance*, wavelength
+    *lam*, *pixel_size* and if *apply_phase_factor* is True, apply the phase factor defined by
+    Fresne approximation. If command *queue* is specified, execute the kernel on it.
     """
     if size % 2:
         raise ValueError('Only even sizes are supported')
-    if ctx is None:
-        ctx = cfg.OPENCL.ctx
     if queue is None:
         queue = cfg.OPENCL.queue
 
-    mem = cl.Buffer(ctx, cl.mem_flags.READ_ONLY, size=size ** 2 * cfg.PRECISION.cl_cplx)
+    out = Array(queue, (size, size), cfg.PRECISION.np_cplx)
     if apply_phase_factor:
         phase_factor = np.exp(2 * np.pi * distance.simplified / lam.simplified * 1j)
     else:
@@ -68,19 +62,13 @@ def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False
     cfg.OPENCL.programs['physics'].propagator(queue,
                                               (size / 2 + 1, size / 2 + 1),
                                               None,
-                                              mem,
+                                              out.data,
                                               cfg.PRECISION.np_float(distance.simplified),
                                               cfg.PRECISION.np_float(lam.simplified),
                                               cfg.PRECISION.np_float(pixel_size.simplified),
                                               g_util.make_vcomplex(phase_factor))
 
-    if copy_to_host:
-        res = np.empty((size, size), dtype=cfg.PRECISION.np_cplx)
-        cl.enqueue_copy(queue, res, mem)
-    else:
-        res = mem
-
-    return res
+    return out
 
 
 def energy_to_wavelength(energy):

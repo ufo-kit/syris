@@ -41,8 +41,7 @@ class TestPhysics(SyrisTest):
     def _get_propagator(self, apply_phase_factor=False):
         return physics.compute_propagator(self.size, self.distance,
                                           self.lam, self.pixel_size,
-                                          apply_phase_factor,
-                                          copy_to_host=True)
+                                          apply_phase_factor).get()
 
     def _cpu_propagator(self, phase_factor=1):
         j, i = np.mgrid[-0.5:0.5:1.0 / self.size, -0.5:0.5:1.0 / self.size].\
