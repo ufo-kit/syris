@@ -7,11 +7,23 @@
 
 
 /*
- * 2D normalized Gaussian in Fourier space.
+ * 2D Gaussian in real space.
  */
-__kernel void gauss_2_f(__global vcomplex *out,
-						const vfloat2 sigma,
-						const vfloat pixel_size) {
+__kernel void gauss_2d(__global vfloat *out, const vfloat2 sigma, const vfloat2 pixel_size) {
+    int ix = get_global_id(0);
+    int iy = get_global_id(1);
+    int width = get_global_size(0);
+    int height = get_global_size(0);
+    vfloat x = (ix - width / 2) * pixel_size.x;
+    vfloat y = (iy - height / 2) * pixel_size.y;
+
+    out[iy * width + ix] = exp (- x * x / (2 * sigma.x * sigma.x) - y * y / (2 * sigma.y * sigma.y));
+}
+
+/*
+ * 2D Gaussian in Fourier space.
+ */
+__kernel void gauss_2d_f(__global vfloat *out, const vfloat2 sigma, const vfloat2 pixel_size) {
     int ix = get_global_id(0);
     int iy = get_global_id(1);
     int n = get_global_size(0);
@@ -36,9 +48,9 @@ __kernel void gauss_2_f(__global vcomplex *out,
 	 *
 	 * The description is for brevity for 1D case.
 	 */
-    out[n * ((iy + n / 2) % n) + ((ix + n / 2) % n)] = (vcomplex)
-    		(exp(- 2 * M_PI * M_PI / (pixel_size * pixel_size) *
-				(sigma.x * sigma.x * i * i + sigma.y * sigma.y * j * j)), 0);
+    out[n * ((iy + n / 2) % n) + ((ix + n / 2) % n)] = exp(- 2 * M_PI * M_PI *
+                (sigma.x * sigma.x * i * i / (pixel_size.x * pixel_size.x) +
+                 sigma.y * sigma.y * j * j / (pixel_size.y * pixel_size.y)));
 }
 
 /*

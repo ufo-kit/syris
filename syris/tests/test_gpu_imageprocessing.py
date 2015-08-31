@@ -19,8 +19,8 @@ class TestGPUImageProcessing(SyrisTest):
         self.prg = cl.Program(cfg.OPENCL.ctx, src).build()
         self.size = 256
         self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                             size=self.size ** 2 * cfg.PRECISION.cl_cplx)
-        self.res = np.empty((self.size, self.size), dtype=cfg.PRECISION.np_cplx)
+                             size=self.size ** 2 * cfg.PRECISION.cl_float)
+        self.res = np.empty((self.size, self.size), dtype=cfg.PRECISION.np_float)
         self.distance = 1 * q.m
         self.lam = 4.9594e-11 * q.m
         self.pixel_size = 1 * q.um
@@ -40,12 +40,13 @@ class TestGPUImageProcessing(SyrisTest):
         the same as Fourier transform of a gauss in real space.
         """
         sigma = 10 * self.pixel_size.simplified, 5 * self.pixel_size.simplified
-        self.prg.gauss_2_f(cfg.OPENCL.queue,
+        self.prg.gauss_2d_f(cfg.OPENCL.queue,
                           (self.size, self.size),
                            None,
                            self.mem,
                            gpu_util.make_vfloat2(sigma[0], sigma[1]),
-                           cfg.PRECISION.np_float(self.pixel_size.simplified))
+                           gpu_util.make_vfloat2(self.pixel_size.simplified,
+                                                 self.pixel_size.simplified))
 
         cl.enqueue_copy(cfg.OPENCL.queue, self.res, self.mem)
 

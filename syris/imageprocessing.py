@@ -5,6 +5,7 @@ import pyopencl as cl
 from pyopencl.array import vec
 from syris import config as cfg
 from syris.gpu import util as g_util
+from syris.util import make_tuple
 
 
 def fft_2(data, plan, wait_for_finish=False):
@@ -22,22 +23,37 @@ def ifft_2(data, plan, wait_for_finish=False):
     plan.execute(data, inverse=True, wait_for_finish=wait_for_finish)
 
 
-def get_gauss_2_f(shape, sigma, pixel_size):
-    """Get 2D Gaussian of *shape* (y, x) in Fourier Space
-    with standard deviation *sigma* specified as (y, x) and *pixel_size*.
+def get_gauss_2d(shape, sigma, pixel_size, fourier=False, queue=None):
+    """Get 2D Gaussian of *shape* with standard deviation *sigma* and *pixel_size*. If *fourier* is
+    True the fourier transform of it is returned so it is faster for usage by convolution. Use
+    command *queue* if specified.
     """
-    mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                    size=shape[0] * shape[1] * cfg.PRECISION.cl_cplx)
+    shape = make_tuple(shape)
+    pixel_size = make_tuple(pixel_size)
+    sigma = make_tuple(sigma)
 
-    cfg.OPENCL.programs['improc'].gauss_2_f(cfg.OPENCL.queue,
-                                            shape,
-                                            None,
-                                            mem,
-                                            g_util.make_vfloat2(sigma[1].simplified,
-                                                                sigma[0].simplified),
-                                            cfg.PRECISION.np_float(pixel_size.simplified))
+    out = cl.array.Array(cfg.OPENCL.queue, shape, dtype=cfg.PRECISION.np_float)
 
-    return mem
+    if fourier:
+        cfg.OPENCL.programs['improc'].gauss_2d_f(cfg.OPENCL.queue,
+                                                 shape[::-1],
+                                                 None,
+                                                 out.data,
+                                                 g_util.make_vfloat2(sigma[1].simplified,
+                                                                     sigma[0].simplified),
+                                                 g_util.make_vfloat2(pixel_size[1].simplified,
+                                                                     pixel_size[0].simplified))
+    else:
+        cfg.OPENCL.programs['improc'].gauss_2d(cfg.OPENCL.queue,
+                                               shape[::-1],
+                                               None,
+                                               out.data,
+                                               g_util.make_vfloat2(sigma[1].simplified,
+                                                                   sigma[0].simplified),
+                                               g_util.make_vfloat2(pixel_size[1].simplified,
+                                                                   pixel_size[0].simplified))
+
+    return out
 
 
 def sum(orig_shape, summed_shape, mem, region, offset,
