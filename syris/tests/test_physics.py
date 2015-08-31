@@ -74,9 +74,7 @@ class TestPhysics(SyrisTest):
         energy = 10 * q.keV
         wavelength = physics.energy_to_wavelength(energy)
         refractive_index = 1e-6 + 1e-9j
-        wavefield_mem = physics.transfer(thickness, refractive_index, wavelength)
-        wavefield = np.empty((4, 4), dtype=cfg.PRECISION.np_cplx)
-        cl.enqueue_copy(cfg.OPENCL.queue, wavefield, wavefield_mem)
+        wavefield = physics.transfer(thickness, refractive_index, wavelength).get()
 
         exponent = - 2 * np.pi * thickness.simplified / wavelength.simplified
         truth = np.exp(exponent * np.complex(refractive_index.imag, refractive_index.real))

@@ -4,36 +4,35 @@ import numpy as np
 import pyopencl as cl
 import quantities as q
 import quantities.constants.quantum as cq
+from pyopencl.array import Array
 from syris.gpu import util as g_util
 from syris import config as cfg
 
 
-def transfer(thickness, refractive_index, wavelength, shape=None, ctx=None,
-             queue=None, out_memory=None):
+def transfer(thickness, refractive_index, wavelength, shape=None, queue=None, out_memory=None):
     """Transfer *thickness* (can be either a numpy array or OpenCL Buffer)
     with *refractive_index* and given *wavelength*. *shape* is the image shape
     as (width, height) in case *thickness* is an OpenCL Buffer. *ctx* is
     OpenCL context and queue a CommandQueue.
     """
-    if ctx is None:
-        ctx = cfg.OPENCL.ctx
     if queue is None:
         queue = cfg.OPENCL.queue
 
     if isinstance(thickness, cl.Buffer):
         thickness_mem = thickness
     else:
-        thickness_mem = cl.Buffer(ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+        thickness_mem = cl.Buffer(queue.context, cl.mem_flags.READ_ONLY |
+                                  cl.mem_flags.COPY_HOST_PTR,
                                   hostbuf=thickness.simplified.magnitude.astype(
                                   cfg.PRECISION.np_float))
-        shape = thickness.shape[::-1]
+        shape = thickness.shape
 
     if out_memory is None:
-        out_memory = cl.Buffer(ctx, cl.mem_flags.READ_WRITE,
-                               size=shape[0] * shape[1] * cfg.PRECISION.cl_cplx)
+        out = Array(queue, shape, cfg.PRECISION.np_cplx)
+        out_memory = out.data
 
     cfg.OPENCL.programs['physics'].transfer(queue,
-                                            shape,
+                                            shape[::-1],
                                             None,
                                             out_memory,
                                             thickness_mem,
@@ -41,7 +40,7 @@ def transfer(thickness, refractive_index, wavelength, shape=None, ctx=None,
                                             cfg.PRECISION.np_float(
                                                 wavelength.simplified.magnitude))
 
-    return out_memory
+    return out
 
 
 def compute_propagator(size, distance, lam, pixel_size, apply_phase_factor=False,
