@@ -129,3 +129,23 @@ def visible_light_attenuation_coeff(scintillator, camera, num_aperture,
 
     return lens_trans_eff * quantum_eff * \
         optics_collection_eff(num_aperture, scintillator.opt_ref_index)
+
+
+def compute_diffraction_angle(diameter, propagation_distance):
+    """Compute the diffraction angle for a region where a wavefield within the *diameter* can
+    interfere on a *propagation_distance*.
+    """
+    distance = propagation_distance.simplified.magnitude
+    diameter = diameter.simplified.magnitude
+
+    return np.arctan(diameter / (2 * distance))
+
+
+def compute_aliasing_limit(n, lam, pixel_size, diameter, propagation_distance):
+    """Get the non-aliased fraction of data points when propagating a wavefield to a region :math:`n
+    \\times pixel\\_size` to *propagation_distance* using wavelength *lam* and *pixel_size*.
+    """
+    cos_al_max = lam.simplified.magnitude / (2 * pixel_size.simplified.magnitude)
+    diffraction_angle = compute_diffraction_angle(diameter, propagation_distance)
+
+    return min(1, np.cos(np.pi / 2 - diffraction_angle) / cos_al_max)
