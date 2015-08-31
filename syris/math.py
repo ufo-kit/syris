@@ -84,3 +84,13 @@ def infimum(x_0, data):
     if len(smaller_indices) == 0:
         return None
     return srt[max(smaller_indices)]
+
+
+def sigma_to_fwnm(sigma, n=2):
+    """Return Gaussian full width at n-th maximum given by *sigma* and *n*."""
+    return sigma * 2 * np.sqrt(2 * np.log(n))
+
+
+def fwnm_to_sigma(fwnm, n=2):
+    """Return Gaussian sigma from full width at *n*-th maximum *fwnm*."""
+    return fwnm / (2 * np.sqrt(2 * np.log(n)))
