@@ -5,7 +5,7 @@ import pyopencl as cl
 from pyopencl.array import vec
 from syris import config as cfg
 from syris.gpu import util as g_util
-from syris.util import make_tuple
+from syris.util import get_magnitude, make_tuple
 
 
 def fft_2(data, plan, wait_for_finish=False):
@@ -23,14 +23,14 @@ def ifft_2(data, plan, wait_for_finish=False):
     plan.execute(data, inverse=True, wait_for_finish=wait_for_finish)
 
 
-def get_gauss_2d(shape, sigma, pixel_size, fourier=False, queue=None):
+def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
     """Get 2D Gaussian of *shape* with standard deviation *sigma* and *pixel_size*. If *fourier* is
     True the fourier transform of it is returned so it is faster for usage by convolution. Use
     command *queue* if specified.
     """
     shape = make_tuple(shape)
-    pixel_size = make_tuple(pixel_size)
-    sigma = make_tuple(sigma)
+    pixel_size = get_magnitude(make_tuple(pixel_size))
+    sigma = get_magnitude(make_tuple(sigma))
 
     out = cl.array.Array(cfg.OPENCL.queue, shape, dtype=cfg.PRECISION.np_float)
 
@@ -39,19 +39,15 @@ def get_gauss_2d(shape, sigma, pixel_size, fourier=False, queue=None):
                                                  shape[::-1],
                                                  None,
                                                  out.data,
-                                                 g_util.make_vfloat2(sigma[1].simplified,
-                                                                     sigma[0].simplified),
-                                                 g_util.make_vfloat2(pixel_size[1].simplified,
-                                                                     pixel_size[0].simplified))
+                                                 g_util.make_vfloat2(sigma[1], sigma[0]),
+                                                 g_util.make_vfloat2(pixel_size[1], pixel_size[0]))
     else:
         cfg.OPENCL.programs['improc'].gauss_2d(cfg.OPENCL.queue,
                                                shape[::-1],
                                                None,
                                                out.data,
-                                               g_util.make_vfloat2(sigma[1].simplified,
-                                                                   sigma[0].simplified),
-                                               g_util.make_vfloat2(pixel_size[1].simplified,
-                                                                   pixel_size[0].simplified))
+                                               g_util.make_vfloat2(sigma[1], sigma[0]),
+                                               g_util.make_vfloat2(pixel_size[1], pixel_size[0]))
 
     return out
 
