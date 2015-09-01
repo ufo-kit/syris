@@ -16,3 +16,13 @@ def make_tuple(value, num_dims=2):
             raise ValueError("Value is a tuple already and with different dimensions")
 
     return value
+
+
+def get_magnitude(value):
+    """If value is a quantity, simplify it to base units and return the magnitude, otherwise do
+    nothing.
+    """
+    if hasattr(value, 'magnitude'):
+        value = value.simplified.magnitude
+
+    return value
