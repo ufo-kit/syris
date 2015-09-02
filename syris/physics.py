@@ -106,11 +106,6 @@ def ref_index_to_attenuation_coeff(ref_index, lam):
     given by :math:`\\mu = \\frac{4 \\pi \\beta}{\\lambda}` based on given
     *ref_index* and wavelength *lam*.
     """
-    if lam.simplified.units == q.m:
-        lam = lam.simplified
-    else:
-        lam = energy_to_wavelength(lam)
-
     return 4 * np.pi * ref_index.imag / lam.simplified
 
 
