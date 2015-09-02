@@ -52,32 +52,30 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
     return out
 
 
-def sum(orig_shape, summed_shape, mem, region, offset,
-        average=False, out_mem=None):
-    """Sum 2D OpenCL buffer *mem* with *orig_shape* as (y, x). One
-    resulting pixel is summed over *region* (y, x) of pixels
-    in the original buffer. The resulting buffer has shape *summer_shape*
-    (y, x). *Offset* (y, x) is the offset to the original buffer *mem*.
-    If *average* is True, the summed pixel is normalized by the
-    region area. If *out_mem* is not None, the output buffer
-    will be *out_mem*.
+def bin_image(image, summed_shape, region, offset,
+              average=False, out=None, queue=None):
+    """Bin a 2D pyopencl Array *image*. One resulting pixel is summed over
+    *region* (y, x) of pixels in the original buffer. The resulting buffer has shape *summer_shape*
+    (y, x). *Offset* (y, x) is the offset to the original *image*.  If *average* is True, the
+    summed pixel is normalized by the region area. *out* is the pyopencl Array instance, if not
+    specified it will be created. *out* is also returned.
     """
-    if out_mem is None:
-        bpp = mem.size / (orig_shape[0] * orig_shape[1])
-        out_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                            size=summed_shape[0] * summed_shape[1] * bpp)
+    if out is None:
+        if queue is None:
+            queue = cfg.OPENCL.queue
+        out = cl.array.Array(queue, summed_shape, dtype=cfg.PRECISION.np_float)
 
     cfg.OPENCL.programs['improc'].sum(cfg.OPENCL.queue,
                                       (summed_shape[::-1]),
                                       None,
-                                      out_mem,
-                                      mem,
+                                      out.data,
+                                      image.data,
                                       vec.make_int2(*region[::-1]),
-                                      np.int32(orig_shape[1]),
+                                      np.int32(image.shape[1]),
                                       vec.make_int2(*offset[::-1]),
                                       np.int32(average))
 
-    return out_mem
+    return out
 
 
 def _check_tiling(shape, tiles_count):
