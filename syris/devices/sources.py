@@ -30,8 +30,7 @@ class XraySource(object):
         self.sample_distance = sample_distance.simplified
         self.energies = energies
         self.size = size.simplified
-        self._angle_step = 2 * np.arctan(pixel_size.simplified /
-                                        (2 * self.sample_distance.simplified))
+        self._angle_step = np.arctan(pixel_size.simplified / self.sample_distance.simplified)
 
     @property
     def gama(self):
@@ -63,9 +62,9 @@ class BendingMagnet(XraySource):
 
         self._angles = np.linspace(- self._angle_step * angle_steps / 2,
                                    self._angle_step * angle_steps / 2,
-                                   angle_steps)
+                                   angle_steps, endpoint=False)
         self.profile_approx = profile_approx
-        self._profiles = self._create_vertical_profiles()
+        self._profiles = [self._create_vertical_profile(e) for e in self.energies]
 
     @property
     def critical_energy(self):
@@ -77,7 +76,7 @@ class BendingMagnet(XraySource):
         return 0.665 * self.electron_energy.rescale(q.GeV).magnitude ** 2 * \
             self.magnetic_field.rescale(q.T).magnitude * q.keV
 
-    def _get_full_profile(self, energy_index):
+    def _get_full_profile(self, energy):
         """Get the vertical profile based on energies integration.
         If there are two energies e_0 and e_1, the profile at
         a specific angle will be calculated by integrating the energy
@@ -87,47 +86,42 @@ class BendingMagnet(XraySource):
             """Get rid of quantities, because scipy.romberg
             cannot work with them.
             """
-            return self.get_flux(photon_energy * q.keV,
-                                 vertical_angle * q.rad).magnitude
+            return self.get_flux(photon_energy * q.keV, vertical_angle * q.rad).magnitude
 
-        def _get_flux_at_angle(angle, energy_index):
+        def _get_flux_at_angle(angle, energy, d_energy):
             if len(self.energies) > 1:
-                e_0 = self.energies[energy_index] - self._d_energy / 2.0
-                e_1 = self.energies[energy_index] + self._d_energy / 2.0
-                return integrate.romberg(_get_flux_wrapper,
-                                         float(e_0.rescale(q.keV).magnitude),
-                                         float(e_1.rescale(q.keV).magnitude),
-                                         args=(angle,))
+                e_0 = energy - d_energy / 2.0
+                e_1 = energy + d_energy / 2.0
+                return integrate.romberg(_get_flux_wrapper, e_0, e_1, args=(angle,))
             else:
-                return self.get_flux(self.energies[energy_index],
-                                     angle * q.rad)
+                return self.get_flux(energy * q.keV, angle * q.rad)
 
         get_profiles = np.vectorize(_get_flux_at_angle)
 
-        return get_profiles(self._angles.rescale(q.rad).magnitude,
-                            energy_index) / q.s
+        energy = energy.rescale(q.keV).magnitude
+        d_energy = self._d_energy.rescale(q.keV).magnitude
 
-    def get_vertical_profile(self, energy_index):
-        """Get flux profile based on bending magnet radiation
-        properties and *energy_index* pointing to the array of energies for
-        which the source was created.
-        """
-        return self._profiles[energy_index]
+        return get_profiles(self._angles.rescale(q.rad).magnitude, energy, d_energy) / q.s
 
-    def _create_vertical_profiles(self):
-        """Create vertical profiles."""
-        profiles = []
-        for energy_index in range(len(self.energies)):
-            if self.profile_approx:
-                # Much faster but less precise.
-                profiles.append(self.get_flux(self.energies[energy_index],
-                                              self._angles) *
-                                self._d_energy.rescale(q.keV).magnitude)
-            else:
-                # Full energy integration.
-                profiles.append(self._get_full_profile(energy_index))
+    def get_vertical_profile(self, energy):
+        """Get flux profile at *energy*."""
+        if energy in self.energies:
+            # Lookup
+            profile = self._profiles[np.where(self.energies == energy)[0][0]]
+        else:
+            profile = self._create_vertical_profile(energy)
 
-        return profiles
+        return profile
+
+    def _create_vertical_profile(self, energy):
+        if self.profile_approx:
+            # Much faster but less precise.
+            result = self.get_flux(energy, self._angles) * self._d_energy.rescale(q.keV).magnitude
+        else:
+            # Full energy integration.
+            result = self._get_full_profile(energy)
+
+        return result
 
     def get_flux(self, photon_energy, vertical_angle):
         """Get the photon flux coming from the source consisting of photons
