@@ -8,14 +8,14 @@ from syris.gpu import util as g_util
 from syris.util import get_magnitude, make_tuple
 
 
-def fft_2(data, plan, wait_for_finish=False):
+def fft_2(data, plan, wait_for_finish=True):
     """2D FFT executed on *data* by a *plan*. *wait_for_finish* specifies
     if the execution will wait until the scheduled FFT kernels finish.
     """
     plan.execute(data, wait_for_finish=wait_for_finish)
 
 
-def ifft_2(data, plan, wait_for_finish=False):
+def ifft_2(data, plan, wait_for_finish=True):
     """2D inverse FFT executed on *data* by a *plan*. *wait_for_finish*
     specifies if the execution will wait until the scheduled FFT kernels
     finish.
