@@ -15,12 +15,10 @@ class Filter(object):
         self.thickness = thickness.simplified
         self.material = material
 
-    def get_attenuation(self, energy_index):
-        """Get attenuation based on *energy_index*, which is an index
-        into energies for which the material was created.
-        """
-        return self.thickness * \
-            self.material.get_attenuation_coefficient(energy_index)
+    def get_attenuation(self, energy):
+        """Get attenuation at *energy*."""
+        return (self.thickness *
+                self.material.get_attenuation_coefficient(energy)).simplified.magnitude
 
 
 class Scintillator(Filter):
