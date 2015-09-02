@@ -7,9 +7,11 @@ type.
 import numpy as np
 import quantities as q
 import quantities.constants.electron as qe
+import pyopencl.array as cl_array
 from quantities.quantity import Quantity
 from quantities.constants import fine_structure_constant
 from scipy import integrate, special
+import syris.config as cfg
 
 
 class XraySource(object):
@@ -112,6 +114,30 @@ class BendingMagnet(XraySource):
             profile = self._create_vertical_profile(energy)
 
         return profile
+
+    def make_flat(self, energy, attenuation=0, width=None, queue=None, out=None):
+        """Make flat wavefield at *energy* with *attenuation* (:math:`\\mu thickness`) of *width*.
+        Use OpenCL *queue* and :class:`pyopencl.array.Array` *out*.
+        """
+        profile = self.get_vertical_profile(energy).rescale(1 / q.s).magnitude
+        profile = np.exp(-attenuation) * profile
+        height = profile.shape[0]
+        if width is None:
+            width = height
+        if queue is None:
+            queue = cfg.OPENCL.queue
+
+        profile = cl_array.to_device(queue, profile.astype(cfg.PRECISION.np_float))
+        if out is None:
+            out = cl_array.Array(queue, (height, width), dtype=cfg.PRECISION.np_cplx)
+
+        cfg.OPENCL.programs['physics'].make_flat(queue,
+                                                 (width, height),
+                                                 None,
+                                                 out.data,
+                                                 profile.data)
+
+        return out
 
     def _create_vertical_profile(self, energy):
         if self.profile_approx:

@@ -133,3 +133,14 @@ __kernel void transfer_coeffs(__global vcomplex *transmission_coeffs,
 	transmission_coeffs[iy * width + ix] = (vcomplex)(e_a * cosine,
 														e_a * sine);
 }
+
+/*
+ * Make flat field wavefield out of a vertical profile of intensities.
+ */
+__kernel void make_flat(__global vcomplex *output,
+                        __global vfloat *input) {
+	int ix = get_global_id(0);
+	int iy = get_global_id(1);
+
+    output[iy * get_global_size(0) + ix] = (vfloat2)(sqrt(input[iy]), 0);
+}
