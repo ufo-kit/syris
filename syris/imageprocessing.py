@@ -52,17 +52,16 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
     return out
 
 
-def bin_image(image, summed_shape, region, offset,
-              average=False, out=None, queue=None):
+def bin_image(image, summed_shape, region, offset, average=False, out=None, queue=None):
     """Bin a 2D pyopencl Array *image*. One resulting pixel is summed over
     *region* (y, x) of pixels in the original buffer. The resulting buffer has shape *summer_shape*
     (y, x). *Offset* (y, x) is the offset to the original *image*.  If *average* is True, the
     summed pixel is normalized by the region area. *out* is the pyopencl Array instance, if not
     specified it will be created. *out* is also returned.
     """
+    if queue is None:
+        queue = cfg.OPENCL.queue
     if out is None:
-        if queue is None:
-            queue = cfg.OPENCL.queue
         out = cl.array.Array(queue, summed_shape, dtype=cfg.PRECISION.np_float)
 
     cfg.OPENCL.programs['improc'].sum(cfg.OPENCL.queue,
@@ -157,18 +156,15 @@ class Tiler(object):
         return np.array(list(itertools.product(y_ind, x_ind))).\
             reshape(self.tiles_count + (2,))
 
-    def average(self, tile_mem, out_mem=None):
-        """Average OpenCL buffer *tile_mem* based on supersampling
-        and outlier specified for the tiler. If *out_mem* is not None,
-        it will be used for returning the sum.
+    def average(self, tile, out=None):
+        """Average :class:`pyopencl.array.Array` *tile* based on supersampling and outlier specified
+        for the tiler. If *out* is not None, it will be used for returning the sum.
         """
         summed_shape = self.result_tile_shape
-        offset = [(self._outlier_coeff - 1) * dim / 4
-                  for dim in self.tile_shape]
+        offset = [(self._outlier_coeff - 1) * dim / 4 for dim in self.tile_shape]
 
-        return sum(self.tile_shape, summed_shape, tile_mem,
-                   (self.supersampling, self.supersampling),
-                   offset, average=True, out_mem=out_mem)
+        return bin_image(tile, summed_shape, (self.supersampling, self.supersampling),
+                         offset, average=True, out=out)
 
     def insert(self, tile, indices):
         """Insert a non-supersampled, outlier-free *tile* into the overall
