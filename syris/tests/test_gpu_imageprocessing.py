@@ -1,5 +1,6 @@
 import numpy as np
 import pyopencl as cl
+import pyopencl.array as cl_array
 import quantities as q
 import syris
 from syris.gpu import util as gpu_util
@@ -80,31 +81,22 @@ class TestGPUImageProcessing(SyrisTest):
                     im = np.tile(tile, (shape[0] / region[0],
                                         shape[1] / region[1])).\
                         astype(cfg.PRECISION.np_float)
-                    mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
-                                    cl.mem_flags.COPY_HOST_PTR, hostbuf=im)
+                    im = cl_array.to_device(cfg.OPENCL.queue, im)
 
                     if coeff:
                         offset = shape[0] / 4, shape[1] / 4
                     else:
                         offset = 0, 0
-                    out_mem = ip.sum(shape, summed_shape, mem, region, offset)
-                    res = np.empty(summed_shape, dtype=cfg.PRECISION.np_float)
-                    cl.enqueue_copy(cfg.OPENCL.queue, res, out_mem)
-                    mem.release()
-                    out_mem.release()
+                    out = ip.bin_image(im, summed_shape, region, offset).get()
 
-                    ground_truth = np.ones_like(res) * np.sum(tile)
-                    np.testing.assert_almost_equal(res, ground_truth)
+                    ground_truth = np.ones_like(out) * np.sum(tile)
+                    np.testing.assert_almost_equal(out, ground_truth)
 
         shape = 16, 16
         summed_shape = 2, 2
         region = 8, 8
         im = np.ones(shape, dtype=cfg.PRECISION.np_float)
-        mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
-                        cl.mem_flags.COPY_HOST_PTR, hostbuf=im)
-        out_mem = ip.sum(shape, summed_shape, mem, region,
-                         (0, 0), average=True)
-        res = np.empty(summed_shape, dtype=cfg.PRECISION.np_float)
-        cl.enqueue_copy(cfg.OPENCL.queue, res, out_mem)
+        im = cl_array.to_device(cfg.OPENCL.queue, im)
+        out = ip.bin_image(im, summed_shape, region, (0, 0), average=True).get()
         ground_truth = np.ones(summed_shape, dtype=cfg.PRECISION.np_float)
-        np.testing.assert_almost_equal(res, ground_truth)
+        np.testing.assert_almost_equal(out, ground_truth)

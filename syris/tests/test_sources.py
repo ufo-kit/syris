@@ -19,8 +19,8 @@ class TestSources(SyrisTest):
                                  energies, np.array([0.2, 0.8]) * q.mm, ps,
                                  angle_step, profile_approx=False)
 
-        for e_i in range(len(energies)):
-            profile = source.get_vertical_profile(e_i)
-            profile_2 = source_2.get_vertical_profile(e_i)
+        for e in energies:
+            profile = source.get_vertical_profile(e)
+            profile_2 = source_2.get_vertical_profile(e)
 
             np.testing.assert_array_almost_equal(profile, profile_2, 0)

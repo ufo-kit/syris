@@ -1,5 +1,6 @@
 import numpy as np
 import pyopencl as cl
+import pyopencl.array as cl_array
 import syris
 from syris import config as cfg
 from syris.imageprocessing import Tiler
@@ -147,10 +148,6 @@ class TestImageTiling(SyrisTest):
         for shape, tiles_count in self.data:
             tiler = Tiler(shape, tiles_count, outlier=False, supersampling=4)
             ones = np.ones(tiler.tile_shape, dtype=cfg.PRECISION.np_float)
-            mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
-                            cl.mem_flags.COPY_HOST_PTR, hostbuf=ones)
-            out_mem = tiler.average(mem)
-            res = np.empty(tiler.result_tile_shape, dtype=cfg.PRECISION.np_float)
-            cl.enqueue_copy(cfg.OPENCL.queue, res, out_mem)
-            np.testing.assert_almost_equal(res, ones[::tiler.supersampling,
-                                                     ::tiler.supersampling])
+            ones_gpu = cl_array.to_device(cfg.OPENCL.queue, ones)
+            out = tiler.average(ones_gpu).get()
+            np.testing.assert_almost_equal(out, ones[::tiler.supersampling, ::tiler.supersampling])

@@ -32,11 +32,8 @@ class TestPhysics(SyrisTest):
         ref_index = 1e-7 + 1e-10j
         energy = 20 * q.keV
         lam = physics.energy_to_wavelength(energy)
-        self.assertAlmostEqual(physics.
-                               ref_index_to_attenuation_coeff(
-                                   ref_index, energy),
-                               physics.ref_index_to_attenuation_coeff(
-                               ref_index, lam))
+        gt = 4 * np.pi * ref_index.imag / lam.simplified
+        self.assertAlmostEqual(gt, physics.ref_index_to_attenuation_coeff(ref_index, lam))
 
     def _get_propagator(self, apply_phase_factor=False):
         return physics.compute_propagator(self.size, self.distance,
