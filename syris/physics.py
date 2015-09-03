@@ -109,7 +109,7 @@ def ref_index_to_attenuation_coeff(ref_index, lam):
     return 4 * np.pi * ref_index.imag / lam.simplified
 
 
-def optics_collection_eff(num_aperture, opt_ref_index):
+def compute_collection(num_aperture, opt_ref_index):
     """Get the collection efficiency of the scintillator combined with
     a lens. The efficiency is given by :math:`\eta = \\frac{1}{2}
     \\left( \\frac{N\!A}{n} \\right)^2`, where :math:`N\!A` is the numerical
@@ -138,8 +138,8 @@ def visible_light_attenuation_coeff(scintillator, camera, num_aperture,
     """
     quantum_eff = np.sum(scintillator.quantum_effs * camera.quantum_effs)
 
-    return lens_trans_eff * quantum_eff * \
-        optics_collection_eff(num_aperture, scintillator.opt_ref_index)
+    return lens_trans_eff * quantum_eff * compute_collection(num_aperture,
+                                                             scintillator.opt_ref_index)
 
 
 def compute_diffraction_angle(diameter, propagation_distance):
