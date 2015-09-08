@@ -88,7 +88,10 @@ class BendingMagnet(XraySource):
             """Get rid of quantities, because scipy.romberg
             cannot work with them.
             """
-            return self.get_flux(photon_energy * q.keV, vertical_angle * q.rad).magnitude
+            flux = self.get_flux(photon_energy * q.keV, vertical_angle * q.rad).magnitude
+            # Conversion is 1e3 * dE / E, 1e3 for the 0.1 % BW. Integration takes care of the dE so
+            # we need to correct by 1e3 / E
+            return flux * 1e3 / photon_energy
 
         def _get_flux_at_angle(angle, energy, d_energy):
             if len(self.energies) > 1:
@@ -142,7 +145,10 @@ class BendingMagnet(XraySource):
     def _create_vertical_profile(self, energy):
         if self.profile_approx:
             # Much faster but less precise.
-            result = self.get_flux(energy, self._angles) * self._d_energy.rescale(q.keV).magnitude
+            # dE / E = 1e-3 = 0.1 % BW, we need to convert it to the actual bandwidth of the
+            # energies we use, so the result is 1e3 * dE / E
+            bw_conv = 1e3 * (self._d_energy / energy).simplified.magnitude
+            result = self.get_flux(energy, self._angles) * bw_conv
         else:
             # Full energy integration.
             result = self._get_full_profile(energy)
