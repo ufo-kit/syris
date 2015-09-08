@@ -22,5 +22,7 @@ class TestSources(SyrisTest):
         for e in energies:
             profile = source.get_vertical_profile(e)
             profile_2 = source_2.get_vertical_profile(e)
+            perc = profile / profile_2
 
-            np.testing.assert_array_almost_equal(profile, profile_2, 0)
+            # Allow 0.1 % difference
+            np.testing.assert_allclose(perc, 1, rtol=1e-3)
