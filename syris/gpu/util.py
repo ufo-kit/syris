@@ -44,14 +44,16 @@ def init_programs():
     cfg.OPENCL.programs['geometry'] = get_program(get_metaobjects_source())
 
 
-def make_opencl_defaults(profiling=True):
-    """Create default OpenCL runtime."""
+def make_opencl_defaults(device_index=0, profiling=True):
+    """Create default OpenCL context and a command queue based on *device_index* to the devices
+    list. If *profiling* is True enable it.
+    """
     if profiling:
         kwargs = {"properties": cl.command_queue_properties.PROFILING_ENABLE}
     else:
         kwargs = {}
     cfg.OPENCL.ctx = get_cuda_context()
-    cfg.OPENCL.devices = get_cuda_devices()
+    cfg.OPENCL.devices = [get_cuda_devices()[device_index]]
     cfg.OPENCL.queues = get_command_queues(cfg.OPENCL.ctx, cfg.OPENCL.devices, queue_kwargs=kwargs)
     cfg.OPENCL.queue = cfg.OPENCL.queues[0]
 
