@@ -133,18 +133,23 @@ class Camera(object):
         if psf:
             electrons = cl_array.to_device(queue, electrons.astype(cfg.PRECISION.np_cplx))
             # Blur with camera PSF
-            if not self._psf:
+            if self._psf is None:
                 sigma = (fwnm_to_sigma(self._bin_factor[0]), fwnm_to_sigma(self._bin_factor[1]))
                 self._psf = get_gauss_2d(photons.shape, sigma, fourier=True)
             fft_2(electrons.data, plan, wait_for_finish=True)
             electrons = electrons * self._psf
             ifft_2(electrons.data, plan, wait_for_finish=True)
             electrons = electrons.real
-        else:
+            if self._bin_factor == (1, 1):
+                electrons = electrons.get()
+        elif self._bin_factor != (1, 1):
             electrons = cl_array.to_device(queue, electrons.astype(cfg.PRECISION.np_float))
 
-        # Decimate to sensor size
-        counts = bin_image(electrons, self.shape, self._bin_factor, (0, 0)).get()
+        if self._bin_factor == (1, 1):
+            counts = electrons
+        else:
+            # Decimate to sensor size
+            counts = bin_image(electrons, self.shape, self._bin_factor, (0, 0)).get()
 
         if self.amplifier_sigma > 0:
             # Add electronics noise
