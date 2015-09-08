@@ -124,8 +124,8 @@ class Camera(object):
             queue = cfg.OPENCL.queue
 
         # Shot noise
-        # Adjust dark current for later binning
-        dark = float(self.dark_current) / self._bin_factor[0] / self._bin_factor[1]
+        # Adjust dark current for later binning and gain
+        dark = float(self.dark_current) / self.gain / self._bin_factor[0] / self._bin_factor[1]
         electrons = dark + photons * self.exp_time.rescale(q.s).magnitude
         if shot_noise:
             electrons = np.random.poisson(electrons)
@@ -152,8 +152,8 @@ class Camera(object):
             counts = bin_image(electrons, self.shape, self._bin_factor, (0, 0)).get()
 
         if self.amplifier_sigma > 0:
-            # Add electronics noise
-            counts = np.random.normal(counts, self.amplifier_sigma)
+            # Add electronics noise (normalize for gain)
+            counts = np.random.normal(counts, self.amplifier_sigma / self.gain)
 
         counts = self.gain * counts
 
