@@ -54,11 +54,11 @@ class Scintillator(Filter):
         """Get luminescence at *wavelength* [1 / nm]."""
         return interp.splev(wavelength.rescale(q.nm).magnitude, self._lum_tck) / q.nm
 
-    def get_conversion_factor(self, energy, d_energy):
+    def get_conversion_factor(self, energy):
         """Get the conversion factor to convert X-ray photons to visible light photons
         [dimensionless].
         """
         absorbed = 1 - np.exp(-self.get_attenuation(energy))
         ly = self.get_light_yield(energy)
 
-        return absorbed * ly * d_energy.rescale(q.keV)
+        return absorbed * ly * energy.rescale(q.keV)
