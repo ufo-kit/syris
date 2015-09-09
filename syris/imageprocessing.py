@@ -32,17 +32,19 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
     pixel_size = get_magnitude(make_tuple(pixel_size))
     sigma = get_magnitude(make_tuple(sigma))
 
-    out = cl.array.Array(cfg.OPENCL.queue, shape, dtype=cfg.PRECISION.np_float)
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    out = cl.array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
 
     if fourier:
-        cfg.OPENCL.programs['improc'].gauss_2d_f(cfg.OPENCL.queue,
+        cfg.OPENCL.programs['improc'].gauss_2d_f(queue,
                                                  shape[::-1],
                                                  None,
                                                  out.data,
                                                  g_util.make_vfloat2(sigma[1], sigma[0]),
                                                  g_util.make_vfloat2(pixel_size[1], pixel_size[0]))
     else:
-        cfg.OPENCL.programs['improc'].gauss_2d(cfg.OPENCL.queue,
+        cfg.OPENCL.programs['improc'].gauss_2d(queue,
                                                shape[::-1],
                                                None,
                                                out.data,
@@ -64,7 +66,7 @@ def bin_image(image, summed_shape, region, offset, average=False, out=None, queu
     if out is None:
         out = cl.array.Array(queue, summed_shape, dtype=cfg.PRECISION.np_float)
 
-    cfg.OPENCL.programs['improc'].sum(cfg.OPENCL.queue,
+    cfg.OPENCL.programs['improc'].sum(queue,
                                       (summed_shape[::-1]),
                                       None,
                                       out.data,
