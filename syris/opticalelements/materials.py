@@ -205,8 +205,10 @@ class _HenkeQuery(object):
 
         req = urllib2.Request(url, url_values)
         response = urllib2.urlopen(req)
+        result = response.read()
+        response.close()
 
-        return response.read()
+        return result
 
     def _interpolate(self, energies, refractive_indices):
         """Interpolate arbitrary *energies* and *refractive_indices* into the ones
