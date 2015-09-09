@@ -52,8 +52,8 @@ def make_opencl_defaults(device_index=0, profiling=True):
         kwargs = {"properties": cl.command_queue_properties.PROFILING_ENABLE}
     else:
         kwargs = {}
-    cfg.OPENCL.ctx = get_cuda_context()
     cfg.OPENCL.devices = [get_cuda_devices()[device_index]]
+    cfg.OPENCL.ctx = get_cuda_context(devices=cfg.OPENCL.devices)
     cfg.OPENCL.queues = get_command_queues(cfg.OPENCL.ctx, cfg.OPENCL.devices, queue_kwargs=kwargs)
     cfg.OPENCL.queue = cfg.OPENCL.queues[0]
 
