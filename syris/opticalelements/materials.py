@@ -175,7 +175,7 @@ class _HenkeQuery(object):
         try:
             response = self._query_server(formula, density)
             if 'error' in response.lower():
-                raise MaterialError('Error finding refractive index')
+                raise MaterialError('Error looking up material `{}`'.format(name))
             parser.feed(response)
             link = urljoin(self._URL, parser.link)
             # First two lines are description
