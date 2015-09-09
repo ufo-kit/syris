@@ -13,12 +13,12 @@ __kernel void gauss_2d(__global vfloat *out, const vfloat2 sigma, const vfloat2 
     int ix = get_global_id(0);
     int iy = get_global_id(1);
     int width = get_global_size(0);
-    int height = get_global_size(0);
-    vfloat x = (ix - width / 2) * pixel_size.x;
-    vfloat y = (iy - height / 2) * pixel_size.y;
+    int height = get_global_size(1);
 
-    out[width * ((iy + height / 2) % height) + ((ix + width / 2) % width)] =
-            exp (- x * x / (2 * sigma.x * sigma.x) - y * y / (2 * sigma.y * sigma.y));
+    vfloat x = ix < width / 2 + width % 2 ? ix * pixel_size.x : (ix - width) * pixel_size.x;
+    vfloat y = iy < height / 2 + height % 2 ? iy * pixel_size.y : (iy - height) * pixel_size.y;
+
+    out[iy * width + ix] = exp (- x * x / (2 * sigma.x * sigma.x) - y * y / (2 * sigma.y * sigma.y));
 }
 
 /*
@@ -27,12 +27,13 @@ __kernel void gauss_2d(__global vfloat *out, const vfloat2 sigma, const vfloat2 
 __kernel void gauss_2d_f(__global vfloat *out, const vfloat2 sigma, const vfloat2 pixel_size) {
     int ix = get_global_id(0);
     int iy = get_global_id(1);
-    int n = get_global_size(0);
-    vfloat i, j;
+    int width = get_global_size(0);
+    int height = get_global_size(1);
 
-	/* Map image coordinates to Fourier coordinates. */
-	i = -0.5 + ((vfloat) ix) / n;
-	j = -0.5 + ((vfloat) iy) / n;
+    vfloat i = (ix < width / 2 + width % 2 ? ix / pixel_size.x :
+                (ix - width) / pixel_size.x) / ((float) width);
+    vfloat j = (iy < height / 2 + height % 2 ? iy / pixel_size.y :
+                (iy - height) / pixel_size.y) / ((float) height);
 
 	/* Fourier transform of a Gaussian is a stretched Gaussian.
 	 * We assume a Gaussian with standard deviation c to be
@@ -49,9 +50,8 @@ __kernel void gauss_2d_f(__global vfloat *out, const vfloat2 sigma, const vfloat
 	 *
 	 * The description is for brevity for 1D case.
 	 */
-    out[n * ((iy + n / 2) % n) + ((ix + n / 2) % n)] = exp(- 2 * M_PI * M_PI *
-                (sigma.x * sigma.x * i * i / (pixel_size.x * pixel_size.x) +
-                 sigma.y * sigma.y * j * j / (pixel_size.y * pixel_size.y)));
+    out[iy * width + ix] = exp(- 2 * M_PI * M_PI * (sigma.x * sigma.x * i * i +
+                                                    sigma.y * sigma.y * j * j));
 }
 
 /*
