@@ -152,8 +152,8 @@ class Camera(object):
             counts = bin_image(electrons, self.shape, self._bin_factor, (0, 0)).get()
 
         if self.amplifier_sigma > 0:
-            # Add electronics noise (normalize for gain)
-            counts = np.random.normal(counts, self.amplifier_sigma / self.gain)
+            # Add electronics noise
+            counts = np.random.normal(counts, self.amplifier_sigma)
 
         counts = self.gain * counts
 
