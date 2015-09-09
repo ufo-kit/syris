@@ -6,8 +6,32 @@ import syris
 from syris.gpu import util as gpu_util
 from syris import config as cfg
 from syris import imageprocessing as ip
+from syris.util import get_magnitude, make_tuple
 import itertools
 from syris.tests import SyrisTest, slow
+
+
+def get_gauss_2d(shape, sigma, pixel_size=None, fourier=False):
+    shape = make_tuple(shape)
+    sigma = get_magnitude(make_tuple(sigma))
+    if pixel_size is None:
+        pixel_size = (1, 1)
+    else:
+        pixel_size = get_magnitude(make_tuple(pixel_size))
+
+    if fourier:
+        i = np.fft.fftfreq(shape[1]) / pixel_size[1]
+        j = np.fft.fftfreq(shape[0]) / pixel_size[0]
+        i, j = np.meshgrid(i, j)
+
+        return np.exp(-2 * np.pi ** 2 * ((i * sigma[1]) ** 2 + (j * sigma[0]) ** 2))
+    else:
+        x = (np.arange(shape[1]) - shape[1] / 2) * pixel_size[1]
+        y = (np.arange(shape[0]) - shape[0] / 2) * pixel_size[0]
+        x, y = np.meshgrid(x, y)
+        gauss = np.exp(- x ** 2 / (2. * sigma[1] ** 2) - y ** 2 / (2. * sigma[0] ** 2))
+
+        return np.fft.ifftshift(gauss)
 
 
 @slow
@@ -26,39 +50,24 @@ class TestGPUImageProcessing(SyrisTest):
         self.lam = 4.9594e-11 * q.m
         self.pixel_size = 1 * q.um
 
-    def _gauss_2d(self, sigma):
-        y, x = np.mgrid[-self.size / 2:self.size / 2,
-                        -self.size / 2:self.size / 2].astype(np.float32) * \
-            self.pixel_size.simplified
-
-        return np.exp(- x ** 2 / (2 * sigma[1] ** 2) -
-                      y ** 2 / (2 * sigma[0] ** 2)) /\
-                     (2 * np.pi * sigma[0] * sigma[1] /
-                      self.pixel_size.simplified ** 2)
-
-    def test_gauss(self):
+    def _test_gauss(self, shape, fourier):
         """Test if the gauss in Fourier space calculated on a GPU is
         the same as Fourier transform of a gauss in real space.
         """
-        sigma = 10 * self.pixel_size.simplified, 5 * self.pixel_size.simplified
-        self.prg.gauss_2d_f(cfg.OPENCL.queue,
-                          (self.size, self.size),
-                           None,
-                           self.mem,
-                           gpu_util.make_vfloat2(sigma[0], sigma[1]),
-                           gpu_util.make_vfloat2(self.pixel_size.simplified,
-                                                 self.pixel_size.simplified))
+        sigma = (shape[0] * self.pixel_size.magnitude,
+                 shape[1] / 2 * self.pixel_size.magnitude) * self.pixel_size.units
+        if fourier:
+            # Make the profile broad
+            sigma = (1. / sigma[0].magnitude, 1. / sigma[1].magnitude) * sigma.units
+        gauss = ip.get_gauss_2d(shape, sigma, self.pixel_size, fourier=fourier).get()
+        gt = get_gauss_2d(shape, sigma, self.pixel_size, fourier=fourier)
+        np.testing.assert_almost_equal(gauss, gt)
 
-        cl.enqueue_copy(cfg.OPENCL.queue, self.res, self.mem)
-
-        cpu = np.fft.fftshift(self._gauss_2d((sigma[1], sigma[0])))
-        cpu_f = np.fft.fft2(cpu)
-
-        np.testing.assert_almost_equal(self.res, cpu_f)
-
-        # Normalization test. The sum of the Gaussian must be 1.
-        gauss_real = np.fft.ifft2(self.res)
-        self.assertAlmostEqual(np.sum(gauss_real), 1)
+    def test_gauss(self):
+        n = (64, 128, 129)
+        for shape in itertools.product(n, n):
+            self._test_gauss(shape, False)
+            self._test_gauss(shape, True)
 
     def test_sum(self):
         widths = [8, 16, 32]
