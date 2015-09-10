@@ -7,7 +7,6 @@ import quantities.constants.quantum as cq
 from syris.gpu import util as g_util
 from syris.imageprocessing import get_gauss_2d
 from syris.math import fwnm_to_sigma
-from syris.util import make_tuple
 from syris import config as cfg
 
 
