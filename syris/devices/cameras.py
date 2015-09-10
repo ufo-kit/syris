@@ -106,15 +106,16 @@ class Camera(object):
         """Get quantum efficiency [dimensionless] at *wavelength*."""
         return interp.splev(wavelength.rescale(q.nm).magnitude, self._qe_tck)
 
-    def get_image(self, photons, shot_noise=True, psf=True, plan=None, queue=None):
+    def get_image(self, photons, shot_noise=True, amplifier_noise=True, psf=True, plan=None,
+                  queue=None):
         """Get digital counts image from incoming *photons*. The resulting image is based on the
         incoming photons and dark current. We apply noise based on EMVA 1288 standard according to
         which the variance :math:`\sigma_y^2 = K^2 ( \sigma_e^2 + \sigma_d^2 ) + \sigma_q^2`, where
         :math:`K` is the system gain, :math:`\sigma_e^2` is the poisson- distributed shot noise
         variance, :math:`\sigma_d^2` is the normal distributed electronics noise variance and
         :math:`\sigma_q^2` is the quantization noise variance. If *shot_noise* is False don't apply
-        it. If *psf* is False don't apply the point spread function. *plan* is used for FFT and
-        *queue* is an OpenCL command queue.
+        it. If *amplifier_noise* is False don't apply it as well. If *psf* is False don't apply the
+        point spread function. *plan* is used for FFT and *queue* is an OpenCL command queue.
         """
         if self._last_input_shape != photons.shape:
             self._last_input_shape = photons.shape
@@ -151,7 +152,7 @@ class Camera(object):
             # Decimate to sensor size
             counts = bin_image(electrons, self.shape, self._bin_factor, (0, 0)).get()
 
-        if self.amplifier_sigma > 0:
+        if amplifier_noise and self.amplifier_sigma > 0:
             # Add electronics noise
             counts = np.random.normal(counts, self.amplifier_sigma)
 
