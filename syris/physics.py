@@ -1,10 +1,9 @@
 """Physics on the light path."""
 
 import numpy as np
-import pyopencl as cl
+import pyopencl.array as cl_array
 import quantities as q
 import quantities.constants.quantum as cq
-from pyopencl.array import Array
 from syris.gpu import util as g_util
 from syris.imageprocessing import get_gauss_2d
 from syris.math import fwnm_to_sigma
@@ -12,33 +11,27 @@ from syris.util import make_tuple
 from syris import config as cfg
 
 
-def transfer(thickness, refractive_index, wavelength, shape=None, queue=None, out_memory=None):
-    """Transfer *thickness* (can be either a numpy array or OpenCL Buffer)
-    with *refractive_index* and given *wavelength*. *shape* is the image shape
-    as (width, height) in case *thickness* is an OpenCL Buffer. *ctx* is
-    OpenCL context and queue a CommandQueue.
+def transfer(thickness, refractive_index, wavelength, queue=None, out=None):
+    """Transfer *thickness* (can be either a numpy or pyopencl array) with *refractive_index* and
+    given *wavelength*. Use command *queue* for computation and *out* pyopencl array.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
 
-    if isinstance(thickness, cl.Buffer):
+    if isinstance(thickness, cl_array.Array):
         thickness_mem = thickness
     else:
-        thickness_mem = cl.Buffer(queue.context, cl.mem_flags.READ_ONLY |
-                                  cl.mem_flags.COPY_HOST_PTR,
-                                  hostbuf=thickness.simplified.magnitude.astype(
-                                  cfg.PRECISION.np_float))
-        shape = thickness.shape
+        prep = thickness.simplified.magnitude.astype(cfg.PRECISION.np_float)
+        thickness_mem = cl_array.to_device(queue, prep)
 
-    if out_memory is None:
-        out = Array(queue, shape, cfg.PRECISION.np_cplx)
-        out_memory = out.data
+    if out is None:
+        out = cl_array.Array(queue, thickness_mem.shape, cfg.PRECISION.np_cplx)
 
     cfg.OPENCL.programs['physics'].transfer(queue,
-                                            shape[::-1],
+                                            thickness_mem.shape[::-1],
                                             None,
-                                            out_memory,
-                                            thickness_mem,
+                                            out.data,
+                                            thickness_mem.data,
                                             cfg.PRECISION.np_cplx(refractive_index),
                                             cfg.PRECISION.np_float(
                                                 wavelength.simplified.magnitude))
@@ -59,7 +52,7 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
     if queue is None:
         queue = cfg.OPENCL.queue
 
-    out = Array(queue, (size, size), cfg.PRECISION.np_cplx)
+    out = cl_array.Array(queue, (size, size), cfg.PRECISION.np_cplx)
     if apply_phase_factor:
         phase_factor = np.exp(2 * np.pi * distance.simplified / lam.simplified * 1j)
     else:
