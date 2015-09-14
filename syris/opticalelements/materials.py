@@ -31,6 +31,9 @@ class Material(object):
         if len(self._energies) > 3:
             self._tckr = interp.splrep(self._energies, self.refractive_indices.real)
             self._tcki = interp.splrep(self._energies, self.refractive_indices.imag)
+        else:
+            raise MaterialError('Number of energy points \'{}\' '.format(len(self.energies)) +
+                                'is too few for interpolation')
 
     @property
     def name(self):
@@ -60,9 +63,6 @@ class Material(object):
 
     def get_refractive_index(self, energy):
         """Interpolate refractive indices to obtain the one at *energy*."""
-        if len(self.energies) < 4:
-            raise MaterialError('Number of energy points \'{}\' '.format(len(self.energies)) +
-                                'is too few for interpolation')
         if energy < self._energies[0] or energy > self._energies[-1]:
             raise ValueError('Energy \'{}\' not within limits \'[{}, {}]\''.
                              format(energy, self._energies[0], self._energies[-1]))
