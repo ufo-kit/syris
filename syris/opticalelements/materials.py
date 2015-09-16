@@ -129,7 +129,7 @@ def make_pmasf(name, energies):
     return Material(name, indices, energies)
 
 
-def make_henke(name, energies, formula=None, density=-1):
+def make_henke(name, energies, formula=None, density=None):
     """Make a material *name* for *energies*, use the spcified chemical *formula* and *density*."""
     indices = _HenkeQuery(name, energies, formula=formula, density=density).refractive_indices
 
@@ -157,7 +157,7 @@ class _HenkeQuery(object):
             if attrs and attrs[0][0] == 'href':
                 self.link = attrs[0][1]
 
-    def __init__(self, name, energies, formula=None, density=-1):
+    def __init__(self, name, energies, formula=None, density=None):
         """Create material with *name* for given *energies*, use the specified *formula* and
         material *density*.
         """
@@ -167,6 +167,7 @@ class _HenkeQuery(object):
             raise ValueError('Minimum acceptable energy is 30 eV')
         if energies[-1] > 30 * q.keV:
             raise ValueError('Maximum acceptable energy is 30 keV')
+        density = -1 if density is None else density.rescale(q.g / q.cm ** 3).magnitude
 
         self.energies = energies
         self.formula = formula
