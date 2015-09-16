@@ -1,4 +1,5 @@
 """Sample material represented by a complex refractive index."""
+import cPickle
 import logging
 import os
 import sys
@@ -72,6 +73,12 @@ class Material(object):
         imag = interp.splev(energy, self._tcki)
 
         return cfg.PRECISION.np_cplx(real + imag * 1j)
+
+    def save(self, filename=None):
+        """Save this instance to a *filename*."""
+        if filename is None:
+            filename = '{}.mat'.format(self.name)
+        cPickle.dump(self, open(filename, 'wb'))
 
     def __eq__(self, other):
         return isinstance(other, Material) and self.name == other.name
@@ -162,6 +169,11 @@ def make_stepanov(name, energies, density, formula=None):
         time.sleep(0.1)
 
     return Material(name, indices, energies)
+
+
+def make_fromfile(filename):
+    """Load saved material from *filename*."""
+    return cPickle.load(open(filename, 'r'))
 
 
 class _HenkeQuery(object):
