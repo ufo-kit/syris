@@ -131,13 +131,18 @@ def make_pmasf(name, energies):
 
 
 def make_henke(name, energies, formula=None, density=None):
-    """Make a material *name* for *energies*, use the spcified chemical *formula* and *density*."""
+    """Use the http://henke.lbl.gov database to lookup a material *name* for *energies*, use the
+    specified chemical *formula* and *density*.
+    """
     indices = _HenkeQuery(name, energies, formula=formula, density=density).refractive_indices
 
     return Material(name, indices, energies)
 
 
 def make_stepanov(name, energies, density, formula=None):
+    """Use the http://x-server.gmca.aps.anl.gov database to lookup a material *name* for
+    *energies*, use the specified chemical *formula* and *density*.
+    """
     if not formula:
         formula = name
     density = density.rescale(q.g / q.cm ** 3).magnitude
