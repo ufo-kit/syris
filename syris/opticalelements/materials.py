@@ -2,6 +2,7 @@
 import logging
 import os
 import sys
+import time
 import urllib
 import urllib2
 from HTMLParser import HTMLParser
@@ -132,6 +133,28 @@ def make_pmasf(name, energies):
 def make_henke(name, energies, formula=None, density=None):
     """Make a material *name* for *energies*, use the spcified chemical *formula* and *density*."""
     indices = _HenkeQuery(name, energies, formula=formula, density=density).refractive_indices
+
+    return Material(name, indices, energies)
+
+
+def make_stepanov(name, energies, density, formula=None):
+    if not formula:
+        formula = name
+    density = density.rescale(q.g / q.cm ** 3).magnitude
+    base = 'http://x-server.gmca.aps.anl.gov/cgi/X0h_form.exe?'
+    url_fmt = base + 'xway=2&wave={}&coway=2&chem={}&rho={}&i1=1&i2=1&i3=1&df1df2=-1&modeout=1'
+
+    indices = []
+    for energy in energies:
+        url = url_fmt.format(energy.rescale(q.keV).magnitude, formula, density)
+        res = urllib2.urlopen(url)
+        txt = res.read()
+        delta, beta = txt[txt.find('delta='):].split('\r\n')[:2]
+        delta = float(delta.split('=')[1])
+        beta = - float(beta.split('=')[1])
+        indices.append(cfg.PRECISION.np_cplx(float(delta) + float(beta) * 1j))
+        # Don't cause a DOS
+        time.sleep(0.1)
 
     return Material(name, indices, energies)
 
