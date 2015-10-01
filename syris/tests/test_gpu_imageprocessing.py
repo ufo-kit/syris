@@ -11,6 +11,16 @@ import itertools
 from syris.tests import SyrisTest, slow
 
 
+def bin_cpu(image, shape):
+    factor = (image.shape[0] / shape[0], image.shape[1] / shape[1])
+    im = np.copy(image)
+    for k in range(1, factor[0]):
+        im[::factor[0], :] += im[k::factor[0], :]
+    for k in range(1, factor[1]):
+        im[:, ::factor[1]] += im[:, k::factor[1]]
+    return im[::factor[0], ::factor[1]]
+
+
 def get_gauss_2d(shape, sigma, pixel_size=None, fourier=False):
     shape = make_tuple(shape)
     sigma = get_magnitude(make_tuple(sigma))
@@ -70,20 +80,11 @@ class TestGPUImageProcessing(SyrisTest):
             self._test_gauss(shape, True)
 
     def test_sum(self):
-        def bin_np(image, shape):
-            factor = (image.shape[0] / shape[0], image.shape[1] / shape[1])
-            im = np.copy(image)
-            for k in range(1, factor[0]):
-                im[::factor[0], :] += im[k::factor[0], :]
-            for k in range(1, factor[1]):
-                im[:, ::factor[1]] += im[:, k::factor[1]]
-            return im[::factor[0], ::factor[1]]
-
         n = 16
         image = np.arange(n * n).reshape(n, n).astype(cfg.PRECISION.np_float)
         cl_im = cl_array.to_device(cfg.OPENCL.queue, image)
         sizes = (1, 2, 4)
         for shape in itertools.product(sizes, sizes):
-            gt = bin_np(image, shape)
+            gt = bin_cpu(image, shape)
             res = ip.bin_image(cl_im, shape)
             np.testing.assert_equal(gt, res)
