@@ -152,3 +152,21 @@ def compute_aliasing_limit(n, lam, pixel_size, diameter, propagation_distance):
     diffraction_angle = compute_diffraction_angle(diameter, propagation_distance)
 
     return min(1, np.cos(np.pi / 2 - diffraction_angle) / cos_al_max)
+
+
+def compute_propagation_sampling(wavelength, distance, fov, fresnel=True):
+    """Compute the required number of pixels and pixel size in order to satisfy the sampling theorem
+    when propagating a wavefield with *wavelength* to *distance* and we want to propagate field of
+    view *fov*. If *fresnel* is true, the same distance computation approximation is done as when
+    computing a Fresnel propagator (2nd order Taylor series expansion for the square root).
+    """
+    if fresnel:
+        r = distance + (fov / 2) ** 2 / (2 * distance)
+    else:
+        r = np.sqrt((fov / 2) ** 2 + distance ** 2)
+    # Nyquist f_max = 1 / 2 pixels
+    # cos_alpha = lam / (2 * ps) = fov / (2 * r)
+    ps = (wavelength * r / fov).rescale(q.um)
+    n = int(np.ceil((fov / ps).simplified.magnitude))
+
+    return n, ps
