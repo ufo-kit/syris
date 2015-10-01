@@ -81,14 +81,20 @@ class TestGPUImageProcessing(SyrisTest):
             self._test_gauss(shape, True)
 
     def test_sum(self):
+        m = 8
         n = 16
-        image = np.arange(n * n).reshape(n, n).astype(cfg.PRECISION.np_float)
+        image = np.arange(m * n).reshape(m, n).astype(cfg.PRECISION.np_float)
         cl_im = cl_array.to_device(cfg.OPENCL.queue, image)
         sizes = (1, 2, 4)
         for shape in itertools.product(sizes, sizes):
+            region = (m / shape[0], n / shape[1])
             gt = bin_cpu(image, shape)
             res = ip.bin_image(cl_im, shape)
             np.testing.assert_equal(gt, res)
+
+            # Test averaging
+            res = ip.bin_image(cl_im, shape, average=True)
+            np.testing.assert_equal(gt / (region[0] * region[1]), res)
 
     def test_decimate(self):
         n = 16
