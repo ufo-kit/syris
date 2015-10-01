@@ -6,6 +6,7 @@ import syris
 from syris.gpu import util as gpu_util
 from syris import config as cfg
 from syris import imageprocessing as ip
+from syris.math import fwnm_to_sigma
 from syris.util import get_magnitude, make_tuple
 import itertools
 from syris.tests import SyrisTest, slow
@@ -88,3 +89,21 @@ class TestGPUImageProcessing(SyrisTest):
             gt = bin_cpu(image, shape)
             res = ip.bin_image(cl_im, shape)
             np.testing.assert_equal(gt, res)
+
+    def test_decimate(self):
+        n = 16
+        sigma = fwnm_to_sigma(1)
+        shape = (n / 2, n / 2)
+
+        image = np.arange(n * n).reshape(n, n).astype(cfg.PRECISION.np_float) / n ** 2
+        fltr = get_gauss_2d((n, n), sigma, fourier=True)
+        filtered = np.fft.ifft2(np.fft.fft2(image) * fltr).real
+        gt = bin_cpu(filtered, shape)
+
+        res = ip.decimate(image, shape, sigma=sigma, average=False).get()
+        np.testing.assert_almost_equal(gt, res, decimal=6)
+
+        # With averaging
+        res = ip.decimate(image, shape, sigma=sigma, average=True).get()
+        gt = gt / 4
+        np.testing.assert_almost_equal(gt, res, decimal=6)
