@@ -67,13 +67,15 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
                                               g_util.make_vcomplex(phase_factor))
 
     if mollified:
-        fwtm = compute_aliasing_limit(size, lam, pixel_size, size * pixel_size, distance)
+        fwtm = compute_aliasing_limit(size, lam, pixel_size, distance,
+                                      fov=size * pixel_size, fourier=True)
         if region is not None:
-            fwtm_region = compute_aliasing_limit(size, lam, pixel_size, region, distance)
+            fwtm_region = compute_aliasing_limit(size, lam, pixel_size, distance, region,
+                                                 fourier=True)
             fwtm = min(fwtm_region, fwtm)
 
-        sigma = fwnm_to_sigma(fwtm * size * pixel_size, n=10)
-        mollifier = get_gauss_2d(size, sigma, pixel_size, fourier=False, queue=queue)
+        sigma = fwnm_to_sigma(fwtm, n=10)
+        mollifier = get_gauss_2d(size, sigma, fourier=False, queue=queue)
         out = out * mollifier
 
     return out
@@ -144,14 +146,21 @@ def compute_diffraction_angle(diameter, propagation_distance):
     return np.arctan(diameter / (2 * distance))
 
 
-def compute_aliasing_limit(n, lam, pixel_size, diameter, propagation_distance):
+def compute_aliasing_limit(n, wavelength, pixel_size, propagation_distance, fov=None, fourier=True):
     """Get the non-aliased fraction of data points when propagating a wavefield to a region :math:`n
-    \\times pixel\\_size` to *propagation_distance* using wavelength *lam* and *pixel_size*.
+    \\times pixel\\_size` to *propagation_distance* using *wavelength*, *pixel_size* and field of
+    view *fov* (if not specified computed as *n* * *pixel_size*). If *fourier* is True then the
+    limit is computed for the Fourier space.
     """
-    cos_al_max = lam.simplified.magnitude / (2 * pixel_size.simplified.magnitude)
-    diffraction_angle = compute_diffraction_angle(diameter, propagation_distance)
+    if fov is None:
+        fov = n * pixel_size
+    cos_al_max = wavelength.simplified.magnitude / (2 * pixel_size.simplified.magnitude)
+    diffraction_angle = compute_diffraction_angle(fov, propagation_distance)
+    ratio = cos_al_max / np.cos(np.pi / 2 - diffraction_angle)
+    if fourier:
+        ratio = 1 / ratio
 
-    return min(1, np.cos(np.pi / 2 - diffraction_angle) / cos_al_max)
+    return int(np.floor(min(n, max(1, n * ratio))))
 
 
 def compute_propagation_sampling(wavelength, distance, fov, fresnel=True):
