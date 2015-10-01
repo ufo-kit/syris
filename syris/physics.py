@@ -1,5 +1,6 @@
 """Physics on the light path."""
 
+import logging
 import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
@@ -8,6 +9,9 @@ from syris.gpu import util as g_util
 from syris.imageprocessing import get_gauss_2d
 from syris.math import fwnm_to_sigma
 from syris import config as cfg
+
+
+LOG = logging.getLogger(__name__)
 
 
 def transfer(thickness, refractive_index, wavelength, queue=None, out=None):
@@ -50,6 +54,15 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
         raise ValueError('Only even sizes are supported')
     if queue is None:
         queue = cfg.OPENCL.queue
+
+    # Check the sampling
+    r_cutoff = compute_aliasing_limit(size, lam, pixel_size, distance, fov=region, fourier=False)
+    min_n = 4
+    if r_cutoff < min_n:
+        LOG.error('Propagator too narrow, propagation distance too small or pixel size too large')
+    f_cutoff = compute_aliasing_limit(size, lam, pixel_size, distance, fov=region, fourier=True)
+    if f_cutoff < min_n:
+        LOG.error('Propagator too wide, propagation distance too large or pixel size too small')
 
     out = cl_array.Array(queue, (size, size), cfg.PRECISION.np_cplx)
     if apply_phase_factor:
