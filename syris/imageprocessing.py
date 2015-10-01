@@ -2,7 +2,9 @@
 import itertools
 import numpy as np
 import pyopencl as cl
+import pyopencl.array as cl_array
 from pyopencl.array import vec
+from pyfft.cl import Plan
 from syris import config as cfg
 from syris.gpu import util as g_util
 from syris.util import get_magnitude, make_tuple
@@ -78,6 +80,26 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
                                       np.int32(average))
 
     return out
+
+
+def decimate(image, shape, sigma=1, average=False, queue=None, plan=None):
+    """Decimate *image* so that its dimensions match the final *shape*. Remove low frequencies by a
+    Gaussian filter with *sigma* pixels. Use command *queue* and FFT *plan* if specified.
+    """
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    if not plan:
+        plan = Plan(image.shape, queue=queue)
+    if not isinstance(image, cl_array.Array):
+        image = cl_array.to_device(queue, image)
+    image = image.astype(cfg.PRECISION.np_cplx)
+
+    fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue)
+    fft_2(image.data, plan, wait_for_finish=True)
+    image *= fltr
+    ifft_2(image.data, plan, wait_for_finish=True)
+
+    return bin_image(image.real, shape, average=average, queue=queue)
 
 
 def _check_tiling(shape, tiles_count):
