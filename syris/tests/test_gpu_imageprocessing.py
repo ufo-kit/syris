@@ -70,42 +70,20 @@ class TestGPUImageProcessing(SyrisTest):
             self._test_gauss(shape, True)
 
     def test_sum(self):
-        widths = [8, 16, 32]
-        region_widths = [1, 2, 4, widths[-1]]
+        def bin_np(image, shape):
+            factor = (image.shape[0] / shape[0], image.shape[1] / shape[1])
+            im = np.copy(image)
+            for k in range(1, factor[0]):
+                im[::factor[0], :] += im[k::factor[0], :]
+            for k in range(1, factor[1]):
+                im[:, ::factor[1]] += im[:, k::factor[1]]
+            return im[::factor[0], ::factor[1]]
 
-        shapes = list(itertools.product(widths, widths))
-        regions = list(itertools.product(region_widths, region_widths))
-
-        for shape in shapes:
-            for region in regions:
-                for coeff in [0, 1]:
-                    summed_shape = [shape[i] / (coeff + 1) / region[i]
-                                    for i in range(len(shape))]
-                    if summed_shape[0] == 0 or summed_shape[1] == 0:
-                        continue
-
-                    # Create such tile, that summing along x and y is
-                    # not equal to summing along y and then x.
-                    tile = np.arange(region[0] * region[1]).reshape(region)
-                    im = np.tile(tile, (shape[0] / region[0],
-                                        shape[1] / region[1])).\
-                        astype(cfg.PRECISION.np_float)
-                    im = cl_array.to_device(cfg.OPENCL.queue, im)
-
-                    if coeff:
-                        offset = shape[0] / 4, shape[1] / 4
-                    else:
-                        offset = 0, 0
-                    out = ip.bin_image(im, summed_shape, region, offset).get()
-
-                    ground_truth = np.ones_like(out) * np.sum(tile)
-                    np.testing.assert_almost_equal(out, ground_truth)
-
-        shape = 16, 16
-        summed_shape = 2, 2
-        region = 8, 8
-        im = np.ones(shape, dtype=cfg.PRECISION.np_float)
-        im = cl_array.to_device(cfg.OPENCL.queue, im)
-        out = ip.bin_image(im, summed_shape, region, (0, 0), average=True).get()
-        ground_truth = np.ones(summed_shape, dtype=cfg.PRECISION.np_float)
-        np.testing.assert_almost_equal(out, ground_truth)
+        n = 16
+        image = np.arange(n * n).reshape(n, n).astype(cfg.PRECISION.np_float)
+        cl_im = cl_array.to_device(cfg.OPENCL.queue, image)
+        sizes = (1, 2, 4)
+        for shape in itertools.product(sizes, sizes):
+            gt = bin_np(image, shape)
+            res = ip.bin_image(cl_im, shape)
+            np.testing.assert_equal(gt, res)

@@ -54,17 +54,18 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
     return out
 
 
-def bin_image(image, summed_shape, region, offset, average=False, out=None, queue=None):
-    """Bin a 2D pyopencl Array *image*. One resulting pixel is summed over
-    *region* (y, x) of pixels in the original buffer. The resulting buffer has shape *summer_shape*
-    (y, x). *Offset* (y, x) is the offset to the original *image*.  If *average* is True, the
-    summed pixel is normalized by the region area. *out* is the pyopencl Array instance, if not
-    specified it will be created. *out* is also returned.
+def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue=None):
+    """Bin a 2D pyopencl Array *image*. The resulting buffer has shape *summer_shape* (y, x).
+    *Offset* (y, x) is the offset to the original *image*.  If *average* is True, the summed pixel
+    is normalized by the region area. *out* is the pyopencl Array instance, if not specified it will
+    be created. *out* is also returned.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl.array.Array(queue, summed_shape, dtype=cfg.PRECISION.np_float)
+    region = ((image.shape[0] - offset[0]) / summed_shape[0],
+              (image.shape[1] - offset[1]) / summed_shape[1])
 
     cfg.OPENCL.programs['improc'].sum(queue,
                                       (summed_shape[::-1]),
@@ -165,8 +166,7 @@ class Tiler(object):
         summed_shape = self.result_tile_shape
         offset = [(self._outlier_coeff - 1) * dim / 4 for dim in self.tile_shape]
 
-        return bin_image(tile, summed_shape, (self.supersampling, self.supersampling),
-                         offset, average=True, out=out)
+        return bin_image(tile, summed_shape, offset, average=True, out=out)
 
     def insert(self, tile, indices):
         """Insert a non-supersampled, outlier-free *tile* into the overall

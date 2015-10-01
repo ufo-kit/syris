@@ -150,7 +150,7 @@ class Camera(object):
             counts = electrons
         else:
             # Decimate to sensor size
-            counts = bin_image(electrons, self.shape, self._bin_factor, (0, 0)).get()
+            counts = bin_image(electrons, self.shape, (0, 0)).get()
 
         if amplifier_noise and self.amplifier_sigma > 0:
             # Add electronics noise
