@@ -18,6 +18,7 @@ from numpy import linalg
 from scipy import interpolate as interp
 import quantities as q
 from syris import config as cfg
+from syris.physics import transfer, energy_to_wavelength
 from syris.opticalelements.geometry import BoundingBox, get_rotation_displacement
 import syris.opticalelements.geometry as geom
 from syris import math as smath
@@ -25,6 +26,28 @@ import struct
 from quantities.quantity import Quantity
 
 LOG = logging.getLogger(__name__)
+
+
+class Sample(object):
+
+    """A sample consisting of a *geometry* and a *material*."""
+
+    def __init__(self, geometry, material):
+        self.geometry = geometry
+        self.material = material
+
+    def project(self, t=None):
+        """Project thickness at time *t*."""
+        return self.geometry
+
+    def transfer(self, energy, t=None, queue=None, out=None):
+        """Compute the transfer function at *energy*, time *t*. Use *queue* for OpenCL computations
+        and *out* pyopencl array.
+        """
+        ri = self.material.get_refractive_index(energy)
+        lam = energy_to_wavelength(energy)
+
+        return transfer(self.project(t=t), ri, lam, queue=queue, out=out)
 
 
 class GraphicalObject(object):
