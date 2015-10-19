@@ -1,11 +1,5 @@
 Optical Elements
 ================
 
-.. automodule:: syris.opticalelements.geometry
-    :members:
-
-.. automodule:: syris.opticalelements.graphicalobjects
-    :members:
-
-.. automodule:: syris.opticalelements.materials
+.. automodule:: syris.opticalelements
     :members:
