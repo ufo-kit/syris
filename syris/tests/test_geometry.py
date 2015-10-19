@@ -1,9 +1,9 @@
 import numpy as np
 from numpy import linalg
 import quantities as q
-from syris.opticalelements import geometry as geom
+from syris import geometry as geom
 import itertools
-from syris.opticalelements.geometry import BoundingBox
+from syris.geometry import BoundingBox
 from syris.tests import SyrisTest
 
 

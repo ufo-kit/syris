@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 from syris import config as cfg
-from syris.opticalelements.materials import Material, MaterialError, make_pmasf, make_henke
+from syris.materials import Material, MaterialError, make_pmasf, make_henke
 import os
 from syris.tests import SyrisTest, pmasf_required, slow
 
@@ -43,8 +43,7 @@ class TestMaterial(SyrisTest):
     def test_interpolation_few_points(self):
         energies = [0] * q.eV
         indices = [1 + 1j]
-        material = Material('foo', indices, energies)
-        self.assertRaises(MaterialError, material.get_refractive_index, 1 * q.eV)
+        self.assertRaises(MaterialError, Material, 'foo', indices, energies)
 
 
 @slow
@@ -58,10 +57,6 @@ class TestPMASFMaterial(SyrisTest):
         if not os.path.exists(cfg.PMASF_FILE):
             # Remote access.
             cfg.PMASF_FILE = "ssh ufo /home/ws/jd2392/software/asf/pmasf"
-
-    def test_one_energy(self):
-        material = make_pmasf("PMMA", [20] * q.keV)
-        self.assertEqual(len(material.refractive_indices), 1)
 
     def test_multiple_energies(self):
         energies = np.linspace(15, 25, 10) * q.keV

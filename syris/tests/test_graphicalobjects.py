@@ -1,9 +1,9 @@
 import numpy as np
 import quantities as q
-from syris.opticalelements import geometry as geom
-from syris.opticalelements.geometry import Trajectory
-from syris.opticalelements.graphicalobjects import MetaBall, CompositeObject
-from syris.opticalelements.materials import Material
+from syris import geometry as geom
+from syris.geometry import Trajectory
+from syris.graphicalobjects import MetaBall, CompositeObject
+from syris.materials import Material
 from syris.tests import SyrisTest, slow
 import itertools
 from numpy import linalg
@@ -285,8 +285,8 @@ class TestGraphicalObjects(SyrisTest):
         right = self.composite
         root = CompositeObject(traj, gr_objects=[left, right])
 
-        energies = [0] * q.eV
-        indices = [0 + 0j]
+        energies = range(10, 20) * q.keV
+        indices = np.ones(len(energies), dtype=np.complex)
         pmma = Material('pmma', indices, energies)
         si = Material('Si', indices, energies)
 
