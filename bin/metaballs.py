@@ -248,10 +248,15 @@ if __name__ == '__main__':
     # z_min, z_max = get_z_range(balls)
 
     # Random metaballs creation
-    num_objects = np.random.randint(1, 100)
-    metaballs, objects_all, coeff, mid = create_metaballs_random(num_objects)
+    # num_objects = np.random.randint(1, 100)
+    # metaballs, objects_all, coeff, mid = create_metaballs_random(num_objects)
+    positions = [(n / 4, n / 2, 0, n / 5),
+                 (3 * n / 4, n / 2, 0, n / 5)] * pixel_size.rescale(q.mm).magnitude
+    num_objects = len(positions)
+    print positions
+    metaballs, objects_all = create_metaballs(positions)
     z_min, z_max = get_z_range(metaballs)
-    print coeff, mid
+    # print coeff, mid
     print 'z min, max:', z_min, z_max, n * pixel_size + z_min, UNITS
     print 'Z steps:', ((z_max - z_min) / pixel_size).simplified
 
