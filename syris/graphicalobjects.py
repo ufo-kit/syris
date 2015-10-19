@@ -232,17 +232,15 @@ class MovableGraphicalObject(GraphicalObject):
                                        self.transform_matrix)
 
 
-class MetaObject(MovableGraphicalObject):
+class MetaBall(MovableGraphicalObject):
 
-    """"Metaball-like graphical object. Metaballs are smooth blobs formed
-    by summing density functions representing particular objects."""
-
-    # Object type.
-    TYPE = None
+    """"Metaball graphical object. Metaballs are smooth blobs formed
+    by summing density functions representing particular objects.
+    """
 
     def __init__(self, trajectory, radius, orientation=geom.Y_AX):
         """Create a metaobject with *radius*."""
-        super(MetaObject, self).__init__(trajectory, orientation=orientation)
+        super(MetaBall, self).__init__(trajectory, orientation=orientation)
         if radius <= 0:
             raise ValueError("Radius must be greater than zero.")
 
@@ -253,8 +251,16 @@ class MetaObject(MovableGraphicalObject):
         return self._radius
 
     @property
+    def furthest_point(self):
+        """
+        Furthest point is twice the radius because of the influence
+        region of the metaball.
+        """
+        return 2 * self.radius * max(self._scale_factor)
+
+    @property
     def bounding_box(self):
-        """Bounding box of the object."""
+        """Bounding box of the metaball."""
         radius = self.radius.simplified.magnitude
 
         base = -2 * radius, 2 * radius
@@ -287,22 +293,6 @@ class MetaObject(MovableGraphicalObject):
                            self.position[1].rescale(units).magnitude,
                            self.position[2].rescale(units).magnitude,
                            self.radius.rescale(units).magnitude)
-
-
-class MetaBall(MetaObject):
-
-    """Metaball graphical object."""
-
-    def __init__(self, trajectory, radius, orientation=geom.Y_AX):
-        super(MetaBall, self).__init__(trajectory, radius, orientation=orientation)
-
-    @property
-    def furthest_point(self):
-        """
-        Furthest point is twice the radius because of the influence
-        region of the metaball.
-        """
-        return 2 * self.radius * max(self._scale_factor)
 
     def __repr__(self):
         return "MetaBall({0})".format(self.radius)
