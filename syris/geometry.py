@@ -10,15 +10,16 @@ T = ABC yielding x' = ABCx = Tx. Backward form means that we calculate
 the matrix in the form T^{-1} = C^{-1}B^{-1}A^{-1} = (ABC)^{-1}. Thus, we can
 easily obtain x = T^{-1}x'.
 """
+from __future__ import absolute_import
+import math
 import numpy as np
 from numpy import linalg
 import quantities as q
 from scipy import interpolate as interp
 import itertools
 import logging
-import math
-from quantities.quantity import Quantity
 from syris import math as smath
+from quantities.quantity import Quantity
 
 
 X = 0

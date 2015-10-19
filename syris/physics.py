@@ -97,7 +97,7 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
 
 def propagate(samples, energies, distance, pixel_size, region=None, apply_phase_factor=False,
               mollified=True, queue=None, out=None, plan=None):
-    """Propagate *samples* which are :class:`syris.opticalelements.graphicalobjects.Sample`
+    """Propagate *samples* which are :class:`syris.opticalelements.OpticalElement`
     instances at *energies* to *distance*. Use *pixel_size*, limit coherence to *region*,
     *apply_phase_factor* is as by the Fresnel approximation phase factor, *queue* an OpenCL command
     queue, *out* a PyOpenCL Array and *plan* and FFT plan.

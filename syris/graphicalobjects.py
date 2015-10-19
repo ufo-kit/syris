@@ -1,7 +1,4 @@
 """
-Graphical objects
-=================
-
 There are two types of graphical objects:
 
     * **primitive** - children of :py:class:`GraphicalObject` but *not* \
@@ -19,8 +16,8 @@ from scipy import interpolate as interp
 import quantities as q
 from syris import config as cfg
 from syris.physics import transfer, energy_to_wavelength
-from syris.opticalelements.geometry import BoundingBox, get_rotation_displacement
-import syris.opticalelements.geometry as geom
+from syris.geometry import BoundingBox, get_rotation_displacement
+import syris.geometry as geom
 from syris import math as smath
 import struct
 from quantities.quantity import Quantity
