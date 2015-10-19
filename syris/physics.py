@@ -5,8 +5,9 @@ import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
 import quantities.constants.quantum as cq
+from pyfft.cl import Plan
 from syris.gpu import util as g_util
-from syris.imageprocessing import get_gauss_2d
+from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2
 from syris.math import fwnm_to_sigma
 from syris import config as cfg
 
@@ -92,6 +93,38 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
         out = out * mollifier
 
     return out
+
+
+def propagate(samples, energies, distance, pixel_size, region=None, apply_phase_factor=False,
+              mollified=True, queue=None, out=None, plan=None):
+    """Propagate *samples* which are :class:`syris.opticalelements.graphicalobjects.Sample`
+    instances at *energies* to *distance*. Use *pixel_size*, limit coherence to *region*,
+    *apply_phase_factor* is as by the Fresnel approximation phase factor, *queue* an OpenCL command
+    queue, *out* a PyOpenCL Array and *plan* and FFT plan.
+    """
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    shape = samples[0].project().shape
+    if plan is None:
+        plan = Plan(shape, queue=queue)
+    u = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
+    intensity = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
+    intensity.fill(0)
+
+    for energy in energies:
+        u.fill(1)
+        lam = energy_to_wavelength(energy)
+        propagator = compute_propagator(u.shape[0], distance, lam, pixel_size, region=region,
+                                        apply_phase_factor=apply_phase_factor,
+                                        mollified=mollified, queue=queue)
+        for sample in samples:
+            u *= sample.transfer(energy, queue=queue, out=out)
+        fft_2(u.data, plan, wait_for_finish=True)
+        u *= propagator
+        ifft_2(u.data, plan, wait_for_finish=True)
+        intensity += abs(u) ** 2
+
+    return intensity
 
 
 def energy_to_wavelength(energy):
