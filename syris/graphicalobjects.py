@@ -1,12 +1,5 @@
 """
-There are two types of graphical objects:
-
-    * **primitive** - children of :py:class:`GraphicalObject` but *not* \
-        children of :py:class:`CompositeObject`
-    * **composite** - can hold other graphical objects, including \
-        another composites, these are the children of \
-        :py:class:`CompositeObject`
-
+Graphical objects are used to construct an optical element's geometry.
 """
 import itertools
 import logging
@@ -27,6 +20,28 @@ LOG = logging.getLogger(__name__)
 
 class GraphicalObject(object):
 
+    """An abstract graphical object class."""
+
+    def project(self, t=None):
+        """Project thickness at time *t*."""
+        raise NotImplementedError
+
+
+class StaticGraphicalObject(GraphicalObject):
+
+    """A static graphical object defined by its projected *thickness*."""
+
+    def __init__(self, thickness):
+        super(StaticGraphicalObject, self).__init__()
+        self.thickness = thickness
+
+    def project(self, t=None):
+        """Project thickness."""
+        return self.thickness
+
+
+class MovableGraphicalObject(GraphicalObject):
+
     """Class representing an abstract graphical object."""
 
     def __init__(self, trajectory, material=None, orientation=geom.Y_AX):
@@ -34,6 +49,7 @@ class GraphicalObject(object):
         *orientation*, which is an (x, y, z) vector specifying object's "up"
         vector.
         """
+        super(MovableGraphicalObject, self).__init__()
         self._trajectory = trajectory
         self._material = material
         self._orientation = geom.normalize(orientation)
@@ -257,7 +273,7 @@ class GraphicalObject(object):
                                        self.transform_matrix)
 
 
-class MetaObject(GraphicalObject):
+class MetaObject(MovableGraphicalObject):
 
     """"Metaball-like graphical object. Metaballs are smooth blobs formed
     by summing density functions representing particular objects."""
@@ -337,7 +353,7 @@ class MetaBall(MetaObject):
         return repr(self)
 
 
-class CompositeObject(GraphicalObject):
+class CompositeObject(MovableGraphicalObject):
 
     """
     Class representing an object consisting of more sub-objects.
@@ -401,7 +417,7 @@ class CompositeObject(GraphicalObject):
 
         return primitive
 
-    @GraphicalObject.material.setter
+    @MovableGraphicalObject.material.setter
     def material(self, material):
         """Set the object's *material*. It propagates to the children
         as well.
@@ -499,7 +515,7 @@ class CompositeObject(GraphicalObject):
 
     def clear_transformation(self):
         """Clear all transformations."""
-        GraphicalObject.clear_transformation(self)
+        MovableGraphicalObject.clear_transformation(self)
         for obj in self:
             obj.clear_transformation()
 
@@ -517,7 +533,7 @@ class CompositeObject(GraphicalObject):
 
     def translate(self, vec):
         """Translate all sub-objects by a vector *vec*."""
-        GraphicalObject.translate(self, vec)
+        MovableGraphicalObject.translate(self, vec)
         for obj in self:
             obj.translate(vec)
 
@@ -526,14 +542,14 @@ class CompositeObject(GraphicalObject):
         *total_start* is the center of rotation point which results in
         transformation TRT^-1.
         """
-        GraphicalObject.rotate(self, angle, vec, total_start)
+        MovableGraphicalObject.rotate(self, angle, vec, total_start)
         for obj in self:
             obj.rotate(angle, vec, total_start)
 
     def move(self, abs_time):
         """Move to a position of the object in time *abs_time*."""
         # Move the whole object.
-        GraphicalObject.move(self, abs_time)
+        MovableGraphicalObject.move(self, abs_time)
         for gr_object in self:
             # Then move its sub-objects.
             gr_object.move(abs_time)
