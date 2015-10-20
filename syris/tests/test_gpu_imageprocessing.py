@@ -130,3 +130,17 @@ class TestGPUImageProcessing(SyrisTest):
         cfg.PRECISION.set_precision(True)
         image = image.astype(cfg.PRECISION.np_float)
         self.assertRaises(TypeError,ip.rescale, image, shape)
+
+    def test_crop(self):
+        shape = 8, 4
+        image = np.arange(shape[0] * shape[1]).reshape(shape).astype(cfg.PRECISION.np_float)
+        x_0 = 1
+        y_0 = 2
+        width = 3
+        height = 4
+        res = ip.crop(image, (y_0, x_0, height, width)).get()
+
+        np.testing.assert_equal(image[y_0:y_0 + height, x_0:x_0 + width], res)
+
+        # Identity
+        np.testing.assert_equal(image, ip.crop(image, (0, 0, shape[0], shape[1])).get())
