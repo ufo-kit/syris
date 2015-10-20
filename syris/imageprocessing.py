@@ -56,6 +56,28 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
     return out
 
 
+def crop(image, region, out=None, queue=None):
+    """Crop a 2D *image*. *region* is the region to crop as (y_0, x_0, height, width), *out* is the
+    pyopencl Array instance, if not specified it will be created. *out* is also returned.
+    """
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    if out is None:
+        out = cl.array.Array(queue, (region[2], region[3]), dtype=image.dtype)
+    if not isinstance(image, cl_array.Array):
+        image = cl_array.to_device(queue, image)
+
+    n_bytes = image.dtype.itemsize
+    y_0, x_0, height, width = region
+    src_origin = (n_bytes * x_0, y_0, 0)
+    dst_origin = (0, 0, 0)
+    region = (n_bytes * width, height, 1)
+
+    _copy_rect(image, out, src_origin, dst_origin, region, queue)
+
+    return out
+
+
 def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue=None):
     """Bin a 2D pyopencl Array *image*. The resulting buffer has shape *summer_shape* (y, x).
     *Offset* (y, x) is the offset to the original *image*.  If *average* is True, the summed pixel
@@ -235,3 +257,16 @@ class Tiler(object):
                       tile_shape[0] * (indices[0] + 1),
                       indices[1] * tile_shape[1]:
                       tile_shape[1] * (indices[1] + 1)] = tile
+
+
+def _copy_rect(src, dst, src_origin, dst_origin, region, queue):
+    """Copy a rectangular OpenCL buffer *region* from *src* to *dst*, where both are a pyopencl
+    Array instance. *src_origin* and *dst_origin* specify the offsets. *queue* is an OpenCL command
+    queue.
+    """
+    n_bytes = src.dtype.itemsize
+    src_pitches = (n_bytes * src.shape[1], n_bytes * src.shape[1] * src.shape[0])
+    dst_pitches = (n_bytes * dst.shape[1], n_bytes * dst.shape[1] * dst.shape[0])
+
+    cl.enqueue_copy_buffer_rect(queue, src.data, dst.data, src_origin, dst_origin, region,
+                                src_pitches, dst_pitches)
