@@ -113,3 +113,20 @@ class TestGPUImageProcessing(SyrisTest):
         res = ip.decimate(image, shape, sigma=sigma, average=True).get()
         gt = gt / 4
         np.testing.assert_almost_equal(gt, res, decimal=6)
+
+    def test_rescale(self):
+        from scipy.interpolate import RectBivariateSpline
+        orig_shape = 8, 4
+        shape = 4, 8
+        image = np.arange(orig_shape[0] *
+                          orig_shape[1]).reshape(orig_shape).astype(cfg.PRECISION.np_float)
+        res = ip.rescale(image, shape).get()
+        xx = np.linspace(0, orig_shape[1], shape[1], endpoint=False)
+        yy = np.linspace(0, orig_shape[0], shape[0], endpoint=False)
+        spl = RectBivariateSpline(range(orig_shape[0]), range(orig_shape[1]), image, kx=1, ky=1)
+
+        np.testing.assert_almost_equal(res, spl(yy, xx))
+
+        cfg.PRECISION.set_precision(True)
+        image = image.astype(cfg.PRECISION.np_float)
+        self.assertRaises(TypeError,ip.rescale, image, shape)
