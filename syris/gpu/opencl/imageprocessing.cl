@@ -81,3 +81,19 @@ __kernel void sum(__global vfloat *out,
 
     out[iy * get_global_size(0) + ix] = value;
 }
+
+/*
+ * Rescale an image.
+ */
+__kernel void rescale (read_only image2d_t input,
+                       __global float *output,
+                       const sampler_t sampler,
+                       const vfloat2 factor)
+{
+    int ix = get_global_id (0);
+    int iy = get_global_id (1);
+
+    output[iy * get_global_size(0) + ix] = read_imagef(input, sampler, (float2)
+                                                       (ix / factor.x + 0.5f,
+                                                        iy / factor.y + 0.5f)).x;
+}

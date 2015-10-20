@@ -102,6 +102,40 @@ def decimate(image, shape, sigma=1, average=False, queue=None, plan=None):
     return bin_image(image.real, shape, average=average, queue=queue)
 
 
+def rescale(image, shape, sampler=None, queue=None, out=None):
+    """Rescale *image* to *shape* and use *sampler* which is a :class:`pyopencl.Sampler` instance.
+    Use OpenCL *queue* and *out* pyopencl Array.
+    """
+    if cfg.PRECISION.cl_float == 8:
+        raise TypeError('Double precision mode not supported')
+    shape = make_tuple(shape)
+    # OpenCL order
+    factor = float(shape[1]) / image.shape[1], float(shape[0]) / image.shape[0]
+
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    if out is None:
+        out = cl.array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
+
+    if not sampler:
+        sampler = cl.Sampler(cfg.OPENCL.ctx, False, cl.addressing_mode.NONE, cl.filter_mode.LINEAR)
+    fmt = cl.ImageFormat(cl.channel_order.INTENSITY, cl.channel_type.FLOAT)
+    mf = cl.mem_flags
+    if not isinstance(image, cl.Image):
+        image = cl.Image(cfg.OPENCL.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, fmt,
+                         shape=image.shape[::-1], hostbuf=image)
+
+    cfg.OPENCL.programs['improc'].rescale(queue,
+                                          shape[::-1],
+                                          None,
+                                          image,
+                                          out.data,
+                                          sampler,
+                                          g_util.make_vfloat2(*factor))
+
+    return out
+
+
 def _check_tiling(shape, tiles_count):
     """Check if tiling with tile counts *tile_counts* as (y, x) is possible
     for *shape* (y, x).
