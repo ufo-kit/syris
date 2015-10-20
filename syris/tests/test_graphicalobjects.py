@@ -2,7 +2,7 @@ import numpy as np
 import quantities as q
 from syris import geometry as geom
 from syris.geometry import Trajectory
-from syris.graphicalobjects import MetaBall, CompositeObject, StaticGraphicalObject
+from syris.graphicalobjects import MetaBall, CompositeObject, SimpleGraphicalObject
 from syris.materials import Material
 from syris.tests import SyrisTest, slow
 import itertools
@@ -35,9 +35,9 @@ def check_distances(graphical_object, distance, decimal_points=3):
     np.testing.assert_almost_equal(max_distances, distance, decimal=decimal_points)
 
 
-def test_static():
+def test_simple():
     thickness = np.ones((4, 4)) * q.mm
-    projection = StaticGraphicalObject(thickness).project()
+    projection = SimpleGraphicalObject(thickness).project()
 
     np.testing.assert_equal(thickness.simplified.magnitude, projection.simplified.magnitude)
 

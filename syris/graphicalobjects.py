@@ -27,12 +27,12 @@ class GraphicalObject(object):
         raise NotImplementedError
 
 
-class StaticGraphicalObject(GraphicalObject):
+class SimpleGraphicalObject(GraphicalObject):
 
-    """A static graphical object defined by its projected *thickness*."""
+    """A simple graphical object defined by its projected *thickness*."""
 
     def __init__(self, thickness):
-        super(StaticGraphicalObject, self).__init__()
+        super(SimpleGraphicalObject, self).__init__()
         self.thickness = thickness
 
     def project(self, t=None):
