@@ -10,8 +10,11 @@ import quantities as q
 from syris import config as cfg
 from syris.physics import transfer, energy_to_wavelength
 from syris.geometry import BoundingBox, get_rotation_displacement
+from syris.imageprocessing import crop, pad, rescale
+import syris.gpu.util as g_util
 import syris.geometry as geom
 from syris import math as smath
+from syris.util import make_tuple
 import struct
 from quantities.quantity import Quantity
 
@@ -22,22 +25,60 @@ class GraphicalObject(object):
 
     """An abstract graphical object class."""
 
-    def project(self, t=None):
-        """Project thickness at time *t*."""
+    def project(self, shape, pixel_size, t=None):
+        """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
+        is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or
+        2D.
+        """
+        shape = make_tuple(shape, num_dims=2)
+        pixel_size = make_tuple(pixel_size, num_dims=2)
+
+        return self._project(shape, pixel_size, t=t)
+
+    def _project(self, shape, pixel_size, t=None):
+        """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
 
 class SimpleGraphicalObject(GraphicalObject):
 
-    """A simple graphical object defined by its projected *thickness*."""
+    """A simple graphical object defined by its projected *thickness*, which is a quantity and it is
+    always converted to meters, thus the :meth:`~GraphicalObject.project` method always returns the
+    projection in meters.
+    """
 
-    def __init__(self, thickness):
+    def __init__(self, thickness, pixel_size):
         super(SimpleGraphicalObject, self).__init__()
-        self.thickness = thickness
+        self.thickness = g_util.get_array(thickness.simplified.magnitude)
+        self.pixel_size = make_tuple(pixel_size, num_dims=2)
 
-    def project(self, t=None):
+    def _project(self, shape, pixel_size, t=None):
         """Project thickness."""
-        return self.thickness
+        if shape == self.thickness.shape and np.array_equal(pixel_size, self.pixel_size):
+            result = self.thickness
+        else:
+            src_fov = self.thickness.shape * self.pixel_size
+            dst_fov = shape * pixel_size
+            fov_coeff = (dst_fov / src_fov).simplified.magnitude
+            orig_shape = self.thickness.shape
+            fov_shape = orig_shape * fov_coeff
+            fov_shape = (int(np.ceil(fov_shape[0])), int(np.ceil(fov_shape[1])))
+            # Do not use just one of them because it might be exactly 1
+            representative = min(fov_coeff)
+            if (fov_coeff[0] < 1) ^ (fov_coeff[1] < 1) and fov_coeff[0] != 1 and fov_coeff[1] != 1:
+                raise ValueError('Cannot simultaneously crop and pad image')
+            elif representative < 1:
+                y_0 = (orig_shape[0] - fov_shape[0]) / 2
+                x_0 = (orig_shape[1] - fov_shape[1]) / 2
+                res = crop(self.thickness, (y_0, x_0) + fov_shape)
+            else:
+                y_0 = (fov_shape[0] - orig_shape[0]) / 2
+                x_0 = (fov_shape[1] - orig_shape[1]) / 2
+                res = pad(self.thickness, (y_0, x_0) + fov_shape)
+
+            result = rescale(res, shape)
+
+        return result
 
 
 class MovableGraphicalObject(GraphicalObject):
