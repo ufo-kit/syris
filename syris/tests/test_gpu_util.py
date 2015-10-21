@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 import pyopencl as cl
 import syris
@@ -29,3 +30,52 @@ class TestGPUUtil(SyrisTest):
         res = np.empty(self.data.shape, dtype=self.data.dtype)
         cl.enqueue_copy(cfg.OPENCL.queue, res, mem)
         np.testing.assert_equal(self.data, res)
+
+    def test_conversion(self):
+        def _test():
+            shape = 8, 4
+            dtypes = ['i', 'u', 'f']
+            lengths = [2, 4, 8]
+            types = [np.dtype('{}{}'.format(dt, length))
+                     for dt, length in itertools.product(dtypes, lengths)]
+            types.append(np.dtype('i1'))
+            types.append(np.dtype('u1'))
+            types += [np.dtype('c8'), np.dtype('c16')]
+            for dtype in types:
+                np_data = np.arange(shape[0] * shape[1]).reshape(shape).astype(dtype)
+                # numpy -> Array
+                cl_data = gu.get_array(np_data)
+                np.testing.assert_equal(np_data, cl_data.get())
+                # Array -> Array
+                res = gu.get_array(cl_data)
+                np.testing.assert_equal(res.get(), cl_data.get())
+                if dtype.kind != 'c':
+                    # numpy -> Image and Image -> Array
+                    image = gu.get_image(np_data)
+                    back = gu.get_array(image).get()
+                    np.testing.assert_equal(back, np_data)
+                    # Array -> Image
+                    image = gu.get_image(cl_data)
+                    back = gu.get_array(image).get()
+                    np.testing.assert_equal(back, np_data)
+                    # Image -> Image
+                    image_2 = gu.get_image(image)
+                    back = gu.get_array(image_2).get()
+                    np.testing.assert_equal(back, np_data)
+
+        # Single precision
+        _test()
+
+        # Double precision
+        cfg.PRECISION.set_precision(True)
+        _test()
+
+        # Unrecognized data types
+        self.assertRaises(TypeError, gu.get_array, 1)
+        self.assertRaises(TypeError, gu.get_array, None)
+        self.assertRaises(TypeError, gu.get_image, 1)
+        self.assertRaises(TypeError, gu.get_image, None)
+
+        # Complex Image
+        data = np.ones((4, 4), dtype=np.complex)
+        self.assertRaises(TypeError, gu.get_image, data)
