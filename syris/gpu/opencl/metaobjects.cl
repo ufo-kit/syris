@@ -5,9 +5,6 @@
  * precision for floating point numbers.
  */
 
-/* Maximum number of objects. They are passed in constant memory block
- * so their number is limited. */
-#define MAX_OBJECTS 30
 #define left_index(a) (((a) == 0) ? 2 : (((a) - 1) % 3))
 #define current_index(a) ((a) % 3)
 #define right_index(a) (((a) + 1) % 3)

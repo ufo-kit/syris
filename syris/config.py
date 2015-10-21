@@ -7,6 +7,7 @@ import pyopencl as cl
 
 
 LOG = logging.getLogger()
+MAX_META_OBJECTS = 30
 
 
 class Precision(object):
