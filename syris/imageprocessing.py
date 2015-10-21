@@ -65,8 +65,7 @@ def pad(image, region, out=None, queue=None):
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl_array.zeros(queue, (region[2], region[3]), dtype=image.dtype)
-    if not isinstance(image, cl_array.Array):
-        image = cl_array.to_device(queue, image)
+    image = g_util.get_array(image)
 
     n_bytes = image.dtype.itemsize
     y_0, x_0, height, width = region
@@ -87,8 +86,7 @@ def crop(image, region, out=None, queue=None):
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl.array.Array(queue, (region[2], region[3]), dtype=image.dtype)
-    if not isinstance(image, cl_array.Array):
-        image = cl_array.to_device(queue, image)
+    image = g_util.get_array(image)
 
     n_bytes = image.dtype.itemsize
     y_0, x_0, height, width = region
@@ -102,15 +100,16 @@ def crop(image, region, out=None, queue=None):
 
 
 def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue=None):
-    """Bin a 2D pyopencl Array *image*. The resulting buffer has shape *summer_shape* (y, x).
-    *Offset* (y, x) is the offset to the original *image*.  If *average* is True, the summed pixel
-    is normalized by the region area. *out* is the pyopencl Array instance, if not specified it will
-    be created. *out* is also returned.
+    """Bin a *image*. The resulting buffer has shape *summer_shape* (y, x).  *Offset* (y, x) is the
+    offset to the original *image*.  If *average* is True, the summed pixel is normalized by the
+    region area. *out* is the pyopencl Array instance, if not specified it will be created. *out* is
+    also returned.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl.array.Array(queue, summed_shape, dtype=cfg.PRECISION.np_float)
+    image = g_util.get_array(image)
     region = ((image.shape[0] - offset[0]) / summed_shape[0],
               (image.shape[1] - offset[1]) / summed_shape[1])
 
@@ -135,8 +134,7 @@ def decimate(image, shape, sigma=1, average=False, queue=None, plan=None):
         queue = cfg.OPENCL.queue
     if not plan:
         plan = Plan(image.shape, queue=queue)
-    if not isinstance(image, cl_array.Array):
-        image = cl_array.to_device(queue, image)
+    image = g_util.get_array(image)
     image = image.astype(cfg.PRECISION.np_cplx)
 
     fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue)
@@ -164,11 +162,7 @@ def rescale(image, shape, sampler=None, queue=None, out=None):
 
     if not sampler:
         sampler = cl.Sampler(cfg.OPENCL.ctx, False, cl.addressing_mode.NONE, cl.filter_mode.LINEAR)
-    fmt = cl.ImageFormat(cl.channel_order.INTENSITY, cl.channel_type.FLOAT)
-    mf = cl.mem_flags
-    if not isinstance(image, cl.Image):
-        image = cl.Image(cfg.OPENCL.ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, fmt,
-                         shape=image.shape[::-1], hostbuf=image)
+    image = g_util.get_image(image)
 
     cfg.OPENCL.programs['improc'].rescale(queue,
                                           shape[::-1],
