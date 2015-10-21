@@ -144,3 +144,19 @@ class TestGPUImageProcessing(SyrisTest):
 
         # Identity
         np.testing.assert_equal(image, ip.crop(image, (0, 0, shape[0], shape[1])).get())
+
+    def test_pad(self):
+        shape = 3, 2
+        image = np.arange(shape[0] * shape[1]).reshape(shape).astype(cfg.PRECISION.np_float)
+        x_0 = 1
+        y_0 = 2
+        width = 8
+        height = 5
+        res = ip.pad(image, (y_0, x_0, height, width)).get()
+
+        gt = np.zeros((height, width), dtype=image.dtype)
+        gt[y_0:y_0 + shape[0], x_0:x_0 + shape[1]] = image
+        np.testing.assert_equal(gt, res)
+
+        # Identity
+        np.testing.assert_equal(image, ip.pad(image, (0, 0, shape[0], shape[1])).get())
