@@ -5,6 +5,7 @@ Utility functions concerning GPU programming.
 import pkg_resources
 import numpy as np
 import pyopencl as cl
+import pyopencl.array as cl_array
 from pyopencl.array import vec
 import time
 from syris import profiling as prf
@@ -217,3 +218,66 @@ def make_vcomplex(value):
     precision.
     """
     return make_vfloat2(value.real, value.imag)
+
+
+def get_array(data, queue=None):
+    """Get pyopencl.array.Array from *data* which can be a numpy array, a pyopencl.array.Array or a
+    pyopencl.Image. *queue* is an OpenCL command queue.
+    """
+    if not queue:
+        queue = cfg.OPENCL.queue
+
+    if isinstance(data, cl_array.Array):
+        result = data
+    elif isinstance(data, np.ndarray):
+        if data.dtype.kind == 'c':
+            if data.dtype.itemsize != cfg.PRECISION.cl_cplx:
+                data = data.astype(cfg.PRECISION.np_cplx)
+            result = cl_array.to_device(queue, data.astype(cfg.PRECISION.np_cplx))
+        else:
+            if data.dtype.kind != 'f' or data.dtype.itemsize != cfg.PRECISION.cl_float:
+                data = data.astype(cfg.PRECISION.np_float)
+            result = cl_array.to_device(queue, data.astype(cfg.PRECISION.np_float))
+    elif isinstance(data, cl.Image):
+        result = cl_array.empty(queue, data.shape[::-1], np.float32)
+        cl.enqueue_copy(queue, result.data, data, offset=0, origin=(0, 0),
+                        region=result.shape[::-1])
+        if result.dtype.itemsize != cfg.PRECISION.cl_float:
+            result = result.astype(cfg.PRECISION.np_float)
+    else:
+        raise TypeError('Unsupported data type {}'.format(type(data)))
+
+    return result
+
+
+def get_image(data, access=cl.mem_flags.READ_ONLY, queue=None):
+    """Get pyopencl.Image from *data* which can be a numpy array, a pyopencl.array.Array or a
+    pyopencl.Image. The image channel order is pyopencl.channel_order.INTENSITY and channel_type is
+    pyopencl.channel_type.FLOAT. *access* is either pyopencl.mem_flags.READ_ONLY or
+    pyopencl.mem_flags.WRITE_ONLY. *queue* is an OpenCL command queue.
+    """
+    if not queue:
+        queue = cfg.OPENCL.queue
+
+    fmt = cl.ImageFormat(cl.channel_order.INTENSITY, cl.channel_type.FLOAT)
+    mf = cl.mem_flags
+
+    if isinstance(data, cl.Image):
+        result = data
+    else:
+        if isinstance(data, cl_array.Array) or isinstance(data, np.ndarray):
+            if data.dtype.kind == 'c':
+                raise TypeError('Complex values are not supported')
+            else:
+                data = data.astype(np.float32)
+        else:
+            raise TypeError('Unsupported data type {}'.format(type(data)))
+
+        if isinstance(data, cl_array.Array):
+            result = cl.Image(cfg.OPENCL.ctx, access, fmt, shape=data.shape[::-1])
+            cl.enqueue_copy(queue, result, data.data, offset=0, origin=(0, 0), region=result.shape)
+        elif isinstance(data, np.ndarray):
+            result = cl.Image(cfg.OPENCL.ctx, access | mf.COPY_HOST_PTR, fmt,
+                              shape=data.shape[::-1], hostbuf=data)
+
+    return result
