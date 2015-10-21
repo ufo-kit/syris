@@ -1,8 +1,11 @@
 import numpy as np
 import quantities as q
+import syris
+import syris.config as cfg
 from syris import geometry as geom
 from syris.geometry import Trajectory
 from syris.graphicalobjects import MetaBall, CompositeObject, SimpleGraphicalObject
+from syris.imageprocessing import crop, pad, rescale
 from syris.materials import Material
 from syris.tests import SyrisTest, slow
 import itertools
@@ -36,10 +39,44 @@ def check_distances(graphical_object, distance, decimal_points=3):
 
 
 def test_simple():
-    thickness = np.ones((4, 4)) * q.mm
-    projection = SimpleGraphicalObject(thickness).project()
+    syris.init()
+    n = 8
+    ps = 1 * q.um
+    thickness = np.arange(n ** 2).reshape(n, n).astype(cfg.PRECISION.np_float) * q.m
+    go = SimpleGraphicalObject(thickness, ps)
+    print thickness.magnitude
 
-    np.testing.assert_equal(thickness.simplified.magnitude, projection.simplified.magnitude)
+    # Same
+    projection = go.project((n, n), ps).get()
+    np.testing.assert_almost_equal(thickness.magnitude, projection)
+
+    # Cropped upsampled
+    shape = (n, n)
+    gt = rescale(thickness.magnitude, shape).get()
+    projection = go.project(shape, ps / 2).get()
+    gt = rescale(crop(thickness.magnitude, (2, 2, n / 2, n / 2)), shape).get()
+    np.testing.assert_almost_equal(gt, projection)
+
+    # Cropped downsampled
+    shape = (n / 4, n / 4)
+    gt = rescale(thickness.magnitude, shape).get()
+    projection = go.project(shape, 2 * ps).get()
+    gt = rescale(crop(thickness.magnitude, (2, 2, n / 2, n / 2)), shape).get()
+    np.testing.assert_almost_equal(gt, projection)
+
+    # Padded upsampled
+    shape = (4 * n, 4 * n)
+    gt = rescale(thickness.magnitude, shape).get()
+    projection = go.project(shape, ps / 2).get()
+    gt = rescale(pad(thickness.magnitude, (4, 4, 2 * n, 2 * n)), shape).get()
+    np.testing.assert_almost_equal(gt, projection)
+
+    # Padded downsampled
+    shape = (n, n)
+    gt = rescale(thickness.magnitude, shape).get()
+    projection = go.project(shape, 2 * ps).get()
+    gt = rescale(pad(thickness.magnitude, (4, 4, 2 * n, 2 * n)), shape).get()
+    np.testing.assert_almost_equal(gt, projection)
 
 
 class TestGraphicalObjects(SyrisTest):
