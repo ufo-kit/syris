@@ -56,6 +56,29 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
     return out
 
 
+def pad(image, region, out=None, queue=None):
+    """Pad a 2D *image*. *region* is the region to pad as (y_0, x_0, height, width), the final image
+    dimensions are height x width and the filling starts at (y_0, x_0), *out* is the pyopencl Array
+    instance, if not specified it will be created. *out* is also returned.
+    """
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    if out is None:
+        out = cl_array.zeros(queue, (region[2], region[3]), dtype=image.dtype)
+    if not isinstance(image, cl_array.Array):
+        image = cl_array.to_device(queue, image)
+
+    n_bytes = image.dtype.itemsize
+    y_0, x_0, height, width = region
+    src_origin = (0, 0, 0)
+    dst_origin = (n_bytes * x_0, y_0, 0)
+    region = (n_bytes * image.shape[1], image.shape[0], 1)
+
+    _copy_rect(image, out, src_origin, dst_origin, region, queue)
+
+    return out
+
+
 def crop(image, region, out=None, queue=None):
     """Crop a 2D *image*. *region* is the region to crop as (y_0, x_0, height, width), *out* is the
     pyopencl Array instance, if not specified it will be created. *out* is also returned.
