@@ -12,12 +12,12 @@ MAX_META_OBJECTS = 30
 
 class Precision(object):
 
-    """A precision object holds information about the precision
-    of the floating point and complex numpy and OpenCL data types.
+    """A precision object holds the precision settings of the floating point and complex numpy and
+    OpenCL data types. If *double* is True, double precision is used.
     """
 
-    def __init__(self):
-        self.set_precision(False)
+    def __init__(self, double=False):
+        self.set_precision(double)
 
     def is_single(self):
         """Return True if the precision is single."""
