@@ -7,18 +7,6 @@ from syris.imageprocessing import Tiler
 from syris.tests import SyrisTest
 
 
-def _get_image(y_range, x_range, ar_type=cfg.PRECISION.np_float):
-    y_points, x_points = np.mgrid[y_range[0]:y_range[1],
-                                  x_range[0]:x_range[1]]
-    if ar_type == cfg.PRECISION.np_cplx:
-        result = np.cast[ar_type](
-            x_points * y_points + x_points * y_points * 1j)
-    else:
-        result = np.cast[ar_type](x_points * y_points)
-
-    return result
-
-
 class TestImageTiling(SyrisTest):
 
     def setUp(self):
