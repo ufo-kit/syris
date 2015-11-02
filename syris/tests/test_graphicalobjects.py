@@ -44,7 +44,6 @@ def test_simple():
     ps = 1 * q.um
     thickness = np.arange(n ** 2).reshape(n, n).astype(cfg.PRECISION.np_float) * q.m
     go = SimpleGraphicalObject(thickness, ps)
-    print thickness.magnitude
 
     # Same
     projection = go.project((n, n), ps).get()
