@@ -6,6 +6,7 @@ import logging
 import numpy as np
 from numpy import linalg
 from scipy import interpolate as interp
+import pyopencl as cl
 import quantities as q
 from syris import config as cfg
 from syris.physics import transfer, energy_to_wavelength
@@ -16,6 +17,7 @@ import syris.geometry as geom
 from syris import math as smath
 from syris.util import make_tuple
 import struct
+import pyopencl.array as cl_array
 from quantities.quantity import Quantity
 
 LOG = logging.getLogger(__name__)
@@ -319,6 +321,11 @@ class MetaBall(MovableGraphicalObject):
 
         return BoundingBox(transformed * q.m)
 
+    def _project(self, shape, pixel_size, t=0 * q.s):
+        self.move(t)
+
+        return project_metaballs(shape, pixel_size, self.pack())
+
     def get_transform_const(self):
         """
         Precompute the transformation constant which does not change for
@@ -612,3 +619,41 @@ def get_format_string(string):
     """
     float_string = "f" if cfg.PRECISION.is_single() else "d"
     return string.replace("vf", float_string)
+
+
+def project_metaballs(shape, pixel_size, object_string, queue=None, out=None):
+    """Project packed metaballs *object_string* on an image plane with *shape*, *pixel_size*. Use
+    OpenCL *queue* and *out* pyopencl Array instance for returning the result.
+    """
+    n, m = shape
+    ps = pixel_size.simplified.magnitude
+    num_objects = len(object_string) / 4 / cfg.PRECISION.cl_float
+    if not queue:
+        queue = cfg.OPENCL.queue
+
+    objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
+                            cl.mem_flags.COPY_HOST_PTR, hostbuf=object_string)
+    pobjects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                             size=m * n * cfg.MAX_META_OBJECTS * 4 * 7)
+    left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                         size=m * n * 2 * cfg.MAX_META_OBJECTS)
+    right_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
+                          size=m * n * 2 * cfg.MAX_META_OBJECTS)
+    if out is None:
+        out = cl_array.Array(queue, shape, cfg.PRECISION.np_float)
+
+    cfg.OPENCL.programs['geometry'].metaballs(cfg.OPENCL.queue,
+                                              (m, n),
+                                              None,
+                                              out.data,
+                                              objects_mem,
+                                              pobjects_mem,
+                                              left_mem,
+                                              right_mem,
+                                              np.int32(num_objects),
+                                              cl_array.vec.make_int2(0, 0),
+                                              cl_array.vec.make_int4(0, 0, m, n),
+                                              g_util.make_vfloat2(ps[1], ps[0]),
+                                              np.int32(True))
+
+    return out
