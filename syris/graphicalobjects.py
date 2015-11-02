@@ -573,16 +573,6 @@ class CompositeObject(MovableGraphicalObject):
 
         return np.max(np.abs(positions - orig_positions)) > distance.simplified.magnitude
 
-    def pack(self, units, coeff=1):
-        """Pack all the sub-objects into a structure suitable for GPU
-        calculation.
-        """
-        string = ""
-        for gr_object in self._objects:
-            string += gr_object.pack(units, coeff)
-
-        return string
-
     def __repr__(self):
         return "CompositeObject{0}".format(self.objects)
 
