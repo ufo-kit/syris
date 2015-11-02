@@ -116,6 +116,11 @@ class MovableGraphicalObject(GraphicalObject):
         raise NotImplementedError
 
     @property
+    def bounding_box(self):
+        """Bounding box defining the extent of the object."""
+        raise NotImplementedError
+
+    @property
     def position(self):
         """Current position."""
         return linalg.inv(self.transform_matrix)[:3, -1] * q.m
