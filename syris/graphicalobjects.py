@@ -587,6 +587,21 @@ class CompositeObject(MovableGraphicalObject):
         return repr(self)
 
 
+class MetaBalls(CompositeObject):
+
+    """Composite graphical object composed of metaballs."""
+
+    def __init__(self, trajectory, metaballs, orientation=geom.Y_AX):
+        super(MetaBalls, self).__init__(trajectory, orientation=orientation, gr_objects=metaballs)
+
+    def _project(self, shape, pixel_size, t=0 * q.s):
+        """Projection implementation."""
+        string = ''.join([go.pack() for go in self._objects])
+
+        self.move(t)
+        return project_metaballs(shape, pixel_size, string)
+
+
 def get_moved_groups(objects, t_0, t_1, distance):
     """
     Filter only *objects* which truly move in the time interval
