@@ -8,15 +8,15 @@ import quantities as q
 import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
-from syris.opticalelements.graphicalobjects import MetaBall
-from syris.opticalelements.geometry import Trajectory
+from syris.graphicalobjects import MetaBall, MetaBalls, project_metaballs
+from syris.geometry import Trajectory
 from libtiff import TIFF
 
 
 LOG = logging.getLogger(__name__)
 
 
-UNITS = q.mm
+UNITS = q.m
 VECTOR_WIDTH = 1
 SUPERSAMPLING = 1
 MAX_OBJECTS = 30
@@ -87,7 +87,7 @@ def create_metaballs(params):
         metaball = MetaBall(trajectory, r[i] * q.mm)
         metaball.move(0 * q.s)
         metaballs.append(metaball)
-        objects += metaball.pack(UNITS)
+        objects += metaball.pack()
 
     return metaballs, objects
 
@@ -115,7 +115,7 @@ def create_metaballs_random(num_objects, write_parameters=False):
     print "objects:", num_objects
     for j in range(num_objects):
         metaball, params = create_metaball_random(n, pixel_size, radius_range)
-        objects_all += metaball.pack(UNITS)
+        objects_all += metaball.pack()
         params_all += params
         metaballs.append(metaball)
 
@@ -263,7 +263,10 @@ if __name__ == '__main__':
     objects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
                             cl.mem_flags.COPY_HOST_PTR, hostbuf=objects_all)
 
-    thickness = fast_metaballs(n, objects_mem, num_objects, pixel_size, thickness=True)
+    traj = Trajectory([(0, 0, 0)] * q.m)
+    comp = MetaBalls(traj, metaballs)
+    thickness = comp.project((n, n), pixel_size).get()
+
     # thickness = slow_metaballs(n, objects_mem, num_objects, (z_min, z_max), pixel_size)
     TIFF.open("/home/farago/data/thickness/thickness.tif", "w").\
         write_image(thickness[:, ::VECTOR_WIDTH].astype(np.float32))
