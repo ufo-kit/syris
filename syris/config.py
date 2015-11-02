@@ -68,8 +68,8 @@ def init_logging(level=logging.DEBUG, logger_file=None):
         LOG.addHandler(file_handler)
 
 
-PRECISION = Precision()
-OPENCL = OpenCL()
+PRECISION = None
+OPENCL = None
 
 # Refractive index calculation program path.
 PMASF_FILE = "pmasf"
