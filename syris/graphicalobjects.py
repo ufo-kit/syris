@@ -324,16 +324,16 @@ class MetaBall(MovableGraphicalObject):
         a_z = self.transform_matrix[2][2]
         return a_x ** 2 + a_y ** 2 + a_z ** 2
 
-    def pack(self, units):
-        """Pack the object into a structure suitable for OpenCL kernels.
-        Rescale the object using *units* first.
+    def pack(self):
+        """Pack the object into a structure suitable for OpenCL kernels. Packed units are in
+        meters.
         """
         fmt = get_format_string("ffff")
 
-        return struct.pack(fmt, self.position[0].rescale(units).magnitude,
-                           self.position[1].rescale(units).magnitude,
-                           self.position[2].rescale(units).magnitude,
-                           self.radius.rescale(units).magnitude)
+        return struct.pack(fmt, self.position[0].simplified.magnitude,
+                           self.position[1].simplified.magnitude,
+                           self.position[2].simplified.magnitude,
+                           self.radius.simplified.magnitude)
 
     def __repr__(self):
         return "MetaBall({0})".format(self.radius)
