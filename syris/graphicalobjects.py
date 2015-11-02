@@ -25,7 +25,7 @@ class GraphicalObject(object):
 
     """An abstract graphical object class."""
 
-    def project(self, shape, pixel_size, t=None):
+    def project(self, shape, pixel_size, t=0 * q.s):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or
         2D.
@@ -35,7 +35,7 @@ class GraphicalObject(object):
 
         return self._project(shape, pixel_size, t=t)
 
-    def _project(self, shape, pixel_size, t=None):
+    def _project(self, shape, pixel_size, t=0 * q.s):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
@@ -52,7 +52,7 @@ class SimpleGraphicalObject(GraphicalObject):
         self.thickness = g_util.get_array(thickness.simplified.magnitude)
         self.pixel_size = make_tuple(pixel_size, num_dims=2)
 
-    def _project(self, shape, pixel_size, t=None):
+    def _project(self, shape, pixel_size, t=0 * q.s):
         """Project thickness."""
         if shape == self.thickness.shape and np.array_equal(pixel_size, self.pixel_size):
             result = self.thickness
