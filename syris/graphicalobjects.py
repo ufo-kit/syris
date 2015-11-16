@@ -539,8 +539,9 @@ class CompositeObject(MovableGraphicalObject):
         # constructively.
         if self._dt is None:
             # Initialize
-            self._dt = np.min([obj.get_maximum_dt(distance / len(self.all_objects))
-                               for obj in self.all_objects]) * q.s
+            dts = [obj.get_maximum_dt(distance / len(self.all_objects))
+                   for obj in self.all_objects if obj.trajectory.length > 0 * q.m]
+            self._dt = np.min(dts) * q.s
 
         for current_time in np.arange(t_0, self.time + self._dt, self._dt) * q.s:
             if self.moved(t_0, current_time, distance):
