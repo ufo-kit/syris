@@ -181,7 +181,7 @@ class MovableGraphicalObject(GraphicalObject):
             return None
 
         if self._distance_tck is None:
-            points = self.trajectory.get_distances(distance.simplified.magnitude)
+            points = self.trajectory.get_distances(self.furthest_point.simplified.magnitude)
             # Use the same parameter so the derivatives are equal
             self._distance_tck = interp.splprep(points, u=self.trajectory.parameter, s=0)[0]
 
