@@ -78,6 +78,10 @@ class TestTrajectory(SyrisTest):
         traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
         self.assertAlmostEqual(traj.length, 2 * np.pi * q.m, places=5)
 
+    def test_get_maximum_dt(self):
+        traj = Trajectory([(0, 0, 0)] * q.m)
+        self.assertEqual(traj.get_maximum_dt(1 * q.m, 1 * q.m), None)
+
     def test_get_point(self):
         # Stationary trajectory
         traj = Trajectory(self.control_points)
