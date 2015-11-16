@@ -260,6 +260,10 @@ class Trajectory(object):
         when by the rotational one the *furhtest_point* is the most distant
         point from the center of the rotation.
         """
+        if self._tck is None:
+            # Stationary trajectory
+            return None
+
         ds = self.get_maximum_du(furthest_point, distance) * self.length.simplified.magnitude
         # f' = ds / dt, f' = const. => dt = ds / f'
         derivative = max(np.abs(interp.splev(self._times, self._time_tck, der=1)))
