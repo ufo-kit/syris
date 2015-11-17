@@ -96,7 +96,7 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
 
 
 def propagate(samples, energies, distance, pixel_size, region=None, apply_phase_factor=False,
-              mollified=True, queue=None, out=None, plan=None):
+              mollified=True, queue=None, out=None, plan=None, t=0 * q.s):
     """Propagate *samples* which are :class:`syris.opticalelements.OpticalElement`
     instances at *energies* to *distance*. Use *pixel_size*, limit coherence to *region*,
     *apply_phase_factor* is as by the Fresnel approximation phase factor, *queue* an OpenCL command
@@ -118,7 +118,7 @@ def propagate(samples, energies, distance, pixel_size, region=None, apply_phase_
                                         apply_phase_factor=apply_phase_factor,
                                         mollified=mollified, queue=queue)
         for sample in samples:
-            u *= sample.transfer(energy, queue=queue, out=out)
+            u *= sample.transfer(energy, queue=queue, out=out, t=t)
         fft_2(u.data, plan, wait_for_finish=True)
         u *= propagator
         ifft_2(u.data, plan, wait_for_finish=True)
