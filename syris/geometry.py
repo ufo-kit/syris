@@ -236,22 +236,24 @@ class Trajectory(object):
 
         return res * q.dimensionless
 
-    def get_distances(self, distance):
-        """Get the distances from the trajectory beginning to every consecutive
-        point defined by the parameter. Take into account translation and rotation
-        of an object with the furthest point from its center given by *distance*.
+    def get_distances(self, distance=None):
+        """Get the distances from the trajectory beginning to every consecutive point defined by the
+        parameter. Take into account translation and rotation of an object with the furthest point
+        from its center given by *distance*. If *distance* is None rotational component is not taken
+        into account.
         """
         points = np.array(interp.splev(self._u, self._tck))
-        angles = np.arctan(np.array(interp.splev(self._u, self._tck, der=1)))
         initial_point = np.array(interp.splev(0, self._tck))
-        initial_angle = np.arctan(np.array(interp.splev(0, self._tck, der=1)))
+        distances = points - initial_point[:, np.newaxis]
 
-        translation = points - initial_point[:, np.newaxis]
-        angle_diff = angles - initial_angle[:, np.newaxis]
-        # sin(phi) = dx / distance => dx = distance * sin(phi)
-        rotation = distance * np.sin(angle_diff)
+        if distance is not None:
+            angles = np.arctan(np.array(interp.splev(self._u, self._tck, der=1)))
+            initial_angle = np.arctan(np.array(interp.splev(0, self._tck, der=1)))
+            angle_diff = angles - initial_angle[:, np.newaxis]
+            # sin(phi) = dx / distance => dx = distance * sin(phi)
+            distances += distance.simplified.magnitude * np.sin(angle_diff)
 
-        return translation + rotation
+        return distances
 
     def get_maximum_dt(self, furthest_point, distance):
         """
@@ -335,7 +337,7 @@ class Trajectory(object):
         if t_0 is None:
             return None
 
-        points = self.get_distances(furthest_point.simplified.magnitude)
+        points = self.get_distances(furthest_point)
         # Use the same parameter so the derivatives are equal
         distance_tck = interp.splprep(points, u=self.parameter, s=0)[0]
 
