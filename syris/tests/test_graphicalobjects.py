@@ -81,6 +81,7 @@ def test_simple():
 class TestGraphicalObjects(SyrisTest):
 
     def setUp(self):
+        syris.init()
         self.pixel_size = 1 * q.um
 
         control_points = get_linear_points(geom.X, start=(1, 1, 1))
