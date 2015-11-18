@@ -12,6 +12,7 @@ from syris import config as cfg
 from syris.physics import transfer, energy_to_wavelength
 from syris.geometry import BoundingBox, get_rotation_displacement
 from syris.imageprocessing import crop, pad, rescale
+from syris.opticalelements import OpticalElement
 import syris.gpu.util as g_util
 import syris.geometry as geom
 from syris import math as smath
@@ -23,9 +24,14 @@ from quantities.quantity import Quantity
 LOG = logging.getLogger(__name__)
 
 
-class GraphicalObject(object):
+class GraphicalObject(OpticalElement):
 
-    """An abstract graphical object class."""
+    """An abstract graphical object class with a *material*, which is a
+    :class:`syris.materials.Material` instance.
+    """
+
+    def __init__(self, material=None):
+        self.material = material
 
     def project(self, shape, pixel_size, t=0 * q.s):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
@@ -41,18 +47,30 @@ class GraphicalObject(object):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
+    def _transfer(self, shape, pixel_size, energy, t=0 * q.s, queue=None, out=None):
+        """Transfer function implementation based on a refractive index."""
+        ri = self.material.get_refractive_index(energy)
+        lam = energy_to_wavelength(energy)
+
+        return transfer(self.project(shape, pixel_size, t=t), ri, lam, queue=queue, out=out)
+
 
 class SimpleGraphicalObject(GraphicalObject):
 
     """A simple graphical object defined by its projected *thickness*, which is a quantity and it is
     always converted to meters, thus the :meth:`~GraphicalObject.project` method always returns the
-    projection in meters.
+    projection in meters. *pixel_size* is the pixel size of the *thickness* and *material* is
+    a :class:`syris.materials.Material` instance.
     """
 
-    def __init__(self, thickness, pixel_size):
-        super(SimpleGraphicalObject, self).__init__()
+    def __init__(self, thickness, pixel_size, material=None):
+        super(SimpleGraphicalObject, self).__init__(material)
         self.thickness = g_util.get_array(thickness.simplified.magnitude)
         self.pixel_size = make_tuple(pixel_size, num_dims=2)
+
+    def get_next_time(self, t_0, distance):
+        """A simple graphical object doesn't move, this function returns infinity."""
+        return np.inf * q.s
 
     def _project(self, shape, pixel_size, t=0 * q.s):
         """Project thickness."""
@@ -87,11 +105,11 @@ class MovableGraphicalObject(GraphicalObject):
 
     """Class representing an abstract graphical object."""
 
-    def __init__(self, trajectory, orientation=geom.Y_AX):
+    def __init__(self, trajectory, material=None, orientation=geom.Y_AX):
         """Create a graphical object with a :class:`~syris.geometry.Trajectory` and *orientation*,
         which is an (x, y, z) vector specifying object's "up" vector.
         """
-        super(MovableGraphicalObject, self).__init__()
+        super(MovableGraphicalObject, self).__init__(material)
         self._trajectory = trajectory
         self._orientation = geom.normalize(orientation)
         self._center = trajectory.control_points[0].simplified
@@ -286,9 +304,9 @@ class MetaBall(MovableGraphicalObject):
     by summing density functions representing particular objects.
     """
 
-    def __init__(self, trajectory, radius, orientation=geom.Y_AX):
+    def __init__(self, trajectory, radius, material=None, orientation=geom.Y_AX):
         """Create a metaobject with *radius*."""
-        super(MetaBall, self).__init__(trajectory, orientation=orientation)
+        super(MetaBall, self).__init__(trajectory, material=material, orientation=orientation)
         if radius <= 0:
             raise ValueError("Radius must be greater than zero.")
 
