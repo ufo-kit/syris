@@ -326,6 +326,63 @@ class Trajectory(object):
             return None
         return smath.supremum(t_0.simplified.magnitude, roots)
 
+    def get_next_time_from_distance(self, t_0, distance, furthest_point=None):
+        """
+        Get time from *t_0* when the trajectory will have travelled more than *distance*, which is
+        typically the pixel size. *furthest_point* is taken into account for rotational
+        displacement.
+        """
+        if t_0 is None:
+            return None
+
+        points = self.get_distances(furthest_point.simplified.magnitude)
+        # Use the same parameter so the derivatives are equal
+        distance_tck = interp.splprep(points, u=self.parameter, s=0)[0]
+
+        def shift_spline(u_0, sgn):
+            t, c, k = distance_tck
+            initial_point = np.array(interp.splev(u_0, distance_tck))[:, np.newaxis]
+            c = np.array(c) - initial_point + sgn * distance.simplified.magnitude
+
+            return t, c, k
+
+        t_1 = t_2 = np.inf
+        u_0 = self.get_parameter(t_0)
+        lower_tck = shift_spline(u_0, 1)
+        upper_tck = shift_spline(u_0, -1)
+
+        # Get the +/- distance roots (we can traverse the trajectory backwards)
+        lower = interp.sproot(lower_tck)
+        upper = interp.sproot(upper_tck)
+        # Combine lower and upper into one list of roots for every dimension
+        roots = [np.concatenate((lower[i], upper[i])) for i in range(3)]
+        # Mix all dimensions, they are not necessary for obtaining the minimum
+        # parameter difference
+        roots = np.concatenate(roots)
+        # Filter roots to get only the infimum and supremum based on u_0
+        smallest = smath.infimum(u_0, roots)
+        greatest = smath.supremum(u_0, roots)
+
+        # Get next time for both directions
+        if smallest is not None:
+            t_1 = self.get_next_time(t_0, smallest)
+            if t_1 is None:
+                t_1 = np.inf
+        if greatest is not None:
+            t_2 = self.get_next_time(t_0, greatest)
+            if t_2 is None:
+                t_2 = np.inf
+
+        # Next time is the smallest one which is greater than t_0.
+        # Get a supremum and if the result is not infinity there
+        # is a time in the future for which the trajectory moves
+        # the associated object more than *distance*.
+        closest_time = smath.supremum(t_0.simplified.magnitude, [t_1, t_2])
+        if closest_time == np.inf:
+            return None
+
+        return closest_time * q.s
+
     def _get_length(self, param_start=0, param_end=1):
         """
         Get spline length on the spline parameter interval *param_start*,

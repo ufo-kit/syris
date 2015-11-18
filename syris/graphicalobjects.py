@@ -5,7 +5,6 @@ import itertools
 import logging
 import numpy as np
 from numpy import linalg
-from scipy import interpolate as interp
 import pyopencl as cl
 import quantities as q
 from syris import config as cfg
@@ -15,7 +14,6 @@ from syris.imageprocessing import crop, pad, rescale
 from syris.opticalelements import OpticalElement
 import syris.gpu.util as g_util
 import syris.geometry as geom
-from syris import math as smath
 from syris.util import make_tuple
 import struct
 import pyopencl.array as cl_array
@@ -192,60 +190,9 @@ class MovableGraphicalObject(GraphicalObject):
 
     def get_next_time(self, t_0, distance):
         """
-        Get time from *t_0* when the object will have travelled more than
-        the *distance*.
+        Get time from *t_0* when the object will have travelled more than *distance*.
         """
-        if t_0 is None:
-            return None
-
-        if self._distance_tck is None:
-            points = self.trajectory.get_distances(self.furthest_point.simplified.magnitude)
-            # Use the same parameter so the derivatives are equal
-            self._distance_tck = interp.splprep(points, u=self.trajectory.parameter, s=0)[0]
-
-        def shift_spline(u_0, sgn):
-            t, c, k = self._distance_tck
-            initial_point = np.array(interp.splev(u_0, self._distance_tck))[:, np.newaxis]
-            c = np.array(c) - initial_point + sgn * distance.simplified.magnitude
-
-            return t, c, k
-
-        t_1 = t_2 = np.inf
-        u_0 = self.trajectory.get_parameter(t_0)
-        lower_tck = shift_spline(u_0, 1)
-        upper_tck = shift_spline(u_0, -1)
-
-        # Get the +/- distance roots (we can traverse the trajectory backwards)
-        lower = interp.sproot(lower_tck)
-        upper = interp.sproot(upper_tck)
-        # Combine lower and upper into one list of roots for every dimension
-        roots = [np.concatenate((lower[i], upper[i])) for i in range(3)]
-        # Mix all dimensions, they are not necessary for obtaining the minimum
-        # parameter difference
-        roots = np.concatenate(roots)
-        # Filter roots to get only the infimum and supremum based on u_0
-        smallest = smath.infimum(u_0, roots)
-        greatest = smath.supremum(u_0, roots)
-
-        # Get next time for both directions
-        if smallest is not None:
-            t_1 = self.trajectory.get_next_time(t_0, smallest)
-            if t_1 is None:
-                t_1 = np.inf
-        if greatest is not None:
-            t_2 = self.trajectory.get_next_time(t_0, greatest)
-            if t_2 is None:
-                t_2 = np.inf
-
-        # Next time is the smallest one which is greater than t_0.
-        # Get a supremum and if the result is not infinity there
-        # is a time in the future for which the trajectory moves
-        # the associated object more than *distance*.
-        closest_time = smath.supremum(t_0.simplified.magnitude, [t_1, t_2])
-        if closest_time == np.inf:
-            return None
-
-        return closest_time * q.s
+        return self.trajectory.get_next_time_from_distance(t_0, distance, self.furthest_point)
 
     def get_maximum_dt(self, distance):
         """Get the maximum delta time for which the object will not
