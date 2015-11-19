@@ -12,61 +12,63 @@ from quantities.quantity import Quantity
 from quantities.constants import fine_structure_constant
 from scipy import integrate, special
 import syris.config as cfg
+from syris.opticalelements import OpticalElement
+from syris.util import make_tuple
 
 
-class XraySource(object):
+class BendingMagnet(OpticalElement):
 
-    """Base class for every synchrotron radiation X-ray source."""
+    """Bending magnet X-ray source."""
 
-    def __init__(self, electron_energy, el_current, sample_distance,
-                 energies, size, pixel_size):
-        """Create an X-ray source with electron beam *electron_energy*,
-        electric *el_current*, place it into *sample_distance*
-        (distance between the source and a sample), take into
-        account all *energies* and set its *size* (y, x) specified
-        as FWHM and approximate it by a Gaussian. *pixel_size* is
-        the effective pixel size.
+    _SR_CONST = 3 * fine_structure_constant.simplified / (4 * np.pi ** 2)
+
+    def __init__(self, electron_energy, el_current, magnetic_field, sample_distance, energies, size,
+                 pixel_size, height, profile_approx=True, trajectory=None):
+        """Create a BendingMagnet source with electron beam *electron_energy*, electric
+        *el_current*, *magnetic_field*, place it into *sample_distance* (distance between the source
+        and a sample), take into account all *energies* and set its *size* (y, x) specified as FWHM
+        and approximate it by a Gaussian. *pixel_size* is the effective pixel size. *trajectory* is
+        the trajectory defining the source position in space and time. The source (0, 0, 0) is in
+        the middle of the produced image. *height* is the number of points for creating vertical
+        profiles. If *profile_approx* is True, the profile at a given vertical observation angle
+        will not be integrated over the relevant energies but will be calculated for the mean energy
+        and multiplied by :math:`\Delta E`.
         """
+        super(BendingMagnet, self).__init__()
         self.electron_energy = electron_energy.simplified
         self.el_current = el_current.simplified
+        self.magnetic_field = magnetic_field
         self.sample_distance = sample_distance.simplified
         self.energies = energies
         self.size = size.simplified
+        self.pixel_size = make_tuple(pixel_size, num_dims=2)
+        self.trajectory = trajectory
+        self._d_energy = 0 if len(self.energies) == 1 else self.energies[1] - self.energies[0]
         self._angle_step = np.arctan(pixel_size.simplified / self.sample_distance.simplified)
+
+        # Compute the vertical span based on how much the source deviates in y-direction
+        shift_down = shift_up = 0
+        if trajectory:
+            def get_shift(func):
+                extrema = np.abs(func(trajectory.points[1, :]))
+                return int(np.ceil((extrema / pixel_size).simplified.magnitude))
+
+            shift_down = get_shift(min)
+            shift_up = get_shift(max)
+
+        half = height / 2
+        aperture = np.arange(-half - shift_down, half + shift_up) * pixel_size
+        self._angles = np.arctan((aperture / sample_distance).simplified.magnitude) * q.rad
+        # Index to the angles where the angle is zero
+        self._mean_angle_index = shift_down + height / 2
+
+        self.profile_approx = profile_approx
+        self._profiles = [self._create_vertical_profile(e) for e in self.energies]
 
     @property
     def gama(self):
         """:math:`\\frac{E}{m_ec^2}`"""
         return self.electron_energy / (qe.electron_mass * q.c ** 2)
-
-
-class BendingMagnet(XraySource):
-
-    """Bending magnet X-ray source."""
-    _SR_CONST = 3 * fine_structure_constant.simplified / (4 * np.pi ** 2)
-
-    def __init__(self, electron_energy, el_current, magnetic_field,
-                 sample_distance, energies, size, pixel_size,
-                 angle_steps, profile_approx=True):
-        """Create a bending magnet source with *magnetic_field*.
-        *angle_steps* define the sampling of the vertical profile,
-        which will have *angle_steps* values. If *profile_approx*
-        is True, the profile at a given vertical observation angle
-        will not be integrated over the relevant energies but will be
-        calculated for the mean energy and multiplied by :math:`\Delta E`.
-        """
-        super(BendingMagnet, self).__init__(electron_energy, el_current,
-                                            sample_distance, energies, size,
-                                            pixel_size)
-        self.magnetic_field = magnetic_field
-        self._d_energy = 0 if len(self.energies) == 1 else \
-            self.energies[1] - self.energies[0]
-
-        self._angles = np.linspace(- self._angle_step * angle_steps / 2,
-                                   self._angle_step * angle_steps / 2,
-                                   angle_steps, endpoint=False)
-        self.profile_approx = profile_approx
-        self._profiles = [self._create_vertical_profile(e) for e in self.energies]
 
     @property
     def critical_energy(self):
@@ -118,24 +120,33 @@ class BendingMagnet(XraySource):
 
         return profile
 
-    def make_flat(self, energy, attenuation=0, width=None, queue=None, out=None):
-        """Make flat wavefield at *energy* with *attenuation* (:math:`\\mu thickness`) of *width*.
-        Use OpenCL *queue* and :class:`pyopencl.array.Array` *out*.
-        """
-        profile = self.get_vertical_profile(energy).rescale(1 / q.s).magnitude
-        profile = np.exp(-attenuation) * profile
-        height = profile.shape[0]
-        if width is None:
-            width = height
+    def get_next_time(self, t_0, distance):
+        """Get the next time when the source will have moved more than *distance*."""
+        return self.trajectory.get_next_time_from_distance(t_0, distance)
+
+    def _transfer(self, shape, pixel_size, energy, t=0 * q.s, queue=None, out=None):
+        """Compute the flat field wavefield."""
         if queue is None:
             queue = cfg.OPENCL.queue
 
-        profile = cl_array.to_device(queue, profile.astype(cfg.PRECISION.np_float))
+        ps = make_tuple(pixel_size)
+        # Compute the shift in pixels
+        y = self.trajectory.get_point(t)[1]
+        shift = int((y / ps[0]).simplified.magnitude)
+
+        # Shift and crop the profile
+        profile = self.get_vertical_profile(energy).rescale(1 / q.s).magnitude
+        start = self._mean_angle_index + shift - shape[0] / 2
+        stop = self._mean_angle_index + shift + shape[0] / 2
+        if start < 0 or stop > profile.shape[0]:
+            raise ValueError('Height extends the source computed vertical profiles')
+
+        profile = cl_array.to_device(queue, profile[start:stop].astype(cfg.PRECISION.np_float))
         if out is None:
-            out = cl_array.Array(queue, (height, width), dtype=cfg.PRECISION.np_cplx)
+            out = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
 
         cfg.OPENCL.programs['physics'].make_flat(queue,
-                                                 (width, height),
+                                                 shape[::-1],
                                                  None,
                                                  out.data,
                                                  profile.data)
