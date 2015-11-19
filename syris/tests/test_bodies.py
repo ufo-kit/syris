@@ -4,7 +4,9 @@ import syris
 import syris.config as cfg
 from syris import geometry as geom
 from syris.geometry import Trajectory
-from syris.graphicalobjects import MetaBall, CompositeObject, SimpleGraphicalObject
+from syris.bodies.base import CompositeBody
+from syris.bodies.isosurfaces import MetaBall
+from syris.bodies.simple import StaticBody
 from syris.imageprocessing import crop, pad, rescale
 from syris.materials import Material
 from syris.tests import SyrisTest, slow
@@ -21,16 +23,15 @@ def get_control_points():
                      (1, 1, 1)]) * q.mm
 
 
-def check_distances(graphical_object, distance, decimal_points=3):
+def check_distances(body, distance, decimal_points=3):
     t_0 = 0 * q.s
     max_distances = []
-    while t_0 <= graphical_object.trajectory.time:
-        t_1 = graphical_object.get_next_time(t_0, distance)
+    while t_0 <= body.trajectory.time:
+        t_1 = body.get_next_time(t_0, distance)
         if t_1 is None:
             break
         if t_0 is not None and t_1 is not None:
-            diff = np.abs(graphical_object.trajectory.get_point(t_1) -
-                          graphical_object.trajectory.get_point(t_0))
+            diff = np.abs(body.trajectory.get_point(t_1) - body.trajectory.get_point(t_0))
             max_distances.append(np.max(diff).magnitude)
         t_0 = t_1
 
@@ -43,7 +44,7 @@ def test_simple():
     n = 8
     ps = 1 * q.um
     thickness = np.arange(n ** 2).reshape(n, n).astype(cfg.PRECISION.np_float) * q.m
-    go = SimpleGraphicalObject(thickness, ps)
+    go = StaticBody(thickness, ps)
 
     # Same
     projection = go.project((n, n), ps).get()
@@ -78,7 +79,7 @@ def test_simple():
     np.testing.assert_almost_equal(gt, projection)
 
 
-class TestGraphicalObjects(SyrisTest):
+class TestBodies(SyrisTest):
 
     def setUp(self):
         syris.init()
@@ -92,20 +93,18 @@ class TestGraphicalObjects(SyrisTest):
         self.metaball_2 = MetaBall(
             Trajectory(get_linear_points(geom.Z)), 2 * q.mm)
 
-        self.composite = CompositeObject(traj,
-                                         gr_objects=[self.metaball,
-                                                     self.metaball_2])
+        self.composite = CompositeBody(traj, bodies=[self.metaball, self.metaball_2])
 
-    def _get_moved_bounding_box(self, obj, angle):
-        obj.translate((1, 0, 0) * q.mm)
-        obj.rotate(angle, np.array((0, 0, 1)))
-        obj.translate((1, 0, 0) * q.mm)
+    def _get_moved_bounding_box(self, body, angle):
+        body.translate((1, 0, 0) * q.mm)
+        body.rotate(angle, np.array((0, 0, 1)))
+        body.translate((1, 0, 0) * q.mm)
 
-        base = -2 * obj.radius.magnitude, 2 * obj.radius.magnitude
+        base = -2 * body.radius.magnitude, 2 * body.radius.magnitude
         transformed = []
         for point in list(itertools.product(base, base, base)):
             transformed.append(geom.transform_vector(linalg.inv(
-                obj.transform_matrix), point * obj.radius.units).
+                body.transform_matrix), point * body.radius.units).
                 simplified.magnitude)
 
         return transformed * q.m
@@ -116,13 +115,13 @@ class TestGraphicalObjects(SyrisTest):
                                        np.array([1, 1, 1]) * q.mm)
 
     def test_metaball_bounding_box(self):
-        """Bounding box moves along with its object."""
+        """Bounding box moves along with its body."""
         mb = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 0.5 * q.mm)
         transformed = self._get_moved_bounding_box(mb, 90 * q.deg)
 
         np.testing.assert_almost_equal(transformed, mb.bounding_box.points)
 
-    def test_composite_subobjects(self):
+    def test_composite_subbodies(self):
         m_1 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 1 * q.mm)
         m_2 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 2 * q.mm)
         m_3 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 3 * q.mm)
@@ -131,54 +130,54 @@ class TestGraphicalObjects(SyrisTest):
         m_6 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 6 * q.mm)
         m_7 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 7 * q.mm)
 
-        c_1 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
-                              gr_objects=[m_1, m_2])
-        c_2 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
-                              gr_objects=[m_3])
-        c_3 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
-                              gr_objects=[c_1, c_2])
-        c_4 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
-                              gr_objects=[m_4, m_5])
-        c_5 = CompositeObject(Trajectory([(0, 0, 0)] * q.mm),
-                              gr_objects=[c_3, c_4, m_6, m_7])
+        c_1 = CompositeBody(Trajectory([(0, 0, 0)] * q.mm),
+                              bodies=[m_1, m_2])
+        c_2 = CompositeBody(Trajectory([(0, 0, 0)] * q.mm),
+                              bodies=[m_3])
+        c_3 = CompositeBody(Trajectory([(0, 0, 0)] * q.mm),
+                              bodies=[c_1, c_2])
+        c_4 = CompositeBody(Trajectory([(0, 0, 0)] * q.mm),
+                              bodies=[m_4, m_5])
+        c_5 = CompositeBody(Trajectory([(0, 0, 0)] * q.mm),
+                              bodies=[c_3, c_4, m_6, m_7])
 
-        # empty object
-        CompositeObject(Trajectory([(0, 0, 0)] * q.mm))
+        # Empty composit body
+        CompositeBody(Trajectory([(0, 0, 0)] * q.mm))
 
-        # Empty composite object.
-        c_empty = CompositeObject(Trajectory([(0, 0, 0)] * q.mm))
-        self.assertEqual(c_empty.direct_primitive_objects, [])
+        # Empty composite body.
+        c_empty = CompositeBody(Trajectory([(0, 0, 0)] * q.mm))
+        self.assertEqual(c_empty.direct_primitive_bodies, [])
 
-        # Test direct subobjects
-        self.assertEqual(c_5.direct_primitive_objects, [m_6, m_7])
-        self.assertEqual(c_3.direct_primitive_objects, [])
+        # Test direct subbodies
+        self.assertEqual(c_5.direct_primitive_bodies, [m_6, m_7])
+        self.assertEqual(c_3.direct_primitive_bodies, [])
 
         # Add self.
         with self.assertRaises(ValueError) as ctx:
             c_5.add(c_5)
         self.assertEqual("Cannot add self", ctx.exception.message)
 
-        # Add already contained primitive object.
+        # Add already contained primitive body.
         with self.assertRaises(ValueError) as ctx:
             c_5.add(m_1)
         self.assertTrue(ctx.exception.message.endswith("already contained"))
 
-        # Add already contained composite object.
+        # Add already contained composite body.
         with self.assertRaises(ValueError) as ctx:
             c_5.add(c_2)
         self.assertTrue(ctx.exception.message.endswith("already contained"))
 
-        # Test all subobjects.
-        self.assertEqual(set(c_3.all_objects),
+        # Test all subbodies.
+        self.assertEqual(set(c_3.all_bodies),
                          set([m_1, m_2, m_3, c_1, c_2, c_3]))
-        self.assertEqual(set(c_1.all_objects), set([c_1, m_1, m_2]))
-        self.assertEqual(c_empty.all_objects, (c_empty,))
+        self.assertEqual(set(c_1.all_bodies), set([c_1, m_1, m_2]))
+        self.assertEqual(c_empty.all_bodies, (c_empty,))
 
     def test_composite_bounding_box(self):
         mb_0 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 0.5 * q.mm)
         mb_1 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 1.5 * q.mm)
-        composite = CompositeObject(Trajectory([(0, 0, 0)] * q.mm,),
-                                    gr_objects=[mb_0, mb_1])
+        composite = CompositeBody(Trajectory([(0, 0, 0)] * q.mm,),
+                                    bodies=[mb_0, mb_1])
 
         transformed_0 = self._get_moved_bounding_box(mb_0, 90 * q.deg)
         transformed_1 = self._get_moved_bounding_box(mb_1, -90 * q.deg)
@@ -218,7 +217,7 @@ class TestGraphicalObjects(SyrisTest):
 
         mb_0 = MetaBall(traj_0, 1 * q.m)
         mb_1 = MetaBall(traj_1, 1 * q.m)
-        composite = CompositeObject(Trajectory([(0, 0, 0)] * q.m), gr_objects=[mb_0, mb_1])
+        composite = CompositeBody(Trajectory([(0, 0, 0)] * q.m), bodies=[mb_0, mb_1])
 
         # We know the maximum distance for cosine in this case, it's corresponding x and y are
         # x = 2Pi, y = 2
@@ -267,7 +266,7 @@ class TestGraphicalObjects(SyrisTest):
         ball = MetaBall(traj_m, 1 * q.mm)
 
         traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
-        comp = CompositeObject(traj, gr_objects=[ball])
+        comp = CompositeBody(traj, bodies=[ball])
 
         t_0 = 0 * q.s
         distance = 1000 * q.mm

@@ -85,7 +85,7 @@ def get_source(file_names, precision_sensitive=True):
 
 def get_metaobjects_source():
     """Get source string for metaobjects creation."""
-    source = '#define MAX_OBJECTS {}'.format(cfg.MAX_META_OBJECTS)
+    source = '#define MAX_OBJECTS {}'.format(cfg.MAX_META_BODIES)
     source += get_source(["polyobject.cl", "heapsort.cl",
                          "polynoms_heapsort.cl", "rootfinding.cl",
                          "metaobjects.cl"])
