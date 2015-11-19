@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 import syris
-from syris.graphicalobjects import SimpleGraphicalObject
+from syris.bodies.simple import StaticBody
 from syris.materials import Material
 from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength, transfer
@@ -22,8 +22,8 @@ class TestOpticalElement(SyrisTest):
         energies = range(10, 20) * q.keV
         self.energy = energies[len(energies) / 2]
         self.material = Material('foo', np.arange(len(energies), dtype=np.complex), energies)
-        self.go = SimpleGraphicalObject(np.arange(4 ** 2).reshape(4, 4) * q.um, 1 * q.um,
-                                        material=self.material)
+        self.go = StaticBody(np.arange(4 ** 2).reshape(4, 4) * q.um, 1 * q.um,
+                             material=self.material)
 
     def test_2d_conversion(self):
         elem = DummyOpticalElement()
