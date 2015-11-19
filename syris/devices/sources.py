@@ -122,7 +122,12 @@ class BendingMagnet(OpticalElement):
 
     def get_next_time(self, t_0, distance):
         """Get the next time when the source will have moved more than *distance*."""
-        return self.trajectory.get_next_time_from_distance(t_0, distance)
+        if self.trajectory:
+            t = self.trajectory.get_next_time_from_distance(t_0, distance)
+        else:
+            t = None
+
+        return t
 
     def _transfer(self, shape, pixel_size, energy, t=0 * q.s, queue=None, out=None):
         """Compute the flat field wavefield."""
@@ -130,9 +135,12 @@ class BendingMagnet(OpticalElement):
             queue = cfg.OPENCL.queue
 
         ps = make_tuple(pixel_size)
-        # Compute the shift in pixels
-        y = self.trajectory.get_point(t)[1]
-        shift = int((y / ps[0]).simplified.magnitude)
+        if self.trajectory:
+            # Compute the shift in pixels
+            y = self.trajectory.get_point(t)[1]
+            shift = int((y / ps[0]).simplified.magnitude)
+        else:
+            shift = 0
 
         # Shift and crop the profile
         profile = self.get_vertical_profile(energy).rescale(1 / q.s).magnitude
