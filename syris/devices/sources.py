@@ -171,19 +171,16 @@ class BendingMagnet(OpticalElement):
         with *photon_energy* and get it at the vertical observation angle
         *vertical_angle*.
         """
-        gama = Quantity(self.electron_energy /
-                        (qe.electron_mass * q.c ** 2)).simplified
+        gama = Quantity(self.electron_energy / (qe.electron_mass * q.c ** 2)).simplified
         gama_psi = gama * vertical_angle.rescale(q.rad)
-        norm_energy = photon_energy.rescale(self.critical_energy.units) / \
-            self.critical_energy
-        xi = Quantity(0.5 * norm_energy.magnitude *
-                      (1.0 + gama_psi ** 2) ** (3.0 / 2)).magnitude
+        norm_energy = photon_energy.rescale(self.critical_energy.units) / self.critical_energy
+        xi = Quantity(0.5 * norm_energy.magnitude * (1.0 + gama_psi ** 2) ** (3.0 / 2)).magnitude
 
         # 1e-3 for 0.1 % BW
         return Quantity(BendingMagnet._SR_CONST * gama ** 2 *
                         self.el_current / q.elementary_charge *
                         norm_energy ** 2 *
-                       (1.0 + gama_psi ** 2) ** 2 *
-                       (special.kv(2.0 / 3, xi) ** 2 + gama_psi ** 2 /
-                       (1.0 + gama_psi ** 2) * special.kv(1.0 / 3, xi) ** 2) *
+                        (1.0 + gama_psi ** 2) ** 2 *
+                        (special.kv(2.0 / 3, xi) ** 2 + gama_psi ** 2 /
+                         (1.0 + gama_psi ** 2) * special.kv(1.0 / 3, xi) ** 2) *
                         self._angle_step.rescale(q.rad) ** 2 * 1e-3).simplified
