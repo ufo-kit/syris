@@ -1,5 +1,5 @@
 """
-Module contains optical elements which consist of a graphical object and a material.
+Optical Elements are entities capable of producing wavefields as a function of time.
 """
 import quantities as q
 from syris.physics import transfer, energy_to_wavelength
