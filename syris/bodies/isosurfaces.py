@@ -101,7 +101,7 @@ class MetaBalls(CompositeBody):
 
     def _project(self, shape, pixel_size, t=0 * q.s):
         """Projection implementation."""
-        string = ''.join([go.pack() for go in self._bodies])
+        string = ''.join([body.pack() for body in self._bodies])
 
         self.move(t)
         return project_metaballs(shape, pixel_size, string)
