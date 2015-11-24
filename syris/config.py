@@ -52,7 +52,8 @@ class OpenCL(object):
         self.queue = None
         self.programs = {'improc': None,
                          'physics': None,
-                         'geometry': None}
+                         'geometry': None,
+                         'mesh': None}
 
 
 def init_logging(level=logging.DEBUG, logger_file=None):
