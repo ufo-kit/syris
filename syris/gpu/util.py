@@ -3,6 +3,7 @@ Utility functions concerning GPU programming.
 """
 
 import pkg_resources
+import sys
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
@@ -43,6 +44,7 @@ def init_programs():
     cfg.OPENCL.programs['improc'] = get_program(get_source(['vcomplex.cl', 'imageprocessing.cl']))
     cfg.OPENCL.programs['physics'] = get_program(get_source(['vcomplex.cl', 'physics.cl']))
     cfg.OPENCL.programs['geometry'] = get_program(get_metaobjects_source())
+    cfg.OPENCL.programs['mesh'] = get_program(get_source(['heapsort.cl', 'mesh.cl']))
 
 
 def make_opencl_defaults(device_index=0, profiling=True):
@@ -209,7 +211,7 @@ def _make_vfloat_functions():
         return make_vfloat
 
     for i in [2, 3, 4, 8, 16]:
-        globals()[_wrapper(i).__name__] = _wrapper(i)
+        setattr(sys.modules[__name__], _wrapper(i).__name__, _wrapper(i))
 
 _make_vfloat_functions()
 
