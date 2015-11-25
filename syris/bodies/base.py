@@ -121,8 +121,7 @@ class MovableBody(Body):
         """
         trans_mat = np.copy(self.transform_matrix)
         for i in range(3):
-            trans_mat[i, 3] = coeff * Quantity(trans_mat[i, 3] * q.m).\
-                rescale(units)
+            trans_mat[i, 3] = coeff * Quantity(trans_mat[i, 3] * q.m).rescale(units)
 
         return trans_mat
 
@@ -177,8 +176,7 @@ class MovableBody(Body):
 
     def translate(self, vec):
         """Translate the body by a vector *vec*."""
-        self.transform_matrix = np.dot(
-            geom.translate(vec), self.transform_matrix)
+        self.transform_matrix = np.dot(geom.translate(vec), self.transform_matrix)
 
     def rotate(self, angle, axis, total_start=None):
         """Rotate the body by *angle* around vector *axis*, where
