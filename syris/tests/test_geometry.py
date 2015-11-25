@@ -131,3 +131,12 @@ class TestGeometry(SyrisTest):
         test((0, 2), True)
         test((-1, 0), True)
         test((-1, 1), True)
+
+    def test_make_points(self):
+        x_ends = [0, 1] * q.mm
+        y_ends = [2, 3] * q.mm
+        z_ends = [4, 5] * q.mm
+
+        gt = list(itertools.product(x_ends.magnitude, y_ends.magnitude, z_ends.magnitude)) * q.mm
+        points = geom.make_points(x_ends, y_ends, z_ends)
+        np.testing.assert_equal(gt, points)
