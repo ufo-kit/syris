@@ -63,7 +63,7 @@ def init_logging(level=logging.DEBUG, logger_file=None):
     logging.basicConfig(format=fmt)
 
     if logger_file:
-        file_handler = logging.FileHandler(logger_file, "w")
+        file_handler = logging.FileHandler(logger_file, "a")
         file_handler.setLevel(level)
         file_handler.setFormatter(logging.Formatter(fmt))
         LOG.addHandler(file_handler)
