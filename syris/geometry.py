@@ -83,9 +83,7 @@ class BoundingBox(object):
         z_min = min(self.get_min(Z), other.get_min(Z))
         z_max = max(self.get_max(Z), other.get_max(Z))
 
-        self._points = np.array(list(itertools.product([x_min, x_max],
-                                                       [y_min, y_max],
-                                                       [z_min, z_max]))) * q.m
+        self._points = make_points([x_min, x_max], [y_min, y_max], [z_min, z_max]) * q.m
 
     def overlaps(self, other):
         """
@@ -581,3 +579,8 @@ def get_rotation_displacement(d_0, d_1, length):
     points.
     """
     return np.abs(length * np.sin(np.arctan(d_1) - np.arctan(d_0)))
+
+
+def make_points(x_ends, y_ends, z_ends):
+    """Make 3D points out of minima and maxima given by *x_ends*, *y_ends* and *z_ends*."""
+    return np.array(list(itertools.product(x_ends, y_ends, z_ends))) * x_ends.units
