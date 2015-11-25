@@ -19,17 +19,19 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape, pixel_size, t=0 * q.s):
+    def project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or
-        2D.
+        2D. *queue* is an OpenCL command queue, *out* is the pyopencl array used for result.
         """
         shape = make_tuple(shape, num_dims=2)
         pixel_size = make_tuple(pixel_size, num_dims=2)
+        if queue is None:
+            queue = cfg.OPENCL.queue
 
-        return self._project(shape, pixel_size, t=t)
+        return self._project(shape, pixel_size, t=t, queue=queue, out=None)
 
-    def _project(self, shape, pixel_size, t=0 * q.s):
+    def _project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
