@@ -5,6 +5,7 @@ import time
 import numpy as np
 import quantities as q
 import syris
+import syris.gpu.util as gutil
 from functools import partial
 from multiprocessing import Lock, Pool
 from concert.storage import write_libtiff
@@ -73,6 +74,28 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
     return projs[best]
 
 
+def make_ground_truth(args, shape, mesh):
+    """Shape is (y, x), so the total number of slices is y."""
+    # Move the mesh to the middle
+    psm = args.pixel_size.simplified.magnitude
+    # Make sure the projections are computed with the same x- and y-offsets
+    point = (shape[1] * psm / 2, shape[0] * psm / 2, shape[1] * psm / 2) * q.m
+    mesh.translate(point)
+    mesh.transform()
+    mesh.sort()
+
+    for i in range(0, shape[0], args.z_chunk):
+        end = min(i + args.z_chunk, shape[0])
+        offset = gutil.make_vfloat3(0, i * args.pixel_size.rescale(q.um), 0)
+        slices = mesh.compute_slices((end - i,) + shape, args.pixel_size, offset=offset).get()
+        LOG.info('Computing slices {}-{}'.format(i, end))
+        for j, sl in enumerate(slices):
+            index = i + j
+            write_libtiff(args.prefix.format(index), sl)
+
+    return slices
+
+
 def process(args, device_index):
     syris.init(device_index=device_index, logfile=args.logfile)
     path, ext = os.path.splitext(args.input)
@@ -88,19 +111,24 @@ def process(args, device_index):
     fov = max([ends[1] - ends[0] for ends in mesh.extrema[1:]]) * 1.1
     n = int(np.ceil((fov / args.pixel_size).simplified.magnitude))
     shape = (n, n)
-    # 360 degrees -> twice the number of tomographic projections
-    num_projs = int(np.pi * n) if args.num_projections is None else args.num_projections
-    angles = np.linspace(0, 360, num_projs, endpoint=False) * q.deg
-    if device_index == 0:
-        LOG.info('n: {}, ps: {}, FOV: {}'.format(n, args.pixel_size, fov))
-        LOG.info('Number of projections: {}'.format(num_projs))
-        LOG.info('--- Mesh info ---')
-        log_attributes(mesh)
-        LOG.info('--- Args info ---')
-        log_attributes(args)
 
-    return scan(shape, args.pixel_size, args.rotation_axis, mesh, angles, args.prefix,
-                lamino_angle=args.lamino_angle, index=device_index, num_devices=args.num_devices)
+    if args.make_gt:
+        return make_ground_truth(args, shape, mesh)[0]
+    else:
+        # 360 degrees -> twice the number of tomographic projections
+        num_projs = int(np.pi * n) if args.num_projections is None else args.num_projections
+        angles = np.linspace(0, 360, num_projs, endpoint=False) * q.deg
+        if device_index == 0:
+            LOG.info('n: {}, ps: {}, FOV: {}'.format(n, args.pixel_size, fov))
+            LOG.info('Number of projections: {}'.format(num_projs))
+            LOG.info('--- Mesh info ---')
+            log_attributes(mesh)
+            LOG.info('--- Args info ---')
+            log_attributes(args)
+
+        return scan(shape, args.pixel_size, args.rotation_axis, mesh, angles, args.prefix,
+                    lamino_angle=args.lamino_angle, index=device_index,
+                    num_devices=args.num_devices)
 
 
 def parse_args():
@@ -110,7 +138,8 @@ def parse_args():
                         help='Data set name, if not specified guessed from input')
     parser.add_argument('--num-projections', type=int, help='Number of projections')
     parser.add_argument('--out-directory', type=str, default='/mnt/LSDF/users/farago/share/cr7',
-                        help="Output directory, result goes to 'out-directory/dset/projections'")
+                        help="Output directory, result goes to 'out-directory/dset/projections'"
+                        "or 'out-directory/dset/gt', depending on the --make-gt switch")
     parser.add_argument('--pixel-size', type=float, default=750., help='Pixel size in nm')
     parser.add_argument('--lamino-angle', type=float, default=5,
                         help='Laminographic angle in degrees')
@@ -118,6 +147,11 @@ def parse_args():
                         help='Rotation axis (y - up, z - beam direction)')
     parser.add_argument('--num-devices', type=int, default=1,
                         help='Number of compute devices to use')
+    # Ground truth related
+    parser.add_argument('--z-chunk', type=int, default=100,
+                        help='Number of ground truth slices to compute during one pass')
+    parser.add_argument('--make-gt', action='store_true',
+                        help='Create ground truth instead of projections')
 
     return parser.parse_args()
 
@@ -134,7 +168,10 @@ def main():
     dset += '_axis_{}'.format(args.rotation_axis)
     dset += '_ps_{:>04}_nm'.format(int(args.pixel_size))
 
-    args.prefix = os.path.join(args.out_directory, dset, 'projections', 'projection_{:>04}.tif')
+    image_directory = 'slices' if args.make_gt else 'projections'
+    file_prefix = image_directory[:-1]
+    file_prefix += '_{:>04}'
+    args.prefix = os.path.join(args.out_directory, dset, image_directory, file_prefix)
     args.logfile = os.path.join(args.out_directory, dset, 'simulation.log')
     directory = os.path.dirname(args.prefix)
     if not os.path.exists(directory):
