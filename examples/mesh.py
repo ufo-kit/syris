@@ -139,7 +139,7 @@ def parse_args():
     parser.add_argument('--dset', type=str,
                         help='Data set name, if not specified guessed from input')
     parser.add_argument('--num-projections', type=int, help='Number of projections')
-    parser.add_argument('--out-directory', type=str, default='/mnt/LSDF/users/farago/share/cr7',
+    parser.add_argument('--out-directory', type=str, default='dataset',
                         help="Output directory, result goes to 'out-directory/dset/projections'"
                         "or 'out-directory/dset/gt', depending on the --make-gt switch")
     parser.add_argument('--pixel-size', type=float, default=750., help='Pixel size in nm')
