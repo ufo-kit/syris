@@ -6,6 +6,7 @@ import pyopencl.array as cl_array
 import quantities as q
 import syris.config as cfg
 import syris.geometry as geom
+import syris.gpu.util as gutil
 from syris.bodies.base import MovableBody
 from syris.util import get_magnitude, make_tuple
 
@@ -265,35 +266,36 @@ class Mesh(MovableBody):
 
         return out
 
-    def compute_slices(self, shape, pixel_size, num_slices):
-        """Compute slices."""
-        queue = cfg.OPENCL.queue
-        pixel_size = make_tuple(pixel_size, num_dims=2)
-        shape = make_tuple(shape, num_dims=2)
+    def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
+        """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for
+        outuput. Offset is the starting point offset as (x, y, z).
+        """
+        if queue is None:
+            queue = cfg.OPENCL.queue
+        if out is None:
+            out = cl_array.zeros(queue, shape, dtype=np.uint8)
+
+        if offset is None:
+            offset = gutil.make_vfloat3(0, 0, 0)
         v_1, v_2, v_3 = self._make_inputs(queue)
-        offset = cl_array.vec.make_int2(0, 0)
-
-        out_data = cl_array.zeros(queue, (num_slices,) + shape, dtype=np.uint8)
         max_dx = get_magnitude(self.max_triangle_x_diff)
-        min_z = self.extrema[0][0].magnitude
-        print out_data.shape
+        ps = pixel_size.rescale(q.um).magnitude
 
-        cfg.OPENCL.programs['mesh'].compute_thickness(queue,
-                                (shape[1], num_slices),
-                                None,
-                                v_1.data,
-                                v_2.data,
-                                v_3.data,
-                                out_data.data,
-                                np.int32(shape[0]),
-                                np.int32(self.num_triangles),
-                                offset,
-                                cfg.PRECISION.np_float(get_magnitude(pixel_size[0])),
-                                cfg.PRECISION.np_float(max_dx),
-                                cfg.PRECISION.np_float(min_z))
+        cfg.OPENCL.programs['mesh'].compute_slices(queue,
+                                                   (shape[2], shape[0]),
+                                                   None,
+                                                   v_1.data,
+                                                   v_2.data,
+                                                   v_3.data,
+                                                   out.data,
+                                                   np.int32(shape[1]),
+                                                   np.int32(self.num_triangles),
+                                                   offset,
+                                                   cfg.PRECISION.np_float(ps),
+                                                   cfg.PRECISION.np_float(max_dx))
 
 
-        return out_data
+        return out
 
 
 def _extract_object(txt):

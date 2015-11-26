@@ -227,10 +227,9 @@ kernel void compute_slices (const global vfloat3 *v_1,
                          global uchar *output,
                          const int depth,
                          const int num_triangles,
-                         const int2 offset,
+                         const vfloat3 offset,
                          const vfloat scale,
-                         const vfloat max_dx,
-                         const vfloat min_z)
+                         const vfloat max_dx)
 {
     int idx = get_global_id (0);
     int idy = get_global_id (1);
@@ -241,9 +240,9 @@ kernel void compute_slices (const global vfloat3 *v_1,
     vfloat3 D = (vfloat3)(0, 0, 1);
     /* When O.y is e.g. exactly 0 some triangles are missed, so introduce a
      * small offset which is negligible compared to the pixel size */
-    O.x = scale * (idx + offset.x + 1.f / 100);
-    O.y = scale * (idy + offset.y + 1.f / 100);
-    O.z = min_z - scale;
+    O.x = scale * (idx + 1.f / 100) + offset.x;
+    O.y = scale * (idy + 1.f / 100) + offset.y;
+    O.z = offset.z;
 
     num_intersections = compute_intersections (v_1, v_2, v_3, num_triangles, &O, &D,
                                                scale, max_dx, intersections);
