@@ -36,6 +36,7 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
 
     # Move to the middle of the FOV
     point = (shape[1] * psm / 2, shape[0] * psm / 2, 0) * q.m
+    LOG.info('Mesh shift: {}'.format(point.rescale(q.um)))
 
     # Compute this device portion of tomographic angles
     enumerated = list(enumerate(angles))
@@ -80,6 +81,7 @@ def make_ground_truth(args, shape, mesh):
     psm = args.pixel_size.simplified.magnitude
     # Make sure the projections are computed with the same x- and y-offsets
     point = (shape[1] * psm / 2, shape[0] * psm / 2, shape[1] * psm / 2) * q.m
+    LOG.info('Mesh shift: {}'.format(point.rescale(q.um)))
     mesh.translate(point)
     mesh.transform()
     mesh.sort()
