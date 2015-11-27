@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import logging
 import os
 import time
@@ -145,11 +146,12 @@ def parse_args():
     parser.add_argument('--out-directory', type=str, default='dataset',
                         help="Output directory, result goes to 'out-directory/dset/projections'"
                         "or 'out-directory/dset/gt', depending on the --make-gt switch")
-    parser.add_argument('--pixel-size', type=float, default=750., help='Pixel size in nm')
-    parser.add_argument('--lamino-angle', type=float, default=5,
+    parser.add_argument('--pixel-size', type=float, default=[750.], nargs='+',
+                        help='Pixel size in nm')
+    parser.add_argument('--lamino-angle', type=float, default=[5], nargs='+',
                         help='Laminographic angle in degrees')
-    parser.add_argument('--rotation-axis', type=str, choices=['y', 'z'], default='y',
-                        help='Rotation axis (y - up, z - beam direction)')
+    parser.add_argument('--rotation-axis', type=str, choices=['y', 'z'], default=['y'],
+                        nargs='+', help='Rotation axis (y - up, z - beam direction)')
     parser.add_argument('--num-devices', type=int, default=1,
                         help='Number of compute devices to use')
     # Ground truth related
@@ -163,38 +165,41 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    # Prepare output
-    if args.dset is None:
-        dset = os.path.splitext(os.path.basename(args.input))[0]
-    else:
-        dset = args.dset
-    dset += '_lamino_angle_{:>02}_deg'.format(int(args.lamino_angle))
-    dset += '_axis_{}'.format(args.rotation_axis)
-    dset += '_ps_{:>04}_nm'.format(int(args.pixel_size))
-
+    combinations = list(itertools.product(args.lamino_angle, args.pixel_size, args.rotation_axis))
     image_directory = 'slices' if args.make_gt else 'projections'
     file_prefix = image_directory[:-1]
-    file_prefix += '_{:>04}'
-    args.prefix = os.path.join(args.out_directory, dset, image_directory, file_prefix)
-    args.logfile = os.path.join(args.out_directory, dset, 'simulation.log')
-    directory = os.path.dirname(args.prefix)
-    if not os.path.exists(directory):
-        os.makedirs(directory, mode=0o755)
-    args.pixel_size = args.pixel_size * q.nm
-    args.lamino_angle = args.lamino_angle * q.deg
-    args.rotation_axis = Y_AX if args.rotation_axis == 'y' else Z_AX
+    file_prefix += '_{:>04}.tif'
 
-    if args.num_devices == 1:
-        # Easier exception message handling for debugging
-        proj = process(args, 0)
-        from pltpreview import show
-        show(proj, block=True)
-    else:
-        exec_func = partial(process, args)
-        devices = range(args.num_devices)
-        pool = Pool(processes=args.num_devices)
-        pool.map(exec_func, devices)
+    for lamino_angle, pixel_size, rotation_axis in combinations:
+        # Prepare output
+        if args.dset is None:
+            dset = os.path.splitext(os.path.basename(args.input))[0]
+        else:
+            dset = args.dset
+        dset += '_lamino_angle_{:>02}_deg'.format(int(lamino_angle))
+        dset += '_axis_{}'.format(rotation_axis)
+        dset += '_ps_{:>04}_nm'.format(int(pixel_size))
+
+        args.prefix = os.path.join(args.out_directory, dset, image_directory, file_prefix)
+        args.logfile = os.path.join(args.out_directory, dset, 'simulation.log')
+        directory = os.path.dirname(args.prefix)
+        if not os.path.exists(directory):
+            os.makedirs(directory, mode=0o755)
+
+        args.pixel_size = pixel_size * q.nm
+        args.lamino_angle = lamino_angle * q.deg
+        args.rotation_axis = Y_AX if rotation_axis == 'y' else Z_AX
+
+        if args.num_devices == 1:
+            # Easier exception message handling for debugging
+            proj = process(args, 0)
+            from pltpreview import show
+            show(proj, block=True)
+        else:
+            exec_func = partial(process, args)
+            devices = range(args.num_devices)
+            pool = Pool(processes=args.num_devices)
+            pool.map(exec_func, devices)
 
 
 def log_attributes(obj):
