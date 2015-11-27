@@ -197,8 +197,8 @@ kernel void compute_thickness (const global vfloat3 *v_1,
     int idy = get_global_id (1);
     int i, j, num_intersections;
     vfloat results[16];
-    vfloat x_0 = scale * (idx + offset.x);
-    vfloat y_0 = scale * (idy + offset.y);
+    vfloat x_0 = scale * (idx + offset.x + 0.5);
+    vfloat y_0 = scale * (idy + offset.y + 0.5);
     vfloat3 O, D = (vfloat3)(0, 0, 1);
     vfloat intersections[MAX_INTERSECTIONS];
     O.z = min_z - scale;
@@ -238,8 +238,8 @@ kernel void compute_slices (const global vfloat3 *v_1,
     vfloat intersections[MAX_INTERSECTIONS];
     vfloat3 O;
     vfloat3 D = (vfloat3)(0, 0, 1);
-    O.x = scale * idx + offset.x;
-    O.y = scale * idy + offset.y;
+    O.x = scale * (idx + 0.5) + offset.x;
+    O.y = scale * (idy + 0.5) + offset.y;
     O.z = offset.z;
 
     num_intersections = compute_intersections (v_1, v_2, v_3, num_triangles, &O, &D,
