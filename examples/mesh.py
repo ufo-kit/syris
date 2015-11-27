@@ -5,13 +5,11 @@ import os
 import time
 import numpy as np
 import quantities as q
-import syris
 import syris.gpu.util as gutil
 from functools import partial
 from multiprocessing import Lock, Pool
 from concert.storage import write_libtiff
-from syris.bodies.mesh import Mesh, read_blender_obj
-from syris.geometry import Trajectory, X_AX, Y_AX, Z_AX
+from syris.geometry import X_AX, Y_AX, Z_AX
 
 
 LOCK = Lock()
@@ -103,6 +101,10 @@ def make_ground_truth(args, shape, mesh):
 
 
 def process(args, device_index):
+    import syris
+    from syris.geometry import Trajectory
+    from syris.bodies.mesh import Mesh, read_blender_obj
+
     syris.init(device_index=device_index, logfile=args.logfile)
     path, ext = os.path.splitext(args.input)
     if ext == '.obj':
@@ -170,6 +172,9 @@ def main():
     file_prefix = image_directory[:-1]
     file_prefix += '_{:>04}.tif'
 
+    devices = range(args.num_devices)
+    pool = Pool(processes=args.num_devices)
+
     for lamino_angle, pixel_size, rotation_axis in combinations:
         # Prepare output
         if args.dset is None:
@@ -197,8 +202,6 @@ def main():
             show(proj, block=True)
         else:
             exec_func = partial(process, args)
-            devices = range(args.num_devices)
-            pool = Pool(processes=args.num_devices)
             pool.map(exec_func, devices)
 
 
