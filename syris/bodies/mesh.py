@@ -223,8 +223,8 @@ class Mesh(MovableBody):
 
             return minimum, maximum
 
-        def get_dimension(minimum, maximum, index):
-            return int(np.ceil(((maximum - minimum) / pixel_size[index]).simplified.magnitude))
+        def get_px_value(value, round_func, ps):
+            return int(round_func(get_magnitude(value / ps)))
 
         # Move to the desired location, apply the T matrix and resort the triangles
         # self.move(t)
@@ -240,10 +240,13 @@ class Mesh(MovableBody):
             # Object inside FOV
             x_min, x_max = get_crop(2, fov)
             y_min, y_max = get_crop(1, fov)
-            width = min(get_dimension(x_min, x_max, 1), shape[1])
-            height = min(get_dimension(y_min, y_max, 0), shape[0])
-            offset = cl_array.vec.make_int2(get_magnitude(x_min / pixel_size[1]),
-                                            get_magnitude(y_min / pixel_size[0]))
+            x_min_px = get_px_value(x_min, np.floor, pixel_size[1])
+            x_max_px = get_px_value(x_max, np.ceil, pixel_size[1])
+            y_min_px = get_px_value(y_min, np.floor, pixel_size[0])
+            y_max_px = get_px_value(y_max, np.ceil, pixel_size[0])
+            width = min(x_max_px - x_min_px, shape[1])
+            height = min(y_max_px - y_min_px, shape[0])
+            offset = cl_array.vec.make_int2(x_min_px, y_min_px)
             v_1, v_2, v_3 = self._make_inputs(queue)
             max_dx = get_magnitude(self.max_triangle_x_diff)
             min_z = self.extrema[0][0].magnitude
