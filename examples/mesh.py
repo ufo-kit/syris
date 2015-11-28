@@ -47,7 +47,10 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
     mine = enumerated[index * per_device:stop]
 
     last = None
+    # Projections which metric exceeds allowed limit
     checked_indices = []
+    # Projections which exceed the allowed metric difference even after more iterations
+    bad_indices = []
     for i, angle in mine:
         st = time.time()
         projs = [make_projection(shape, ps, axis, mesh, point, lamino_angle, angle)]
@@ -62,6 +65,8 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
                                              lamino_angle, angle))
                 max_vals.append(projs[-1].max())
             best = np.argmin(max_vals)
+            if best > 2 * last or np.isnan(best):
+                bad_indices.append(i)
         duration = time.time() - st
         with LOCK:
             LOG.info(log_fmt.format(index, i + 1, num_angles, duration,
@@ -72,6 +77,8 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
     with LOCK:
         LOG.info('Checked indices: {}'.format(checked_indices))
         LOG.info('Which map to files: {}'.format([prefix.format(i) for i in checked_indices]))
+        LOG.info('Exceeding indices: {}'.format(bad_indices))
+        LOG.info('Which map to files: {}'.format([prefix.format(i) for i in bad_indices]))
 
     return projs[best]
 
