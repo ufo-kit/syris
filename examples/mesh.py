@@ -17,6 +17,9 @@ LOG = logging.getLogger(__name__)
 
 
 def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle):
+    if axis == 'z':
+        lamino_angle = lamino_angle + 90 * q.deg
+    axis = Y_AX if axis == 'y' else Z_AX
     mesh.clear_transformation()
     mesh.translate(center)
     mesh.rotate(lamino_angle, X_AX)
@@ -200,7 +203,7 @@ def main():
 
         args.pixel_size = pixel_size * q.nm
         args.lamino_angle = lamino_angle * q.deg
-        args.rotation_axis = Y_AX if rotation_axis == 'y' else Z_AX
+        args.rotation_axis = rotation_axis
 
         if args.num_devices == 1:
             # Easier exception message handling for debugging
