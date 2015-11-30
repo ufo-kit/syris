@@ -16,7 +16,8 @@ LOCK = Lock()
 LOG = logging.getLogger(__name__)
 
 
-def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle):
+def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=1):
+    from syris.imageprocessing import bin_image
     if axis == 'z':
         lamino_angle = lamino_angle + 90 * q.deg
     axis = Y_AX if axis == 'y' else Z_AX
@@ -25,11 +26,19 @@ def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle):
     mesh.rotate(lamino_angle, X_AX)
     mesh.rotate(tomo_angle, axis)
 
-    return mesh.project(shape, ps).get()
+    orig_shape = shape
+    shape = tuple([n * ss for n in orig_shape])
+    ps = ps / ss
+
+    projection = mesh.project(shape, ps)
+    if ss > 1:
+        projection = bin_image(projection, orig_shape, average=True)
+
+    return projection.get()
 
 
 def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0, num_devices=1,
-         shift_coeff=1e4):
+         shift_coeff=1e4, ss=1):
     """Make a scan of tomographic angles. *shift_coeff* is the coefficient multiplied by pixel size
     which shifts the triangles to get rid of faulty pixels.
     """
@@ -56,7 +65,7 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
     bad_indices = []
     for i, angle in mine:
         st = time.time()
-        projs = [make_projection(shape, ps, axis, mesh, point, lamino_angle, angle)]
+        projs = [make_projection(shape, ps, axis, mesh, point, lamino_angle, angle, ss=ss)]
         max_vals = [projs[-1].max()]
         best = 0
         if last is not None and max_vals[0] > 2 * last or np.isnan(max_vals[0]):
@@ -65,7 +74,7 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
             for shift in [-psm / shift_coeff, psm / shift_coeff]:
                 shifted_point = point + (shift, 0, 0) * q.m
                 projs.append(make_projection(shape, ps, axis, mesh, shifted_point,
-                                             lamino_angle, angle))
+                                             lamino_angle, angle, ss=ss))
                 max_vals.append(projs[-1].max())
             best = np.argmin(max_vals)
             if best > 2 * last or np.isnan(best):
@@ -88,8 +97,18 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
 
 def make_ground_truth(args, shape, mesh):
     """Shape is (y, x), so the total number of slices is y."""
+    import syris.config as cfg
+    from syris.imageprocessing import bin_image
+
+    if args.z_chunk % args.supersampling:
+        raise ValueError('z_chunk must be dividable by supersampling')
+
+    queue = cfg.OPENCL.queue
     # Move the mesh to the middle
-    psm = args.pixel_size.simplified.magnitude
+    ps = args.pixel_size / args.supersampling
+    psm = ps.simplified.magnitude
+    orig_shape = shape
+    shape = tuple([n * args.supersampling for n in shape])
     # Make sure the projections are computed with the same x- and y-offsets
     point = (shape[1] * psm / 2, shape[0] * psm / 2, shape[1] * psm / 2) * q.m
     LOG.info('Mesh shift: {}'.format(point.rescale(q.um)))
@@ -98,16 +117,24 @@ def make_ground_truth(args, shape, mesh):
     mesh.transform()
     mesh.sort()
 
+    z_stack = np.empty((args.supersampling,) + orig_shape, dtype=cfg.PRECISION.np_float)
+
     for i in range(0, shape[0], args.z_chunk):
         end = min(i + args.z_chunk, shape[0])
-        offset = gutil.make_vfloat3(0, i * args.pixel_size.rescale(q.um), 0)
-        slices = mesh.compute_slices((end - i,) + shape, args.pixel_size, offset=offset).get()
+        offset = gutil.make_vfloat3(0, i * ps.rescale(q.um), 0)
+        slices = mesh.compute_slices((end - i,) + shape, ps, offset=offset).get()
         LOG.info('Computing slices {}-{}'.format(i, end))
-        for j, sl in enumerate(slices):
-            index = i + j
+        enumerated = list(enumerate(slices))[::args.supersampling]
+        for j, sl in enumerated:
+            # Z-dimension downsampling
+            for k in range(args.supersampling):
+                z_stack[k] = bin_image(slices[j + k], orig_shape, average=True, queue=queue).get()
+            # Sum only the slices which are present (last run might not go to the end)
+            sl = np.mean(z_stack[:slices.shape[0]], axis=0)
+            index = (i + j) / args.supersampling
             write_libtiff(args.prefix.format(index), sl)
 
-    return slices
+    return sl
 
 
 def process(args, device_index):
@@ -131,7 +158,10 @@ def process(args, device_index):
     shape = (n, n)
 
     if args.make_gt:
-        return make_ground_truth(args, shape, mesh)[0]
+        LOG.info('--- Args info ---')
+        log_attributes(args)
+
+        return make_ground_truth(args, shape, mesh)
     else:
         # 360 degrees -> twice the number of tomographic projections
         num_projs = int(np.pi * n) if args.num_projections is None else args.num_projections
@@ -146,7 +176,7 @@ def process(args, device_index):
 
         return scan(shape, args.pixel_size, args.rotation_axis, mesh, angles, args.prefix,
                     lamino_angle=args.lamino_angle, index=device_index,
-                    num_devices=args.num_devices)
+                    num_devices=args.num_devices, ss=args.supersampling)
 
 
 def parse_args():
@@ -157,7 +187,7 @@ def parse_args():
     parser.add_argument('--num-projections', type=int, help='Number of projections')
     parser.add_argument('--out-directory', type=str, default='dataset',
                         help="Output directory, result goes to 'out-directory/dset/projections'"
-                        "or 'out-directory/dset/gt', depending on the --make-gt switch")
+                        "or 'out-directory/dset/truth', depending on the --make-gt switch")
     parser.add_argument('--pixel-size', type=float, default=[750.], nargs='+',
                         help='Pixel size in nm')
     parser.add_argument('--lamino-angle', type=float, default=[5], nargs='+',
@@ -166,6 +196,8 @@ def parse_args():
                         nargs='+', help='Rotation axis (y - up, z - beam direction)')
     parser.add_argument('--num-devices', type=int, default=1,
                         help='Number of compute devices to use')
+    parser.add_argument('--supersampling', type=int, default=[1], nargs='+',
+                        help='Supersampling computes with n-times more pixels than usual')
     # Ground truth related
     parser.add_argument('--z-chunk', type=int, default=100,
                         help='Number of ground truth slices to compute during one pass')
@@ -177,15 +209,23 @@ def parse_args():
 
 def main():
     args = parse_args()
-    combinations = list(itertools.product(args.lamino_angle, args.pixel_size, args.rotation_axis))
-    image_directory = 'slices' if args.make_gt else 'projections'
-    file_prefix = image_directory[:-1]
+    combinations = list(itertools.product(args.lamino_angle,
+                                          args.pixel_size,
+                                          args.rotation_axis,
+                                          args.supersampling))
+    if args.make_gt:
+        image_directory = 'truth'
+        file_prefix = 'slice'
+    else:
+        image_directory = 'projections'
+        file_prefix = image_directory[:-1]
+
     file_prefix += '_{:>04}.tif'
 
     devices = range(args.num_devices)
     pool = Pool(processes=args.num_devices)
 
-    for lamino_angle, pixel_size, rotation_axis in combinations:
+    for lamino_angle, pixel_size, rotation_axis, ss in combinations:
         # Prepare output
         if args.dset is None:
             dset = os.path.splitext(os.path.basename(args.input))[0]
@@ -194,6 +234,7 @@ def main():
         dset += '_lamino_angle_{:>02}_deg'.format(int(lamino_angle))
         dset += '_axis_{}'.format(rotation_axis)
         dset += '_ps_{:>04}_nm'.format(int(pixel_size))
+        dset += '_ss_{:>02}'.format(ss)
 
         args.prefix = os.path.join(args.out_directory, dset, image_directory, file_prefix)
         args.logfile = os.path.join(args.out_directory, dset, 'simulation.log')
@@ -204,6 +245,7 @@ def main():
         args.pixel_size = pixel_size * q.nm
         args.lamino_angle = lamino_angle * q.deg
         args.rotation_axis = rotation_axis
+        args.supersampling = ss
 
         if args.num_devices == 1:
             # Easier exception message handling for debugging
