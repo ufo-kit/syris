@@ -249,9 +249,7 @@ def main():
 
         if args.num_devices == 1:
             # Easier exception message handling for debugging
-            proj = process(args, 0)
-            from pltpreview import show
-            show(proj, block=True)
+            process(args, 0)
         else:
             exec_func = partial(process, args)
             pool.map(exec_func, devices)
