@@ -1,4 +1,5 @@
 """Utility functions."""
+import numpy as np
 
 
 def make_tuple(value, num_dims=2):
@@ -26,3 +27,8 @@ def get_magnitude(value):
         value = value.simplified.magnitude
 
     return value
+
+
+def next_power_of_two(n):
+    """Get next power of two for number *n*."""
+    return 2 ** int(np.ceil(np.log2(n)))

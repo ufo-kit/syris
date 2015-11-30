@@ -7,7 +7,7 @@ from pyopencl.array import vec
 from pyfft.cl import Plan
 from syris import config as cfg
 from syris.gpu import util as g_util
-from syris.util import get_magnitude, make_tuple
+from syris.util import get_magnitude, make_tuple, next_power_of_two
 
 
 def fft_2(data, plan, wait_for_finish=True):
@@ -56,11 +56,17 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
     return out
 
 
-def pad(image, region, out=None, queue=None):
-    """Pad a 2D *image*. *region* is the region to pad as (y_0, x_0, height, width), the final image
-    dimensions are height x width and the filling starts at (y_0, x_0), *out* is the pyopencl Array
-    instance, if not specified it will be created. *out* is also returned.
+def pad(image, region=None, out=None, queue=None):
+    """Pad a 2D *image*. *region* is the region to pad as (y_0, x_0, height, width). If not
+    specified, the next power of two dimensions are used and the image is centered in the padded
+    one. The final image dimensions are height x width and the filling starts at (y_0, x_0), *out*
+    is the pyopencl Array instance, if not specified it will be created. *out* is also returned.
     """
+    if region is None:
+        shape = tuple([next_power_of_two(n) for n in image.shape])
+        y_0 = (shape[0] - image.shape[0]) / 2
+        x_0 = (shape[1] - image.shape[1]) / 2
+        region = (y_0, x_0) + shape
     if queue is None:
         queue = cfg.OPENCL.queue
     if out is None:
@@ -132,15 +138,20 @@ def decimate(image, shape, sigma=1, average=False, queue=None, plan=None):
     """
     if queue is None:
         queue = cfg.OPENCL.queue
-    if not plan:
-        plan = Plan(image.shape, queue=queue)
     image = g_util.get_array(image)
     image = image.astype(cfg.PRECISION.np_cplx)
+    pow_shape = tuple([next_power_of_two(n) for n in image.shape])
+    orig_shape = image.shape
+    if image.shape != pow_shape:
+        image = pad(image, region=(0, 0) + pow_shape, queue=queue)
+    if not plan:
+        plan = Plan(image.shape, queue=queue)
 
     fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue)
     fft_2(image.data, plan, wait_for_finish=True)
     image *= fltr
     ifft_2(image.data, plan, wait_for_finish=True)
+    image = crop(image, (0, 0) + orig_shape, queue=queue)
 
     return bin_image(image.real, shape, average=average, queue=queue)
 
