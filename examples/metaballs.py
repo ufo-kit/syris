@@ -8,7 +8,7 @@ import quantities as q
 import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
-from syris.graphicalobjects import MetaBall, MetaBalls, project_metaballs
+from syris.bodies.isosurfaces import MetaBall, MetaBalls
 from syris.geometry import Trajectory
 from libtiff import TIFF
 
