@@ -20,6 +20,7 @@ def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=
     from syris.imageprocessing import bin_image
     if axis == 'z':
         lamino_angle = lamino_angle + 90 * q.deg
+        tomo_angle = -tomo_angle
     axis = Y_AX if axis == 'y' else Z_AX
     mesh.clear_transformation()
     mesh.translate(center)
