@@ -82,7 +82,8 @@ class BoundingBox(object):
         z_min = min(self.get_min(Z), other.get_min(Z))
         z_max = max(self.get_max(Z), other.get_max(Z))
 
-        self._points = make_points([x_min, x_max], [y_min, y_max], [z_min, z_max]) * q.m
+        self._points = make_points([x_min, x_max] * q.m, [y_min, y_max] * q.m,
+                                   [z_min, z_max] * q.m)
 
     def overlaps(self, other):
         """
