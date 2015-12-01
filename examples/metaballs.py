@@ -268,8 +268,6 @@ if __name__ == '__main__':
     thickness = comp.project((n, n), pixel_size).get()
 
     # thickness = slow_metaballs(n, objects_mem, num_objects, (z_min, z_max), pixel_size)
-    TIFF.open("/home/farago/data/thickness/thickness.tif", "w").\
-        write_image(thickness[:, ::VECTOR_WIDTH].astype(np.float32))
 
     res_mem = slow_metaballs(n, objects_mem, num_objects, (z_min, z_max), pixel_size,
             thickness=False)
