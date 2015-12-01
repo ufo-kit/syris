@@ -5,9 +5,9 @@
  * precision for floating point numbers.
  */
 
-#define left_index(a) (((a) == 0) ? 2 : (((a) - 1) % 3))
-#define current_index(a) ((a) % 3)
-#define right_index(a) (((a) + 1) % 3)
+#define get_left_index(a) (((a) == 0) ? 2 : (((a) - 1) % 3))
+#define get_current_index(a) ((a) % 3)
+#define get_right_index(a) (((a) + 1) % 3)
 
 
 /**
@@ -28,7 +28,7 @@ vfloat2 solve_quadric(vfloat a, vfloat b, vfloat c) {
 	return (vfloat2)((-b - sqrt(d))/(2*a), (-b + sqrt(d))/(2*a));
 }
 
-void add_coeffs(vfloat *result, vfloat *src, global vfloat *toadd, int size) {
+void add_coeffs(private vfloat *result, vfloat *src, global vfloat *toadd, int size) {
 	int i;
 
 	for (i = 0; i < size; i++) {
@@ -36,7 +36,7 @@ void add_coeffs(vfloat *result, vfloat *src, global vfloat *toadd, int size) {
 	}
 }
 
-void subtract_coeffs(vfloat *result, vfloat *src, global vfloat *tosub, int size) {
+void subtract_coeffs(private vfloat *result, vfloat *src, global vfloat *tosub, int size) {
 	int i;
 
 	for (i = 0; i < size; i++) {
@@ -101,7 +101,7 @@ bool is_root_valid(const vfloat *coeffs, unsigned int degree,
 	int sgn = sgn(derivative(coeffs, degree, root));
 
 	return last_derivative_sgn == -2 || sgn != last_derivative_sgn ||
-			sgn == 0 && last_derivative_sgn == 0;
+			(sgn == 0 && last_derivative_sgn == 0);
 }
 
 int next_root(const vfloat *coeffs, unsigned int degree,
@@ -207,7 +207,7 @@ __kernel void thickness_add_kernel(__global vfloat4 *out,
 	out[0] = (vfloat4)(thickness, previous, last_derivative_sgn, 0);
 }
 
-vfloat *adjust_coefficients(vfloat coeffs[3][POLY_DEG + 1],
+vfloat *adjust_coefficients(private vfloat coeffs[3][POLY_DEG + 1],
 		vfloat *source_coeffs, global poly_object *objects,
 		global ushort *sorted, vfloat left_end, unsigned int *object_index,
 		uint offset, uint index, unsigned int size, bool addition) {
@@ -218,16 +218,16 @@ vfloat *adjust_coefficients(vfloat coeffs[3][POLY_DEG + 1],
 			(addition ? objects[offset + sorted[offset + *object_index]].interval.x :
 						objects[offset + sorted[offset + *object_index]].interval.y) <= left_end) {
 		if (addition) {
-			add_coeffs(coeffs[index == 0 ? 0 : current_index(index)],
+			add_coeffs(coeffs[index == 0 ? 0 : get_current_index(index)],
 					source_coeffs, objects[offset + sorted[offset + *object_index]].coeffs,
 					POLY_COEFFS_NUM);
 		} else {
-			subtract_coeffs(coeffs[index == 0 ? 0 : current_index(index)],
+			subtract_coeffs(coeffs[index == 0 ? 0 : get_current_index(index)],
 					source_coeffs, objects[offset + sorted[offset + *object_index]].coeffs,
 					POLY_COEFFS_NUM);
 		}
 		/* Source coefficient are current coefficients from now on. */
-		source_coeffs = coeffs[index == 0 ? 0 : current_index(index)];
+		source_coeffs = coeffs[index == 0 ? 0 : get_current_index(index)];
 		(*object_index)++;
 	}
 
@@ -235,7 +235,7 @@ vfloat *adjust_coefficients(vfloat coeffs[3][POLY_DEG + 1],
 }
 
 
-void update_coefficients(vfloat coeffs[3][POLY_DEG + 1],
+void update_coefficients(private vfloat coeffs[3][POLY_DEG + 1],
 			global ushort *left, global ushort *right, global poly_object *objects,
 			uint offset,
 			vfloat left_end, unsigned int *left_index,
@@ -245,7 +245,7 @@ void update_coefficients(vfloat coeffs[3][POLY_DEG + 1],
 	 * Add the upcoming interval coefficients and remove the coefficients from
 	 * past intervals.
 	 */
-	vfloat *src_coeffs = coeffs[index == 0 ? 0 : left_index(index)];
+	vfloat *src_coeffs = coeffs[index == 0 ? 0 : get_left_index(index)];
 
 	/* If we add some coefficient, current coefficients become the source
 	 * coefficients, otherwise we would discard the changes in addition. */
@@ -378,18 +378,18 @@ __kernel void metaballs(__global vfloat *out,
 					} else if(right_index < size) {
 						right_end = pobjects[obj_offset + right[obj_offset + right_index]].interval.y;
 					} else {
-						coeffs[right_index(index - 1)][0] = NAN;
+						coeffs[get_right_index(index - 1)][0] = NAN;
 					}
 
 					if (index > 0) {
-						get_roots(coeffs[left_index(index -  1)],
-									coeffs[current_index(index - 1)],
-									coeffs[right_index(index - 1)],
+						get_roots(coeffs[get_left_index(index -  1)],
+									coeffs[get_current_index(index - 1)],
+									coeffs[get_right_index(index - 1)],
 									POLY_DEG, previous_end,
 									left_end, roots, pixel_size.x);
 						get_intersections(intersections,
 								(const vfloat *)
-								coeffs[current_index(index - 1)],
+								coeffs[get_current_index(index - 1)],
 								POLY_DEG, roots, &previous,
 								&last_derivative_sgn);
 						if (out_thickness) {
