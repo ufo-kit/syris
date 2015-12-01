@@ -10,7 +10,6 @@ import quantities as q
 import syris.gpu.util as g_util
 import syris.geometry as geom
 import struct
-from numpy import linalg
 from syris import config as cfg
 from syris.bodies.base import CompositeBody, MovableBody
 from syris.geometry import BoundingBox
@@ -55,7 +54,7 @@ class MetaBall(MovableBody):
         # Transform by the current transformation matrix.
         transformed = []
         for point in points:
-            transformed.append(geom.transform_vector(linalg.inv(self.transform_matrix), point))
+            transformed.append(geom.transform_vector(self.transform_matrix, point))
 
         return BoundingBox(np.array(transformed) * q.m)
 

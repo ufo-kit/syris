@@ -176,8 +176,7 @@ class Mesh(MovableBody):
         provided, pixel indices are returned instead of real triangle coordinates.
         """
         ray = np.array([0, 0, 1, 1])
-        i_matrix = np.linalg.inv(matrix)
-        ray = np.dot(i_matrix, ray)[:-1]
+        ray = np.dot(matrix, ray)[:-1]
         dot = np.sqrt(np.sum(self.normals ** 2, axis=1))
         theta = np.rad2deg(np.arccos(np.dot(self.normals, ray) / dot))
         diff = np.abs(theta - 90)
@@ -212,7 +211,7 @@ class Mesh(MovableBody):
     def transform(self):
         """Apply transformation *matrix* and return the resulting triangles."""
         # TODO: drop the inversion from MovableBody
-        matrix = np.linalg.inv(self.get_rescaled_transform_matrix(q.um))
+        matrix = self.get_rescaled_transform_matrix(q.um)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
     def _project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):

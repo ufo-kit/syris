@@ -75,8 +75,7 @@ class TestGeometry(SyrisTest):
         directions = get_directions(vec_0.units)
 
         for direction in directions:
-            res_vec = geom.transform_vector(linalg.inv(
-                                            geom.translate(direction)), vec_0)
+            res_vec = geom.transform_vector(geom.translate(direction), vec_0)
             res = np.sum(res_vec - (direction + vec_0))
             self.assertAlmostEqual(res, 0)
 
@@ -89,8 +88,7 @@ class TestGeometry(SyrisTest):
         vec_0 = get_vec_0()
 
         for coeff in coeffs:
-            res_vec = geom.transform_vector(
-                linalg.inv(geom.scale(coeff)), vec_0)
+            res_vec = geom.transform_vector(geom.scale(coeff), vec_0)
             res = np.sum(res_vec - (coeff * vec_0))
             self.assertAlmostEqual(res, 0)
 
@@ -102,9 +100,7 @@ class TestGeometry(SyrisTest):
 
         for direction in directions:
             rot_axis = np.cross(direction, normalized) * q.dimensionless
-            trans_mat = linalg.inv(geom.rotate(geom.angle(direction,
-                                                          normalized),
-                                               rot_axis))
+            trans_mat = geom.rotate(geom.angle(direction, normalized), rot_axis)
             diff = np.sum(normalized - geom.normalize(
                           geom.transform_vector(trans_mat, direction)))
             self.assertAlmostEqual(diff, 0)

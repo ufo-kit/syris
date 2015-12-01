@@ -11,7 +11,6 @@ from syris.imageprocessing import crop, pad, rescale
 from syris.materials import Material
 from syris.tests import SyrisTest, slow
 import itertools
-from numpy import linalg
 from syris.tests.graphics_util import get_linear_points
 
 
@@ -103,9 +102,9 @@ class TestBodies(SyrisTest):
         base = -2 * body.radius.magnitude, 2 * body.radius.magnitude
         transformed = []
         for point in list(itertools.product(base, base, base)):
-            transformed.append(geom.transform_vector(linalg.inv(
-                body.transform_matrix), point * body.radius.units).
-                simplified.magnitude)
+            transformed.append(geom.transform_vector(body.transform_matrix,
+                                                     point * body.radius.units).
+                                                     simplified.magnitude)
 
         return transformed * q.m
 

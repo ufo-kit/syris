@@ -3,7 +3,6 @@ import numpy as np
 import quantities as q
 import syris.config as cfg
 import syris.geometry as geom
-from numpy import linalg
 from quantities.quantity import Quantity
 from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength, transfer
@@ -85,7 +84,7 @@ class MovableBody(Body):
     @property
     def position(self):
         """Current position."""
-        return linalg.inv(self.transform_matrix)[:3, -1] * q.m
+        return self.transform_matrix[:3, -1] * q.m
 
     @property
     def last_position(self):
@@ -176,15 +175,14 @@ class MovableBody(Body):
 
     def translate(self, vec):
         """Translate the body by a vector *vec*."""
-        self.transform_matrix = np.dot(geom.translate(vec), self.transform_matrix)
+        self.transform_matrix = np.dot(self.transform_matrix, geom.translate(vec))
 
     def rotate(self, angle, axis, total_start=None):
         """Rotate the body by *angle* around vector *axis*, where
         *total_start* is the center of rotation point which results in
         transformation TRT^-1.
         """
-        self.transform_matrix = np.dot(geom.rotate(angle, axis, total_start),
-                                       self.transform_matrix)
+        self.transform_matrix = np.dot(self.transform_matrix, geom.rotate(angle, axis, total_start))
 
 
 class CompositeBody(MovableBody):

@@ -13,7 +13,6 @@ easily obtain x = T^{-1}x'.
 from __future__ import absolute_import
 import math
 import numpy as np
-from numpy import linalg
 import quantities as q
 from scipy import interpolate as interp
 import itertools
@@ -442,25 +441,20 @@ def overlap(interval_0, interval_1):
 
 
 def translate(vec):
-    """Translate the object by a vector *vec*. The transformation is
-    in the backward form and the vector is _always_ transformed into meters.
-    """
+    """Translate the object by a vector *vec*. The vector is _always_ transformed into meters."""
     vec = vec.simplified
     trans_matrix = np.identity(4)
 
-    # minus because of the backward fashion
-    trans_matrix[0][3] = -vec[0]
-    trans_matrix[1][3] = -vec[1]
-    trans_matrix[2][3] = -vec[2]
+    trans_matrix[0][3] = vec[0]
+    trans_matrix[1][3] = vec[1]
+    trans_matrix[2][3] = vec[2]
 
     return trans_matrix
 
 
 def rotate(phi, axis, total_start=None):
-    """Rotate the object by *phi* around vector *axis*, where
-    *total_start* is the center of rotation point which results in
-    transformation TRT^-1. The transformation is in the backward form and
-    the angle is _always_ rescaled to radians.
+    """Rotate the object by *phi* around vector *axis*, where *total_start* is the center of
+    rotation point which results in transformation TRT. The angle is _always_ rescaled to radians.
     """
     axis = normalize(axis)
 
@@ -476,36 +470,32 @@ def rotate(phi, axis, total_start=None):
         t_1 = translate(total_start)
 
     rot_matrix = np.identity(4)
-    rot_matrix[0][0] = cos + pow(v_x, 2) * (1 - cos)
+    rot_matrix[0][0] = cos + v_x ** 2 * (1 - cos)
     rot_matrix[0][1] = v_x * v_y * (1 - cos) - v_z * sin
     rot_matrix[0][2] = v_x * v_z * (1 - cos) + v_y * sin
     rot_matrix[1][0] = v_x * v_y * (1 - cos) + v_z * sin
-    rot_matrix[1][1] = cos + pow(v_y, 2) * (1 - cos)
+    rot_matrix[1][1] = cos + v_y ** 2 * (1 - cos)
     rot_matrix[1][2] = v_y * v_z * (1 - cos) - v_x * sin
     rot_matrix[2][0] = v_z * v_x * (1 - cos) - v_y * sin
     rot_matrix[2][1] = v_z * v_y * (1 - cos) + v_x * sin
-    rot_matrix[2][2] = cos + pow(v_z, 2) * (1 - cos)
+    rot_matrix[2][2] = cos + v_z ** 2 * (1 - cos)
 
     if total_start is not None:
         t_2 = translate(-total_start)
-        return np.dot(np.dot(t_2, linalg.inv(rot_matrix)), t_1)
-    else:
-        return linalg.inv(rot_matrix)
+        rot_matrix = np.dot(np.dot(t_2, rot_matrix), t_1)
 
+    return rot_matrix
 
 def scale(scale_vec):
-    """Scale the object by scaling coefficients (kx, ky, kz)
-    given by *sc_vec*. The transformation is in the backward form.
-    """
+    """Scale the object by scaling coefficients (kx, ky, kz) given by *sc_vec*."""
     if (scale_vec[0] <= 0 or scale_vec[1] <= 0 or scale_vec[2] <= 0):
         raise ValueError("All components of the scaling " +
                          "must be greater than 0")
     trans_matrix = np.identity(4)
 
-    # 1/x because of the backward fashion
-    trans_matrix[0][0] = 1.0 / scale_vec[0]
-    trans_matrix[1][1] = 1.0 / scale_vec[1]
-    trans_matrix[2][2] = 1.0 / scale_vec[2]
+    trans_matrix[0][0] = scale_vec[0]
+    trans_matrix[1][1] = scale_vec[1]
+    trans_matrix[2][2] = scale_vec[2]
 
     return trans_matrix
 
