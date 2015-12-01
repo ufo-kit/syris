@@ -58,10 +58,10 @@ class MetaBall(MovableBody):
 
         return BoundingBox(np.array(transformed) * q.m)
 
-    def _project(self, shape, pixel_size, t=0 * q.s):
+    def _project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
         self.move(t)
 
-        return project_metaballs(shape, pixel_size, self.pack())
+        return project_metaballs(shape, pixel_size, self.pack(), queue=queue, out=out)
 
     def get_transform_const(self):
         """
@@ -98,12 +98,12 @@ class MetaBalls(CompositeBody):
     def __init__(self, trajectory, metaballs, orientation=geom.Y_AX):
         super(MetaBalls, self).__init__(trajectory, orientation=orientation, bodies=metaballs)
 
-    def _project(self, shape, pixel_size, t=0 * q.s):
+    def _project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
         """Projection implementation."""
         string = ''.join([body.pack() for body in self._bodies])
 
         self.move(t)
-        return project_metaballs(shape, pixel_size, string)
+        return project_metaballs(shape, pixel_size, string, queue=queue, out=out)
 
 
 def get_moved_groups(bodies, t_0, t_1, distance):
