@@ -251,8 +251,8 @@ class Mesh(MovableBody):
             height = min(y_max_px - y_min_px, shape[0])
             offset = cl_array.vec.make_int2(x_min_px, y_min_px)
             v_1, v_2, v_3 = self._make_inputs(queue)
-            max_dx = get_magnitude(self.max_triangle_x_diff)
-            min_z = self.extrema[2][0].magnitude
+            max_dx = self.max_triangle_x_diff.rescale(q.um).magnitude
+            min_z = self.extrema[2][0].rescale(q.um).magnitude
             ps = pixel_size[0].rescale(q.um).magnitude
 
             cfg.OPENCL.programs['mesh'].compute_thickness(queue,
@@ -284,7 +284,7 @@ class Mesh(MovableBody):
         if offset is None:
             offset = gutil.make_vfloat3(0, 0, 0)
         v_1, v_2, v_3 = self._make_inputs(queue)
-        max_dx = get_magnitude(self.max_triangle_x_diff)
+        max_dx = self.max_triangle_x_diff.rescale(q.um).magnitude
         ps = pixel_size.rescale(q.um).magnitude
 
         cfg.OPENCL.programs['mesh'].compute_slices(queue,
