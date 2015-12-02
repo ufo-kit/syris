@@ -201,7 +201,7 @@ class Mesh(MovableBody):
 
     def _make_vertices(self, index):
         """Make a flat array of vertices belong to *triangles* at *index*."""
-        vertices = get_magnitude(self._current[:, index::3])
+        vertices = self._current[:, index::3]
 
         return vertices.transpose().flatten().astype(cfg.PRECISION.np_float)
 
