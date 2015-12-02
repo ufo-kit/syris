@@ -1,4 +1,5 @@
 """Bodies made from mesh."""
+import itertools
 import re
 import numpy as np
 import pyopencl as cl
@@ -341,3 +342,17 @@ def read_blender_obj(filename, objects=None):
         i += 1
 
     return triangles
+
+
+def make_cube():
+    """Create a cube triangle mesh from -1 to 1 m in all dimensions."""
+    seed = (-1, 1)
+    points = list(itertools.product(seed, seed, seed))
+    points = np.array(zip(*points)).reshape(3, 8)
+    indices = [0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7]
+    triangles = points[:, indices]
+    for i in range(1, 3):
+        shifted = np.roll(points, i, axis=0)[:, indices]
+        triangles = np.concatenate((triangles, shifted), axis=1)
+
+    return triangles * q.m
