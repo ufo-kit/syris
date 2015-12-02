@@ -154,7 +154,7 @@ def process(args, device_index):
     tr = Trajectory([(0, 0, 0)] * q.um)
     mesh = Mesh(tri, tr, center='bbox', iterations=2)
 
-    fov = max([ends[1] - ends[0] for ends in mesh.extrema[1:]]) * 1.1
+    fov = max([ends[1] - ends[0] for ends in mesh.extrema[:-1]]) * 1.1
     n = int(np.ceil((fov / args.pixel_size).simplified.magnitude))
     shape = (n, n)
 
