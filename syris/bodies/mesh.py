@@ -23,40 +23,41 @@ class Mesh(MovableBody):
 
     then A, B, C are one triangle's points. *iterations* are the number of iterations within one
     pixel which try to find an intersection. *center* determines the center of the local
-    coordinates, it can be one of 'bbox', 'gravity' or a (z, y, x) tuple specifying an arbitrary
-    point.
+    coordinates, it can be one of None, 'bbox', 'gravity' or a (x, y, z) tuple specifying an
+    arbitrary point.
     """
 
     def __init__(self, triangles, trajectory, material=None, orientation=geom.Y_AX, iterations=1,
-                 center=None):
+                 center='bbox'):
         """Constructor."""
         super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
         # Use homogeneous coordinates for easy matrix multiplication, i.e. the 4-th element is 1
         self._current = np.insert(triangles.rescale(q.um).magnitude, 3, np.ones(triangles.shape[1]), axis=0)
-        if center is not None:
-            if center == 'gravity':
-                point = self.center_of_gravity
-            elif center == 'bbox':
-                point = self.center_of_bbox
-            else:
-                # Arbitrary point
-                point = center
-            point = np.insert(point.rescale(q.um).magnitude[::-1], 3, 0)[:, np.newaxis]
-            self._current -= point
+        if center is None:
+            point = (0, 0, 0) * q.um
+        elif center == 'gravity':
+            point = self.center_of_gravity
+        elif center == 'bbox':
+            point = self.center_of_bbox
+        else:
+            # Arbitrary point
+            point = center
+        point = np.insert(point.rescale(q.um).magnitude, 3, 0)[:, np.newaxis]
+        self._current -= point
+
         self._triangles = np.copy(self._current)
-        points = triangles - self.center_of_gravity[::-1][:, np.newaxis]
-        self._furthest_point = np.max(np.sqrt(np.sum(points ** 2, axis=0)))
+        self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
         self.iterations = iterations
 
     @property
     def furthest_point(self):
         """Furthest point from the center."""
-        return self._furthest_point
+        return self._furthest_point * q.um
 
     @property
     def bounding_box(self):
         """Bounding box implementation."""
-        z, y, x = self.extrema
+        x, y, z = self.extrema
 
         return geom.BoundingBox(geom.make_points(x, y, z))
 
@@ -68,14 +69,14 @@ class Mesh(MovableBody):
     @property
     def extrema(self):
         """Mesh extrema as ((z_min, z_max), (y_min, y_max), (x_min, x_max))."""
-        return ((self._compute(min, 2), self._compute(max, 2)),
+        return ((self._compute(min, 0), self._compute(max, 0)),
                 (self._compute(min, 1), self._compute(max, 1)),
-                (self._compute(min, 0), self._compute(max, 0))) * q.um
+                (self._compute(min, 2), self._compute(max, 2))) * q.um
 
     @property
     def center_of_gravity(self):
         """Get body's center of gravity as (z, y, x)."""
-        center = (self._compute(np.mean, 2), self._compute(np.mean, 1), self._compute(np.mean, 0))
+        center = (self._compute(np.mean, 0), self._compute(np.mean, 1), self._compute(np.mean, 2))
 
         return np.array(center) * q.um
 
@@ -99,9 +100,9 @@ class Mesh(MovableBody):
         y_diff = self._compute(func, 1)
         z_diff = self._compute(func, 2)
 
-        return ((min_nonzero(z_diff), max_nonzero(z_diff)),
+        return ((min_nonzero(x_diff), max_nonzero(x_diff)),
                 (min_nonzero(y_diff), max_nonzero(y_diff)),
-                (min_nonzero(x_diff), max_nonzero(x_diff))) * q.um
+                (min_nonzero(z_diff), max_nonzero(z_diff))) * q.um
 
     @property
     def vectors(self):
@@ -114,7 +115,7 @@ class Mesh(MovableBody):
         v_0 = (b - a).transpose()
         v_1 = (c - a).transpose()
 
-        return v_0, v_1
+        return v_0 * q.um, v_1 * q.um
 
     @property
     def areas(self):
@@ -122,14 +123,14 @@ class Mesh(MovableBody):
         v_0, v_1 = self.vectors
         cross = np.cross(v_0, v_1)
 
-        return np.sqrt(np.sum(cross * cross, axis=1)) / 2
+        return np.sqrt(np.sum(cross * cross, axis=1)) / 2 * q.um ** 2
 
     @property
     def normals(self):
         """Triangle normals."""
         v_0, v_1 = self.vectors
 
-        return np.cross(v_0, v_1)
+        return np.cross(v_0, v_1) * q.um
 
     @property
     def max_triangle_x_diff(self):
@@ -141,7 +142,12 @@ class Mesh(MovableBody):
         d_1 = np.max(np.abs(x_1 - x_2))
         d_2 = np.max(np.abs(x_2 - x_1))
 
-        return max(d_0, d_1, d_2)
+        return max(d_0, d_1, d_2) * q.um
+
+    @property
+    def triangles(self):
+        """Return current triangle mesh."""
+        return self._current[:-1, :] * q.um
 
     def sort(self):
         """Sort triangles based on the greatest x-coordinate in an ascending order. Also sort
@@ -169,26 +175,24 @@ class Mesh(MovableBody):
         # Sort the triangles among each other
         self._current = self._current[:, indices]
 
-    def get_degenerate_triangles(self, matrix, eps=1e-3, scale=None, offset=None):
-        """Get triangles which are close to be parallel with the ray in z-direction. *matrix* is the
-        transformation matrix applied to triangles, *eps* is the tolerance for the angle between a
-        triangle and the ray to be still considered parallel in degrees. If *scale* and *offset* are
-        provided, pixel indices are returned instead of real triangle coordinates.
+    def get_degenerate_triangles(self, eps=1e-3 * q.deg):
+        """Get triangles which are close to be parallel with the ray in z-direction based on the
+        current transformation matrix. *eps* is the tolerance for the angle between a triangle and
+        the ray to be still considered parallel.
         """
-        ray = np.array([0, 0, 1, 1])
-        ray = np.dot(matrix, ray)[:-1]
+        ray = np.array([0, 0, 1]) * q.um
         dot = np.sqrt(np.sum(self.normals ** 2, axis=1))
-        theta = np.rad2deg(np.arccos(np.dot(self.normals, ray) / dot))
-        diff = np.abs(theta - 90)
+        theta = np.arccos(np.dot(self.normals, ray) / dot)
+        diff = np.abs(theta - np.pi / 2 * q.rad)
         indices = np.where(diff < eps)[0]
-        close = np.dot(matrix, self._current[:, 3 * indices])
-        if scale is not None and offset is not None:
-            offset = np.array(offset)[:, np.newaxis]
-            scale = np.array(scale)[:, np.newaxis]
-            close[:-1, :] = (close[:-1, :] + 0.5 * scale - offset) / scale
-            close = np.round(close).astype(np.int)
 
-        return close
+        # Stretch to vertex indices
+        t_indices = np.empty(3 * len(indices), dtype=np.int)
+        for i in range(3):
+            t_indices[i::3] = 3 * indices + i
+        close = self._current[:-1, t_indices]
+
+        return close * q.um
 
     def _compute(self, func, axis):
         """General function for computations with triangles."""
@@ -210,7 +214,6 @@ class Mesh(MovableBody):
 
     def transform(self):
         """Apply transformation *matrix* and return the resulting triangles."""
-        # TODO: drop the inversion from MovableBody
         matrix = self.get_rescaled_transform_matrix(q.um)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
@@ -218,7 +221,7 @@ class Mesh(MovableBody):
         """Projection implementation."""
         def get_crop(index, fov):
             minimum = max(self.extrema[index][0], 0 * q.um)
-            maximum = min(self.extrema[index][1], fov[index - 1])
+            maximum = min(self.extrema[index][1], fov[::-1][index])
 
             return minimum, maximum
 
@@ -234,10 +237,10 @@ class Mesh(MovableBody):
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
 
-        if (self.extrema[2][0] < fov[1] and self.extrema[2][1] > 0 * q.um and
+        if (self.extrema[0][0] < fov[1] and self.extrema[0][1] > 0 * q.um and
             self.extrema[1][0] < fov[0] and self.extrema[1][1] > 0 * q.um):
             # Object inside FOV
-            x_min, x_max = get_crop(2, fov)
+            x_min, x_max = get_crop(0, fov)
             y_min, y_max = get_crop(1, fov)
             x_min_px = get_px_value(x_min, np.floor, pixel_size[1])
             x_max_px = get_px_value(x_max, np.ceil, pixel_size[1])
@@ -248,7 +251,7 @@ class Mesh(MovableBody):
             offset = cl_array.vec.make_int2(x_min_px, y_min_px)
             v_1, v_2, v_3 = self._make_inputs(queue)
             max_dx = get_magnitude(self.max_triangle_x_diff)
-            min_z = self.extrema[0][0].magnitude
+            min_z = self.extrema[2][0].magnitude
             ps = pixel_size[0].rescale(q.um).magnitude
 
             cfg.OPENCL.programs['mesh'].compute_thickness(queue,
