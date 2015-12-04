@@ -1,9 +1,13 @@
+"""Trajectory and motion example."""
+import argparse
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
 import syris
+import scipy.misc
 from syris.geometry import Trajectory
-from syris.graphicalobjects import MetaBall
+from syris.bodies.isosurfaces import MetaBall
 
 
 def make_triangle(n=128):
@@ -31,6 +35,16 @@ def make_circle(n=128):
     return zip(x, y, z) * q.mm
 
 
+def make_sine(n=128, x_ends=(0, 1) * q.mm, y_ends=(0, 1) * q.mm):
+    t = np.linspace(0, 2 * np.pi, n)
+    x = np.linspace(x_ends[0], x_ends[1], n)
+    amplitude = (y_ends[1] - y_ends[0]) / 2
+    y = (1 + np.sin(t)) * amplitude + y_ends[0]
+    z = np.zeros(n)
+
+    return zip(x.rescale(q.mm), y.rescale(q.mm), z) * q.mm
+
+
 def get_ds(points):
     d_points = np.gradient(points)[1]
 
@@ -49,6 +63,20 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
 
     times = times * q.s
     points = np.array(zip(*[obj.trajectory.get_point(tt).rescale(q.um).magnitude for tt in times]))
+    dt = np.gradient(times)
+
+    plt.figure()
+    plt.plot(get_ds(points))
+    plt.title('ds')
+
+    plt.figure()
+    plt.plot(dt)
+    plt.title('dt')
+
+    plt.figure()
+    plt.plot(get_ds(points) / dt * 1e-3)
+    plt.title('Speed [mm / s]')
+    plt.ylim(0, 2)
 
     if do_plot:
         d_points = np.abs(np.gradient(points)[1])
@@ -65,14 +93,27 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
     return times, points
 
 
+def create_sample(n, ps, radius=None):
+    """Crete a metaball with a sine trajectory."""
+    fov = n * ps
+    if radius is None:
+        radius = n / 16 * ps
+    cp = make_sine(n=32, x_ends=(radius, fov - radius), y_ends=(n / 4 * ps, 3 * n / 4 * ps))
+    tr = Trajectory(cp, velocity=1 * q.mm / q.s)
+    mb = MetaBall(tr, radius)
+
+    return mb
+
+
 def main():
+    """main"""
+    args = parse_args()
     n = 256
     ps = 10 * q.um
     syris.init()
 
-    cp = make_triangle(n=32)
-    tr = Trajectory(cp, velocity=1 * q.mm / q.s)
-    mb = MetaBall(tr, n / 4 * ps)
+    mb = create_sample(n, ps)
+    tr = mb.trajectory
     print 'Length: {}, time: {}'.format(tr.length.rescale(q.mm), tr.time)
 
     plt.figure()
@@ -80,7 +121,23 @@ def main():
     plt.title('Trajectory')
     times, points = get_diffs(mb, ps)
 
+    if args.output is not None:
+        if not os.path.exists(args.output):
+            os.makedirs(args.output, mode=0o755)
+        for i, t in enumerate(times):
+            mb.clear_transformation()
+            proj = mb.project((n, n), ps, t=t).get()
+            scipy.misc.imsave(os.path.join(args.output, 'projection_{:>04}.tif'.format(i)), proj)
+
     plt.show()
+
+
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output', type=str, help='Output directory for moving objects.')
+
+    return parser.parse_args()
 
 
 if __name__ == '__main__':
