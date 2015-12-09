@@ -105,7 +105,7 @@ def propagate(samples, shape, energies, distance, pixel_size, region=None, apply
     """
     if queue is None:
         queue = cfg.OPENCL.queue
-    if plan is None:
+    if plan is None and distance != 0 * q.m:
         plan = Plan(shape, queue=queue)
     u = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
     intensity = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
@@ -114,14 +114,15 @@ def propagate(samples, shape, energies, distance, pixel_size, region=None, apply
     for energy in energies:
         u.fill(1)
         lam = energy_to_wavelength(energy)
-        propagator = compute_propagator(u.shape[0], distance, lam, pixel_size, region=region,
-                                        apply_phase_factor=apply_phase_factor,
-                                        mollified=mollified, queue=queue)
         for sample in samples:
             u *= sample.transfer(shape, pixel_size, energy, queue=queue, out=out, t=t)
-        fft_2(u.data, plan, wait_for_finish=True)
-        u *= propagator
-        ifft_2(u.data, plan, wait_for_finish=True)
+        if distance != 0 * q.m:
+            propagator = compute_propagator(u.shape[0], distance, lam, pixel_size, region=region,
+                                            apply_phase_factor=apply_phase_factor,
+                                            mollified=mollified, queue=queue)
+            fft_2(u.data, plan, wait_for_finish=True)
+            u *= propagator
+            ifft_2(u.data, plan, wait_for_finish=True)
         intensity += abs(u) ** 2
 
     return intensity
