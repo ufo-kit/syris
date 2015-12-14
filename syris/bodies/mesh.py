@@ -230,7 +230,6 @@ class Mesh(MovableBody):
             return int(round_func(get_magnitude(value / ps)))
 
         # Move to the desired location, apply the T matrix and resort the triangles
-        # self.move(t)
         self.transform()
         self.sort()
 

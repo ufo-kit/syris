@@ -68,6 +68,17 @@ class MovableBody(Body):
         # body's trajectory
         self._distance_tck = None
 
+    def project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
+        """Project thickness at time *t* (if it is None no transformation is applied) to the image
+        plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
+        *pixel_size* is the point size, also either 1D or 2D. *queue* is an OpenCL command queue,
+        *out* is the pyopencl array used for result.
+        """
+        if t is not None:
+            self.move(t)
+
+        return super(MovableBody, self).project(shape, pixel_size, t=t, queue=queue, out=None)
+
     @property
     def furthest_point(self):
         """
