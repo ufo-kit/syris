@@ -223,6 +223,26 @@ def make_vcomplex(value):
     return make_vfloat2(value.real, value.imag)
 
 
+def get_host(data, queue=None):
+    """Get *data* as numpy.ndarray."""
+    if not queue:
+        queue = cfg.OPENCL.queue
+
+    if isinstance(data, cl_array.Array):
+        result = data.get()
+    elif isinstance(data, np.ndarray):
+        result = data
+    elif isinstance(data, cl.Image):
+        result = np.empty(data.shape[::-1], np.float32)
+        cl.enqueue_copy(queue, result, data, origin=(0, 0), region=result.shape[::-1])
+        if result.dtype != cfg.PRECISION.np_float:
+            result = result.astype(cfg.PRECISION.np_float)
+    else:
+        raise TypeError('Unsupported data type {}'.format(type(data)))
+
+    return result
+
+
 def get_array(data, queue=None):
     """Get pyopencl.array.Array from *data* which can be a numpy array, a pyopencl.array.Array or a
     pyopencl.Image. *queue* is an OpenCL command queue.
