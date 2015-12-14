@@ -131,7 +131,7 @@ class Camera(object):
         # Shot noise
         # Adjust dark current for later binning and gain
         dark = float(self.dark_current) / self.gain / self._bin_factor[0] / self._bin_factor[1]
-        electrons = dark + photons * self.exp_time.rescale(q.s).magnitude
+        electrons = dark + photons
         if shot_noise:
             electrons = np.random.poisson(electrons)
 
