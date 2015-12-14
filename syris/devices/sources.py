@@ -125,7 +125,7 @@ class BendingMagnet(OpticalElement):
         if self.trajectory:
             t = self.trajectory.get_next_time_from_distance(t_0, distance)
         else:
-            t = None
+            t = np.inf * q.s
 
         return t
 
