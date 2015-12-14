@@ -17,8 +17,10 @@ class Detector(object):
     def pixel_size(self):
         return self.camera.pixel_size.simplified / self.lens.magnification
 
-    def get_visible_attenuation(self, wavelengths):
+    def get_visible_attenuation(self, wavelengths=None):
         """Get the attenuation coefficient for visible light *wavelengths* [dimensionless]."""
+        if wavelengths is None:
+            wavelengths = self.camera.wavelengths
         if len(wavelengths) < 2:
             raise ValueError('Wavelengths must contain at least two values')
         d_lam = wavelengths[1] - wavelengths[0]
@@ -30,8 +32,10 @@ class Detector(object):
 
         return coeff * self.lens.transmission_eff * coll
 
-    def convert(self, photons, energy, wavelengths):
+    def convert(self, photons, energy, wavelengths=None):
         """Convert X-ray *photons* at *energy* to visible light photons with *wavelengths*."""
+        if wavelengths is None:
+            wavelengths = self.camera.wavelengths
         x_to_vis = self.scintillator.get_conversion_factor(energy).magnitude
         vis = self.get_visible_attenuation(wavelengths).magnitude
 
