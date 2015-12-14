@@ -171,6 +171,7 @@ class MovableBody(Body):
 
     def move(self, abs_time):
         """Move to a position of the body in time *abs_time*."""
+        self.clear_transformation()
         abs_time = abs_time.simplified
         p_0 = self.trajectory.get_point(abs_time).simplified
         vec = self.trajectory.get_direction(abs_time)
