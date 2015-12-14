@@ -81,6 +81,10 @@ class Camera(object):
         self._fps = fps
 
     @property
+    def wavelengths(self):
+        return self._wavelengths
+
+    @property
     def exp_time(self):
         return self._exp_time
 
