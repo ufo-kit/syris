@@ -373,7 +373,7 @@ class CompositeBody(MovableBody):
             if self.moved(t_0, current_time, distance):
                 return current_time
 
-        return None
+        return np.inf * q.s
 
     def moved(self, t_0, t_1, distance):
         """Return True if the body moves between time *t_0* and *t_1* more than *distance*. We need
