@@ -43,17 +43,26 @@ class TestGPUUtil(SyrisTest):
             types += [np.dtype('c8'), np.dtype('c16')]
             for dtype in types:
                 np_data = np.arange(shape[0] * shape[1]).reshape(shape).astype(dtype)
-                # numpy -> Array
+                # host -> Array
                 cl_data = gu.get_array(np_data)
                 np.testing.assert_equal(np_data, cl_data.get())
                 # Array -> Array
                 res = gu.get_array(cl_data)
                 np.testing.assert_equal(res.get(), cl_data.get())
+                # Array -> host
+                host_data = gu.get_host(cl_data)
+                np.testing.assert_equal(np_data, host_data)
+                # host -> host
+                host_data = gu.get_host(np_data)
+                np.testing.assert_equal(np_data, host_data)
                 if dtype.kind != 'c':
                     # numpy -> Image and Image -> Array
                     image = gu.get_image(np_data)
                     back = gu.get_array(image).get()
                     np.testing.assert_equal(back, np_data)
+                    # Image -> host
+                    host_data = gu.get_host(image)
+                    np.testing.assert_equal(host_data, np_data)
                     # Array -> Image
                     image = gu.get_image(cl_data)
                     back = gu.get_array(image).get()
