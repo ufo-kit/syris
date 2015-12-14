@@ -375,15 +375,16 @@ class CompositeBody(MovableBody):
         # given one because the combination of body movements might
         # exceed the distance if the motion of bodies adds up
         # constructively.
-        if self._dt is None:
-            # Initialize
-            dts = [body.get_maximum_dt(distance / len(self.all_bodies))
-                   for body in self.all_bodies if body.trajectory.length > 0 * q.m]
-            self._dt = np.min(dts) * q.s
+        if t_0 != np.inf * q.s:
+            if self._dt is None:
+                # Initialize
+                dts = [body.get_maximum_dt(distance / len(self.all_bodies))
+                       for body in self.all_bodies if body.trajectory.length > 0 * q.m]
+                self._dt = np.min(dts) * q.s
 
-        for current_time in np.arange(t_0, self.time + self._dt, self._dt) * q.s:
-            if self.moved(t_0, current_time, distance):
-                return current_time
+            for current_time in np.arange(t_0, self.time + self._dt, self._dt) * q.s:
+                if self.moved(t_0, current_time, distance):
+                    return current_time
 
         return np.inf * q.s
 
