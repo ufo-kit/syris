@@ -333,9 +333,6 @@ class Trajectory(object):
         typically the pixel size. *furthest_point* is taken into account for rotational
         displacement.
         """
-        if t_0 is None:
-            return None
-
         points = self.get_distances(furthest_point)
         # Use the same parameter so the derivatives are equal
         distance_tck = interp.splprep(points, u=self.parameter, s=0)[0]
