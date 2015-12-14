@@ -27,9 +27,9 @@ def check_distances(body, distance, decimal_points=3):
     max_distances = []
     while t_0 <= body.trajectory.time:
         t_1 = body.get_next_time(t_0, distance)
-        if t_1 is None:
+        if t_1 == np.inf * q.s:
             break
-        if t_0 is not None and t_1 is not None:
+        if t_0 != np.inf * q.s and t_1 != np.inf * q.s:
             diff = np.abs(body.trajectory.get_point(t_1) - body.trajectory.get_point(t_0))
             max_distances.append(np.max(diff).magnitude)
         t_0 = t_1
@@ -271,7 +271,7 @@ class TestBodies(SyrisTest):
         distance = 1000 * q.mm
         while True:
             t_1 = comp.get_next_time(t_0, distance)
-            if t_1 is None:
+            if t_1 == np.inf * q.s:
                 break
 
             pos_0 = move_and_get_position(comp, ball, t_0)
