@@ -323,7 +323,8 @@ class Trajectory(object):
         roots = interp.sproot(shifted_tck, mest=100)
 
         if len(roots) == 0:
-            return None
+            return np.inf * q.s
+
         return smath.supremum(t_0.simplified.magnitude, roots)
 
     def get_next_time_from_distance(self, t_0, distance, furthest_point=None):
@@ -378,8 +379,6 @@ class Trajectory(object):
         # is a time in the future for which the trajectory moves
         # the associated object more than *distance*.
         closest_time = smath.supremum(t_0.simplified.magnitude, [t_1, t_2])
-        if closest_time == np.inf:
-            return None
 
         return closest_time * q.s
 
