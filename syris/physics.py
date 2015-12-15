@@ -120,9 +120,9 @@ def propagate(samples, shape, energies, distance, pixel_size, region=None, apply
             propagator = compute_propagator(u.shape[0], distance, lam, pixel_size, region=region,
                                             apply_phase_factor=apply_phase_factor,
                                             mollified=mollified, queue=queue)
-            fft_2(u.data, plan, wait_for_finish=True)
+            fft_2(u, plan, wait_for_finish=True)
             u *= propagator
-            ifft_2(u.data, plan, wait_for_finish=True)
+            ifft_2(u, plan, wait_for_finish=True)
         if detector:
             intensity += detector.convert(abs(u) ** 2, energy)
         else:

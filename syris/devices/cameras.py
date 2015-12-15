@@ -141,9 +141,9 @@ class Camera(object):
             if self._psf is None:
                 sigma = (fwnm_to_sigma(self._bin_factor[0]), fwnm_to_sigma(self._bin_factor[1]))
                 self._psf = get_gauss_2d(photons.shape, sigma, fourier=True)
-            fft_2(electrons.data, plan, wait_for_finish=True)
+            fft_2(electrons, plan, wait_for_finish=True)
             electrons = electrons * self._psf
-            ifft_2(electrons.data, plan, wait_for_finish=True)
+            ifft_2(electrons, plan, wait_for_finish=True)
             electrons = electrons.real
             if self._bin_factor == (1, 1):
                 electrons = electrons.get()

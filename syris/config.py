@@ -54,6 +54,8 @@ class OpenCL(object):
                          'physics': None,
                          'geometry': None,
                          'mesh': None}
+        # {command queue: {shape: plan}} dictionary
+        self.fft_plans = {}
 
 
 def init_logging(level=logging.DEBUG, logger_file=None):

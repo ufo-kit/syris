@@ -160,3 +160,18 @@ class TestGPUImageProcessing(SyrisTest):
 
         # Identity
         np.testing.assert_equal(image, ip.pad(image, (0, 0, shape[0], shape[1])).get())
+
+    def test_fft(self):
+        data = gpu_util.get_array(np.random.normal(100, 100,
+                                                   size=(4, 4)).astype(cfg.PRECISION.np_float))
+        orig = gpu_util.get_host(data)
+        data = ip.fft_2(data)
+        ip.ifft_2(data)
+        np.testing.assert_almost_equal(orig, data.get().real, decimal=4)
+
+        # With a plan
+        from pyfft.cl import Plan
+        plan = Plan((4, 4), queue=cfg.OPENCL.queue)
+        data = ip.fft_2(np.copy(orig), plan=plan)
+        ip.ifft_2(data, plan=plan)
+        np.testing.assert_almost_equal(orig, data.get().real, decimal=4)
