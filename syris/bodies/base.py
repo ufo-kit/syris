@@ -1,4 +1,5 @@
 """A base module for pysical bodies, which are optical elements having spatial extent."""
+import logging
 import numpy as np
 import quantities as q
 import syris.config as cfg
@@ -7,6 +8,9 @@ from quantities.quantity import Quantity
 from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength, transfer
 from syris.util import make_tuple
+
+
+LOG = logging.getLogger(__name__)
 
 
 class Body(OpticalElement):
@@ -46,9 +50,11 @@ class MovableBody(Body):
 
     """Class representing a movable body."""
 
-    def __init__(self, trajectory, material=None, orientation=geom.Y_AX):
+    def __init__(self, trajectory, material=None, orientation=geom.Y_AX, cache_projection=True):
         """Create a body with a :class:`~syris.geometry.Trajectory` and *orientation*,
-        which is an (x, y, z) vector specifying body's "up" vector.
+        which is an (x, y, z) vector specifying body's "up" vector. If *cache_projection* is True,
+        the projection is computed only if the object moves between the last projection time and the
+        desired time.
         """
         super(MovableBody, self).__init__(material)
         self._trajectory = trajectory
@@ -68,16 +74,61 @@ class MovableBody(Body):
         # body's trajectory
         self._distance_tck = None
 
+        self._cache_projection = cache_projection
+        self.update_projection_cache()
+
     def project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
         """Project thickness at time *t* (if it is None no transformation is applied) to the image
         plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
         *pixel_size* is the point size, also either 1D or 2D. *queue* is an OpenCL command queue,
         *out* is the pyopencl array used for result.
         """
+        pixel_size = make_tuple(pixel_size, 2)
         if t is not None:
             self.move(t)
 
-        return super(MovableBody, self).project(shape, pixel_size, t=t, queue=queue, out=None)
+        if self.cache_projection:
+            if (self._p_cache['time'] is None or np.any(self._p_cache['ps'] != pixel_size) or
+                    self._p_cache['shape'] != shape):
+                moved = True
+                self.update_projection_cache(t=t, shape=shape, pixel_size=pixel_size)
+            else:
+                # 0.99 to make sure we recompute when next_time from cached time is current t
+                moved = self.moved(min(self._p_cache['time'], t),
+                                   max(self._p_cache['time'], t), 0.99 * min(pixel_size))
+
+            if moved:
+                LOG.debug('{} computing projection at {}'.format(self, t))
+                self._p_cache['time'] = t
+                self._p_cache['projection'] = super(MovableBody, self).project(shape, pixel_size,
+                                                                               t=t, queue=queue,
+                                                                               out=None)
+            else:
+                LOG.debug('{} cached projection at {}'.format(self, t))
+            projection = self._p_cache['projection']
+        else:
+            LOG.debug('{} computing projection at {}'.format(self, t))
+            projection = super(MovableBody, self).project(shape, pixel_size, t=t,
+                                                          queue=queue, out=None)
+
+        return projection
+
+    @property
+    def cache_projection(self):
+        """Whether or not projection cache is being used."""
+        return self._cache_projection
+
+    @cache_projection.setter
+    def cache_projection(self, value):
+        """If *value* is True, cache projections for cases when the body doesn't move, otherwise
+        not.
+        """
+        self._cache_projection = value
+        self.update_projection_cache()
+
+    def update_projection_cache(self, t=None, shape=None, pixel_size=None, projection=None):
+        """Update projection cache with time *t*, *shape*, *pixel_size* and *projection*."""
+        self._p_cache = {'time': t, 'shape': shape, 'ps': pixel_size, 'projection': projection}
 
     @property
     def furthest_point(self):
