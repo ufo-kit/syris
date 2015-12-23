@@ -123,7 +123,7 @@ class BendingMagnet(OpticalElement):
     def get_next_time(self, t_0, distance):
         """Get the next time when the source will have moved more than *distance*."""
         if self.trajectory:
-            t = self.trajectory.get_next_time_from_distance(t_0, distance)
+            t = self.trajectory.get_next_time(t_0)
         else:
             t = np.inf * q.s
 
