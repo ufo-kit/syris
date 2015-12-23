@@ -25,11 +25,11 @@ class MetaBall(MovableBody):
 
     def __init__(self, trajectory, radius, material=None, orientation=geom.Y_AX):
         """Create a metaball with *radius*."""
-        super(MetaBall, self).__init__(trajectory, material=material, orientation=orientation)
         if radius <= 0:
             raise ValueError("Radius must be greater than zero.")
 
         self._radius = radius.simplified
+        super(MetaBall, self).__init__(trajectory, material=material, orientation=orientation)
 
     @property
     def radius(self):

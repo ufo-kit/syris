@@ -31,7 +31,6 @@ class Mesh(MovableBody):
     def __init__(self, triangles, trajectory, material=None, orientation=geom.Y_AX, iterations=1,
                  center='bbox'):
         """Constructor."""
-        super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
         # Use homogeneous coordinates for easy matrix multiplication, i.e. the 4-th element is 1
         self._current = np.insert(triangles.rescale(q.um).magnitude, 3, np.ones(triangles.shape[1]), axis=0)
         if center is None:
@@ -49,6 +48,7 @@ class Mesh(MovableBody):
         self._triangles = np.copy(self._current)
         self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
         self.iterations = iterations
+        super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
     @property
     def furthest_point(self):
