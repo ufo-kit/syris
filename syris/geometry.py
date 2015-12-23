@@ -657,7 +657,7 @@ def get_rotation_displacement(d_0, d_1, length):
     *length*. The *d_0* and *d_1* are the tangents at different
     points.
     """
-    return np.abs(length * np.sin(np.arctan(d_1) - np.arctan(d_0)))
+    return np.abs(length * (normalize(d_1) - normalize(d_0)))
 
 
 def make_points(x_ends, y_ends, z_ends):
