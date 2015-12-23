@@ -85,13 +85,9 @@ class TestBodies(SyrisTest):
         self.pixel_size = 1 * q.um
 
         control_points = get_linear_points(geom.X, start=(1, 1, 1))
-
         traj = Trajectory(control_points, velocity=1 * q.mm / q.s)
         self.metaball = MetaBall(traj, 1 * q.mm)
-
-        self.metaball_2 = MetaBall(
-            Trajectory(get_linear_points(geom.Z)), 2 * q.mm)
-
+        self.metaball_2 = MetaBall(Trajectory(get_linear_points(geom.Z)), 2 * q.mm)
         self.composite = CompositeBody(traj, bodies=[self.metaball, self.metaball_2])
 
     def _get_moved_bounding_box(self, body, angle):
@@ -207,12 +203,16 @@ class TestBodies(SyrisTest):
         x_points_0 = t
         y_points_0 = np.cos(t)
         z_points_0 = np.zeros(n)
-        traj_0 = Trajectory(zip(x_points_0, y_points_0, z_points_0) * q.m, velocity=1 * q.m / q.s)
+        points = zip(x_points_0, y_points_0, z_points_0) * q.m
+        traj_0 = Trajectory(points, pixel_size=10 * q.mm, furthest_point=1 * q.mm,
+                            velocity=1 * q.m / q.s)
 
         x_points_1 = t
         y_points_1 = 1 + np.cos(t)
         z_points_1 = np.zeros(n)
-        traj_1 = Trajectory(zip(x_points_1, y_points_1, z_points_1) * q.m, velocity=1 * q.m / q.s)
+        points = zip(x_points_1, y_points_1, z_points_1) * q.m
+        traj_1 = Trajectory(points, pixel_size=10 * q.mm, furthest_point=1 * q.mm,
+                            velocity=1 * q.m / q.s)
 
         mb_0 = MetaBall(traj_0, 1 * q.m)
         mb_1 = MetaBall(traj_1, 1 * q.m)
@@ -225,6 +225,7 @@ class TestBodies(SyrisTest):
 
     def test_save_transformation_matrix(self):
         old = self.composite.transform_matrix
+        self.composite.bind_trajectory(self.pixel_size)
         self.composite.save_transformation_matrices()
 
         self.composite.move(1 * q.s)
