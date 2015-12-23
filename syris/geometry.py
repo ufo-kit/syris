@@ -118,42 +118,72 @@ class Trajectory(object):
     Trajectory is a spline interpolated from a set of points.
     """
 
-    def __init__(self, control_points, time_dist=None, velocity=None):
+    def __init__(self, control_points, pixel_size=None, furthest_point=None, time_dist=None,
+                 velocity=None, num_points=None):
         """
-        TODO: describe when you are done!
+        Construct a trajectory from *control_points* specified as [(x, y, z), ...]. Use *pixel_size*
+        to interpolate such that the trajectory doesn't move more than 1 px between two time points.
+        For this you need to specify *furthest_point* which is the furthest point from a body center
+        and it is used to compute the rotational displacement component, it can be None. You specify
+        the velocity profile by *time_dist*, which are tuples of (time, distance) or you can set
+        constant *velocity*. *num_points* is the number of points used for interpolating the spline
+        before it is used for determination of next times. If not specified, it is estimated
+        automaticaly.
         """
         self._control_points = control_points.simplified
+        self._velocity = velocity
+        self._time_dist = time_dist
+        self._pixel_size = pixel_size
+        self._furthest_point = furthest_point
+        self._num_points = num_points
 
         if time_dist is not None and velocity is not None:
-            raise ValueError("Either times and distances or velocity " +
-                             "must be given, but not both at the same time.")
+            raise ValueError("time_dist and velocity can't be specified at the same time.")
 
-        if len(self.control_points) == 1 or (time_dist is None and
-                                             velocity is None):
-            # Static trajectory or no velocity profile specified.
-            self._tck = None
-            self._u = None
-            self._points = control_points[0].simplified
-            self._length = 0 * q.m
-            self._times = self._distances = self._time_tck = None
-        else:
-            # Extract x, y, z points
-            points = zip(*control_points.simplified)
+        self._tck = None
+        self._u = None
+        self._points = control_points[0].simplified
+        self._length = 0 * q.m
+        self._times = self._distances = self._time_tck = None
 
-            # Positions
-            tck, u = interp.splprep(points, s=0)
-            self._tck, self._u = reinterpolate(tck, u, 1000)
-            self._points = np.array(interp.splev(self._u, self._tck)) * q.m
+        if len(control_points) > 1 and pixel_size is not None:
+            self.bind(pixel_size=pixel_size, furthest_point=furthest_point)
 
-            # Derivatives of the spline (x_d, y_d, z_d tuple)
+    def _interpolate(self):
+        # Extract x, y, z points
+        points = zip(*self._control_points)
+        self._tck, self._u = interp.splprep(points, s=0)
+        if self._num_points is None:
+            # Reinterpolate with so many points that the trajectory doesn't move (both
+            # translation and rotation taken into account) by more than pixel size between two
+            # consecutive parameter values
             self._derivatives = interp.splev(self._u, self._tck, der=1)
             self._length = self._get_length() * q.m
+            max_du = self.get_maximum_du()
+            coeff = max(np.gradient(self.parameter)) / max_du
+            # Use 4 times more points then approximated to try to fit the curve the best
+            n = 4 * int(np.ceil(coeff * len(self.parameter))) if coeff > 1 else len(self.parameter)
+        else:
+            n = self._num_points
 
-            # Velocity profile
-            if velocity is not None:
-                # Constant velocity
-                time_dist = get_constant_velocity(velocity, self.length / velocity)
+        LOG.debug('Using {} points for interpolation'.format(n))
 
+        # Reinterpolate based on the updated number of points
+        self._tck, self._u = reinterpolate(self._tck, self._u, n)
+        self._points = np.array(interp.splev(self._u, self._tck)) * q.m
+        self._derivatives = interp.splev(self._u, self._tck, der=1)
+        self._length = self._get_length() * q.m
+
+        # Velocity profile
+        time_dist = None
+        if self._velocity is not None:
+            # Constant velocity
+            duration = (self.length / self._velocity).simplified
+            time_dist = get_constant_velocity(self._velocity, duration)
+        elif self._time_dist is not None:
+            time_dist = self._time_dist
+
+        if time_dist is not None:
             t_0, s_0 = zip(*time_dist)
             t_0 = np.array(t_0)
             s_0 = np.array(s_0)
@@ -169,8 +199,36 @@ class Trajectory(object):
             d_units = time_dist[0][1].units
             t_0 = Quantity(t_0 * t_units).simplified.magnitude
             s_0 = Quantity(s_0 * d_units).simplified.magnitude
-            self._times, self._distances = interpolate_1d(t_0, s_0, 1000)
+            self._times, self._distances = interpolate_1d(t_0, s_0, len(self.parameter))
             self._time_tck = interp.splrep(self._times, self._distances)
+
+    def bind(self, pixel_size=None, furthest_point=None):
+        """Bind the trajectory to a *pixel_size* to make sure two positions are not more than
+        *pixel_size* apart between two time points. *furthest_point* is the furthest point from a
+        body center used to compute rotational displacement and it can be None.
+        """
+        if pixel_size is not None:
+            self._pixel_size = pixel_size
+        self._furthest_point = furthest_point
+        if self._pixel_size is None:
+            raise ValueError('Pixel size must be set either here or before')
+        self._interpolate()
+
+    @property
+    def stationary(self):
+        """Return True if the trajectory is stationary."""
+        return len(self._control_points) == 1 or (self._velocity is None and
+                                                  self._time_dist is None)
+
+    @property
+    def pixel_size(self):
+        """Pixel size for which the trajectory is interpolated."""
+        return self._pixel_size
+
+    @property
+    def furthest_point(self):
+        """Furthest point for which the trajectory is interpolated."""
+        return self._furthest_point
 
     @property
     def control_points(self):
@@ -188,6 +246,16 @@ class Trajectory(object):
         return self._length
 
     @property
+    def time_tck(self):
+        """The tck tuple of :py:func:`scipy.interpolate.splrep` for time-distance spline."""
+        return self._time_tck
+
+    @property
+    def times(self):
+        """Return the time points for which the distance is defined."""
+        return self._times * q.s
+
+    @property
     def time(self):
         """Total time needed to travel the whole trajectory."""
         if self._times is not None:
@@ -199,108 +267,122 @@ class Trajectory(object):
     def parameter(self):
         return self._u
 
-    def get_point(self, abs_time):
-        """Get a point on the trajectory at the time *abs_time*."""
+    def _evaluate(self, abs_time, der=0):
+        """Evaluate trajectory's derivative *der* at time *abs_time*."""
         if abs_time < 0:
             raise ValueError("Time cannot be negative.")
         if abs_time > self.time:
             abs_time = self.time
 
-        if self._tck is None:
-            # Stationary trajectory.
-            result = self._control_points[0]
+        if self.stationary:
+            result = np.array((0, 0, 0)) if der else self._control_points[0].magnitude
         else:
-            if self._times is None:
-                # Stationary trajectory.
-                result = self._control_points[0]
-            else:
-                result = interp.splev(self.get_parameter(abs_time), self._tck) * q.m
+            if self._tck is None:
+                raise TrajectoryError('Trajectory not bound')
+            result = interp.splev(self.get_parameter(abs_time), self._tck, der=der)
 
         return result
 
+    def get_point(self, abs_time):
+        """Get a point on the trajectory at the time *abs_time*."""
+        return self._evaluate(abs_time, der=0) * q.m
+
     def get_direction(self, abs_time, norm=True):
         """
-        Get direction of the trajectory at the time *abs_time*. It is the
-        derivative of the trajectory at *abs_time*. If *norm* is True, the
-        direction vector will be normalized.
+        Get direction of the trajectory at the time *abs_time*. It is the derivative of the
+        trajectory at *abs_time*. If *norm* is True, the direction vector will be normalized.
         """
-        if self._times is None:
-            res = np.array((0, 0, 0))
-        else:
-            res = np.array(interp.splev(self.get_parameter(abs_time),
-                                        self._tck, der=1))
-            if norm:
-                res = normalize(res)
+        direction = self._evaluate(abs_time, der=1) * q.dimensionless
+        if norm:
+            direction = normalize(direction)
 
-        return res * q.dimensionless
+        return direction
 
-    def get_distances(self, distance=None):
+    def get_distances(self, u=None, u_0=None):
         """Get the distances from the trajectory beginning to every consecutive point defined by the
-        parameter. Take into account translation and rotation of an object with the furthest point
-        from its center given by *distance*. If *distance* is None rotational component is not taken
-        into account.
+        parameter.
         """
-        points = np.array(interp.splev(self._u, self._tck))
-        initial_point = np.array(interp.splev(0, self._tck))
-        distances = points - initial_point[:, np.newaxis]
+        if self._tck is None:
+            raise TrajectoryError('Trajectory not bound')
 
-        if distance is not None:
-            angles = np.arctan(np.array(interp.splev(self._u, self._tck, der=1)))
-            initial_angle = np.arctan(np.array(interp.splev(0, self._tck, der=1)))
-            angle_diff = angles - initial_angle[:, np.newaxis]
-            # sin(phi) = dx / distance => dx = distance * sin(phi)
-            distances += distance.simplified.magnitude * np.sin(angle_diff)
+        if u is None:
+            u = self._u
+        if u_0 is None:
+            u_0 = 0
+
+        points = np.array(interp.splev(u, self._tck))
+        initial_point = np.array(interp.splev(u_0, self._tck))
+        distances = np.abs(points - initial_point[:, np.newaxis])
+
+        if self._furthest_point is not None and self._furthest_point > 0 * q.m:
+            # Trajectory with no rotational displacement
+            len_mag = self.length.simplified.magnitude
+            der = np.array(interp.splev(u, self._tck, der=1)) / len_mag
+            initial_der = np.array(interp.splev(u_0, self._tck, der=1)) / len_mag
+            d_der = np.abs(der - initial_der[:, np.newaxis])
+            distances += self._furthest_point.simplified.magnitude * d_der
 
         return distances
 
-    def get_maximum_dt(self, furthest_point, distance):
+    def get_maximum_dt(self, distance=None):
         """
-        Get the maximum time difference which moves the object no more than
-        *distance*. Consider both rotational and translational displacement,
-        when by the rotational one the *furhtest_point* is the most distant
-        point from the center of the rotation.
+        Get the maximum time difference which moves the object no more than *distance*. If distance
+        is None the pixel size this trajectory is bound to is used. Consider both rotational and
+        translational displacement.
         """
-        if self._tck is None:
-            # Stationary trajectory
+        if self.stationary:
             return None
+        elif self._tck is None:
+            raise TrajectoryError('Trajectory not bound')
+        if distance is None:
+            distance = self._pixel_size
 
-        ds = self.get_maximum_du(furthest_point, distance) * self.length.simplified.magnitude
-        # f' = ds / dt, f' = const. => dt = ds / f'
-        derivative = max(np.abs(interp.splev(self._times, self._time_tck, der=1)))
-        return ds / (derivative * self._times[-1])
+        # x(u) is the function of distance based on the parameter u. u(t) is the parameter as a
+        # function of time. We need to find the maximum dt which doesn't move the body by more than
+        # *distance*. We need to find (x(u(t)))' = dx / dt, then we set dx = *distance* and so
+        # dt = *distance* / max((x(u(t)))') is the maximum allowed dt.
+        # We compute the derivative (x(u(t)))' using the chain rule, (x(u(t)))' = x'(u(t)) * u'(t),
+        # where x'(u(t)) means evaluating the distance spline derivative at points u(t) and u'(t) is
+        # the time-distance spline derivative.
+        length = self.length.simplified.magnitude
+        distances = self.get_distances()
 
-    def get_maximum_du(self, furthest_point, distance):
+        # Create the function x(u)
+        dtck = interp.splprep(distances, u=self.parameter, s=0)[0]
+        # Evaluate x'(u(t)). The parameter is normalized to (0, 1), so rescale the real distances
+        # by the trajectory length
+        dx_ut = np.array(interp.splev(self._distances / length, dtck, der=1))
+        # Evaluate u'(t) = du / dt, but the time-distance spline yields ds / dt. Since the
+        # trajectory spline is arc-length parametrized, ds = du * length, so
+        # du / dt = ds / (length * dt)
+        du_dt = np.array(interp.splev(self._times, self._time_tck, der=1)) / length
+        # (x(u(t)))' = x'(u(t)) * u'(t)
+        max_f_der = np.max(np.abs(dx_ut * du_dt))
+        # dt = *distance* / max|(x(u(t)))'|
+        max_dt = distance.simplified.magnitude / max_f_der
+
+        return max_dt
+
+    def get_maximum_du(self, distance=None):
         """
-        Get the maximum parameter difference which moves the object no more than
-        *distance*. Consider both rotational and translational displacement,
-        when by the rotational one the *furhtest_point* is the most distant
-        point from the center of the rotation.
+        Get the maximum parameter difference which moves the object no more than *distance*. If
+        distance is None the pixel size this trajectory is bound to is used. Consider both
+        rotational and translational displacement.
         """
-        return min(self._get_translation_du(distance),
-                   self._get_rotation_du(furthest_point, distance))
+        if self.stationary:
+            return 1
+        elif self._tck is None:
+            raise TrajectoryError('Trajectory not bound')
+        if distance is None:
+            distance = self._pixel_size
 
-    def _get_translation_du(self, distance):
-        """Get the maximum du in order not to move more than *distance*."""
-        return maximum_derivative_parameter(self._tck, self._u, distance.simplified.magnitude)
+        # Get the distances as a combination of translation and rotation and find the du which
+        # doesn't move the body by more than *distance*
+        distances = self.get_distances()
+        tck = interp.splprep(distances, u=self.parameter, s=0)[0]
+        max_du = maximum_derivative_parameter(tck, self.parameter, distance.simplified.magnitude)
 
-    def _get_rotation_du(self, furthest_point, distance):
-        """
-        Get the maximum du in order not to move angularly more than *distance*.
-        *furthest_point* is the furthest point from the middle of the rotation
-        which must not move more than *distance*.
-        """
-        furthest_point = furthest_point.simplified.magnitude
-        distance = distance.simplified.magnitude
-
-        du = np.gradient(self._u)
-        max_sin = distance / furthest_point
-        derivatives = interp.splev(self._u, self._tck, der=1)
-        sines = np.array([np.abs(np.sin(np.gradient(np.arctan(der)))) for der in derivatives])
-        dim = np.argmax(sines.max(axis=1))
-        index = np.argmax(sines[dim])
-        k = max_sin / sines[dim, index]
-
-        return k * du[index]
+        return max_du
 
     def get_parameter(self, abs_time):
         """Get the spline parameter from the time *abs_time*."""
@@ -312,42 +394,29 @@ class Trajectory(object):
 
         return u
 
-    def get_next_time(self, t_0, u_0):
-        """
-        Get the next time when the trajectory parameter will be at position *u_0*.
-        There can be multiple results but only the closest one is returned.
-        """
-        t, c, k = self._time_tck
-        c = c - (self.length.magnitude * u_0)
-        shifted_tck = t, c, k
-        roots = interp.sproot(shifted_tck, mest=100)
-
-        if len(roots) == 0:
+    def get_next_time(self, t_0):
+        """Get time from *t_0* when the trajectory will have travelled more than pixel size."""
+        if self.stationary:
             return np.inf * q.s
+        elif self._tck is None:
+            raise TrajectoryError('Trajectory not bound')
 
-        return smath.supremum(t_0.simplified.magnitude, roots)
+        u_0 = self.get_parameter(t_0)
+        distances = self.get_distances(u_0=u_0)
+        # Use the same parameter for distances and trajectory so that we can directly use the
+        # parameter for time calculation. This is however an approximation and if the distance
+        # spline doesn't have enough points it can cause inaccuracies.
+        dtck = interp.splprep(distances, u=self.parameter, s=0)[0]
 
-    def get_next_time_from_distance(self, t_0, distance, furthest_point=None):
-        """
-        Get time from *t_0* when the trajectory will have travelled more than *distance*, which is
-        typically the pixel size. *furthest_point* is taken into account for rotational
-        displacement.
-        """
-        points = self.get_distances(furthest_point)
-        # Use the same parameter so the derivatives are equal
-        distance_tck = interp.splprep(points, u=self.parameter, s=0)[0]
-
-        def shift_spline(u_0, sgn):
-            t, c, k = distance_tck
-            initial_point = np.array(interp.splev(u_0, distance_tck))[:, np.newaxis]
-            c = np.array(c) - initial_point + sgn * distance.simplified.magnitude
+        def shift_spline(sgn):
+            t, c, k = dtck
+            c = np.array(c) + sgn * self._pixel_size.simplified.magnitude
 
             return t, c, k
 
         t_1 = t_2 = np.inf
-        u_0 = self.get_parameter(t_0)
-        lower_tck = shift_spline(u_0, 1)
-        upper_tck = shift_spline(u_0, -1)
+        lower_tck = shift_spline(1)
+        upper_tck = shift_spline(-1)
 
         # Get the +/- distance roots (we can traverse the trajectory backwards)
         lower = interp.sproot(lower_tck)
@@ -363,11 +432,11 @@ class Trajectory(object):
 
         # Get next time for both directions
         if smallest is not None:
-            t_1 = self.get_next_time(t_0, smallest)
+            t_1 = self._get_next_time(t_0, smallest)
             if t_1 is None:
                 t_1 = np.inf
         if greatest is not None:
-            t_2 = self.get_next_time(t_0, greatest)
+            t_2 = self._get_next_time(t_0, greatest)
             if t_2 is None:
                 t_2 = np.inf
 
@@ -378,6 +447,24 @@ class Trajectory(object):
         closest_time = smath.supremum(t_0.simplified.magnitude, [t_1, t_2])
 
         return closest_time * q.s
+
+    def _get_next_time(self, t_0, u_0):
+        """
+        Get the next time when the trajectory parameter will be at position *u_0*.
+        There can be multiple results but only the closest one is returned.
+        """
+        if self.stationary:
+            return np.inf * q.s
+
+        t, c, k = self._time_tck
+        c = c - (self.length.magnitude * u_0)
+        shifted_tck = t, c, k
+        roots = interp.sproot(shifted_tck, mest=100)
+
+        if len(roots) == 0:
+            return np.inf * q.s
+
+        return smath.supremum(t_0.simplified.magnitude, roots)
 
     def _get_length(self, param_start=0, param_end=1):
         """
@@ -392,6 +479,13 @@ class Trajectory(object):
         der_tck = interp.splrep(self._u, part(*self._derivatives))
 
         return interp.splint(param_start, param_end, der_tck)
+
+
+class TrajectoryError(Exception):
+
+    """Exceptions related to trajectory."""
+
+    pass
 
 
 def closest(values, min_value):
@@ -483,6 +577,7 @@ def rotate(phi, axis, total_start=None):
 
     return rot_matrix
 
+
 def scale(scale_vec):
     """Scale the object by scaling coefficients (kx, ky, kz) given by *sc_vec*."""
     if (scale_vec[0] <= 0 or scale_vec[1] <= 0 or scale_vec[2] <= 0):
@@ -524,20 +619,17 @@ def reinterpolate(tck, u, n):
     # First reinterpolate the arc length parameter
     u_tck = interp.splrep(np.linspace(0, 1, len(u)), u, s=0)
     new_u = interp.splev(np.linspace(0, 1, n), u_tck)
-
     x, y, z = interp.splev(new_u, tck)
+
     return interp.splprep((x, y, z), s=0)
 
 
 def maximum_derivative_parameter(tck, u, max_distance):
     """Get the maximum possible du, for which holds that dx < *max_distance*."""
-    derivatives = interp.splev(u, tck, der=1)
-    du = np.gradient(u)
-    distances = np.array([np.abs(derivative * du) for derivative in derivatives])
-    max_indices = np.argmax(distances, axis=1)
-    max_derivative = max([np.abs(derivatives[i][max_indices[i]]) for i in range(3)])
-    # The desired du is given by max_distance / f'
-    return max_distance / max_derivative
+    abs_derivatives = np.abs(np.array(interp.splev(u, tck, der=1)))
+
+    # dx / du = f', max_distance / du = f' => du = max_distance / f'
+    return max_distance / np.max(abs_derivatives)
 
 
 def derivative_fit(tck, u, max_distance):
