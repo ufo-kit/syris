@@ -136,3 +136,13 @@ class TestGeometry(SyrisTest):
         gt = list(itertools.product(x_ends.magnitude, y_ends.magnitude, z_ends.magnitude)) * q.mm
         points = geom.make_points(x_ends, y_ends, z_ends)
         np.testing.assert_equal(gt, points)
+
+    def test_get_rotation_displacement(self):
+        d_0 = np.array((0, 2, 0))
+        d_1 = np.array((1, 0, 0))
+        length = 5 * q.m
+        # 90 degrees around z moves both x and y components by the *length*
+        gt = np.array((length, length, 0)) * q.m
+
+        displ = geom.get_rotation_displacement(d_0, d_1, length)
+        np.testing.assert_equal(gt, displ)
