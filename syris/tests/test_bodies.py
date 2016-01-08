@@ -22,22 +22,6 @@ def get_control_points():
                      (1, 1, 1)]) * q.mm
 
 
-def check_distances(body, distance, decimal_points=3):
-    t_0 = 0 * q.s
-    max_distances = []
-    while t_0 <= body.trajectory.time:
-        t_1 = body.get_next_time(t_0, distance)
-        if t_1 == np.inf * q.s:
-            break
-        if t_0 != np.inf * q.s and t_1 != np.inf * q.s:
-            diff = np.abs(body.trajectory.get_point(t_1) - body.trajectory.get_point(t_0))
-            max_distances.append(np.max(diff).magnitude)
-        t_0 = t_1
-
-    distance = distance.simplified.magnitude
-    np.testing.assert_almost_equal(max_distances, distance, decimal=decimal_points)
-
-
 def test_simple():
     syris.init()
     n = 8
@@ -197,31 +181,12 @@ class TestBodies(SyrisTest):
                                        composite.bounding_box.points)
 
     def test_composite_furthest_point(self):
-        n = 100
-        t = np.linspace(0, 2 * np.pi, n)
-
-        x_points_0 = t
-        y_points_0 = np.cos(t)
-        z_points_0 = np.zeros(n)
-        points = zip(x_points_0, y_points_0, z_points_0) * q.m
-        traj_0 = Trajectory(points, pixel_size=10 * q.mm, furthest_point=1 * q.mm,
-                            velocity=1 * q.m / q.s)
-
-        x_points_1 = t
-        y_points_1 = 1 + np.cos(t)
-        z_points_1 = np.zeros(n)
-        points = zip(x_points_1, y_points_1, z_points_1) * q.m
-        traj_1 = Trajectory(points, pixel_size=10 * q.mm, furthest_point=1 * q.mm,
-                            velocity=1 * q.m / q.s)
-
-        mb_0 = MetaBall(traj_0, 1 * q.m)
-        mb_1 = MetaBall(traj_1, 1 * q.m)
+        mb_0 = MetaBall(Trajectory([(0, 0, 0)] * q.m), 1 * q.m)
+        mb_1 = MetaBall(Trajectory([(0, 0, 0)] * q.m), 2 * q.m)
         composite = CompositeBody(Trajectory([(0, 0, 0)] * q.m), bodies=[mb_0, mb_1])
 
-        # We know the maximum distance for cosine in this case, it's corresponding x and y are
-        # x = 2Pi, y = 2
-        furthest = np.sqrt(4 * np.pi ** 2 + 4) * q.m + mb_1.furthest_point
-        self.assertAlmostEqual(furthest, composite.furthest_point)
+        # Metaball's furthest point is twice the radius
+        self.assertAlmostEqual(4 * q.m, composite.furthest_point)
 
     def test_save_transformation_matrix(self):
         old = self.composite.transform_matrix
@@ -233,51 +198,72 @@ class TestBodies(SyrisTest):
 
         np.testing.assert_equal(old, self.composite.transform_matrix)
 
-    @slow
-    def test_get_displacement(self):
-        p = np.linspace(1, 10, 100)
-        x = p
-        y = p ** 2
-        z = np.zeros(len(p))
+    def test_get_distance(self):
+        n = 100
+        ps = 100 * q.mm
+        p = np.linspace(0, np.pi, n)
+        sin = np.sin(p)
+        cos = np.cos(p)
+        zeros = np.zeros(n)
 
-        traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
-        ball = MetaBall(traj, 1 * q.mm)
+        # Simple body
+        # -----------
+        traj = Trajectory(zip(cos, sin, zeros) * q.m, velocity=1 * q.m / q.s)
+        ball = MetaBall(traj, .5 * q.m)
+        ball.bind_trajectory(ps)
+        dist = ball.get_distance(0 * q.s, ball.trajectory.time)
+        # Maximum along the x axis where the body travels 2 m by translation and rotates by 180
+        # degrees compared to position at t0, so the rotational displacement is 2 * furthest point,
+        # in this case 2 m, so altogether 4 m
+        self.assertAlmostEqual(dist.simplified.magnitude, 4)
 
-        check_distances(ball, 100 * q.mm, 3)
+        # Composite body
+        # --------------
+        traj_m = Trajectory([(0, 0, 0)] * q.m)
+        ball = MetaBall(traj_m, .5 * q.m)
+        comp = CompositeBody(traj, bodies=[ball])
+        comp.bind_trajectory(ps)
+
+        d = comp.get_distance(0 * q.s, comp.time).simplified.magnitude
+        # 2 by translation and 180 degrees means 2 * furthest
+        gt = 2 * ball.furthest_point.simplified.magnitude + 2
+        self.assertAlmostEqual(gt, d, places=4)
+
+        d = comp.get_distance(0 * q.s, comp.time / 2).simplified.magnitude
+        # 1 by translation by either x or y and sqrt(2) * furthest by rotation
+        gt = 1 + comp.furthest_point.simplified.magnitude * np.sqrt(2)
+        self.assertAlmostEqual(gt, d, places=4)
 
     @slow
     def test_get_next_time(self):
-        def move_and_get_position(composite, primitive, abs_time):
-            composite.clear_transformation()
-            composite.move(abs_time)
-
-            return primitive.position
-
         n = 100
+        ps = 100 * q.mm
+        psm = ps.simplified.magnitude
         p = np.linspace(0, np.pi, n)
-        x = np.cos(p)
-        y = np.sin(p)
-        z = np.zeros(n)
-        x_m = 1 + p
+        sin = np.sin(p) * 1e-3
+        cos = np.cos(p) * 1e-3
+        zeros = np.zeros(n)
 
-        y_m = np.zeros(n)
-        z_m = np.zeros(n)
-        traj_m = Trajectory(zip(x_m, y_m, z_m) * q.m, velocity=1 * q.m / q.s)
-        ball = MetaBall(traj_m, 1 * q.mm)
+        traj_m_0 = Trajectory(zip(p * 1e-3, zeros, zeros) * q.m, velocity=1 * q.mm / q.s)
+        traj_m_1 = Trajectory([(0, 0, 0)] * q.m)
+        ball_0 = MetaBall(traj_m_0, .5 * q.m)
+        ball_1 = MetaBall(traj_m_1, .5 * q.m)
+        traj = Trajectory(zip(cos, sin, zeros) * q.m, velocity=1 * q.mm / q.s)
+        comp = CompositeBody(traj, bodies=[ball_0, ball_1])
+        dt = comp.get_maximum_dt(ps)
 
-        traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s)
+        # Normal trajectories
+        # Test the beginning, middle and end because of time complexity
+        for t_0 in [0 * q.s, comp.time / 2, comp.time - 10 * dt]:
+            t_1 = comp.get_next_time(t_0, ps)
+
+            d = comp.get_distance(t_0, t_1).simplified.magnitude
+            np.testing.assert_almost_equal(psm, d)
+
+        # Trajectories which sum up to no movement
+        traj_m = Trajectory(zip(zeros, -p, zeros) * q.m, velocity=1 * q.mm / q.s)
+        ball = MetaBall(traj_m, .5 * q.m)
+        traj = Trajectory(zip(p, zeros, zeros) * q.m, velocity=1 * q.mm / q.s)
         comp = CompositeBody(traj, bodies=[ball])
 
-        t_0 = 0 * q.s
-        distance = 1000 * q.mm
-        while True:
-            t_1 = comp.get_next_time(t_0, distance)
-            if t_1 == np.inf * q.s:
-                break
-
-            pos_0 = move_and_get_position(comp, ball, t_0)
-            pos_1 = move_and_get_position(comp, ball, t_1)
-            diff = np.round(np.max(np.abs(pos_1 - pos_0)).rescale(q.mm) / distance)
-            # distance represents a pixel, thus we must less than
-            self.assertLessEqual(diff, 1)
-            t_0 = t_1
+        self.assertEqual(np.inf * q.s, comp.get_next_time(0 * q.s, ps))
