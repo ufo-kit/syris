@@ -326,8 +326,8 @@ class Trajectory(object):
             len_mag = self.length.simplified.magnitude
             der = np.array(interp.splev(u, self._tck, der=1)) / len_mag
             initial_der = np.array(interp.splev(u_0, self._tck, der=1)) / len_mag
-            d_der = np.abs(der - initial_der[:, np.newaxis])
-            distances += self._furthest_point.simplified.magnitude * d_der
+            distances += get_rotation_displacement(der, initial_der,
+                                                   self._furthest_point).simplified.magnitude
 
         return distances
 
@@ -669,11 +669,39 @@ def get_constant_velocity(v_0, duration):
 
 def get_rotation_displacement(d_0, d_1, length):
     """
-    Return the displacement cause by rotation of a vector of some
-    *length*. The *d_0* and *d_1* are the tangents at different
-    points.
+    Return the displacement of a sphere with radius *length* caused by rotation around vectors *d_0*
+    and *d_1*. The displacement is returned for every axis (x, y, z).
     """
-    return np.abs(length * (normalize(d_1) - normalize(d_0)))
+    # return np.abs(length * (normalize(d_1) - normalize(d_0)))
+    def get_displacement(axis, rot_axis, phi):
+        """
+        We first determine the local maximum rotation displacement in the plane parallel to the
+        rotation plane (perpendicular to the rotation axis *rot_axis*, i.e. we work in local
+        coordinates). We obtain the maximum when *phi* / 2 is aligned with an axis perpendicular to
+        the *axis* we are interested in. We compute half of the local principal displacement (it is
+        the displacement in one of the local principal axes direction) as the sine of the angle
+        multiplied by the *length*, then we multiply by 2 to get the other half of the displacement.
+        At the end we need to take into account that we have thus far worked with local principal
+        axes (aligned with respect to *rot_axis*) and need to transform the displacement to the
+        global coordinate system. This is obtained by taking the sine of the rotation axis and the
+        principal axis angle and multiplying with the local displacement.
+        """
+        axis_sin = np.sin(angle(axis, rot_axis).rescale(q.rad).magnitude)
+        # print axis
+        # print rot_axis
+        # print axis_sin, 'axis sin'
+        # print phi, 'phi'
+
+        return np.abs(axis_sin * 2 * get_magnitude(length) * np.sin(phi / 2))
+
+    phi = angle(d_0, d_1)
+    rot_axis = np.cross(d_0, d_1, axis=0) * q.dimensionless
+
+    dx = get_displacement(AXES[X], rot_axis, phi)
+    dy = get_displacement(AXES[Y], rot_axis, phi)
+    dz = get_displacement(AXES[Z], rot_axis, phi)
+
+    return (dx, dy, dz) * q.m
 
 
 def make_points(x_ends, y_ends, z_ends):
