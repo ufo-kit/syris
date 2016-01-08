@@ -319,7 +319,9 @@ class Trajectory(object):
 
         points = np.array(interp.splev(u, self._tck))
         initial_point = np.array(interp.splev(u_0, self._tck))
-        distances = np.abs(points - initial_point[:, np.newaxis])
+        if isinstance(u, collections.Iterable):
+            initial_point = initial_point[:, np.newaxis]
+        distances = np.abs(points - initial_point)
 
         if self._furthest_point is not None and self._furthest_point > 0 * q.m:
             # Trajectory with no rotational displacement
