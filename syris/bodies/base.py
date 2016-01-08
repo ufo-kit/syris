@@ -5,6 +5,7 @@ import quantities as q
 import syris.config as cfg
 import syris.geometry as geom
 from quantities.quantity import Quantity
+from scipy.optimize import bisect
 from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength, transfer
 from syris.util import make_tuple
@@ -216,6 +217,19 @@ class MovableBody(Body):
 
         return self.trajectory.get_maximum_dt(distance=pixel_size)
 
+    def get_distance(self, t_0, t_1):
+        """Return the maximum principal axes translational and rotational travelled distance in time
+        interval *t_0*, *t_1*.
+        """
+        if not self.trajectory.bound:
+            raise ValueError('Trajectory not bound')
+
+        u_0 = self.trajectory.get_parameter(t_0)
+        u_1 = self.trajectory.get_parameter(t_1)
+        dist = self.trajectory.get_distances(u_0=u_0, u=u_1)
+
+        return np.max(dist) * q.m
+
     def moved(self, t_0, t_1, pixel_size):
         """
         Return True if the body moves more than *pixel_size* in time interval *t_0*, *t_1*.
@@ -233,9 +247,12 @@ class MovableBody(Body):
 
         return max(total_displacement) > pixel_size
 
-    def move(self, abs_time):
-        """Move to a position of the body in time *abs_time*."""
-        self.clear_transformation()
+    def move(self, abs_time, clear=True):
+        """Move to a position of the body in time *abs_time*. If *clear* is true clear the
+        transformation matrix first.
+        """
+        if clear:
+            self.clear_transformation()
         abs_time = abs_time.simplified
         p_0 = self.trajectory.get_point(abs_time).simplified
         vec = self.trajectory.get_direction(abs_time)
@@ -283,15 +300,6 @@ class CompositeBody(MovableBody):
         self._dt = None
         self._saved_matrices = {}
 
-    def bind_trajectory(self, pixel_size):
-        """Bind trajectory for *pixel_size*."""
-        for body in self.all_bodies:
-            if (body.trajectory.pixel_size != pixel_size or
-                    body.trajectory.furthest_point != body.furthest_point):
-                fmt = 'Binding trajectory to pixel size {} and furthest point {}'
-                LOG.debug(fmt.format(pixel_size, body.furthest_point))
-                body.trajectory.bind(pixel_size=pixel_size, furthest_point=body.furthest_point)
-
     @property
     def bodies(self):
         """All bodies which are inside this composite body."""
@@ -335,28 +343,20 @@ class CompositeBody(MovableBody):
 
     @property
     def furthest_point(self):
-        """Furthest point is the greatest achievable distance to some primitive
-        bodies plus the furthest point of the primitive body. This way we can
-        put an upper bound on the distance travelled by any primitive body.
-        """
-        if self._furthest_point is None:
-            self._determine_furthest_point()
-        return self._furthest_point
+        """Furthest point is 0 for composite object."""
+        return max([body.furthest_point for body in self.primitive_bodies])
 
-    def _determine_furthest_point(self):
-        """Calculate the furthest point based on all primitive bodies."""
-        furthest = None
+    @property
+    def bounding_box(self):
+        """Get bounding box around all the bodies inside."""
+        b_box = None
+        for i in range(len(self)):
+            if b_box is None:
+                b_box = self[i].bounding_box
+            else:
+                b_box.merge(self[i].bounding_box)
 
-        for body in self.primitive_bodies:
-            traj_dist = np.sqrt(np.sum(body.trajectory.points ** 2, axis=0))
-            if len(body.trajectory.points.shape) == 2:
-                # For non-stationary trajectory we take the maximum
-                traj_dist = max(traj_dist)
-            dist = traj_dist + body.furthest_point
-            if furthest is None or dist > furthest:
-                furthest = dist
-
-        self._furthest_point = furthest
+        return b_box
 
     def __len__(self):
         return len(self._bodies)
@@ -366,6 +366,12 @@ class CompositeBody(MovableBody):
 
     def __iter__(self):
         return self.bodies.__iter__()
+
+    def __repr__(self):
+        return "CompositeBody{0}".format(self.bodies)
+
+    def __str__(self):
+        return repr(self)
 
     def add(self, body):
         """Add a body *body*."""
@@ -390,18 +396,6 @@ class CompositeBody(MovableBody):
         for body in self:
             body.clear_transformation()
 
-    @property
-    def bounding_box(self):
-        """Get bounding box around all the bodies inside."""
-        b_box = None
-        for i in range(len(self)):
-            if b_box is None:
-                b_box = self[i].bounding_box
-            else:
-                b_box.merge(self[i].bounding_box)
-
-        return b_box
-
     def translate(self, vec):
         """Translate all sub-bodies by a vector *vec*."""
         MovableBody.translate(self, vec)
@@ -423,7 +417,7 @@ class CompositeBody(MovableBody):
         MovableBody.move(self, abs_time)
         for body in self:
             # Then move its sub-bodies.
-            body.move(abs_time)
+            body.move(abs_time, clear=False)
 
     def save_transformation_matrices(self):
         """Save transformation matrices of all bodies and return
@@ -439,36 +433,66 @@ class CompositeBody(MovableBody):
 
         self._saved_matrices = {}
 
-    def get_next_time(self, t_0, pixel_size):
-        """
-        Get next time at which the body will have traveled *pixel_size*, the starting time is *t_0*.
+    def bind_trajectory(self, pixel_size):
+        """Bind trajectory for *pixel_size*."""
+        for body in self.all_bodies:
+            if (body.trajectory.pixel_size != pixel_size or
+                    body.trajectory.furthest_point != body.furthest_point):
+                if body == self:
+                    self._dt = None
+                fmt = 'Binding trajectory to pixel size {} and furthest point {}'
+                LOG.debug(fmt.format(pixel_size, body.furthest_point))
+                body.trajectory.bind(pixel_size=pixel_size, furthest_point=body.furthest_point)
+
+    def get_maximum_dt(self, pixel_size):
+        """Get the maximum delta time for which the body will not move more than *pixel_size*
+        divided by the number of bodies because their movement can sum up constructively.
         """
         self.bind_trajectory(pixel_size)
 
-        # First deterimne the real distance which is smaller by the given one because the
-        # combination of body movements might exceed the pixel_size if the motion of bodies
-        # adds up constructively.
-        if t_0 != np.inf * q.s:
-            if self._dt is None:
-                # Initialize
-                dts = [body.get_maximum_dt(pixel_size / len(self.all_bodies))
-                       for body in self.all_bodies if not body.trajectory.stationary]
-                self._dt = np.min(dts) * q.s
+        if self._dt is None:
+            dts = [MovableBody.get_maximum_dt(self, pixel_size / len(self.all_bodies))]
+            dts += [body.get_maximum_dt(pixel_size / len(self.all_bodies))
+                    for body in self if not body.trajectory.stationary]
+            self._dt = np.min(dts) * q.s
 
-            for current_time in np.arange(t_0, self.time + self._dt, self._dt) * q.s:
-                if self.moved(t_0, current_time, pixel_size):
-                    return current_time
+        return self._dt
+
+    def get_next_time(self, t_0, pixel_size, xtol=1e-12):
+        """
+        Get next time at which the body will have traveled *pixel_size*, the starting time is *t_0*.
+        *xtol* is the absolute tolerance for bisection passed to :py:func:`scipy.optimize.bisect`.
+        """
+        def func(t):
+            """Objective function for time bisection. The
+            maximum dt obtained from individual trajectories might not be precise enough, but is
+            precise enough to deterimne when the *pixel_size* is overstepped. Thus, we compute the
+            time when the overall trajectory doesn't move more than *pixel_size*, then the time it
+            does move more than the *pixel_size* and bisect to obtain the movement by exactly
+            *pixel_size*.
+            """
+            t = t * q.s
+            # scipy's bisection gets the root at 0, thus we need to shift by *pixel_size*
+            return (self.get_distance(t_0, t) - pixel_size).simplified.magnitude
+
+        self.bind_trajectory(pixel_size)
+        if self._dt is None:
+            self.get_maximum_dt(pixel_size)
+
+        for current_time in np.arange(t_0, self.time, self._dt) * q.s:
+            if self.moved(t_0, current_time, pixel_size):
+                return bisect(func, t_0, current_time, xtol=xtol) * q.s
 
         return np.inf * q.s
 
-    def moved(self, t_0, t_1, pixel_size):
-        """Return True if the body moves between time *t_0* and *t_1* more than *pixel_size*. We need
-        to check all subbodies.  Moreover, simple trajectory distance between points at t_0 and t_1
-        will not work because when the composite body moves more than one pixel, but the primitive
-        body moves the exact opposite it results in no movement. We need to check also the composite
-        body movement because it may cause some subbodies to rotate.
+    def get_distance(self, t_0, t_1):
+        """Return the translational and rotational travelled distance in time interval
+        *t_0*, *t_1*.
         """
-        self.bind_trajectory(pixel_size)
+        if not self.trajectory.bound:
+            raise ValueError('Trajectory not bound')
+        # Place the point for computing the derivative very close
+        dt = (t_1 - t_0) * 1e-7
 
         def move_and_save(abs_time):
             """Move primitive bodies to time *abs_time* and return
@@ -485,14 +509,29 @@ class CompositeBody(MovableBody):
             return positions
 
         self.save_transformation_matrices()
-        orig_positions = move_and_save(t_0)
-        positions = move_and_save(t_1)
+        p_0 = move_and_save(t_0)
+        p_1 = move_and_save(t_1)
+        if t_0 + dt < self.time:
+            d_0 = move_and_save(t_0 + dt) - p_0
+        else:
+            d_0 = p_0 - move_and_save(t_0 - dt)
+        if t_1 + dt < self.time:
+            d_1 = move_and_save(t_1 + dt) - p_1
+        else:
+            d_1 = p_1 - move_and_save(t_1 - dt)
         self.restore_transformation_matrices()
 
-        return np.max(np.abs(positions - orig_positions)) > pixel_size.simplified.magnitude
+        trans = np.abs(p_1 - p_0) * q.m
 
-    def __repr__(self):
-        return "CompositeBody{0}".format(self.bodies)
+        rot = []
+        for i in range(len(self.primitive_bodies)):
+            rot.append(geom.get_rotation_displacement(d_0[i], d_1[i],
+                                                      self.primitive_bodies[i].
+                                                      furthest_point.simplified.magnitude))
+        rot = np.array(rot) * q.m
 
-    def __str__(self):
-        return repr(self)
+        return np.max(trans) + np.max(rot)
+
+    def moved(self, t_0, t_1, pixel_size):
+        """Return True if the body moves more than *pixel_size* in time interval *t_0*, *t_1*."""
+        return self.get_distance(t_0, t_1) > pixel_size
