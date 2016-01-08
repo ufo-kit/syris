@@ -147,7 +147,7 @@ class Trajectory(object):
         self._length = 0 * q.m
         self._times = self._distances = self._time_tck = None
 
-        if len(control_points) > 1 and pixel_size is not None:
+        if pixel_size is not None:
             self.bind(pixel_size=pixel_size, furthest_point=furthest_point)
 
     def _interpolate(self):
@@ -213,7 +213,8 @@ class Trajectory(object):
         self._furthest_point = furthest_point
         if self._pixel_size is None:
             raise ValueError('Pixel size must be set either here or before')
-        self._interpolate()
+        if len(self.control_points) > 1:
+            self._interpolate()
 
     @property
     def stationary(self):
