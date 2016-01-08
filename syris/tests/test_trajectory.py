@@ -6,7 +6,7 @@ Created on Jul 3, 2013
 import numpy as np
 import quantities as q
 from scipy import interpolate as interp
-from syris.geometry import Trajectory
+from syris.geometry import get_rotation_displacement, Trajectory
 from syris.tests import SyrisTest, slow
 
 
@@ -122,13 +122,18 @@ class TestTrajectory(SyrisTest):
 
     def test_bind(self):
         traj = Trajectory(self.control_points, time_dist=self.time_dist)
+        self.assertFalse(traj.bound)
         traj.bind(pixel_size=1 * q.m, furthest_point=1 * q.um)
-        # This must pass if the trajectory is not stationary and bound
-        traj.get_next_time(0 * q.s)
+        self.assertTrue(traj.bound)
 
         # Trajectory with no furthest point must work too
         traj.bind(pixel_size=1 * q.m)
-        traj.get_next_time(0 * q.s)
+        self.assertTrue(traj.bound)
+
+        # Binding stationary trajectory must be possible
+        traj = Trajectory([(0, 0, 0)] * q.m)
+        traj.bind(pixel_size=100 * q.mm)
+        self.assertTrue(traj.bound)
 
     def test_length(self):
         u = np.linspace(0, 2 * np.pi, 100)
@@ -205,7 +210,7 @@ class TestTrajectory(SyrisTest):
         """Compare analytically computed distances with the ones obtained from trajectory."""
         points = make_circle(n=128)
         x, y, z = zip(*points)
-        furthest = 6 * q.um
+        furthest = 3 * q.mm
         ps = 10 * q.um
         tr = Trajectory(points, ps, furthest, velocity=1 * q.mm / q.s)
 
@@ -216,7 +221,7 @@ class TestTrajectory(SyrisTest):
         dy = np.cos(t)
         dz = z
         derivatives = np.array(zip(dx, dy, dz)).T.copy()
-        d_derivatives = np.abs(derivatives[:, 0][:, np.newaxis] - derivatives) * furthest.simplified
+        d_derivatives = get_rotation_displacement(derivatives[:, 0], derivatives, furthest)
         distances = (d_points + d_derivatives).simplified.magnitude
 
         np.testing.assert_almost_equal(distances, tr.get_distances())
