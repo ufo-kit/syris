@@ -217,6 +217,11 @@ class Trajectory(object):
             self._interpolate()
 
     @property
+    def bound(self):
+        """Return True if the trajectory is currently bound."""
+        return self._pixel_size is not None
+
+    @property
     def stationary(self):
         """Return True if the trajectory is stationary."""
         return len(self._control_points) == 1 or (self._velocity is None and
@@ -279,7 +284,7 @@ class Trajectory(object):
         if self.stationary:
             result = np.array((0, 0, 0)) if der else self._control_points[0].magnitude
         else:
-            if self._tck is None:
+            if not self.bound:
                 raise TrajectoryError('Trajectory not bound')
             result = interp.splev(self.get_parameter(abs_time), self._tck, der=der)
 
@@ -304,7 +309,7 @@ class Trajectory(object):
         """Get the distances from the trajectory beginning to every consecutive point defined by the
         parameter.
         """
-        if self._tck is None:
+        if not self.bound:
             raise TrajectoryError('Trajectory not bound')
 
         if u is None:
@@ -334,7 +339,7 @@ class Trajectory(object):
         """
         if self.stationary:
             return None
-        elif self._tck is None:
+        elif not self.bound:
             raise TrajectoryError('Trajectory not bound')
         if distance is None:
             distance = self._pixel_size
@@ -400,7 +405,7 @@ class Trajectory(object):
         """Get time from *t_0* when the trajectory will have travelled more than pixel size."""
         if self.stationary:
             return np.inf * q.s
-        elif self._tck is None:
+        elif not self.bound:
             raise TrajectoryError('Trajectory not bound')
 
         u_0 = self.get_parameter(t_0)
