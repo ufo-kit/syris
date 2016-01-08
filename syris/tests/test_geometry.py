@@ -28,6 +28,24 @@ def get_vec_0():
 
 class TestGeometry(SyrisTest):
 
+    def test_angle(self):
+        a = np.zeros((3, 2)) * q.m
+        a[1, 0] = 1 * q.m
+        a[0, 1] = 1 * q.m
+        a[1, 1] = 1 * q.m
+        v = (1, 0, 0) * q.m
+        gt = [np.pi / 2, np.pi / 4]
+
+        # 1D x 1D
+        self.assertAlmostEqual(gt[0], geom.angle(a[:, 0], v))
+        # 2D x 1D
+        np.testing.assert_almost_equal(gt, geom.angle(a, v).simplified.magnitude)
+        # It must work also the other way around (vector, matrix)
+        np.testing.assert_almost_equal(gt, geom.angle(v, a).simplified.magnitude)
+        # 2D x 2D array vector-wise
+        np.testing.assert_almost_equal([gt[1], gt[1]],
+                                       geom.angle(a, a[:, ::-1]).simplified.magnitude)
+
     def test_zero_angle(self):
         zero_vec = np.zeros(3) * q.m
         self.assertEqual(geom.angle(zero_vec, zero_vec), 0 * q.deg)
@@ -69,6 +87,13 @@ class TestGeometry(SyrisTest):
         self.assertAlmostEqual(geom.length(vec), np.sqrt(3) * q.m)
         vec = np.array([0, 0, 0]) * q.m
         self.assertAlmostEqual(geom.length(vec), 0 * q.m)
+
+        # 2D vector
+        vec = np.ones((3, 2)) * q.m
+        vec[:, 1] = 2 * q.m
+        gt = [np.sqrt(3), 2 * np.sqrt(3)]
+        res = geom.length(vec).simplified.magnitude
+        np.testing.assert_almost_equal(gt, res)
 
     def test_translate(self):
         vec_0 = get_vec_0()
