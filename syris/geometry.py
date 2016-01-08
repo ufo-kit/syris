@@ -11,13 +11,14 @@ the matrix in the form T^{-1} = C^{-1}B^{-1}A^{-1} = (ABC)^{-1}. Thus, we can
 easily obtain x = T^{-1}x'.
 """
 from __future__ import absolute_import
-import math
+import collections
 import numpy as np
 import quantities as q
 from scipy import interpolate as interp
 import itertools
 import logging
 from syris import math as smath
+from syris.util import get_magnitude
 from quantities.quantity import Quantity
 
 
@@ -499,7 +500,7 @@ def closest(values, min_value):
 
 def length(vector):
     """Get length of a *vector*."""
-    return np.sqrt(np.sum(vector ** 2))
+    return np.sqrt(np.sum(vector ** 2, axis=0))
 
 
 def normalize(vector):
@@ -593,11 +594,20 @@ def scale(scale_vec):
 
 
 def angle(vec_0, vec_1):
-    """Angle between vectors *vec_0* and *vec_1*."""
-    vec_1 = vec_1.rescale(vec_0.units)
+    """Angle between vectors *vec_0* and *vec_1*. The vectors might be 2D with 0 dimension
+    specifying (x, y, z) components.
+    """
+    vec_0 = get_magnitude(vec_0)
+    vec_1 = get_magnitude(vec_1)
+    if vec_0.ndim == 2 and vec_1.ndim == 2:
+        # The dot product would yield a matrix
+        dot = length(vec_0 * vec_1)
+    else:
+        dot = np.dot(vec_0.T, vec_1)
+    cross = np.cross(vec_0, vec_1, axis=0) * q.dimensionless
+    lngth = length(cross)
 
-    return math.atan2(length(np.cross(vec_0, vec_1) * q.dimensionless),
-                      np.dot(vec_0, vec_1)) * q.rad
+    return np.arctan2(lngth, dot) * q.rad
 
 
 def interpolate_1d(x_0, y_0, size):
