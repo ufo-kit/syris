@@ -1,22 +1,33 @@
+import numpy as np
 import quantities as q
+import syris
+from syris.bodies.isosurfaces import MetaBall
 from syris.devices.cameras import Camera
 from syris.devices.lenses import Lens
 from syris.devices.detectors import Detector
-from syris.imageprocessing import Tiler
+from syris.geometry import Trajectory
 from syris.tests import SyrisTest
-from syris.experiments.base import Experiment
+from syris.experiments import Experiment
 
 
 class TestExperiments(SyrisTest):
 
     def setUp(self):
+        syris.init()
         lens = Lens(1.4, 100 * q.mm, 3.0, 1.0, (1 * q.um, 1 * q.um))
         camera = Camera(1 * q.um, 0.1, 10, 1.0, 12, (64, 64))
         detector = Detector(None, lens, camera)
-        tiler = Tiler(camera.shape, (1, 1), outlier=True, supersampling=2)
-        self.experiment = Experiment(None, None, None, detector, tiler)
+        ps = detector.pixel_size
+        t = np.linspace(0, 1, 10) * q.mm
+        x = t
+        y = np.zeros(len(t))
+        z = np.zeros(len(t))
+        points = zip(x, y, z) * q.mm
+        mb_0 = MetaBall(Trajectory(points, pixel_size=ps, furthest_point=1 * q.um,
+                                   velocity=1 * q.mm / q.s), 1 * q.um)
+        mb_1 = MetaBall(Trajectory(points, pixel_size=ps, furthest_point=1 * q.um,
+                                   velocity=2 * q.mm / q.s), 1 * q.um)
+        self.experiment = Experiment([mb_0, mb_1], None, detector, 0 * q.m)
 
     def test_pixel_size(self):
-        pixel_size = self.experiment.detector.pixel_size / \
-            self.experiment.tiler.supersampling
-        self.assertAlmostEqual(self.experiment.super_pixel_size, pixel_size)
+        self.assertAlmostEqual(1, self.experiment.time.simplified.magnitude)
