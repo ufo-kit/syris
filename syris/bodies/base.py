@@ -104,11 +104,8 @@ class MovableBody(Body):
                 self._p_cache['projection'] = super(MovableBody, self).project(shape, pixel_size,
                                                                                t=t, queue=queue,
                                                                                out=None)
-            else:
-                LOG.debug('{} cached projection at {}'.format(self, t))
             projection = self._p_cache['projection']
         else:
-            LOG.debug('{} computing projection at {}'.format(self, t))
             projection = super(MovableBody, self).project(shape, pixel_size, t=t,
                                                           queue=queue, out=None)
 
