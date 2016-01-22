@@ -201,7 +201,8 @@ class Mesh(MovableBody):
 
     def _make_vertices(self, index):
         """Make a flat array of vertices belong to *triangles* at *index*."""
-        vertices = self._current[:, index::3]
+        # Convert to meters
+        vertices = self._current[:, index::3] * 1e-6
 
         return vertices.transpose().flatten().astype(cfg.PRECISION.np_float)
 
@@ -250,9 +251,9 @@ class Mesh(MovableBody):
             height = min(y_max_px - y_min_px, shape[0])
             offset = cl_array.vec.make_int2(x_min_px, y_min_px)
             v_1, v_2, v_3 = self._make_inputs(queue)
-            max_dx = self.max_triangle_x_diff.rescale(q.um).magnitude
-            min_z = self.extrema[2][0].rescale(q.um).magnitude
-            ps = pixel_size[0].rescale(q.um).magnitude
+            max_dx = self.max_triangle_x_diff.simplified.magnitude
+            min_z = self.extrema[2][0].simplified.magnitude
+            ps = pixel_size[0].simplified.magnitude
 
             cfg.OPENCL.programs['mesh'].compute_thickness(queue,
                                                           (width, height),
