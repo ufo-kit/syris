@@ -96,7 +96,8 @@ class MovableBody(Body):
             else:
                 # 0.99 to make sure we recompute when next_time from cached time is current t
                 moved = self.moved(min(self._p_cache['time'], t),
-                                   max(self._p_cache['time'], t), 0.99 * min(pixel_size))
+                                   max(self._p_cache['time'], t), 0.99 * min(pixel_size),
+                                   bind=False)
 
             if moved:
                 LOG.debug('{} computing projection at {}'.format(self, t))
@@ -227,11 +228,14 @@ class MovableBody(Body):
 
         return np.max(dist) * q.m
 
-    def moved(self, t_0, t_1, pixel_size):
+    def moved(self, t_0, t_1, pixel_size, bind=True):
         """
-        Return True if the body moves more than *pixel_size* in time interval *t_0*, *t_1*.
+        Return True if the body moves more than *pixel_size* in time interval *t_0*, *t_1*. If
+        *bind* is True bind the trajectory to the specified *pixel_size*, otherwise use the
+        trajectory as-is to compute an estimate.
         """
-        self.bind_trajectory(pixel_size)
+        if bind or not self.trajectory.bound:
+            self.bind_trajectory(pixel_size)
 
         p_0 = self.trajectory.get_point(t_0)
         p_1 = self.trajectory.get_point(t_1)
