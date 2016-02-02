@@ -15,7 +15,7 @@ LOG = logging.getLogger(__name__)
 def main():
     """Main function."""
     args = parse_args()
-    syris.init()
+    syris.init(loglevel=logging.INFO)
     triangles = make_cube() if args.input is None else read_blender_obj(args.input) * q.m
     tr = geom.Trajectory([(0, 0, 0)] * q.m)
     mesh = Mesh(triangles, tr)
