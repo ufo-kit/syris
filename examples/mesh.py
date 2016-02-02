@@ -23,7 +23,7 @@ def main():
     mesh.rotate(35 * q.deg, geom.X_AX)
 
     proj = mesh.project(shape, ps, t=None).get()
-    offset = syris.gpu.util.make_vfloat3(0, center[1].rescale(q.um), -(fov / 2.).rescale(q.um))
+    offset = syris.gpu.util.make_vfloat3(0, center[1].simplified, -(fov / 2.).simplified)
     sl = mesh.compute_slices((1,) + shape, ps, offset=offset).get()[0]
 
     plt.figure()

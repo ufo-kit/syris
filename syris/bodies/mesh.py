@@ -284,8 +284,8 @@ class Mesh(MovableBody):
         if offset is None:
             offset = gutil.make_vfloat3(0, 0, 0)
         v_1, v_2, v_3 = self._make_inputs(queue)
-        max_dx = self.max_triangle_x_diff.rescale(q.um).magnitude
-        ps = pixel_size.rescale(q.um).magnitude
+        max_dx = self.max_triangle_x_diff.simplified.magnitude
+        ps = pixel_size.simplified.magnitude
 
         cfg.OPENCL.programs['mesh'].compute_slices(queue,
                                                    (shape[2], shape[0]),
