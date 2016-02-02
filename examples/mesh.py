@@ -19,6 +19,7 @@ def main():
     triangles = make_cube() if args.input is None else read_blender_obj(args.input) * q.m
     tr = geom.Trajectory([(0, 0, 0)] * q.m)
     mesh = Mesh(triangles, tr)
+    LOG.info('Number of triangles: {}'.format(mesh.num_triangles))
 
     shape = (args.n, args.n)
     if args.pixel_size is None:
