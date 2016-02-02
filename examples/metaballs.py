@@ -10,7 +10,7 @@ from syris import config as cfg
 from syris.gpu import util as g_util
 from syris.bodies.isosurfaces import MetaBall, MetaBalls
 from syris.geometry import Trajectory
-from libtiff import TIFF
+from util import save_image
 
 
 LOG = logging.getLogger(__name__)
@@ -275,8 +275,8 @@ if __name__ == '__main__':
 
     # for h in range(n):
     #     res = intersections_to_slice(n, h, res_mem, z_min, pixel_size, prg)
-    #     TIFF.open("/home/farago/data/thickness/radio_{:>05}.tif".format(h), "w").\
-    #         write_image(res[:, ::VECTOR_WIDTH].astype(np.float32))
+    #     save_image("/home/farago/data/thickness/radio_{:>05}.tif".format(h),
+    #                res[:, ::VECTOR_WIDTH])
 
     plt.figure()
     plt.imshow(thickness[:, ::VECTOR_WIDTH], origin="lower", cmap=cm.get_cmap("gray"),

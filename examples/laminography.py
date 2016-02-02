@@ -8,8 +8,8 @@ import quantities as q
 import syris.gpu.util as gutil
 from functools import partial
 from multiprocessing import Lock, Pool
-from concert.storage import write_libtiff
 from syris.geometry import X_AX, Y_AX, Z_AX
+from util import save_image
 
 
 LOCK = Lock()
@@ -84,7 +84,7 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
         with LOCK:
             LOG.info(log_fmt.format(index, i + 1, num_angles, duration,
                                     float(angle.magnitude), max_vals))
-        write_libtiff(prefix.format(i), projs[best])
+        save_image(prefix.format(i), projs[best])
         last = max_vals[best]
 
     with LOCK:
@@ -133,7 +133,7 @@ def make_ground_truth(args, shape, mesh):
             # Sum only the slices which are present (last run might not go to the end)
             sl = np.mean(z_stack[:slices.shape[0]], axis=0)
             index = (i + j) / args.supersampling
-            write_libtiff(args.prefix.format(index), sl)
+            save_image(args.prefix.format(index), sl)
 
     return sl
 
