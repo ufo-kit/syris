@@ -7,6 +7,7 @@ import quantities as q
 import syris
 import syris.geometry as geom
 from syris.bodies.mesh import Mesh, make_cube, read_blender_obj
+from util import save_image
 
 
 LOG = logging.getLogger(__name__)
@@ -45,6 +46,11 @@ def main():
     offset = syris.gpu.util.make_vfloat3(0, center[1].simplified, -(fov / 2.).simplified)
     sl = mesh.compute_slices((1,) + shape, args.pixel_size, offset=offset).get()[0]
 
+    if args.projection_filename is not None:
+        save_image(args.projection_filename, proj)
+    if args.slice_filename is not None:
+        save_image(args.slice_filename, sl)
+
     plt.figure()
     plt.imshow(proj)
     plt.title('Projection')
@@ -66,6 +72,8 @@ def parse_args():
     parser.add_argument('--x-rotate', type=float, default=0., help='Rotation around x axis [deg]')
     parser.add_argument('--y-rotate', type=float, default=0., help='Rotation around y axis [deg]')
     parser.add_argument('--margin', type=float, default=1., help='Margin in factor of the full FOV')
+    parser.add_argument('--projection-filename', type=str, help='Save projection to this filename')
+    parser.add_argument('--slice-filename', type=str, help='Save slice to this filename')
 
     args = parser.parse_args()
     if args.pixel_size is not None:
