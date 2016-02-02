@@ -69,14 +69,14 @@ class Mesh(MovableBody):
 
     @property
     def extrema(self):
-        """Mesh extrema as ((z_min, z_max), (y_min, y_max), (x_min, x_max))."""
+        """Mesh extrema as ((x_min, x_max), (y_min, y_max), (z_min, z_max))."""
         return ((self._compute(min, 0), self._compute(max, 0)),
                 (self._compute(min, 1), self._compute(max, 1)),
                 (self._compute(min, 2), self._compute(max, 2))) * q.um
 
     @property
     def center_of_gravity(self):
-        """Get body's center of gravity as (z, y, x)."""
+        """Get body's center of gravity as (x, y, z)."""
         center = (self._compute(np.mean, 0), self._compute(np.mean, 1), self._compute(np.mean, 2))
 
         return np.array(center) * q.um
@@ -92,7 +92,7 @@ class Mesh(MovableBody):
     @property
     def diff(self):
         """Smallest and greatest difference between all mesh points in all three dimensions. Returns
-        ((min(dy), max(dz)), (min(dy), max(dy)), (min(dx), max(dx))).
+        ((min(dx), max(dx)), (min(dy), max(dy)), (min(dz), max(dz))).
         """
         func = lambda ar: np.abs(ar[1:] - ar[:-1])
         min_nonzero = lambda ar: min(ar[np.where(ar != 0)])
