@@ -19,7 +19,7 @@ def main():
     syris.init(loglevel=logging.INFO)
     triangles = make_cube() if args.input is None else read_blender_obj(args.input) * q.m
     tr = geom.Trajectory([(0, 0, 0)] * q.m)
-    mesh = Mesh(triangles, tr)
+    mesh = Mesh(triangles, tr, center=args.center)
     LOG.info('Number of triangles: {}'.format(mesh.num_triangles))
 
     shape = (args.n, args.n)
@@ -35,15 +35,21 @@ def main():
     else:
         fov = args.n * args.pixel_size
 
-    center = (fov.simplified.magnitude / 2., fov.simplified.magnitude / 2., 0) * q.m
-    mesh.translate(center)
+    if args.translate is None:
+        translate = (fov.simplified.magnitude / 2., fov.simplified.magnitude / 2., 0) * q.m
+    else:
+        translate = (args.translate[0].simplified.magnitude,
+                     args.translate[1].simplified.magnitude, 0) * q.m
+    LOG.info('Translation: {}'.format(translate))
+
+    mesh.translate(translate)
     mesh.rotate(args.y_rotate, geom.Y_AX)
     mesh.rotate(args.x_rotate, geom.X_AX)
     fmt = 'n: {}, pixel size: {}, FOV: {}'
     LOG.info(fmt.format(args.n, args.pixel_size.simplified, fov.simplified))
 
     proj = mesh.project(shape, args.pixel_size, t=None).get()
-    offset = syris.gpu.util.make_vfloat3(0, center[1].simplified, -(fov / 2.).simplified)
+    offset = syris.gpu.util.make_vfloat3(0, translate[1].simplified, -(fov / 2.).simplified)
     sl = mesh.compute_slices((1,) + shape, args.pixel_size, offset=offset).get()[0]
 
     if args.projection_filename is not None:
@@ -69,6 +75,8 @@ def parse_args():
     parser.add_argument('--input', type=str, help='Input .obj file')
     parser.add_argument('--n', type=int, default=256, help='Number of pixels')
     parser.add_argument('--pixel-size', type=float, help='Pixel size in um')
+    parser.add_argument('--center', type=str, help='Mesh centering on creation')
+    parser.add_argument('--translate', type=float, nargs=2, help='Translation as (x, y) in um')
     parser.add_argument('--x-rotate', type=float, default=0., help='Rotation around x axis [deg]')
     parser.add_argument('--y-rotate', type=float, default=0., help='Rotation around y axis [deg]')
     parser.add_argument('--margin', type=float, default=1., help='Margin in factor of the full FOV')
@@ -80,6 +88,8 @@ def parse_args():
         args.pixel_size = args.pixel_size * q.um
     args.x_rotate = args.x_rotate * q.deg
     args.y_rotate = args.y_rotate * q.deg
+    if args.translate is not None:
+        args.translate = args.translate * q.um
 
     return args
 
