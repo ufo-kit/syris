@@ -168,3 +168,41 @@ def project_metaballs(metaballs, shape, pixel_size, queue=None, out=None):
                                               np.int32(True))
 
     return out
+
+
+def project_metaballs_naive(metaballs, shape, pixel_size, queue=None, out=None):
+    """Project a list of :class:`.MetaBall` on an image plane with *shape*, *pixel_size*.
+    Use OpenCL *queue* and *out* pyopencl Array instance for returning the result.
+    """
+    def get_extrema(sgn):
+        func = np.max if sgn > 0 else np.min
+        x_ps = pixel_size[1]
+        res = [(ball.position[2] + sgn * (2 * ball.radius + x_ps)).simplified.magnitude
+               for ball in metaballs]
+
+        return func(res)
+
+    string = ''.join([body.pack() for body in metaballs])
+    n, m = shape
+    ps = pixel_size.simplified.magnitude
+    if not queue:
+        queue = cfg.OPENCL.queue
+
+    bodies_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
+                           cl.mem_flags.COPY_HOST_PTR, hostbuf=string)
+    if out is None:
+        out = cl_array.Array(queue, shape, cfg.PRECISION.np_float)
+
+    z_range = get_extrema(-1), get_extrema(1)
+
+    cfg.OPENCL.programs['geometry'].naive_metaballs(cfg.OPENCL.queue,
+                                                    (m, n),
+                                                    None,
+                                                    out.data,
+                                                    bodies_mem,
+                                                    np.int32(len(metaballs)),
+                                                    g_util.make_vfloat2(*z_range),
+                                                    cfg.PRECISION.np_float(ps[1]),
+                                                    np.int32(True))
+
+    return out
