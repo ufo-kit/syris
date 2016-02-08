@@ -59,7 +59,7 @@ class MetaBall(MovableBody):
         return BoundingBox(np.array(transformed) * q.m)
 
     def _project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
-        return project_metaballs(shape, pixel_size, self.pack(), queue=queue, out=out)
+        return project_metaballs([self], shape, pixel_size, queue=queue, out=out)
 
     def get_transform_const(self):
         """
@@ -98,9 +98,7 @@ class MetaBalls(CompositeBody):
 
     def _project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
         """Projection implementation."""
-        string = ''.join([body.pack() for body in self._bodies])
-
-        return project_metaballs(shape, pixel_size, string, queue=queue, out=out)
+        return project_metaballs(self._bodies, shape, pixel_size, queue=queue, out=out)
 
 
 def get_moved_groups(bodies, t_0, t_1, distance):
@@ -134,18 +132,18 @@ def get_format_string(string):
     return string.replace("vf", float_string)
 
 
-def project_metaballs(shape, pixel_size, body_string, queue=None, out=None):
-    """Project packed metaballs *body_string* on an image plane with *shape*, *pixel_size*. Use
-    OpenCL *queue* and *out* pyopencl Array instance for returning the result.
+def project_metaballs(metaballs, shape, pixel_size, queue=None, out=None):
+    """Project a list of :class:`.MetaBall` on an image plane with *shape*, *pixel_size*.
+    Use OpenCL *queue* and *out* pyopencl Array instance for returning the result.
     """
+    string = ''.join([body.pack() for body in metaballs])
     n, m = shape
     ps = pixel_size.simplified.magnitude
-    num_bodies = len(body_string) / 4 / cfg.PRECISION.cl_float
     if not queue:
         queue = cfg.OPENCL.queue
 
     bodies_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
-                           cl.mem_flags.COPY_HOST_PTR, hostbuf=body_string)
+                           cl.mem_flags.COPY_HOST_PTR, hostbuf=string)
     pbodies_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
                             size=m * n * cfg.MAX_META_BODIES * 4 * 7)
     left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
@@ -163,7 +161,7 @@ def project_metaballs(shape, pixel_size, body_string, queue=None, out=None):
                                               pbodies_mem,
                                               left_mem,
                                               right_mem,
-                                              np.int32(num_bodies),
+                                              np.int32(len(metaballs)),
                                               cl_array.vec.make_int2(0, 0),
                                               cl_array.vec.make_int4(0, 0, m, n),
                                               g_util.make_vfloat2(ps[1], ps[0]),
