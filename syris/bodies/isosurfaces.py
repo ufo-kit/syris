@@ -9,6 +9,7 @@ import pyopencl.array as cl_array
 import quantities as q
 import syris.gpu.util as g_util
 import syris.geometry as geom
+import syris.util as util
 import struct
 from syris import config as cfg
 from syris.bodies.base import CompositeBody, MovableBody
@@ -170,13 +171,14 @@ def project_metaballs(metaballs, shape, pixel_size, queue=None, out=None):
     return out
 
 
-def project_metaballs_naive(metaballs, shape, pixel_size, queue=None, out=None):
-    """Project a list of :class:`.MetaBall` on an image plane with *shape*, *pixel_size*.
-    Use OpenCL *queue* and *out* pyopencl Array instance for returning the result.
+def project_metaballs_naive(metaballs, shape, pixel_size, z_step=None, queue=None, out=None):
+    """Project a list of :class:`.MetaBall` on an image plane with *shape*, *pixel_size*. *z_step*
+    is the physical step in the z-dimension, if not specified it is the same as *pixel_size*. Use
+    OpenCL *queue* and *out* pyopencl Array instance for returning the result.
     """
     def get_extrema(sgn):
         func = np.max if sgn > 0 else np.min
-        x_ps = pixel_size[1]
+        x_ps = util.make_tuple(pixel_size)[1]
         res = [(ball.position[2] + sgn * (2 * ball.radius + x_ps)).simplified.magnitude
                for ball in metaballs]
 
@@ -184,7 +186,8 @@ def project_metaballs_naive(metaballs, shape, pixel_size, queue=None, out=None):
 
     string = ''.join([body.pack() for body in metaballs])
     n, m = shape
-    ps = pixel_size.simplified.magnitude
+    ps = util.make_tuple(pixel_size.simplified.magnitude)
+    z_step = ps[1] if z_step is None else z_step.simplified.magnitude
     if not queue:
         queue = cfg.OPENCL.queue
 
@@ -202,7 +205,8 @@ def project_metaballs_naive(metaballs, shape, pixel_size, queue=None, out=None):
                                                     bodies_mem,
                                                     np.int32(len(metaballs)),
                                                     g_util.make_vfloat2(*z_range),
-                                                    cfg.PRECISION.np_float(ps[1]),
+                                                    cfg.PRECISION.np_float(z_step),
+                                                    g_util.make_vfloat2(*ps[::-1]),
                                                     np.int32(True))
 
     return out

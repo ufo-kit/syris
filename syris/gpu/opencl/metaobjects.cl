@@ -436,14 +436,17 @@ __kernel void metaballs(__global vfloat *out,
  * @objects: (x, y, z, radius) tuples representing the metaballs
  * @num_objects: number of metaballs
  * @z_range: start and end of the ray in the z-direction in physical units
- * @pixel_size: pixel size in physical units
+ * @z_step: z step (pixel size in z-direction)
+ * @pixel_size: pixel size in physical units as (x, y)
+ * @out_thickness: If true compute the thickness, intersections otherwise
  */
 
 __kernel void naive_metaballs(__global vfloat *thickness,
                         __constant vfloat4 *objects,
                         const uint num_objects,
                         const vfloat2 z_range,
-                        const vfloat pixel_size,
+                        const vfloat z_step,
+                        const vfloat2 pixel_size,
                         uint out_thickness) {
     int ix = get_global_id(0);
     int iy = get_global_id(1);
@@ -453,12 +456,12 @@ __kernel void naive_metaballs(__global vfloat *thickness,
     vfloat z, isosurface, dist, start, result;
     vfloat4 point;
 
-    point.x = ix * pixel_size;
-    point.y = iy * pixel_size;
+    point.x = ix * pixel_size.x;
+    point.y = iy * pixel_size.y;
     inside = 0;
     result = 0.0;
 
-    for (z = z_range.x; z <= z_range.y; z += pixel_size) {
+    for (z = z_range.x; z <= z_range.y; z += z_step) {
         isosurface = 0.0;
         point.z = z;
         for (m = 0; m < num_objects; m++) {
