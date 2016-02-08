@@ -133,7 +133,7 @@ class Camera(object):
         dark = float(self.dark_current) / self._bin_factor[0] / self._bin_factor[1]
         electrons = dark + gutil.get_host(photons)
 
-        if self._bin_factor == (1, 1):
+        if self._bin_factor != (1, 1):
             sigma = (fwnm_to_sigma(self._bin_factor[0]), fwnm_to_sigma(self._bin_factor[1]))
             electrons = gutil.get_host(decimate(electrons, self.shape, sigma=sigma))
 
