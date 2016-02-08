@@ -8,8 +8,9 @@ import quantities as q
 import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
-from syris.bodies.isosurfaces import MetaBall, MetaBalls
+from syris.bodies.isosurfaces import MetaBall, MetaBalls, project_metaballs_naive
 from syris.geometry import Trajectory
+from syris.util import make_tuple
 from util import save_image
 
 
@@ -141,6 +142,7 @@ def get_z_range(metaballs):
 
     return z_min, z_max
 
+
 def create_metaball_buffers(n, thickness):
     if thickness:
         res = np.empty((n, VECTOR_WIDTH * n), dtype=cfg.PRECISION.np_float)
@@ -155,63 +157,6 @@ def create_metaball_buffers(n, thickness):
                                cl.mem_flags.COPY_HOST_PTR, hostbuf=res)
 
     return result_mem, res
-
-def slow_metaballs(n, objects_mem, num_objects, z_range, pixel_size, thickness=True):
-    result_mem, res = create_metaball_buffers(n, thickness)
-    ev = prg.naive_metaballs(cfg.OPENCL.queue,
-                            (n, n),
-                             None,
-                             result_mem,
-                             objects_mem,
-                             np.uint32(num_objects),
-                             g_util.make_vfloat2(z_range[0].rescale(UNITS).magnitude,
-                                                 z_range[1].rescale(UNITS).magnitude),
-                             np.float32(pixel_size.rescale(UNITS)),
-                             np.uint32(thickness))
-    cl.wait_for_events([ev])
-    print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
-
-    cl.enqueue_copy(cfg.OPENCL.queue, res, result_mem)
-
-    if thickness:
-        return res
-    else:
-        return result_mem
-
-
-def fast_metaballs(n, objects_mem, num_objects, pixel_size, thickness=True,
-                   intersection_index=0):
-    pobjects_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                             size=n ** 2 * MAX_OBJECTS * 4 * 7)
-    left_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                         size=n ** 2 * 2 * MAX_OBJECTS)
-    right_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                          size=n ** 2 * 2 * MAX_OBJECTS)
-    result_mem, res = create_metaball_buffers(n, thickness)
-
-    ev = prg.metaballs(cfg.OPENCL.queue,
-                      (n, n),
-                       None,
-                       result_mem,
-                       objects_mem,
-                       pobjects_mem,
-                       left_mem,
-                       right_mem,
-                       np.int32(num_objects),
-                       vec.make_int2(0, 0),
-                       vec.make_int4(0, 0, n, n),
-                       g_util.make_vfloat2(pixel_size.rescale(UNITS).magnitude,
-                                           pixel_size.rescale(UNITS).magnitude),
-                       np.int32(thickness))
-    cl.wait_for_events([ev])
-    print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
-
-    cl.enqueue_copy(cfg.OPENCL.queue, res, result_mem)
-
-    if thickness:
-        return res
-    else:
-        return result_mem
 
 
 def intersections_to_slice(n, height, intersections_mem, z_start, pixel_size, program):
@@ -265,12 +210,9 @@ if __name__ == '__main__':
 
     traj = Trajectory([(0, 0, 0)] * q.m)
     comp = MetaBalls(traj, metaballs)
-    thickness = comp.project((n, n), pixel_size).get()
+    # thickness = comp.project((n, n), pixel_size).get()
+    thickness = project_metaballs_naive(metaballs, (n, n), make_tuple(pixel_size)).get()
 
-    # thickness = slow_metaballs(n, objects_mem, num_objects, (z_min, z_max), pixel_size)
-
-    res_mem = slow_metaballs(n, objects_mem, num_objects, (z_min, z_max), pixel_size,
-            thickness=False)
     objects_mem.release()
 
     # for h in range(n):
