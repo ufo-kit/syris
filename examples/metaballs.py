@@ -10,8 +10,7 @@ from syris import config as cfg
 from syris.gpu import util as g_util
 from syris.bodies.isosurfaces import MetaBall, MetaBalls, project_metaballs_naive
 from syris.geometry import Trajectory
-from syris.util import make_tuple
-from util import save_image
+from syris.util import make_tuple, save_image
 
 
 LOG = logging.getLogger(__name__)

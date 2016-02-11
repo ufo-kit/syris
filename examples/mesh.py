@@ -7,7 +7,7 @@ import quantities as q
 import syris
 import syris.geometry as geom
 from syris.bodies.mesh import Mesh, make_cube, read_blender_obj
-from util import save_image
+from syris.util import save_image
 
 
 LOG = logging.getLogger(__name__)

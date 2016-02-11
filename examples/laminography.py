@@ -9,7 +9,7 @@ import syris.gpu.util as gutil
 from functools import partial
 from multiprocessing import Lock, Pool
 from syris.geometry import X_AX, Y_AX, Z_AX
-from util import save_image
+from syris.util import save_image
 
 
 LOCK = Lock()
