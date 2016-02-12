@@ -49,7 +49,7 @@ def _fft_2(data, inverse=False, plan=None, queue=None, wait_for_finish=True):
         if data.shape not in cfg.OPENCL.fft_plans[queue]:
             LOG.debug('Creating FFT Plan for {} and shape {}'.format(queue, data.shape))
             cfg.OPENCL.fft_plans[queue][data.shape] = Plan(data.shape, queue=queue)
-        plan = cfg.OPENCL.fft_plans[queue][data.shape] = Plan(data.shape, queue=queue)
+        plan = cfg.OPENCL.fft_plans[queue][data.shape]
 
     plan.execute(data.data, inverse=inverse, wait_for_finish=wait_for_finish)
 
