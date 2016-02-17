@@ -12,12 +12,12 @@ class StaticBody(Body):
     """A static body is defined by its projected *thickness*, which is a quantity and it is
     always converted to meters, thus the :meth:`~Body.project` method always returns the
     projection in meters. *pixel_size* is the pixel size of the *thickness* and *material* is
-    a :class:`syris.materials.Material` instance.
+    a :class:`syris.materials.Material` instance. Use OpenCL command *queue*.
     """
 
-    def __init__(self, thickness, pixel_size, material=None):
+    def __init__(self, thickness, pixel_size, material=None, queue=None):
         super(StaticBody, self).__init__(material)
-        self.thickness = g_util.get_array(thickness.simplified.magnitude)
+        self.thickness = g_util.get_array(thickness.simplified.magnitude, queue=queue)
         self.pixel_size = make_tuple(pixel_size, num_dims=2)
 
     def get_next_time(self, t_0, distance):
