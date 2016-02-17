@@ -1,4 +1,5 @@
 """Module for GPU-based image processing."""
+import glob
 import itertools
 import logging
 import numpy as np
@@ -8,7 +9,8 @@ from pyopencl.array import vec
 from pyfft.cl import Plan
 from syris import config as cfg
 from syris.gpu import util as g_util
-from syris.util import get_magnitude, make_tuple, next_power_of_two
+from syris.math import fwnm_to_sigma
+from syris.util import get_magnitude, make_tuple, next_power_of_two, read_image, save_image
 
 
 LOG = logging.getLogger(__name__)
@@ -316,6 +318,89 @@ class Tiler(object):
                       tile_shape[0] * (indices[0] + 1),
                       indices[1] * tile_shape[1]:
                       tile_shape[1] * (indices[1] + 1)] = tile
+
+
+def make_tile_offsets(shape, tile_shape, outlier=(0, 0)):
+    """Make tile offsets in pixels so that one tile has *tile_shape* and all tiles form an image of
+    *shape*. *outlier* specifies the the overlap of the tiles, so if the outlier width is m, the
+    tile overlaps with the previous and next tiles by m / 2. If the tile width is n, the tile must
+    be cropped to (m / 2, n - n / 2) before it can be placed into the resulting image. This is
+    convenient for convolution outlier treatment.
+    """
+    y_starts = np.arange(0, shape[0], tile_shape[0] - outlier[0]) - outlier[0] / 2
+    x_starts = np.arange(0, shape[1], tile_shape[1] - outlier[1]) - outlier[1] / 2
+
+    return list(itertools.product(y_starts, x_starts))
+
+
+def make_tiles(func, shape, tile_shape, iterable=None, outlier=(0, 0), queues=None,
+               args=(), kwargs=None):
+    """Make tiles using *func* which can either have signature func(item, *args, **kwargs) or
+    func(item, queue, *args, **kwargs), where queue is the OpenCL command queue. In the latter case,
+    multiple command queues are mapped to different computation items. *shape* (y, x) is the final
+    image shape, *tile_shape* (y, x) is the shape of one tile, *iterable* is the sequence to be
+    mapped to *func*, if not specified, the offsets from :func:`.make_tile_offsets` are used.
+    *outlier* (y, x) is the amount of overlapping region between tiles, *queues* are the OpenCL
+    command queues to use, *args* and *kwargs* are additional arguments passed to *func*.
+    """
+    if iterable is None:
+        iterable = make_tile_offsets(shape, tile_shape, outlier=outlier)
+    if kwargs is None:
+        kwargs = {}
+
+    if queues is None:
+        for item in iterable:
+            yield func(item, *args, **kwargs)
+    else:
+        # Use multiple comand queues
+        for item in g_util.qmap(func, iterable, queues=queues, args=args, kwargs=kwargs):
+            yield item
+
+
+def save_tiles(prefix, tiles):
+    """Save *tiles* to linearly indexed files formed by *prefix* and the tile number."""
+    for i, tile in enumerate(tiles):
+        save_image(prefix.format(i), tile)
+
+
+def read_tiles(prefix):
+    """Read tiles from disk using the glob module for pattern expansion."""
+    names = sorted(glob.glob(prefix))
+
+    for name in names:
+        yield read_image(name)
+
+
+def merge_tiles(tiles, num_tiles=None, outlier=(0, 0)):
+    """Merge *tiles* which is a list to one large image. *num_tiles* is a tuple specifying the
+    number of tiles as (y, x) or None, meaning there is equal number of tiles in both dimensions.
+    The tiles must be stored in the row-major order.
+    """
+    n, m = get_num_tiles(tiles, num_tiles=num_tiles)
+    tile_shape = tiles[0].shape
+    crop_shape = (tile_shape[0] - outlier[0], tile_shape[1] - outlier[1])
+    result = np.zeros((n * crop_shape[0], m * crop_shape[1]), dtype=tiles[0].dtype)
+
+    for j in range(n):
+        for i in range(m):
+            tile = g_util.get_host(tiles[j * m + i])[outlier[0] / 2:tile_shape[0] - outlier[0] / 2,
+                                                     outlier[1] / 2:tile_shape[1] - outlier[1] / 2]
+            result[j * crop_shape[0]:(j + 1) * crop_shape[0],
+                   i * crop_shape[1]:(i + 1) * crop_shape[1]] = tile
+
+    return result
+
+
+def get_num_tiles(tiles, num_tiles=None):
+    """Determine number of tiles in the *tiles* list."""
+    if num_tiles is None:
+        num_tiles = int(np.sqrt(len(tiles)))
+        if num_tiles ** 2 != len(tiles):
+            raise ValueError('There must be equal number of tiles in both dimensions if '
+                             'num_tiles is not specified')
+        num_tiles = (num_tiles, num_tiles)
+
+    return num_tiles
 
 
 def _copy_rect(src, dst, src_origin, dst_origin, region, queue):
