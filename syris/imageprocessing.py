@@ -16,26 +16,25 @@ from syris.util import get_magnitude, make_tuple, next_power_of_two, read_image,
 LOG = logging.getLogger(__name__)
 
 
-def fft_2(data, plan=None, queue=None, wait_for_finish=True):
+def fft_2(data, plan=None, queue=None, block=True):
     """2D FFT executed on *data* by a *plan*. If *plan* is None, it is created either for *queue* if
-    given, otherwise for the default opencl queue. *wait_for_finish* specifies if the execution will
-    wait until the scheduled FFT kernels finish. The transformation is done in-place if *data* is a
+    given, otherwise for the default opencl queue. *block* specifies if the execution will wait
+    until the scheduled FFT kernels finish. The transformation is done in-place if *data* is a
     pyopencl Array class and has complex data type, otherwise the data is converted first.
     """
-    return _fft_2(data, inverse=False, plan=plan, queue=queue, wait_for_finish=wait_for_finish)
+    return _fft_2(data, inverse=False, plan=plan, queue=queue, block=block)
 
 
-def ifft_2(data, plan=None, queue=None, wait_for_finish=True):
+def ifft_2(data, plan=None, queue=None, block=True):
     """2D inverse FFT executed on *data* by a *plan*. If *plan* is None, it is created either for
-    *queue* if given, otherwise for the default opencl queue. *wait_for_finish* specifies if the
-    execution will wait until the scheduled FFT kernels finish. The transformation is done in-place
-    if *data* is a pyopencl Array class and has complex data type, otherwise the data is converted
-    first.
+    *queue* if given, otherwise for the default opencl queue. *block* specifies if the execution
+    will wait until the scheduled FFT kernels finish. The transformation is done in-place if *data*
+    is a pyopencl Array class and has complex data type, otherwise the data is converted first.
     """
-    return _fft_2(data, inverse=True, plan=plan, queue=queue, wait_for_finish=wait_for_finish)
+    return _fft_2(data, inverse=True, plan=plan, queue=queue, block=block)
 
 
-def _fft_2(data, inverse=False, plan=None, queue=None, wait_for_finish=True):
+def _fft_2(data, inverse=False, plan=None, queue=None, block=True):
     """Execute FFT on *data*, which is first converted to a pyopencl array and retyped to
     complex.
     """
@@ -53,7 +52,7 @@ def _fft_2(data, inverse=False, plan=None, queue=None, wait_for_finish=True):
             cfg.OPENCL.fft_plans[queue][data.shape] = Plan(data.shape, queue=queue)
         plan = cfg.OPENCL.fft_plans[queue][data.shape]
 
-    plan.execute(data.data, inverse=inverse, wait_for_finish=wait_for_finish)
+    plan.execute(data.data, inverse=inverse, wait_for_finish=block)
 
     return data
 
@@ -186,9 +185,9 @@ def decimate(image, shape, sigma=None, average=False, queue=None, plan=None):
     LOG.debug('Decimating {} -> {} with sigma {}'.format(image.shape, shape, sigma))
 
     fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue)
-    fft_2(image, plan, wait_for_finish=True)
+    fft_2(image, plan, block=True)
     image *= fltr
-    ifft_2(image, plan, wait_for_finish=True)
+    ifft_2(image, plan, block=True)
     image = crop(image, (0, 0) + orig_shape, queue=queue)
 
     return bin_image(image.real, shape, average=average, queue=queue)
