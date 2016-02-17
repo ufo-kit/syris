@@ -165,9 +165,10 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
     return out
 
 
-def decimate(image, shape, sigma=1, average=False, queue=None, plan=None):
+def decimate(image, shape, sigma=None, average=False, queue=None, plan=None):
     """Decimate *image* so that its dimensions match the final *shape*. Remove low frequencies by a
-    Gaussian filter with *sigma* pixels. Use command *queue* and FFT *plan* if specified.
+    Gaussian filter with *sigma* pixels. If *sigma* is None, use the FWHM of one low resolution
+    pixel. Use command *queue* and FFT *plan* if specified.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -179,6 +180,8 @@ def decimate(image, shape, sigma=1, average=False, queue=None, plan=None):
         image = pad(image, region=(0, 0) + pow_shape, queue=queue)
     if not plan:
         plan = Plan(image.shape, queue=queue)
+    if sigma is None:
+        sigma = tuple([fwnm_to_sigma(float(image.shape[i]) / shape[i], n=2) for i in range(2)])
 
     fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue)
     fft_2(image, plan, wait_for_finish=True)
