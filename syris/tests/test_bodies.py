@@ -37,29 +37,41 @@ def test_simple():
     shape = (n, n)
     gt = rescale(thickness.magnitude, shape).get()
     projection = go.project(shape, ps / 2).get()
-    gt = rescale(crop(thickness.magnitude, (2, 2, n / 2, n / 2)), shape).get()
+    gt = rescale(crop(thickness.magnitude, (0, 0, n / 2, n / 2)), shape).get()
     np.testing.assert_almost_equal(gt, projection)
 
     # Cropped downsampled
     shape = (n / 4, n / 4)
     gt = rescale(thickness.magnitude, shape).get()
     projection = go.project(shape, 2 * ps).get()
-    gt = rescale(crop(thickness.magnitude, (2, 2, n / 2, n / 2)), shape).get()
+    gt = rescale(crop(thickness.magnitude, (0, 0, n / 2, n / 2)), shape).get()
     np.testing.assert_almost_equal(gt, projection)
 
     # Padded upsampled
     shape = (4 * n, 4 * n)
-    gt = rescale(thickness.magnitude, shape).get()
-    projection = go.project(shape, ps / 2).get()
-    gt = rescale(pad(thickness.magnitude, (4, 4, 2 * n, 2 * n)), shape).get()
+    projection = go.project(shape, ps / 2, offset=(-n / 2, -n / 2) * ps).get()
+    gt = rescale(pad(thickness.magnitude, (n / 2, n / 2, 2 * n, 2 * n)), shape).get()
     np.testing.assert_almost_equal(gt, projection)
 
     # Padded downsampled
     shape = (n, n)
-    gt = rescale(thickness.magnitude, shape).get()
-    projection = go.project(shape, 2 * ps).get()
+    projection = go.project(shape, 2 * ps, offset=(-n / 2, -n / 2) * ps).get()
     gt = rescale(pad(thickness.magnitude, (4, 4, 2 * n, 2 * n)), shape).get()
     np.testing.assert_almost_equal(gt, projection)
+
+    # Crop and pad and upsample
+    def crop_pad_rescale(ss):
+        shape = (n, n)
+        target_ps = ps / ss
+        fov = shape * ps
+        offset = (2, -2) * q.um
+        shape = (int(n / 2 * ss), int(ss * 3 * n / 2))
+        projection = go.project(shape, target_ps, offset=offset).get()
+        gt = rescale(pad(thickness[n/4:3*n/4, :], (0, n / 4, n / 2, 3 * n / 2)), shape).get()
+        np.testing.assert_almost_equal(gt, projection)
+
+    crop_pad_rescale(2)
+    crop_pad_rescale(0.5)
 
 
 class TestBodies(SyrisTest):
