@@ -24,31 +24,29 @@ class StaticBody(Body):
         """A simple body doesn't move, this function returns infinity."""
         return np.inf * q.s
 
-    def _project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
+    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None):
         """Project thickness."""
-        if shape == self.thickness.shape and np.array_equal(pixel_size, self.pixel_size):
-            result = self.thickness
-        else:
-            src_fov = self.thickness.shape * self.pixel_size
-            dst_fov = shape * pixel_size
-            fov_coeff = (dst_fov / src_fov).simplified.magnitude
-            orig_shape = self.thickness.shape
-            fov_shape = orig_shape * fov_coeff
-            fov_shape = (int(np.ceil(fov_shape[0])), int(np.ceil(fov_shape[1])))
-            # Do not use just one of them because it might be exactly 1
-            representative = min(fov_coeff)
-            if (fov_coeff[0] < 1) ^ (fov_coeff[1] < 1) and fov_coeff[0] != 1 and fov_coeff[1] != 1:
-                raise ValueError('Cannot simultaneously crop and pad image')
-            elif representative < 1:
-                y_0 = (orig_shape[0] - fov_shape[0]) / 2
-                x_0 = (orig_shape[1] - fov_shape[1]) / 2
-                res = crop(self.thickness, (y_0, x_0) + fov_shape)
-            else:
-                y_0 = (fov_shape[0] - orig_shape[0]) / 2
-                x_0 = (fov_shape[1] - orig_shape[1]) / 2
-                res = pad(self.thickness, (y_0, x_0) + fov_shape)
+        orig_shape = self.thickness.shape
+        orig_region = (0, 0) + orig_shape
+        end = ((offset + shape * pixel_size) / self.pixel_size).simplified.magnitude
+        end = np.round(end).astype(np.int)
+        start = np.round((offset / self.pixel_size).simplified.magnitude).astype(np.int)
+        # numpy integers are not understood by pyopencl's rectangle copy
+        end = [int(num) for num in end]
+        start = [int(num) for num in start]
 
-            result = rescale(res, shape)
+        cy, cx = (max(0, start[0]), max(0, start[1]))
+        crop_region = (cy, cx,
+                       min(end[0], orig_shape[0]) - cy,
+                       min(end[1], orig_shape[1]) - cx)
 
-        return result
+        py, px = (abs(min(0, start[0])), abs(min(0, start[1])))
+        pad_region = (py, px, end[0] - start[0], end[1] - start[1])
 
+        proj = self.thickness
+        if crop_region != orig_region:
+            proj = crop(self.thickness, crop_region)
+        if pad_region != (0, 0) + crop_region[2:]:
+            proj = pad(proj, pad_region)
+
+        return rescale(proj, shape)

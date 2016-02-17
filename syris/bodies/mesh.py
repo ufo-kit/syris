@@ -219,13 +219,13 @@ class Mesh(MovableBody):
         matrix = self.get_rescaled_transform_matrix(q.um)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
-    def _project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
+    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None):
         """Projection implementation."""
         def get_crop(index, fov):
-            minimum = max(self.extrema[index][0], 0 * q.um)
-            maximum = min(self.extrema[index][1], fov[::-1][index])
+            minimum = max(self.extrema[index][0], fov[index][0])
+            maximum = min(self.extrema[index][1], fov[index][1])
 
-            return minimum, maximum
+            return minimum - offset[::-1][index], maximum - offset[::-1][index]
 
         def get_px_value(value, round_func, ps):
             return int(round_func(get_magnitude(value / ps)))
@@ -234,12 +234,14 @@ class Mesh(MovableBody):
         self.transform()
         self.sort()
 
-        fov = shape * pixel_size
+        fov = offset + shape * pixel_size
+        fov = np.concatenate((offset.simplified.magnitude[::-1],
+                              fov.simplified.magnitude[::-1])).reshape(2, 2).transpose() * q.m
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
 
-        if (self.extrema[0][0] < fov[1] and self.extrema[0][1] > 0 * q.um and
-            self.extrema[1][0] < fov[0] and self.extrema[1][1] > 0 * q.um):
+        if (self.extrema[0][0] < fov[0][1] and self.extrema[0][1] > fov[0][0] and
+            self.extrema[1][0] < fov[1][1] and self.extrema[1][1] > fov[1][0]):
             # Object inside FOV
             x_min, x_max = get_crop(0, fov)
             y_min, y_max = get_crop(1, fov)
@@ -249,11 +251,12 @@ class Mesh(MovableBody):
             y_max_px = get_px_value(y_max, np.ceil, pixel_size[0])
             width = min(x_max_px - x_min_px, shape[1])
             height = min(y_max_px - y_min_px, shape[0])
-            offset = cl_array.vec.make_int2(x_min_px, y_min_px)
+            compute_offset = cl_array.vec.make_int2(x_min_px, y_min_px)
             v_1, v_2, v_3 = self._make_inputs(queue)
             max_dx = self.max_triangle_x_diff.simplified.magnitude
             min_z = self.extrema[2][0].simplified.magnitude
             ps = pixel_size[0].simplified.magnitude
+            offset = gutil.make_vfloat2(*offset.simplified.magnitude[::-1])
 
             cfg.OPENCL.programs['mesh'].compute_thickness(queue,
                                                           (width, height),
@@ -264,6 +267,7 @@ class Mesh(MovableBody):
                                                           out.data,
                                                           np.int32(self.num_triangles),
                                                           np.int32(shape[1]),
+                                                          compute_offset,
                                                           offset,
                                                           cfg.PRECISION.np_float(ps),
                                                           cfg.PRECISION.np_float(max_dx),

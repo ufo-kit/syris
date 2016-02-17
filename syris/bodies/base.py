@@ -23,28 +23,32 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
+    def project(self, shape, pixel_size, offset=None, t=0 * q.s, queue=None, out=None):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
-        is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or
-        2D. *queue* is an OpenCL command queue, *out* is the pyopencl array used for result.
+        is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D.
+        *offset* is the physical spatial body offset as (y, x). *queue* is an OpenCL command
+        queue, *out* is the pyopencl array used for result.
         """
         shape = make_tuple(shape, num_dims=2)
         pixel_size = make_tuple(pixel_size, num_dims=2)
+        if offset is None:
+            offset = (0, 0) * q.m
         if queue is None:
             queue = cfg.OPENCL.queue
 
-        return self._project(shape, pixel_size, t=t, queue=queue, out=None)
+        return self._project(shape, pixel_size, offset, t=t, queue=queue, out=None)
 
-    def _project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
+    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
-    def _transfer(self, shape, pixel_size, energy, t=0 * q.s, queue=None, out=None):
+    def _transfer(self, shape, pixel_size, energy, offset, t=0 * q.s, queue=None, out=None):
         """Transfer function implementation based on a refractive index."""
         ri = self.material.get_refractive_index(energy)
         lam = energy_to_wavelength(energy)
+        proj = self.project(shape, pixel_size, offset=offset, t=t)
 
-        return transfer(self.project(shape, pixel_size, t=t), ri, lam, queue=queue, out=out)
+        return transfer(proj, ri, lam, queue=queue, out=out)
 
 
 class MovableBody(Body):
@@ -78,21 +82,24 @@ class MovableBody(Body):
         self._cache_projection = cache_projection
         self.update_projection_cache()
 
-    def project(self, shape, pixel_size, t=0 * q.s, queue=None, out=None):
+    def project(self, shape, pixel_size, offset=None, t=0 * q.s, queue=None, out=None):
         """Project thickness at time *t* (if it is None no transformation is applied) to the image
         plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
-        *pixel_size* is the point size, also either 1D or 2D. *queue* is an OpenCL command queue,
-        *out* is the pyopencl array used for result.
+        *pixel_size* is the point size, also either 1D or 2D. *offset* is the physical spatial body
+        offset as (y, x). *queue* is an OpenCL command queue, *out* is the pyopencl array used for
+        result.
         """
         pixel_size = make_tuple(pixel_size, 2)
+        if offset is None:
+            offset = (0, 0) * q.m
         if t is not None:
             self.move(t)
 
         if self.cache_projection:
             if (self._p_cache['time'] is None or np.any(self._p_cache['ps'] != pixel_size) or
-                    self._p_cache['shape'] != shape):
+                    self._p_cache['shape'] != shape or self._p_cache['offset'] != offset):
                 moved = True
-                self.update_projection_cache(t=t, shape=shape, pixel_size=pixel_size)
+                self.update_projection_cache(t=t, shape=shape, pixel_size=pixel_size, offset=offset)
             else:
                 # 0.99 to make sure we recompute when next_time from cached time is current t
                 moved = self.moved(min(self._p_cache['time'], t),
@@ -103,12 +110,13 @@ class MovableBody(Body):
                 LOG.debug('{} computing projection at {}'.format(self, t))
                 self._p_cache['time'] = t
                 self._p_cache['projection'] = super(MovableBody, self).project(shape, pixel_size,
+                                                                               offset=offset,
                                                                                t=t, queue=queue,
                                                                                out=None)
             projection = self._p_cache['projection']
         else:
-            projection = super(MovableBody, self).project(shape, pixel_size, t=t,
-                                                          queue=queue, out=None)
+            projection = super(MovableBody, self).project(shape, pixel_size, offset=offset,
+                                                          t=t, queue=queue, out=None)
 
         return projection
 
@@ -133,9 +141,13 @@ class MovableBody(Body):
         self._cache_projection = value
         self.update_projection_cache()
 
-    def update_projection_cache(self, t=None, shape=None, pixel_size=None, projection=None):
-        """Update projection cache with time *t*, *shape*, *pixel_size* and *projection*."""
-        self._p_cache = {'time': t, 'shape': shape, 'ps': pixel_size, 'projection': projection}
+    def update_projection_cache(self, t=None, shape=None, pixel_size=None, offset=None, projection=None):
+        """Update projection cache with time *t*, *shape*, *pixel_size*, *offset* and *projection*."""
+        self._p_cache = {'time': t,
+                         'shape': shape,
+                         'ps': pixel_size,
+                         'offset': offset,
+                         'projection': projection}
 
     @property
     def furthest_point(self):

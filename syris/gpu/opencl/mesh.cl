@@ -188,6 +188,7 @@ kernel void compute_thickness (const global vfloat3 *v_1,
                                const int num_triangles,
                                const int image_width,
                                const int2 offset,
+                               const vfloat2 mesh_offset,
                                const vfloat scale,
                                const vfloat max_dx,
                                const vfloat min_z,
@@ -197,8 +198,8 @@ kernel void compute_thickness (const global vfloat3 *v_1,
     int idy = get_global_id (1);
     int i, j, num_intersections;
     vfloat results[16];
-    vfloat x_0 = scale * (idx + offset.x + 0.5);
-    vfloat y_0 = scale * (idy + offset.y + 0.5);
+    vfloat x_0 = scale * (idx + offset.x + 0.5) + mesh_offset.x;
+    vfloat y_0 = scale * (idy + offset.y + 0.5) + mesh_offset.y;
     vfloat3 O, D = (vfloat3)(0, 0, 1);
     vfloat intersections[MAX_INTERSECTIONS];
     O.z = min_z - scale;

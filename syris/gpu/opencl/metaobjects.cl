@@ -270,6 +270,7 @@ __kernel void metaballs(__global vfloat *out,
 						global ushort *left,
 						global ushort *right,
 						const int num_objects,
+                        const vfloat2 offset,
 						const int2 gl_offset,
 						const int4 roi,
 						const vfloat2 pixel_size,
@@ -301,8 +302,8 @@ __kernel void metaballs(__global vfloat *out,
 			roi.y <= iy + gl_offset.y && iy + gl_offset.y < roi.w) {
 		/* We are in the FOV. */
 		/* transform pixel to object point in mm first */
-		obj_coords.x = (ix + gl_offset.x) * pixel_size.x;
-		obj_coords.y = (iy + gl_offset.y) * pixel_size.y;
+		obj_coords.x = (ix + gl_offset.x) * pixel_size.x + offset.x;
+		obj_coords.y = (iy + gl_offset.y) * pixel_size.y + offset.y;
 
 		for (i = 0; i < num_objects; i++) {
 			get_meta_ball_equation(poly, &objects[i], &obj_coords, pixel_size.x);
@@ -435,6 +436,7 @@ __kernel void metaballs(__global vfloat *out,
  * @thickness: the projected thickness 2D buffer
  * @objects: (x, y, z, radius) tuples representing the metaballs
  * @num_objects: number of metaballs
+ * @offset: Spatial physical offset as (x, y)
  * @z_range: start and end of the ray in the z-direction in physical units
  * @z_step: z step (pixel size in z-direction)
  * @pixel_size: pixel size in physical units as (x, y)
@@ -444,6 +446,7 @@ __kernel void metaballs(__global vfloat *out,
 __kernel void naive_metaballs(__global vfloat *thickness,
                         __constant vfloat4 *objects,
                         const uint num_objects,
+                        const vfloat2 offset,
                         const vfloat2 z_range,
                         const vfloat z_step,
                         const vfloat2 pixel_size,
@@ -456,8 +459,8 @@ __kernel void naive_metaballs(__global vfloat *thickness,
     vfloat z, isosurface, dist, start, result;
     vfloat4 point;
 
-    point.x = ix * pixel_size.x;
-    point.y = iy * pixel_size.y;
+    point.x = ix * pixel_size.x + offset.x;
+    point.y = iy * pixel_size.y + offset.y;
     inside = 0;
     result = 0.0;
 
