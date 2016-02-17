@@ -183,6 +183,8 @@ def decimate(image, shape, sigma=None, average=False, queue=None, plan=None):
     if sigma is None:
         sigma = tuple([fwnm_to_sigma(float(image.shape[i]) / shape[i], n=2) for i in range(2)])
 
+    LOG.debug('Decimating {} -> {} with sigma {}'.format(image.shape, shape, sigma))
+
     fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue)
     fft_2(image, plan, wait_for_finish=True)
     image *= fltr
