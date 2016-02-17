@@ -135,7 +135,7 @@ class Camera(object):
 
         if self._bin_factor != (1, 1):
             sigma = (fwnm_to_sigma(self._bin_factor[0]), fwnm_to_sigma(self._bin_factor[1]))
-            electrons = gutil.get_host(decimate(electrons, self.shape, sigma=sigma))
+            electrons = gutil.get_host(decimate(electrons, self.shape, sigma=sigma, queue=queue))
 
         if shot_noise:
             electrons = np.random.poisson(electrons)
