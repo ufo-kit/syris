@@ -455,14 +455,26 @@ __kernel void naive_metaballs(__global vfloat *thickness,
     int iy = get_global_id(1);
 	uint mem_index = get_global_size(0) * iy + ix;
 	uint obj_offset = mem_index * MAX_OBJECTS;
-    int m, inside, num_transitions, intersection_index = 0;
-    vfloat z, isosurface, dist, start, result;
+    int m, inside = 0, num_transitions, intersection_index = 0, hit = 0;
+    vfloat z, isosurface, dist, start, result = 0.0;
     vfloat4 point;
 
     point.x = ix * pixel_size.x + offset.x;
     point.y = iy * pixel_size.y + offset.y;
-    inside = 0;
-    result = 0.0;
+
+    /* First make sure we hit any metaball */
+    for (m = 0; m < num_objects; m++) {
+        if (objects[m].x - 2 * objects[m].w < point.x && point.x < objects[m].x + 2 * objects[m].w &&
+            objects[m].y - 2 * objects[m].w < point.y && point.y < objects[m].y + 2 * objects[m].w) {
+            hit = 1;
+            break;
+        }
+    }
+
+    if (!hit) {
+        thickness[mem_index] = 0.0;
+        return;
+    }
 
     for (z = z_range.x; z <= z_range.y; z += z_step) {
         isosurface = 0.0;
