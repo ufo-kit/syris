@@ -3,10 +3,12 @@ Utility functions concerning GPU programming.
 """
 
 import pkg_resources
+import Queue
 import sys
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
+from multiprocessing.pool import ThreadPool
 from pyopencl.array import vec
 import time
 from syris import profiling as prf
@@ -308,3 +310,35 @@ def get_image(data, access=cl.mem_flags.READ_ONLY, queue=None):
                               shape=data.shape[::-1], hostbuf=data)
 
     return result
+
+
+def qmap(func, items, queues=None, args=(), kwargs=None):
+    """Apply *func* to *items* on multiple command queues. The function *func* should block until
+    the execution on a device is finished, otherwise the command queue which is assigned to it might
+    return to the pool of usable resources too soon and stall execution. Consider using another
+    mechanism if *func* is a kernel, i.e. the multi gpu execution might be realized without
+    threading, which is used here.
+    *func* is a callable with signature func(item, queue, *args, **kwargs) where item is an item to
+    be processed and queue is the OpenCL command queue to be used. *queues* are the command queues
+    to be used for computation, if not specified, all the default ones are used. *args* is a list
+    and *kwargs* a dictionary, both passed to *func*.
+    """
+    queue_of_queues = Queue.Queue()
+    if queues is None:
+        queues = cfg.OPENCL.queues
+    for queue in queues:
+        queue_of_queues.put(queue)
+    if kwargs is None:
+        kwargs = {}
+    pool = ThreadPool(processes=len(queues))
+
+    def process(item):
+        queue = queue_of_queues.get()
+        LOG.debug("Mapping '{}' to item {} and queue {}".format(func.__name__, item,
+                                                                queues.index(queue)))
+        result = func(item, queue, *args, **kwargs)
+        queue_of_queues.put(queue)
+
+        return result
+
+    return pool.map(process, items)
