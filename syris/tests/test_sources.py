@@ -11,37 +11,33 @@ class TestSources(SyrisTest):
     def setUp(self):
         syris.init()
         self.energies = np.arange(14.8, 15, 0.1) * q.keV
-        self.angle_step = 10
+        self.trajectory = Trajectory([(0, 0, 0)] * q.m)
         self.ps = 10 * q.um
 
         self.source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
                                     self.energies, np.array([0.2, 0.8]) * q.mm, self.ps,
-                                    self.angle_step)
+                                    self.trajectory)
 
     @slow
     def test_bending_magnet_approx(self):
         source_2 = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
                                  self.energies, np.array([0.2, 0.8]) * q.mm, self.ps,
-                                 self.angle_step, profile_approx=False)
+                                 self.trajectory, profile_approx=False)
 
         for e in self.energies:
-            profile = self.source.get_vertical_profile(e)
-            profile_2 = source_2.get_vertical_profile(e)
-            perc = profile / profile_2
+            u_0 = self.source.transfer((16, 16), self.ps, e).get().real
+            u_1 = source_2.transfer((16, 16), self.ps, e).get().real
+            perc = u_0 / u_1
 
             # Allow 0.1 % difference
             np.testing.assert_allclose(perc, 1, rtol=1e-3)
 
     def test_transfer(self):
-        shape = self.angle_step
+        shape = 10
         # No trajectory
         self.source.transfer(shape, self.ps, self.energies[0])
         # Width may be larger
-        self.source.transfer((self.angle_step, 2 * self.angle_step), self.ps, self.energies[0])
-
-        # Wrong shape
-        bad_shape = 2 * self.angle_step
-        self.assertRaises(ValueError, self.source.transfer, bad_shape, self.ps, self.energies[0])
+        self.source.transfer((shape, 2 * shape), self.ps, self.energies[0])
 
         # With trajectory
         n = 16
@@ -50,8 +46,7 @@ class TestSources(SyrisTest):
         tr = Trajectory(zip(x, y, z) * q.mm, pixel_size=10 * q.um, furthest_point=0*q.m,
                         velocity=1 * q.mm / q.s)
         source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
-                               self.energies, np.array([0.2, 0.8]) * q.mm, self.ps,
-                               self.angle_step, trajectory=tr)
+                               self.energies, np.array([0.2, 0.8]) * q.mm, self.ps, trajectory=tr)
         im_0 = source.transfer(shape, self.ps, self.energies[0]).get()
         im_1 = source.transfer(shape, self.ps, self.energies[0], t=tr.time / 2).get()
 
