@@ -96,12 +96,12 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
 
 
 def propagate(samples, shape, energies, distance, pixel_size, region=None, apply_phase_factor=False,
-              mollified=True, detector=None, queue=None, out=None, plan=None, t=0 * q.s):
+              mollified=True, detector=None, offset=None, queue=None, out=None, plan=None, t=0 * q.s):
     """Propagate *samples* with *shape* as (y, x) which are
     :class:`syris.opticalelements.OpticalElement` instances at *energies* to *distance*. Use
     *pixel_size*, limit coherence to *region*, *apply_phase_factor* is as by the Fresnel
-    approximation phase factor, *queue* an OpenCL command queue, *out* a PyOpenCL Array and *plan*
-    and FFT plan.
+    approximation phase factor, *offset* is the sample offset. *queue* an OpenCL command queue,
+    *out* a PyOpenCL Array and *plan* and FFT plan.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -115,7 +115,8 @@ def propagate(samples, shape, energies, distance, pixel_size, region=None, apply
         u.fill(1)
         lam = energy_to_wavelength(energy)
         for sample in samples:
-            u *= sample.transfer(shape, pixel_size, energy, queue=queue, out=out, t=t)
+            u *= sample.transfer(shape, pixel_size, energy, offset=offset,
+                                 queue=queue, out=out, t=t)
         if distance != 0 * q.m:
             propagator = compute_propagator(u.shape[0], distance, lam, pixel_size, region=region,
                                             apply_phase_factor=apply_phase_factor,
