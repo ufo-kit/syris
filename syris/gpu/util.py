@@ -47,15 +47,19 @@ def init_programs():
     cfg.OPENCL.programs['mesh'] = get_program(get_source(['heapsort.cl', 'mesh.cl']))
 
 
-def make_opencl_defaults(device_index=0, profiling=True):
+def make_opencl_defaults(device_index=None, profiling=True):
     """Create default OpenCL context and a command queue based on *device_index* to the devices
-    list. If *profiling* is True enable it.
+    list. If None, all devices are used in the context. If *profiling* is True enable it.
     """
     if profiling:
         kwargs = {"properties": cl.command_queue_properties.PROFILING_ENABLE}
     else:
         kwargs = {}
-    cfg.OPENCL.devices = [get_cuda_devices()[device_index]]
+    if device_index is None:
+        cfg.OPENCL.devices = get_cuda_devices()
+    else:
+        cfg.OPENCL.devices = [get_cuda_devices()[device_index]]
+
     cfg.OPENCL.ctx = get_cuda_context(devices=cfg.OPENCL.devices)
     cfg.OPENCL.queues = get_command_queues(cfg.OPENCL.ctx, cfg.OPENCL.devices, queue_kwargs=kwargs)
     cfg.OPENCL.queue = cfg.OPENCL.queues[0]

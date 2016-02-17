@@ -10,7 +10,7 @@ from syris import profiling as prf
 __version__ = '0.1'
 
 
-def init(device_index=0, profiling=True, profiling_file='profile.dat', loglevel=logging.DEBUG,
+def init(device_index=None, profiling=True, profiling_file='profile.dat', loglevel=logging.DEBUG,
          logfile=None, double_precision=False):
     """Initialize syris with *device_index*."""
     cfg.PRECISION = cfg.Precision(double_precision)
