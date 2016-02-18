@@ -146,19 +146,29 @@ def make_henke(name, energies, formula=None, density=None):
     return Material(name, indices, energies)
 
 
-def make_stepanov(name, energies, density, formula=None):
+def make_stepanov(name, energies, density=None, formula=None, crystal=None):
     """Use the http://x-server.gmca.aps.anl.gov database to lookup a material *name* for
     *energies*, use the specified chemical *formula* and *density*.
     """
-    if not formula:
-        formula = name
-    density = density.rescale(q.g / q.cm ** 3).magnitude
-    base = 'http://x-server.gmca.aps.anl.gov/cgi/X0h_form.exe?'
-    url_fmt = base + 'xway=2&wave={}&coway=2&chem={}&rho={}&i1=1&i2=1&i3=1&df1df2=-1&modeout=1'
+    if crystal and formula:
+        raise ValueError("Only one of 'formula' or 'crystal' can be specified")
+    if crystal:
+        mat = '&coway=0&code={}'.format(crystal)
+    else:
+        if not density:
+            raise ValueError("'density' must be specified for formula-based lookup")
+        if not formula:
+            formula = name
+        density = density.rescale(q.g / q.cm ** 3).magnitude
+        mat = '&coway=2&chem={}&rho={}'.format(formula, density)
+
+    base = 'http://x-server.gmca.aps.anl.gov/cgi/X0h_form.exe?xway=2'
+    apdx_fmt = '&wave={}&i1=1&i2=1&i3=1&df1df2=-1&modeout=1'
 
     indices = []
     for energy in energies:
-        url = url_fmt.format(energy.rescale(q.keV).magnitude, formula, density)
+        apdx = apdx_fmt.format(energy.rescale(q.keV).magnitude)
+        url = base + mat + apdx
         res = urllib2.urlopen(url)
         txt = res.read()
         delta, beta = txt[txt.find('delta='):].split('\r\n')[:2]
