@@ -57,10 +57,10 @@ def _fft_2(data, inverse=False, plan=None, queue=None, block=True):
     return data
 
 
-def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
+def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None, block=False):
     """Get 2D Gaussian of *shape* with standard deviation *sigma* and *pixel_size*. If *fourier* is
     True the fourier transform of it is returned so it is faster for usage by convolution. Use
-    command *queue* if specified.
+    command *queue* if specified. If *block* is True, wait for the kernel to finish.
     """
     shape = make_tuple(shape)
     pixel_size = get_magnitude(make_tuple(pixel_size))
@@ -71,28 +71,33 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None):
     out = cl.array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
 
     if fourier:
-        cfg.OPENCL.programs['improc'].gauss_2d_f(queue,
-                                                 shape[::-1],
-                                                 None,
-                                                 out.data,
-                                                 g_util.make_vfloat2(sigma[1], sigma[0]),
-                                                 g_util.make_vfloat2(pixel_size[1], pixel_size[0]))
+        ev = cfg.OPENCL.programs['improc'].gauss_2d_f(queue,
+                                                      shape[::-1],
+                                                      None,
+                                                      out.data,
+                                                      g_util.make_vfloat2(sigma[1], sigma[0]),
+                                                      g_util.make_vfloat2(pixel_size[1],
+                                                      pixel_size[0]))
     else:
-        cfg.OPENCL.programs['improc'].gauss_2d(queue,
-                                               shape[::-1],
-                                               None,
-                                               out.data,
-                                               g_util.make_vfloat2(sigma[1], sigma[0]),
-                                               g_util.make_vfloat2(pixel_size[1], pixel_size[0]))
+        ev = cfg.OPENCL.programs['improc'].gauss_2d(queue,
+                                                    shape[::-1],
+                                                    None,
+                                                    out.data,
+                                                    g_util.make_vfloat2(sigma[1], sigma[0]),
+                                                    g_util.make_vfloat2(pixel_size[1],
+                                                    pixel_size[0]))
+    if block:
+        ev.wait()
 
     return out
 
 
-def pad(image, region=None, out=None, queue=None):
+def pad(image, region=None, out=None, queue=None, block=False):
     """Pad a 2D *image*. *region* is the region to pad as (y_0, x_0, height, width). If not
     specified, the next power of two dimensions are used and the image is centered in the padded
     one. The final image dimensions are height x width and the filling starts at (y_0, x_0), *out*
-    is the pyopencl Array instance, if not specified it will be created. *out* is also returned.
+    is the pyopencl Array instance, if not specified it will be created. *out* is also returned. If
+    *block* is True, wait for the copy to finish.
     """
     if region is None:
         shape = tuple([next_power_of_two(n) for n in image.shape])
@@ -111,14 +116,15 @@ def pad(image, region=None, out=None, queue=None):
     dst_origin = (n_bytes * x_0, y_0, 0)
     region = (n_bytes * image.shape[1], image.shape[0], 1)
 
-    _copy_rect(image, out, src_origin, dst_origin, region, queue)
+    _copy_rect(image, out, src_origin, dst_origin, region, queue, block=block)
 
     return out
 
 
-def crop(image, region, out=None, queue=None):
+def crop(image, region, out=None, queue=None, block=False):
     """Crop a 2D *image*. *region* is the region to crop as (y_0, x_0, height, width), *out* is the
-    pyopencl Array instance, if not specified it will be created. *out* is also returned.
+    pyopencl Array instance, if not specified it will be created. *out* is also returned. If *block*
+    is True, wait for the copy to finish.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -132,16 +138,17 @@ def crop(image, region, out=None, queue=None):
     dst_origin = (0, 0, 0)
     region = (n_bytes * width, height, 1)
 
-    _copy_rect(image, out, src_origin, dst_origin, region, queue)
+    _copy_rect(image, out, src_origin, dst_origin, region, queue, block=block)
 
     return out
 
 
-def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue=None):
+def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue=None,
+              block=False):
     """Bin a *image*. The resulting buffer has shape *summer_shape* (y, x).  *Offset* (y, x) is the
     offset to the original *image*.  If *average* is True, the summed pixel is normalized by the
     region area. *out* is the pyopencl Array instance, if not specified it will be created. *out* is
-    also returned.
+    also returned. If *block* is True, wait for the copy to finish.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -151,23 +158,26 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
     region = ((image.shape[0] - offset[0]) / summed_shape[0],
               (image.shape[1] - offset[1]) / summed_shape[1])
 
-    cfg.OPENCL.programs['improc'].sum(queue,
-                                      (summed_shape[::-1]),
-                                      None,
-                                      out.data,
-                                      image.data,
-                                      vec.make_int2(*region[::-1]),
-                                      np.int32(image.shape[1]),
-                                      vec.make_int2(*offset[::-1]),
-                                      np.int32(average))
+    ev = cfg.OPENCL.programs['improc'].sum(queue,
+                                           (summed_shape[::-1]),
+                                           None,
+                                           out.data,
+                                           image.data,
+                                           vec.make_int2(*region[::-1]),
+                                           np.int32(image.shape[1]),
+                                           vec.make_int2(*offset[::-1]),
+                                           np.int32(average))
+    if block:
+        ev.wait()
 
     return out
 
 
-def decimate(image, shape, sigma=None, average=False, queue=None, plan=None):
+def decimate(image, shape, sigma=None, average=False, queue=None, plan=None, block=False):
     """Decimate *image* so that its dimensions match the final *shape*. Remove low frequencies by a
     Gaussian filter with *sigma* pixels. If *sigma* is None, use the FWHM of one low resolution
-    pixel. Use command *queue* and FFT *plan* if specified.
+    pixel. Use command *queue* and FFT *plan* if specified. If *block* is True, wait for the copy to
+    finish.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -184,18 +194,18 @@ def decimate(image, shape, sigma=None, average=False, queue=None, plan=None):
 
     LOG.debug('Decimating {} -> {} with sigma {}'.format(image.shape, shape, sigma))
 
-    fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue)
-    fft_2(image, plan, block=True)
+    fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue, block=block)
+    fft_2(image, plan, block=block)
     image *= fltr
-    ifft_2(image, plan, block=True)
-    image = crop(image, (0, 0) + orig_shape, queue=queue)
+    ifft_2(image, plan, block=block)
+    image = crop(image, (0, 0) + orig_shape, queue=queue, block=block)
 
-    return bin_image(image.real, shape, average=average, queue=queue)
+    return bin_image(image.real, shape, average=average, queue=queue, block=block)
 
 
-def rescale(image, shape, sampler=None, queue=None, out=None):
+def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
     """Rescale *image* to *shape* and use *sampler* which is a :class:`pyopencl.Sampler` instance.
-    Use OpenCL *queue* and *out* pyopencl Array.
+    Use OpenCL *queue* and *out* pyopencl Array. If *block* is True, wait for the copy to finish.
     """
     if cfg.PRECISION.cl_float == 8:
         raise TypeError('Double precision mode not supported')
@@ -212,13 +222,15 @@ def rescale(image, shape, sampler=None, queue=None, out=None):
         sampler = cl.Sampler(cfg.OPENCL.ctx, False, cl.addressing_mode.NONE, cl.filter_mode.LINEAR)
     image = g_util.get_image(image)
 
-    cfg.OPENCL.programs['improc'].rescale(queue,
-                                          shape[::-1],
-                                          None,
-                                          image,
-                                          out.data,
-                                          sampler,
-                                          g_util.make_vfloat2(*factor))
+    ev = cfg.OPENCL.programs['improc'].rescale(queue,
+                                               shape[::-1],
+                                               None,
+                                               image,
+                                               out.data,
+                                               sampler,
+                                               g_util.make_vfloat2(*factor))
+    if block:
+        ev.wait()
 
     return out
 
@@ -407,14 +419,16 @@ def get_num_tiles(tiles, num_tiles=None):
     return num_tiles
 
 
-def _copy_rect(src, dst, src_origin, dst_origin, region, queue):
+def _copy_rect(src, dst, src_origin, dst_origin, region, queue, block=False):
     """Copy a rectangular OpenCL buffer *region* from *src* to *dst*, where both are a pyopencl
     Array instance. *src_origin* and *dst_origin* specify the offsets. *queue* is an OpenCL command
-    queue.
+    queue. If *block* is True, wait for the copy to finish.
     """
     n_bytes = src.dtype.itemsize
     src_pitches = (n_bytes * src.shape[1], n_bytes * src.shape[1] * src.shape[0])
     dst_pitches = (n_bytes * dst.shape[1], n_bytes * dst.shape[1] * dst.shape[0])
 
-    cl.enqueue_copy_buffer_rect(queue, src.data, dst.data, src_origin, dst_origin, region,
-                                src_pitches, dst_pitches)
+    ev = cl.enqueue_copy_buffer_rect(queue, src.data, dst.data, src_origin, dst_origin, region,
+                                     src_pitches, dst_pitches)
+    if block:
+        ev.wait()

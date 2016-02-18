@@ -24,7 +24,7 @@ class StaticBody(Body):
         """A simple body doesn't move, this function returns infinity."""
         return np.inf * q.s
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None):
+    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
         """Project thickness."""
         orig_shape = self.thickness.shape
         orig_region = (0, 0) + orig_shape
@@ -45,8 +45,8 @@ class StaticBody(Body):
 
         proj = self.thickness
         if crop_region != orig_region:
-            proj = crop(self.thickness, crop_region)
+            proj = crop(self.thickness, crop_region, block=block)
         if pad_region != (0, 0) + crop_region[2:]:
-            proj = pad(proj, pad_region)
+            proj = pad(proj, pad_region, block=block)
 
-        return rescale(proj, shape)
+        return rescale(proj, shape, block=block)

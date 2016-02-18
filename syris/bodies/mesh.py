@@ -219,7 +219,7 @@ class Mesh(MovableBody):
         matrix = self.get_rescaled_transform_matrix(q.um)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None):
+    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
         """Projection implementation."""
         def get_crop(index, fov):
             minimum = max(self.extrema[index][0], fov[index][0])
@@ -258,21 +258,23 @@ class Mesh(MovableBody):
             ps = pixel_size[0].simplified.magnitude
             offset = gutil.make_vfloat2(*offset.simplified.magnitude[::-1])
 
-            cfg.OPENCL.programs['mesh'].compute_thickness(queue,
-                                                          (width, height),
-                                                          None,
-                                                          v_1.data,
-                                                          v_2.data,
-                                                          v_3.data,
-                                                          out.data,
-                                                          np.int32(self.num_triangles),
-                                                          np.int32(shape[1]),
-                                                          compute_offset,
-                                                          offset,
-                                                          cfg.PRECISION.np_float(ps),
-                                                          cfg.PRECISION.np_float(max_dx),
-                                                          cfg.PRECISION.np_float(min_z),
-                                                          np.int32(self.iterations))
+            ev = cfg.OPENCL.programs['mesh'].compute_thickness(queue,
+                                                               (width, height),
+                                                               None,
+                                                               v_1.data,
+                                                               v_2.data,
+                                                               v_3.data,
+                                                               out.data,
+                                                               np.int32(self.num_triangles),
+                                                               np.int32(shape[1]),
+                                                               compute_offset,
+                                                               offset,
+                                                               cfg.PRECISION.np_float(ps),
+                                                               cfg.PRECISION.np_float(max_dx),
+                                                               cfg.PRECISION.np_float(min_z),
+                                                               np.int32(self.iterations))
+            if block:
+                ev.wait()
 
         return out
 

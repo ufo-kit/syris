@@ -59,8 +59,9 @@ class MetaBall(MovableBody):
 
         return BoundingBox(np.array(transformed) * q.m)
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None):
-        return project_metaballs([self], shape, pixel_size, offset, queue=queue, out=out)
+    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
+        return project_metaballs([self], shape, pixel_size, offset, queue=queue, out=out,
+                                 block=block)
 
     def get_transform_const(self):
         """
@@ -97,9 +98,10 @@ class MetaBalls(CompositeBody):
     def __init__(self, trajectory, metaballs, orientation=geom.Y_AX):
         super(MetaBalls, self).__init__(trajectory, orientation=orientation, bodies=metaballs)
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None):
+    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
         """Projection implementation."""
-        return project_metaballs(self._bodies, shape, pixel_size, offset, queue=queue, out=out)
+        return project_metaballs(self._bodies, shape, pixel_size, offset, queue=queue, out=out,
+                                 block=block)
 
 
 def get_moved_groups(bodies, t_0, t_1, distance):
@@ -133,10 +135,11 @@ def get_format_string(string):
     return string.replace("vf", float_string)
 
 
-def project_metaballs(metaballs, shape, pixel_size, offset=None, queue=None, out=None):
+def project_metaballs(metaballs, shape, pixel_size, offset=None, queue=None, out=None,
+                      block=False):
     """Project a list of :class:`.MetaBall` on an image plane with *shape*, *pixel_size*.  *offset*
     is the physical spatial body offset as (y, x). Use OpenCL *queue* and *out* pyopencl Array
-    instance for returning the result.
+    instance for returning the result. If *block* is True, wait for the kernel to finish.
     """
     string = ''.join([body.pack() for body in metaballs])
     n, m = shape
@@ -158,30 +161,32 @@ def project_metaballs(metaballs, shape, pixel_size, offset=None, queue=None, out
     if out is None:
         out = cl_array.Array(queue, shape, cfg.PRECISION.np_float)
 
-    cfg.OPENCL.programs['geometry'].metaballs(cfg.OPENCL.queue,
-                                              (m, n),
-                                              None,
-                                              out.data,
-                                              bodies_mem,
-                                              pbodies_mem,
-                                              left_mem,
-                                              right_mem,
-                                              np.int32(len(metaballs)),
-                                              offset,
-                                              cl_array.vec.make_int2(0, 0),
-                                              cl_array.vec.make_int4(0, 0, m, n),
-                                              g_util.make_vfloat2(ps[1], ps[0]),
-                                              np.int32(True))
+    ev = cfg.OPENCL.programs['geometry'].metaballs(cfg.OPENCL.queue,
+                                                   (m, n),
+                                                   None,
+                                                   out.data,
+                                                   bodies_mem,
+                                                   pbodies_mem,
+                                                   left_mem,
+                                                   right_mem,
+                                                   np.int32(len(metaballs)),
+                                                   offset,
+                                                   cl_array.vec.make_int2(0, 0),
+                                                   cl_array.vec.make_int4(0, 0, m, n),
+                                                   g_util.make_vfloat2(ps[1], ps[0]),
+                                                   np.int32(True))
+    if block:
+        ev.wait()
 
     return out
 
 
 def project_metaballs_naive(metaballs, shape, pixel_size, offset=None, z_step=None,
-                            queue=None, out=None):
+                            queue=None, out=None, block=False):
     """Project a list of :class:`.MetaBall` on an image plane with *shape*, *pixel_size*. *z_step*
     is the physical step in the z-dimension, if not specified it is the same as *pixel_size*.
     *offset* is the physical spatial body offset as (y, x). Use OpenCL *queue* and *out* pyopencl
-    Array instance for returning the result.
+    Array instance for returning the result. If *block* is True, wait for the kernel to finish.
     """
     def get_extrema(sgn):
         func = np.max if sgn > 0 else np.min
@@ -193,31 +198,33 @@ def project_metaballs_naive(metaballs, shape, pixel_size, offset=None, z_step=No
 
     if offset is None:
         offset = (0, 0) * q.m
+    if not queue:
+        queue = cfg.OPENCL.queue
+    if out is None:
+        out = cl_array.Array(queue, shape, cfg.PRECISION.np_float)
+
     string = ''.join([body.pack() for body in metaballs])
+    data = np.fromstring(string, dtype=np.float32)
+    data = cl_array.to_device(queue, data)
     n, m = shape
     ps = util.make_tuple(pixel_size.simplified.magnitude)
     z_step = ps[1] if z_step is None else z_step.simplified.magnitude
-    if not queue:
-        queue = cfg.OPENCL.queue
-
-    bodies_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
-                           cl.mem_flags.COPY_HOST_PTR, hostbuf=string)
-    if out is None:
-        out = cl_array.Array(queue, shape, cfg.PRECISION.np_float)
 
     z_range = get_extrema(-1), get_extrema(1)
     offset = g_util.make_vfloat2(*offset.simplified.magnitude[::-1])
 
-    cfg.OPENCL.programs['geometry'].naive_metaballs(cfg.OPENCL.queue,
-                                                    (m, n),
-                                                    None,
-                                                    out.data,
-                                                    bodies_mem,
-                                                    np.int32(len(metaballs)),
-                                                    offset,
-                                                    g_util.make_vfloat2(*z_range),
-                                                    cfg.PRECISION.np_float(z_step),
-                                                    g_util.make_vfloat2(*ps[::-1]),
-                                                    np.int32(True))
+    ev = cfg.OPENCL.programs['geometry'].naive_metaballs(cfg.OPENCL.queue,
+                                                         (m, n),
+                                                         None,
+                                                         out.data,
+                                                         data.data,
+                                                         np.int32(len(metaballs)),
+                                                         offset,
+                                                         g_util.make_vfloat2(*z_range),
+                                                         cfg.PRECISION.np_float(z_step),
+                                                         g_util.make_vfloat2(*ps[::-1]),
+                                                         np.int32(True))
+    if block:
+        ev.wait()
 
     return out

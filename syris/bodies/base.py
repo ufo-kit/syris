@@ -23,11 +23,13 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape, pixel_size, offset=None, t=0 * q.s, queue=None, out=None):
+    def project(self, shape, pixel_size, offset=None, t=0 * q.s, queue=None, out=None,
+                block=False):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D.
-        *offset* is the physical spatial body offset as (y, x). *queue* is an OpenCL command
-        queue, *out* is the pyopencl array used for result.
+        *offset* is the physical spatial body offset as (y, x). *queue* is an OpenCL command queue,
+        *out* is the pyopencl array used for result. If *block* is True, wait for the kernel to
+        finish.
         """
         shape = make_tuple(shape, num_dims=2)
         pixel_size = make_tuple(pixel_size, num_dims=2)
@@ -36,19 +38,20 @@ class Body(OpticalElement):
         if queue is None:
             queue = cfg.OPENCL.queue
 
-        return self._project(shape, pixel_size, offset, t=t, queue=queue, out=None)
+        return self._project(shape, pixel_size, offset, t=t, queue=queue, out=None, block=block)
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None):
+    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
-    def _transfer(self, shape, pixel_size, energy, offset, t=0 * q.s, queue=None, out=None):
+    def _transfer(self, shape, pixel_size, energy, offset, t=0 * q.s, queue=None, out=None,
+                  block=False):
         """Transfer function implementation based on a refractive index."""
         ri = self.material.get_refractive_index(energy)
         lam = energy_to_wavelength(energy)
-        proj = self.project(shape, pixel_size, offset=offset, t=t)
+        proj = self.project(shape, pixel_size, offset=offset, t=t, block=block)
 
-        return transfer(proj, ri, lam, queue=queue, out=out)
+        return transfer(proj, ri, lam, queue=queue, out=out, block=block)
 
 
 class MovableBody(Body):
@@ -82,12 +85,13 @@ class MovableBody(Body):
         self._cache_projection = cache_projection
         self.update_projection_cache()
 
-    def project(self, shape, pixel_size, offset=None, t=0 * q.s, queue=None, out=None):
+    def project(self, shape, pixel_size, offset=None, t=0 * q.s, queue=None, out=None,
+                block=False):
         """Project thickness at time *t* (if it is None no transformation is applied) to the image
         plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
         *pixel_size* is the point size, also either 1D or 2D. *offset* is the physical spatial body
         offset as (y, x). *queue* is an OpenCL command queue, *out* is the pyopencl array used for
-        result.
+        result. If *block* is True, wait for the kernel to finish.
         """
         pixel_size = make_tuple(pixel_size, 2)
         if offset is None:
@@ -112,11 +116,12 @@ class MovableBody(Body):
                 self._p_cache['projection'] = super(MovableBody, self).project(shape, pixel_size,
                                                                                offset=offset,
                                                                                t=t, queue=queue,
-                                                                               out=None)
+                                                                               out=None,
+                                                                               block=block)
             projection = self._p_cache['projection']
         else:
             projection = super(MovableBody, self).project(shape, pixel_size, offset=offset,
-                                                          t=t, queue=queue, out=None)
+                                                          t=t, queue=queue, out=None, block=block)
 
         return projection
 

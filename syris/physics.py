@@ -15,9 +15,10 @@ from syris import config as cfg
 LOG = logging.getLogger(__name__)
 
 
-def transfer(thickness, refractive_index, wavelength, queue=None, out=None):
+def transfer(thickness, refractive_index, wavelength, queue=None, out=None, block=False):
     """Transfer *thickness* (can be either a numpy or pyopencl array) with *refractive_index* and
-    given *wavelength*. Use command *queue* for computation and *out* pyopencl array.
+    given *wavelength*. Use command *queue* for computation and *out* pyopencl array. If *block* is
+    True, wait for the kernel to finish.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -31,25 +32,27 @@ def transfer(thickness, refractive_index, wavelength, queue=None, out=None):
     if out is None:
         out = cl_array.Array(queue, thickness_mem.shape, cfg.PRECISION.np_cplx)
 
-    cfg.OPENCL.programs['physics'].transfer(queue,
-                                            thickness_mem.shape[::-1],
-                                            None,
-                                            out.data,
-                                            thickness_mem.data,
-                                            cfg.PRECISION.np_cplx(refractive_index),
-                                            cfg.PRECISION.np_float(
-                                                wavelength.simplified.magnitude))
+    ev = cfg.OPENCL.programs['physics'].transfer(queue,
+                                                 thickness_mem.shape[::-1],
+                                                 None,
+                                                 out.data,
+                                                 thickness_mem.data,
+                                                 cfg.PRECISION.np_cplx(refractive_index),
+                                                 cfg.PRECISION.np_float(
+                                                     wavelength.simplified.magnitude))
+    if block:
+        ev.wait()
 
     return out
 
 
 def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase_factor=False,
-                       mollified=True, queue=None):
+                       mollified=True, queue=None, block=False):
     """Create a propagator with (*size*, *size*) dimensions for propagation *distance*, wavelength
     *lam* and *pixel_size*. *region* is the diameter of the the wavefront area which is capable of
     interference. If *apply_phase_factor* is True, apply the phase factor defined by Fresnel
     approximation. If *mollified* is True the aliased frequencies are suppressed. If command *queue*
-    is specified, execute the kernel on it.
+    is specified, execute the kernel on it. If *block* is True, wait for the kernel to finish.
     """
     if size % 2:
         raise ValueError('Only even sizes are supported')
@@ -71,14 +74,16 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
     else:
         phase_factor = 0 + 0j
 
-    cfg.OPENCL.programs['physics'].propagator(queue,
-                                              (size / 2 + 1, size / 2 + 1),
-                                              None,
-                                              out.data,
-                                              cfg.PRECISION.np_float(distance.simplified),
-                                              cfg.PRECISION.np_float(lam.simplified),
-                                              cfg.PRECISION.np_float(pixel_size.simplified),
-                                              g_util.make_vcomplex(phase_factor))
+    ev = cfg.OPENCL.programs['physics'].propagator(queue,
+                                                   (size / 2 + 1, size / 2 + 1),
+                                                   None,
+                                                   out.data,
+                                                   cfg.PRECISION.np_float(distance.simplified),
+                                                   cfg.PRECISION.np_float(lam.simplified),
+                                                   cfg.PRECISION.np_float(pixel_size.simplified),
+                                                   g_util.make_vcomplex(phase_factor))
+    if block:
+        ev.wait()
 
     if mollified:
         fwtm = compute_aliasing_limit(size, lam, pixel_size, distance,
@@ -89,19 +94,21 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
             fwtm = min(fwtm_region, fwtm)
 
         sigma = fwnm_to_sigma(fwtm, n=10)
-        mollifier = get_gauss_2d(size, sigma, fourier=False, queue=queue)
+        mollifier = get_gauss_2d(size, sigma, fourier=False, queue=queue, block=block)
         out = out * mollifier
 
     return out
 
 
-def propagate(samples, shape, energies, distance, pixel_size, region=None, apply_phase_factor=False,
-              mollified=True, detector=None, offset=None, queue=None, out=None, plan=None, t=0 * q.s):
+def propagate(samples, shape, energies, distance, pixel_size, region=None,
+              apply_phase_factor=False, mollified=True, detector=None, offset=None,
+              queue=None, out=None, plan=None, t=0 * q.s, block=False):
     """Propagate *samples* with *shape* as (y, x) which are
     :class:`syris.opticalelements.OpticalElement` instances at *energies* to *distance*. Use
     *pixel_size*, limit coherence to *region*, *apply_phase_factor* is as by the Fresnel
     approximation phase factor, *offset* is the sample offset. *queue* an OpenCL command queue,
-    *out* a PyOpenCL Array and *plan* and FFT plan.
+    *out* a PyOpenCL Array and *plan* and FFT plan. If *block* is True, wait for the kernels to
+    finish.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -115,14 +122,14 @@ def propagate(samples, shape, energies, distance, pixel_size, region=None, apply
         lam = energy_to_wavelength(energy)
         for sample in samples:
             u *= sample.transfer(shape, pixel_size, energy, offset=offset,
-                                 queue=queue, out=out, t=t)
+                                 queue=queue, out=out, t=t, block=block)
         if distance != 0 * q.m:
             propagator = compute_propagator(u.shape[0], distance, lam, pixel_size, region=region,
                                             apply_phase_factor=apply_phase_factor,
-                                            mollified=mollified, queue=queue)
-            fft_2(u, plan, block=True)
+                                            mollified=mollified, queue=queue, block=block)
+            fft_2(u, plan, block=block)
             u *= propagator
-            ifft_2(u, plan, block=True)
+            ifft_2(u, plan, block=block)
         if detector:
             intensity += detector.convert(abs(u) ** 2, energy)
         else:
