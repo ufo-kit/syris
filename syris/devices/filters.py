@@ -5,9 +5,12 @@ a wavefield passes through them.
 import numpy as np
 import quantities as q
 import scipy.interpolate as interp
+import syris.config as cfg
+from syris.opticalelements import OpticalElement
+from syris.physics import energy_to_wavelength
 
 
-class Filter(object):
+class Filter(OpticalElement):
 
     """Beam frequency filter."""
 
@@ -22,6 +25,22 @@ class Filter(object):
         """Get attenuation at *energy*."""
         return (self.thickness *
                 self.material.get_attenuation_coefficient(energy)).simplified.magnitude
+
+    def get_next_time(self, t_0, distance):
+        """A filter doesn't move, this function returns infinity."""
+        return np.inf * q.s
+
+    def _transfer(self, shape, pixel_size, energy, offset, t=0 * q.s, queue=None, out=None,
+                  block=False):
+        """Transfer function implementation. Only *energy* is relevant becaus a filter has the same
+        thickness everywhere.
+        """
+        lam = energy_to_wavelength(energy).simplified.magnitude
+        thickness = self.thickness.simplified.magnitude
+        ri = self.material.get_refractive_index(energy)
+        coeff = -2 * np.pi * thickness / lam
+
+        return np.exp(coeff * (ri.imag + ri.real * 1j)).astype(cfg.PRECISION.np_cplx)
 
 
 class Scintillator(Filter):
