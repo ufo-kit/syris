@@ -108,8 +108,7 @@ def propagate(samples, shape, energies, distance, pixel_size, region=None, apply
     if plan is None and distance != 0 * q.m:
         plan = Plan(shape, queue=queue)
     u = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
-    intensity = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
-    intensity.fill(0)
+    intensity = cl_array.zeros(queue, shape, cfg.PRECISION.np_float)
 
     for energy in energies:
         u.fill(1)
