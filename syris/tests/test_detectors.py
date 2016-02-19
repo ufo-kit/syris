@@ -9,7 +9,7 @@ from syris.tests import SyrisTest
 class TestDetector(SyrisTest):
 
     def setUp(self):
-        self.lens = Lens(1.4, 100.0 * q.mm, 3.0, 1.0, (1 * q.um, 1 * q.um))
+        self.lens = Lens(3., f_number=1.4, focal_length=100.0 * q.mm)
         self.camera = Camera(10 * q.um, 0.1, 10, 1, 12, None)
         self.detector = Detector(None, self.lens, self.camera)
 
