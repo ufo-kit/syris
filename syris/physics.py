@@ -166,29 +166,6 @@ def compute_collection(num_aperture, opt_ref_index):
     return 0.5 * (num_aperture / opt_ref_index) ** 2
 
 
-def visible_light_attenuation_coeff(scintillator, camera, num_aperture,
-                                    lens_trans_eff):
-    """Get the visible light attenuation coefficient given by the optical
-    system composed of a *scintillator*, objective lens with transmission
-    efficiency *lens_trans_eff* and a *camera*. If we assume the lens
-    transmission efficiency :math:`l_{eff}` and optics collection efficiency
-    :math:`\eta` to be constant for all visible light wavelengths, define
-    :math:`Q_{scint}\\left( \lambda_{vis}\\right)` to be the quantum
-    efficiency of the scintillator for a visible light wavelength
-    :math:`\lambda_{vis}`, :math:`Q_{cam} \\left( \lambda_{vis}\\right)`
-    to be the quantum efficiency of the camera, the attenuation coefficient
-    is given by
-
-    .. math::
-        l_{eff} \cdot \eta \int Q_{scint}\\left( \lambda_{vis}\\right)
-        Q_{cam}\\left( \lambda_{vis}\\right) \, \mathrm{d}\lambda_{vis}.
-    """
-    quantum_eff = np.sum(scintillator.quantum_effs * camera.quantum_effs)
-
-    return lens_trans_eff * quantum_eff * compute_collection(num_aperture,
-                                                             scintillator.opt_ref_index)
-
-
 def compute_diffraction_angle(diameter, propagation_distance):
     """Compute the diffraction angle for a region where a wavefield within the *diameter* can
     interfere on a *propagation_distance*.
