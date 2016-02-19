@@ -357,7 +357,8 @@ def make_tiles(func, shape, tile_shape, iterable=None, outlier=(0, 0), queues=No
     image shape, *tile_shape* (y, x) is the shape of one tile, *iterable* is the sequence to be
     mapped to *func*, if not specified, the offsets from :func:`.make_tile_offsets` are used.
     *outlier* (y, x) is the amount of overlapping region between tiles, *queues* are the OpenCL
-    command queues to use, *args* and *kwargs* are additional arguments passed to *func*.
+    command queues to use, *args* and *kwargs* are additional arguments passed to *func*. Returns a
+    generator.
     """
     if iterable is None:
         iterable = make_tile_offsets(shape, tile_shape, outlier=outlier)
@@ -379,7 +380,7 @@ def save_tiles(prefix, tiles):
 
 
 def read_tiles(prefix):
-    """Read tiles from disk using the glob module for pattern expansion."""
+    """Read tiles from disk using the glob module for pattern expansion. Returns a generator."""
     names = sorted(glob.glob(prefix))
 
     return (read_image(name) for name in names)
