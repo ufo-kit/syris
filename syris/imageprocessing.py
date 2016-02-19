@@ -365,12 +365,11 @@ def make_tiles(func, shape, tile_shape, iterable=None, outlier=(0, 0), queues=No
         kwargs = {}
 
     if queues is None:
-        for item in iterable:
-            yield func(item, *args, **kwargs)
+        return (func(item, *args, **kwargs) for item in iterable)
     else:
         # Use multiple comand queues
-        for item in g_util.qmap(func, iterable, queues=queues, args=args, kwargs=kwargs):
-            yield item
+        return (item for item in g_util.qmap(func, iterable, queues=queues, args=args,
+                                             kwargs=kwargs))
 
 
 def save_tiles(prefix, tiles):
@@ -383,8 +382,7 @@ def read_tiles(prefix):
     """Read tiles from disk using the glob module for pattern expansion."""
     names = sorted(glob.glob(prefix))
 
-    for name in names:
-        yield read_image(name)
+    return (read_image(name) for name in names)
 
 
 def merge_tiles(tiles, num_tiles=None, outlier=(0, 0)):
