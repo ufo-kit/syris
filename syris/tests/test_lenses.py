@@ -25,3 +25,18 @@ class TestLenses(SyrisTest):
         self.assertAlmostEquals(self.lens.numerical_aperture, 0.17579063848)
         self.lens.magnification = 3
         self.assertAlmostEquals(self.lens.numerical_aperture, 0.25873608522)
+
+    def test_given_numerical_aperture(self):
+        gt = 1
+        lens = Lens(1, na=gt)
+        self.assertEquals(gt, lens.numerical_aperture)
+
+    def test_constructor_args(self):
+        self.assertRaises(ValueError, Lens, 1)
+        Lens(1, na=1)
+        Lens(1, f_number=1, focal_length=1 * q.m)
+
+    def test_na_supersedes_compute(self):
+        gt = 0.5
+        lens = Lens(1, na=gt, f_number=2, focal_length=100 * q.mm)
+        self.assertEquals(gt, lens.na)
