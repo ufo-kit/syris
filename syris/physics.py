@@ -5,7 +5,6 @@ import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
 import quantities.constants.quantum as cq
-from pyfft.cl import Plan
 from syris.gpu import util as g_util
 from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2
 from syris.math import fwnm_to_sigma
@@ -102,18 +101,15 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
 
 def propagate(samples, shape, energies, distance, pixel_size, region=None,
               apply_phase_factor=False, mollified=True, detector=None, offset=None,
-              queue=None, out=None, plan=None, t=0 * q.s, block=False):
+              queue=None, out=None, t=0 * q.s, block=False):
     """Propagate *samples* with *shape* as (y, x) which are
     :class:`syris.opticalelements.OpticalElement` instances at *energies* to *distance*. Use
     *pixel_size*, limit coherence to *region*, *apply_phase_factor* is as by the Fresnel
     approximation phase factor, *offset* is the sample offset. *queue* an OpenCL command queue,
-    *out* a PyOpenCL Array and *plan* and FFT plan. If *block* is True, wait for the kernels to
-    finish.
+    *out* a PyOpenCL Array. If *block* is True, wait for the kernels to finish.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
-    if plan is None and distance != 0 * q.m:
-        plan = Plan(shape, queue=queue)
     u = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
     intensity = cl_array.zeros(queue, shape, cfg.PRECISION.np_float)
 
@@ -127,9 +123,9 @@ def propagate(samples, shape, energies, distance, pixel_size, region=None,
             propagator = compute_propagator(u.shape[0], distance, lam, pixel_size, region=region,
                                             apply_phase_factor=apply_phase_factor,
                                             mollified=mollified, queue=queue, block=block)
-            fft_2(u, plan, block=block)
+            fft_2(u, queue=queue, block=block)
             u *= propagator
-            ifft_2(u, plan, block=block)
+            ifft_2(u, queue=queue, block=block)
         if detector:
             intensity += detector.convert(abs(u) ** 2, energy)
         else:
