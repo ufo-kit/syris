@@ -14,8 +14,7 @@ class Lens(object):
         If *na* is None, it is computed from *focal_length*, *magnification* and *f_number*.
         """
         if transmission_eff < 0 or transmission_eff > 1:
-            raise ValueError("Transmission efficiency must " +
-                             "be between 0 and 1.")
+            raise ValueError("Transmission efficiency must be between 0 and 1.")
 
         if na is None and focal_length is None and f_number is None:
             raise ValueError("Either 'na' must be specified or both 'focal_length' and 'f_number'")
@@ -60,5 +59,4 @@ class Lens(object):
         """
         d_0 = (self.focal_length + self.focal_length / self.magnification)
 
-        return math.sin(math.atan(self.focal_length /
-                                  (2 * self.f_number * d_0)))
+        return math.sin(math.atan(self.focal_length / (2 * self.f_number * d_0)))
