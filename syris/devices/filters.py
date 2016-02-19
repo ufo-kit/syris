@@ -63,7 +63,7 @@ class Scintillator(Filter):
         self._ly_tck = interp.splrep(self._energies.rescale(q.keV).magnitude,
                                      self._lights_yields.rescale(1 / q.keV).magnitude)
         self._lum_tck = interp.splrep(self._wavelengths.rescale(q.nm).magnitude,
-                                      self._luminescence)
+                                      self._luminescence.rescale(1 / q.nm).magnitude)
 
     def get_light_yield(self, energy):
         """Get light yield at *energy* [1 / keV]."""
