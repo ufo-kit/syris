@@ -38,7 +38,7 @@ def _fft_2(data, inverse=False, plan=None, queue=None, block=True):
     """Execute FFT on *data*, which is first converted to a pyopencl array and retyped to
     complex.
     """
-    data = g_util.get_array(data)
+    data = g_util.get_array(data, queue=queue)
     if data.dtype != cfg.PRECISION.np_cplx:
         data = data.astype(cfg.PRECISION.np_cplx)
 
@@ -108,7 +108,7 @@ def pad(image, region=None, out=None, queue=None, block=False):
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl_array.zeros(queue, (region[2], region[3]), dtype=image.dtype)
-    image = g_util.get_array(image)
+    image = g_util.get_array(image, queue=queue)
 
     n_bytes = image.dtype.itemsize
     y_0, x_0, height, width = region
@@ -130,7 +130,7 @@ def crop(image, region, out=None, queue=None, block=False):
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl.array.Array(queue, (region[2], region[3]), dtype=image.dtype)
-    image = g_util.get_array(image)
+    image = g_util.get_array(image, queue=queue)
 
     n_bytes = image.dtype.itemsize
     y_0, x_0, height, width = region
@@ -154,7 +154,7 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl.array.Array(queue, summed_shape, dtype=cfg.PRECISION.np_float)
-    image = g_util.get_array(image)
+    image = g_util.get_array(image, queue=queue)
     region = ((image.shape[0] - offset[0]) / summed_shape[0],
               (image.shape[1] - offset[1]) / summed_shape[1])
 
@@ -181,7 +181,7 @@ def decimate(image, shape, sigma=None, average=False, queue=None, plan=None, blo
     """
     if queue is None:
         queue = cfg.OPENCL.queue
-    image = g_util.get_array(image)
+    image = g_util.get_array(image, queue=queue)
     image = image.astype(cfg.PRECISION.np_cplx)
     pow_shape = tuple([next_power_of_two(n) for n in image.shape])
     orig_shape = image.shape
