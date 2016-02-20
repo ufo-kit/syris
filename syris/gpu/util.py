@@ -337,6 +337,7 @@ def qmap(func, items, queues=None, args=(), kwargs=None):
         LOG.debug("Mapping '{}' to item {} and queue {}".format(func.__name__, item,
                                                                 queues.index(queue)))
         result = func(item, queue, *args, **kwargs)
+        queue_of_queues.task_done()
         queue_of_queues.put(queue)
 
         return result
