@@ -173,11 +173,10 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
     return out
 
 
-def decimate(image, shape, sigma=None, average=False, queue=None, plan=None, block=False):
+def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
     """Decimate *image* so that its dimensions match the final *shape*. Remove low frequencies by a
     Gaussian filter with *sigma* pixels. If *sigma* is None, use the FWHM of one low resolution
-    pixel. Use command *queue* and FFT *plan* if specified. If *block* is True, wait for the copy to
-    finish.
+    pixel. Use command *queue*, if *block* is True, wait for the copy to finish.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -187,17 +186,15 @@ def decimate(image, shape, sigma=None, average=False, queue=None, plan=None, blo
     orig_shape = image.shape
     if image.shape != pow_shape:
         image = pad(image, region=(0, 0) + pow_shape, queue=queue)
-    if not plan:
-        plan = Plan(image.shape, queue=queue)
     if sigma is None:
         sigma = tuple([fwnm_to_sigma(float(image.shape[i]) / shape[i], n=2) for i in range(2)])
 
     LOG.debug('Decimating {} -> {} with sigma {}'.format(image.shape, shape, sigma))
 
     fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue, block=block)
-    fft_2(image, plan, block=block)
+    fft_2(image, queue=queue, block=block)
     image *= fltr
-    ifft_2(image, plan, block=block)
+    ifft_2(image, queue=queue, block=block)
     image = crop(image, (0, 0) + orig_shape, queue=queue, block=block)
 
     return bin_image(image.real, shape, average=average, queue=queue, block=block)
