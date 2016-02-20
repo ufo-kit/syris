@@ -181,7 +181,6 @@ def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
     if queue is None:
         queue = cfg.OPENCL.queue
     image = g_util.get_array(image, queue=queue)
-    image = image.astype(cfg.PRECISION.np_cplx)
     pow_shape = tuple([next_power_of_two(n) for n in image.shape])
     orig_shape = image.shape
     if image.shape != pow_shape:
@@ -192,12 +191,13 @@ def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
     LOG.debug('Decimating {} -> {} with sigma {}'.format(image.shape, shape, sigma))
 
     fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue, block=block)
+    image = image.astype(cfg.PRECISION.np_cplx)
     fft_2(image, queue=queue, block=block)
     image *= fltr
     ifft_2(image, queue=queue, block=block)
-    image = crop(image, (0, 0) + orig_shape, queue=queue, block=block)
+    image = crop(image.real, (0, 0) + orig_shape, queue=queue, block=block)
 
-    return bin_image(image.real, shape, average=average, queue=queue, block=block)
+    return bin_image(image, shape, average=average, queue=queue, block=block)
 
 
 def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
