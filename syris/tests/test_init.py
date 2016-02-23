@@ -1,4 +1,5 @@
 import logging
+import pyopencl.array as cl_array
 import syris
 import syris.physics
 import syris.profiling
@@ -11,3 +12,4 @@ def test_init():
     assert cfg.OPENCL.ctx is not None
     assert cfg.PRECISION.cl_float == 8
     assert syris.profiling.PROFILER is not None
+    assert cfg.PRECISION.vfloat2 == cl_array.vec.double2
