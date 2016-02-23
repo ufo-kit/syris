@@ -75,6 +75,11 @@ def get_program(src):
         raise RuntimeError('OpenCL context has not been set yet')
 
 
+def get_precision_header():
+    """Return single or double precision vfloat definitions header."""
+    return _SINGLE_HEADER if cfg.PRECISION.is_single() else _DOUBLE_HEADER
+
+
 def get_source(file_names, precision_sensitive=True):
     """Get source by concatenating files from *file_names* list and apply
     single or double precision parametrization if *precision_sensitive*
@@ -85,8 +90,7 @@ def get_source(file_names, precision_sensitive=True):
         string += pkg_resources.resource_string(__name__, 'opencl/{}'.format(file_name))
 
     if precision_sensitive:
-        header = _SINGLE_HEADER if cfg.PRECISION.is_single() else _DOUBLE_HEADER
-        string = header + string
+        string = get_precision_header() + string
 
     return string
 
