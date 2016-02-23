@@ -4,6 +4,7 @@ Utility functions.
 import logging
 import numpy as np
 import pyopencl as cl
+import pyopencl.array as cl_array
 
 
 LOG = logging.getLogger()
@@ -38,6 +39,10 @@ class Precision(object):
         self.numpy_to_opencl = {self.np_float: self.cl_float, self.np_cplx: self.cl_cplx}
         self.opencl_to_numpy = dict(zip(self.numpy_to_opencl.values(),
                                         self.numpy_to_opencl.keys()))
+
+        dtype_base = 'double' if double else 'float'
+        for i in [2, 3, 4, 8, 16]:
+            setattr(self, 'vfloat' + str(i), getattr(cl_array.vec, dtype_base + str(i)))
 
 
 class OpenCL(object):
