@@ -2,6 +2,7 @@
 Utility functions concerning GPU programming.
 """
 
+import itertools
 import pkg_resources
 import Queue
 import sys
@@ -47,6 +48,7 @@ def init_programs():
     cfg.OPENCL.programs['physics'] = get_program(get_source(['vcomplex.cl', 'physics.cl']))
     cfg.OPENCL.programs['geometry'] = get_program(get_metaobjects_source())
     cfg.OPENCL.programs['mesh'] = get_program(get_source(['heapsort.cl', 'mesh.cl']))
+    cfg.OPENCL.programs['varconv'] = get_program(get_all_varconvolutions())
 
 
 def make_opencl_defaults(device_index=None, profiling=True):
@@ -103,6 +105,187 @@ def get_metaobjects_source():
                          "metaobjects.cl"])
 
     return source
+
+
+def get_varconvolution_source(name, header='', inputs='', init='', compute_outer='',
+                              compute_inner='weight = 1.0;', after='', cplx=False,
+                              only_kernel=False):
+    """Create a shift dependent convolution kernel function with *name*. *header* is an OpenCL code
+    which is placed in the front of the source before the kernel function. *inputs* are additional
+    kernel inputs (see opencl/varconvolution.in for the fixed ones), *init* is the kernel
+    initialization code, *compute_outer* is called at every iteration of the outer (y) loop,
+    *compute_inner* is called in the inner (x) loop. *after* is the code after both loops. If *cplx*
+    is True, the complex version of the kernel is used.
+    Pseudo-code of the OpenCL source for the noncomplex version will look like this:
+
+    *header*
+
+    kernel void *name* (read_only image2d_t input,
+                        global vfloat *output,
+                        const sampler_t sampler,
+                        int2 window, *inputs*)
+    {
+        int idx = get_global_id (0);
+        int idy = get_global_id (1);
+        int width = get_global_size (0);
+        int i, j, tx, ty, imx, imy;
+        vfloat value, weight, result = 0.0;
+
+        *init*
+
+        for (j = 0; j < window.y; j++) {
+            ty = window.y - j - 1;
+            imy = idy + j - window.y / 2;
+            *compute_outer*
+            for (i = 0; i < window.x; i++) {
+                imx = idx + i - window.x / 2;
+                value = read_imagef (input, sampler, (int2)(imx, imy)).x;
+                tx = window.x - i - 1;
+                *compute_inner*
+                result += value * weight;
+            }
+        }
+
+        *after*
+
+        output[idy * width + idx] = result;
+    }
+
+    The complex version uses two inputs, *input_real* and *input_imag* which are also image2d_t
+    instances.
+    *compute_inner* must set the *weight* variable in order to apply the convolution kernel weight.
+    """
+    if inputs:
+        inputs = ',' + inputs
+    kernel_src = get_source(['varconvolution.in'], precision_sensitive=False)
+    kernel_src = kernel_src.split('%nl')[1 if cplx else 0]
+
+    if only_kernel:
+        top = ''
+        header = ''
+    else:
+        # Precision definition and complex operations
+        top = get_precision_header()
+        if cplx:
+            top += get_source(['vcomplex.cl'], precision_sensitive=False)
+
+    return top + kernel_src.format(header, name, inputs, init, compute_outer, compute_inner, after)
+
+
+def _get_varconvolve_2d_parametrized(name, func_name, func_src, normalized=True, additional_init='',
+                                     only_kernel=False):
+    """Make a variable convolution kernel named varconvolve_*name*[_normalized], if *normalized* is
+    True. *func_name* is the function name, *func_str* is the function code, if *only_kernel* is
+    True only the kernel is returned. *additional_init* is added after the coordinate point
+    computation and parameter read.
+    Suitable for creating kernels where the function computing the convolution kernel takes f(x) and
+    g(y) arguments instead of plain x, y coordinates.
+    """
+    inputs = 'global vfloat2 *params'
+    init = 'vfloat2 p, param = params[idy * width + idx];'
+    init += additional_init
+    if normalized:
+        init += 'vfloat sum = 0.0;'
+    compute_outer = 'p.y = (vfloat) (ty - window.y / 2);'
+    compute_inner = 'p.x = (vfloat) (tx - window.x / 2);'
+    compute_inner += 'weight = {} (&p, &param);'.format(func_name)
+    if normalized:
+        compute_inner += 'sum += weight;'
+        after = 'result /= sum;'
+    else:
+        after = ''
+
+    kernel_name = 'varconvolve_{}'.format(name)
+    if normalized:
+        kernel_name += '_normalized'
+
+    return get_varconvolution_source(kernel_name, header=func_src, inputs=inputs, init=init,
+                                     compute_outer=compute_outer, compute_inner=compute_inner,
+                                     after=after, only_kernel=only_kernel)
+
+
+def get_varconvolve_gauss(normalized=True, window_fwnm=1000, only_kernel=False):
+    """Create variable Gaussian convolution. The kernel sum is 1 if *normalized* is True, window is
+    computed automatically for every x, y position in the original image based on the sigma at x, y
+    and *window_fwnm* as 2 * sqrt(2 * log(*window_fwnm*)) * sigma. If *only_kernel* is True only the
+    kernel is returned.
+    """
+    src = get_source(['varconvolution.in'], precision_sensitive=False).split('%nl')[2]
+    # Make the kernel window size variable based on the
+    fwnm_factor = 2 * np.sqrt(2 * np.log(window_fwnm))
+    LOG.debug('Creating Gaussian convolution with window size FW(1/{})M'.format(window_fwnm))
+    additional_init = 'window.x = (int) ({} * param.x + 0.5);'.format(fwnm_factor)
+    additional_init += 'window.y = (int) ({} * param.y + 0.5);'.format(fwnm_factor)
+    additional_init += 'window.x += 1 - window.x % 2;'
+    additional_init += 'window.y += 1 - window.y % 2;'
+
+    return _get_varconvolve_2d_parametrized('gauss', 'get_gauss', src, normalized=normalized,
+                                            additional_init=additional_init,
+                                            only_kernel=only_kernel)
+
+
+def get_varconvolve_disk(normalized=True, smooth=True, only_kernel=False):
+    """Create variable circlular kernel convolution, kernel sum is 1 if *normalized* is True, if
+    *smooth* is True smooth out sharp edges of the disk. If *only_kernel* is True only the kernel
+    is returned.
+    """
+    name = 'disk_smooth' if smooth else 'disk'
+    func_name = 'get_{}'.format(name)
+    src = get_source(['varconvolution.in'], precision_sensitive=False)
+    header = src.split('%nl')[4 if smooth else 3]
+    additional_init = 'window.x = (int) (2 * param.x + 0.5);'
+    additional_init += 'window.x += 1 - window.x % 2;'
+    additional_init += 'window.y = (int) (2 * param.y + 0.5);'
+    additional_init += 'window.y += 1 - window.y % 2;'
+    if smooth:
+        additional_init += 'window.x += 2;'
+        additional_init += 'window.y += 2;'
+
+    return _get_varconvolve_2d_parametrized(name, func_name, header, normalized=normalized,
+                                            additional_init=additional_init,
+                                            only_kernel=only_kernel)
+
+
+def get_varconvolve_propagator(only_kernel=False):
+    """Create the variable propagator convolution. If *only_kernel* is True only the kernel is
+    returned.
+    """
+    inputs = 'const vfloat lam,'
+    inputs += 'read_only image2d_t distances,'
+    inputs += 'const vfloat2 ps,'
+    inputs += 'const vfloat2 sigma'
+    init = 'vcomplex sum = (vcomplex)(0.0, 0.0); vfloat2 p;'
+    compute_outer = 'p.y = (vfloat) (j - window.y / 2) * ps.y;'
+    compute_inner = 'p.x = (vfloat) (i - window.x / 2) * ps.x;'
+    compute_inner += 'weight = get_propagator (&p, lam, '
+    compute_inner += 'read_imagef (distances, sampler, (int2)(imx, imy)).x, &sigma);'
+    compute_inner += 'sum += weight;'
+    after = 'result = result / sqrt (sum.x * sum.x + sum.y * sum.y);'
+    src = get_source(['varconvolution.in'], precision_sensitive=False)
+    header = src.split('%nl')[2]
+    header += src.split('%nl')[5]
+
+    return get_varconvolution_source('varconvolve_propagator', header=header, inputs=inputs,
+                                     init=init, compute_outer=compute_outer,
+                                     compute_inner=compute_inner, after=after, cplx=True,
+                                     only_kernel=only_kernel)
+
+
+def get_all_varconvolutions():
+    """Create all variable convolutions."""
+    src = get_source(['varconvolution.in'], precision_sensitive=False).split('%nl')
+    header = ''.join([func + '\n' for func in src[2:]])
+
+    k_src = get_varconvolve_gauss(normalized=False, only_kernel=True)
+    k_src += get_varconvolve_gauss(normalized=True, only_kernel=True)
+    for norm, smooth in itertools.product([False, True], [False, True]):
+        k_src += get_varconvolve_disk(normalized=norm, smooth=smooth, only_kernel=True)
+    k_src += get_varconvolve_propagator(only_kernel=True)
+
+    top = get_precision_header()
+    top += get_source(['vcomplex.cl'], precision_sensitive=False)
+
+    return top + header + k_src
 
 
 def get_cache(buf):
