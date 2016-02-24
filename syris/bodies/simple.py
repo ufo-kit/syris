@@ -1,6 +1,7 @@
 """A static body."""
 import numpy as np
 import quantities as q
+import syris.config as cfg
 import syris.gpu.util as g_util
 from syris.bodies.base import Body
 from syris.imageprocessing import crop, pad, rescale
@@ -50,3 +51,38 @@ class StaticBody(Body):
             proj = pad(proj, pad_region, block=block)
 
         return rescale(proj, shape, block=block)
+
+
+def make_grid(n, period, width=1 * q.m, thickness=1 * q.m, pixel_size=1 * q.m):
+    """Make a rectangluar grid with shape (*n*, *n*), the bars are spaced *period* and are
+    *width* in diameter. *thickness* is the projected thickness and *pixel_size* is the pixel
+    size used to create :class:`.StaticBody`.
+    """
+    ps = pixel_size.simplified.magnitude
+    period = int(np.round(period.simplified.magnitude / ps))
+    width = int(np.round(width.simplified.magnitude / ps))
+
+    image = np.zeros((n, n), dtype=cfg.PRECISION.np_float)
+
+    for i in range(-width / 2, width / 2):
+        if i < 0:
+            i = period + i
+        image[i::period, :] = 1
+        image[:, i::period] = 1
+
+    return StaticBody(image * thickness, pixel_size)
+
+
+def make_sphere(n, radius, pixel_size=1 * q.m):
+    """Make a sphere with image shape (*n*, *n*), *radius* and *pixel_size*. Sphere center is in
+    n / 2 + 0.5, which means between two adjacent pixels.
+    """
+    image = np.zeros((n, n), dtype=cfg.PRECISION.np_float)
+    y, x = np.mgrid[-n / 2:n / 2, -n / 2:n / 2]
+    x = (x + .5) * pixel_size.simplified.magnitude
+    y = (y + .5) * pixel_size.simplified.magnitude
+    radius = radius.simplified.magnitude
+    valid = np.where(x ** 2 + y ** 2 < radius ** 2)
+    image[valid] = 2 * np.sqrt(radius ** 2 - x[valid] ** 2 - y[valid] ** 2)
+
+    return StaticBody(image * q.m, pixel_size)
