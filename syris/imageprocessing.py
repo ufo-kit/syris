@@ -232,6 +232,103 @@ def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
     return out
 
 
+def varconvolve(kernel_name, shape, kernel_args, local_size=None, program=None, queue=None,
+                block=False):
+    """Variable convolution with OpenCL kernel function *kernel_name*, gloal size *shape* (y, x),
+    kernel arguments *kernel_args*, work group size *local_size* (can be None, i.e. OpenCL will
+    determine it automatically), OpenCL *program* (can be None in which case the default syris
+    variable convolution program is used with all predefined kernels). *queue* is the command queue,
+    if *block* is True wait for the kernel to finish. Return OpenCL event from the kernel execution.
+
+    .. math::
+
+        (f \\ast g)(x, y) = \\int_{-\\infty}^{\\infty} \\int_{-\\infty}^{\\infty} \\
+                f(x, y, \\xi, \\eta) g(x - \\xi, y - \\eta) d\\xi d\\eta
+
+    """
+    if not program:
+        program = cfg.OPENCL.programs['varconv']
+    if queue is None:
+        queue = cfg.OPENCL.queue
+
+    ev = getattr(program, kernel_name)(queue, shape[::-1], local_size, *kernel_args)
+
+    if block:
+        ev.wait()
+
+    return ev
+
+
+def _varconvolve_2d_parametrized(image, parameters, kernel_name, sampler=None, queue=None,
+                                 out=None, block=False):
+    """Variable convolution of *image* with *parameters*, use OpoenCL kernel *kernel_name*,
+    *sampler*, *queue*, *out* and wait if *block* is True. Return *out*.
+    """
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    if out is None:
+        out = cl.array.Array(queue, image.shape, dtype=cfg.PRECISION.np_float)
+    if sampler is None:
+        sampler = cl.Sampler(queue.context, False, cl.addressing_mode.CLAMP_TO_EDGE,
+                             cl.filter_mode.NEAREST)
+    if not isinstance(parameters, cl_array.Array):
+        params_host = np.empty(parameters[0].shape, dtype=cfg.PRECISION.vfloat2)
+        params_host['y'] = g_util.get_host(parameters[0])
+        params_host['x'] = g_util.get_host(parameters[1])
+        parameters = cl_array.to_device(queue, params_host)
+    if parameters.shape != image.shape:
+        raise ValueError("Parameters shape '{}' differs from image shape '{}'".
+                         format(parameters.shape, image.shape))
+    image = g_util.get_image(image, queue=queue)
+    args = (image, out.data, sampler, cl_array.vec.make_int2(0, 0), parameters.data)
+
+    varconvolve(kernel_name, image.shape[::-1], args, queue=queue, block=block)
+
+    return out
+
+
+def varconvolve_gauss(image, sigmas, normalized=True, sampler=None, queue=None,
+                      out=None, block=False):
+    """Variable convolution of input *image* with a Gaussian with y and x sigmas. *sigmas* specify
+    the convolution kernel y and x sigmas for every output point. They are specified as two 2D
+    arrays and can be either a tuple of two 2D arrays or a pyopencl.array.Array instance with
+    vfloat2 data type, meaning both 2D arrays are encoded in it. If *normalized* is True the
+    convolution kernel sum is always 1. Use OpenCL *sampler*, command *queue*, *out* as output and
+    wait for execution end if *block* is True.
+    Convolution window is always odd-shaped and the middle pixel is set to 0. This means that if the
+    *sigmas* are smaller numbers than 1, the convolution returns the original image.
+    """
+    kernel_name = 'varconvolve_gauss'
+    if normalized:
+        kernel_name += '_normalized'
+    return _varconvolve_2d_parametrized(image, sigmas, kernel_name, sampler=sampler,
+                                        queue=queue, out=out, block=block)
+
+
+def varconvolve_disk(image, radii, normalized=True, smooth=True, sampler=None, queue=None,
+                     out=None, block=False):
+    """Variable convolution of input *image* with an elliptical disk with y and x radii. *radii*
+    specify the convolution kernel disk y and x radius for every output point. They are specified as
+    two 2D arrays and can be either a tuple of two 2D arrays or a pyopencl.array.Array instance with
+    vfloat2 data type, meaning both 2D arrays are encoded in it. If *normalized* is True the
+    convolution kernel sum is always 1. Use OpenCL *sampler*, command *queue*, *out* as output and
+    wait for execution end if *block* is True.
+    Convolution window is always odd-shaped and the middle pixel is set to 0. This means that if the
+    *radii* are smaller numbers than 1, the convolution returns the original image. This has a
+    consequence that it is not possible to create a disk with even number of pixels accross one of
+    the principal axes, so the disk radius will be exact from the middle if you specify it in half
+    pixels, e.g. if the radius is 1.5, then pixels [-1, 0, 1] will be selected, i.e. the disk
+    diameter is 3 pixels.
+    """
+    kernel_name = 'varconvolve_disk'
+    if smooth:
+        kernel_name += '_smooth'
+    if normalized:
+        kernel_name += '_normalized'
+    return _varconvolve_2d_parametrized(image, radii, kernel_name, sampler=sampler,
+                                        queue=queue, out=out, block=block)
+
+
 def _check_tiling(shape, tiles_count):
     """Check if tiling with tile counts *tile_counts* as (y, x) is possible
     for *shape* (y, x).
