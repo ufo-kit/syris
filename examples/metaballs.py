@@ -11,6 +11,7 @@ from syris.gpu import util as g_util
 from syris.bodies.isosurfaces import MetaBall, MetaBalls, project_metaballs_naive
 from syris.geometry import Trajectory
 from syris.util import make_tuple, save_image
+from util import show
 
 
 LOG = logging.getLogger(__name__)
@@ -219,10 +220,7 @@ if __name__ == '__main__':
     #     save_image("/home/farago/data/thickness/radio_{:>05}.tif".format(h),
     #                res[:, ::VECTOR_WIDTH])
 
-    plt.figure()
-    plt.imshow(thickness[:, ::VECTOR_WIDTH], origin="lower", cmap=cm.get_cmap("gray"),
-               interpolation="nearest")
-    plt.colorbar()
+    show(thickness[:, ::VECTOR_WIDTH])
 
     # plt.figure()
     # plt.imshow(res1[:, ::VECTOR_WIDTH], origin="lower", cmap=cm.get_cmap("gray"),

@@ -8,6 +8,7 @@ import syris
 import syris.geometry as geom
 from syris.bodies.mesh import Mesh, make_cube, read_blender_obj
 from syris.util import save_image
+from util import show
 
 
 LOG = logging.getLogger(__name__)
@@ -59,14 +60,8 @@ def main():
     if args.slice_filename is not None:
         save_image(args.slice_filename, sl)
 
-    plt.figure()
-    plt.imshow(proj)
-    plt.title('Projection')
-    plt.colorbar()
-
-    plt.figure()
-    plt.imshow(sl)
-    plt.title('Slice at y = {}'.format(args.n / 2))
+    show(proj, title='Projection')
+    show(sl, title='Slice at y = {}'.format(args.n / 2))
     plt.show()
 
 

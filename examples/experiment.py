@@ -18,6 +18,7 @@ from syris.gpu.util import get_host
 from syris.experiments import Experiment
 from syris.materials import make_fromfile
 from trajectory import create_sample, make_circle
+from util import show
 
 
 def get_flat(shape, energies, detector, source):
@@ -79,10 +80,7 @@ def main():
             sample.trajectory.bind(detector.pixel_size)
 
     if args.show_flat:
-        plt.figure()
-        plt.imshow(get_flat(shape, energies, detector, bm))
-        plt.title('Counts')
-        plt.colorbar()
+        show(get_flat(shape, energies, detector, bm), title='Counts')
         plt.show()
 
     if args.conduct:

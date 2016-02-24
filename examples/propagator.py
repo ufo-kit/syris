@@ -5,6 +5,7 @@ import quantities as q
 from numpy.fft import fftfreq
 import syris
 from syris.physics import energy_to_wavelength, compute_propagator
+from util import show
 
 
 def get_fresnel_kernel_f(n, lam, z, ps):
@@ -27,14 +28,6 @@ def get_fresnel_kernel_f(n, lam, z, ps):
     g /= ps[0]
 
     return np.exp(-1j * np.pi * lam * z * (f ** 2 + g ** 2))
-
-
-def show(data, title):
-    """Show *data* with *title*."""
-    plt.figure()
-    plt.imshow(data)
-    plt.title(title)
-    plt.colorbar()
 
 
 def main():
