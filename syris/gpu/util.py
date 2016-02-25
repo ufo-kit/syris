@@ -9,6 +9,7 @@ import sys
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
+import quantities as q
 from multiprocessing.pool import ThreadPool
 from pyopencl.array import vec
 import time
@@ -530,3 +531,8 @@ def qmap(func, items, queues=None, args=(), kwargs=None):
         return result
 
     return pool.map(process, items)
+
+
+def get_event_duration(event, start=cl.profiling_info.START, stop=cl.profiling_info.END):
+    """Get OpenCL event duration. *start* and *stop* define the OpenCL timer start and stop."""
+    return (event.get_profiling_info(stop) - event.get_profiling_info(start)) * 1e-9 * q.s
