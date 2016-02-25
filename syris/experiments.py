@@ -50,7 +50,8 @@ class Experiment(object):
             queue = cfg.OPENCL.queue
         fps = self.detector.camera.fps
         frame_time = 1 / fps
-        times = np.arange(t_start.simplified, t_end.simplified, frame_time) * q.s
+        times = np.arange(t_start.simplified.magnitude, t_end.simplified.magnitude,
+                          frame_time) * q.s
 
         image = cl_array.Array(queue, self.detector.camera.shape, dtype=cfg.PRECISION.np_float)
 

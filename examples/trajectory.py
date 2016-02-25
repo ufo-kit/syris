@@ -36,13 +36,15 @@ def make_circle(n=128):
 
 
 def make_sine(n=128, x_ends=(0, 1) * q.mm, y_ends=(0, 1) * q.mm):
+    x_ends = x_ends.simplified.magnitude
+    y_ends = y_ends.simplified.magnitude
     t = np.linspace(0, 2 * np.pi, n)
     x = np.linspace(x_ends[0], x_ends[1], n)
     amplitude = (y_ends[1] - y_ends[0]) / 2
     y = (1 + np.sin(t)) * amplitude + y_ends[0]
     z = np.zeros(n)
 
-    return zip(x.rescale(q.mm), y.rescale(q.mm), z) * q.mm
+    return zip(x, y, z) * q.m
 
 
 def get_ds(points):
@@ -98,7 +100,9 @@ def create_sample(n, ps, radius=None, velocity=None):
     fov = n * ps
     if radius is None:
         radius = n / 16 * ps
-    cp = make_sine(n=32, x_ends=(radius, fov - radius), y_ends=(n / 4 * ps, 3 * n / 4 * ps))
+    radius_m = radius.simplified.magnitude
+    fov_m = fov.simplified.magnitude
+    cp = make_sine(n=32, x_ends=(radius_m, fov_m - radius_m) * q.m, y_ends=(n / 4, 3 * n / 4) * ps)
     if velocity is None:
         velocity = 1 * q.mm / q.s
     tr = Trajectory(cp, velocity=velocity)

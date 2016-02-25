@@ -83,7 +83,7 @@ def main():
     res = propagate_numerically(n, w, ps, d, lam)
     res_a = propagate_analytically(n, w, ps, d, lam)
 
-    x_data = np.linspace(-2 * w, 2 * w, res.shape[0]).rescale(q.um).magnitude
+    x_data = np.linspace(-2 * w.magnitude, 2 * w.magnitude, res.shape[0])
     aperture = np.zeros(res.shape[1])
     aperture[res.shape[1] / 4:3 * res.shape[1] / 4] = 1
     plt.figure()

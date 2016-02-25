@@ -663,7 +663,7 @@ def derivative_fit(tck, u, max_distance):
 
 
 def get_constant_velocity(v_0, duration):
-    times = np.linspace(0 * duration.units, duration, 5)
+    times = np.linspace(0 * duration.magnitude, duration.magnitude, 5) * duration.units
     dist = v_0 * times
 
     return zip(times, dist)
