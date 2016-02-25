@@ -175,3 +175,36 @@ class TestGPUImageProcessing(SyrisTest):
         data = ip.fft_2(np.copy(orig), plan=plan)
         ip.ifft_2(data, plan=plan)
         np.testing.assert_almost_equal(orig, data.get().real, decimal=4)
+
+    def test_varconvolve_disk(self):
+        n = 4
+        shape = (n, n)
+        image = np.zeros(shape, dtype=cfg.PRECISION.np_float)
+        image[n / 2, n / 2] = 1
+        radii = np.ones_like(image) * 1e-3
+        result = ip.varconvolve_disk(image, (radii, radii), normalized=False, smooth=False).get()
+        # At least one pixel in the midle must exist (just copies the original image)
+        self.assertEqual(1, np.sum(result))
+
+        radii = np.ones_like(image) * 2
+        norm_result = ip.varconvolve_disk(image, (radii, radii), normalized=True,
+                                          smooth=False).get()
+        self.assertAlmostEqual(1, np.sum(norm_result))
+
+    def test_varconvolve_gauss(self):
+        from scipy.ndimage import gaussian_filter
+        n = 128
+        shape = (n, n)
+        image = np.zeros(shape, dtype=cfg.PRECISION.np_float)
+        image[n / 2, n / 2] = 1
+        sigmas = np.ones_like(image) * 1e-3
+        result = ip.varconvolve_gauss(image, (sigmas, sigmas), normalized=False).get()
+        # At least one pixel in the midle must exist (just copies the original image)
+        self.assertEqual(1, np.sum(result))
+
+        # Test against the scipy implementation
+        sigma = fwnm_to_sigma(5, n=2)
+        sigmas = np.ones_like(image) * sigma
+        gt = gaussian_filter(image, sigma)
+        result = ip.varconvolve_gauss(image, (sigmas, sigmas), normalized=True).get()
+        np.testing.assert_almost_equal(gt, result)
