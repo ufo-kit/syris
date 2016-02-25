@@ -48,7 +48,7 @@ def main():
     camera = Camera(11 * q.um, .1, 500, 23, 32, shape, fps=1000 / q.s,
                     quantum_efficiencies=0.5 * np.ones(len(vis_wavelengths)),
                     wavelengths=vis_wavelengths, dtype=np.float32)
-    lens = Lens(1.4, 50 * q.mm, 3, 0.7, 1)
+    lens = Lens(3, f_number=1.4, focal_length=50 * q.mm, transmission_eff=0.7, sigma=None)
     luag = get_material('luag.mat')
     scintillator = Scintillator(50 * q.um,
                                 luag,
@@ -71,8 +71,9 @@ def main():
     mesh = Mesh(cube, tr, material=glass)
     # mesh.material = mb.material
     mesh.bind_trajectory(detector.pixel_size)
+    source_trajectory = Trajectory([(n / 2, n / 2, 0)] * detector.pixel_size)
     bm = BendingMagnet(2.5 * q.GeV, 100 * q.mA, 1.5 * q.T, 30 * q.m, energies,
-                       (200, 800) * q.um, detector.pixel_size, shape[0])
+                       (200, 800) * q.um, detector.pixel_size, source_trajectory)
     ex = Experiment([bm, mb, mb_2, mesh], bm, detector, 0 * q.m)
 
     for sample in ex.samples:
