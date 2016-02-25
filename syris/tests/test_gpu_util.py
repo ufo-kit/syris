@@ -88,3 +88,11 @@ class TestGPUUtil(SyrisTest):
         # Complex Image
         data = np.ones((4, 4), dtype=np.complex)
         self.assertRaises(TypeError, gu.get_image, data)
+
+    def test_get_duration(self):
+        data = np.arange(64, dtype=cfg.PRECISION.np_float)
+        mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY, size=data.nbytes)
+
+        ev = cl.enqueue_copy(cfg.OPENCL.queue, mem, data)
+        ev.wait()
+        gu.get_event_duration(ev)
