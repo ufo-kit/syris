@@ -102,7 +102,7 @@ class MovableBody(Body):
 
         if self.cache_projection:
             if (self._p_cache['time'] is None or np.any(self._p_cache['ps'] != pixel_size) or
-                    self._p_cache['shape'] != shape or self._p_cache['offset'] != offset):
+                    self._p_cache['shape'] != shape or np.any(self._p_cache['offset'] != offset)):
                 moved = True
                 self.update_projection_cache(t=t, shape=shape, pixel_size=pixel_size, offset=offset)
             else:
