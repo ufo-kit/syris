@@ -49,7 +49,8 @@ class Body(OpticalElement):
         """Transfer function implementation based on a refractive index."""
         ri = self.material.get_refractive_index(energy)
         lam = energy_to_wavelength(energy)
-        proj = self.project(shape, pixel_size, offset=offset, t=t, block=block)
+        proj = self.project(shape, pixel_size, offset=offset, t=t, queue=queue,
+                            out=out, block=block)
 
         return transfer(proj, ri, lam, queue=queue, out=out, block=block)
 
