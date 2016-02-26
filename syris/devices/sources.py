@@ -12,6 +12,7 @@ from quantities.quantity import Quantity
 from quantities.constants import fine_structure_constant
 from scipy import integrate, special
 import syris.config as cfg
+from syris.geometry import Trajectory
 from syris.opticalelements import OpticalElement
 from syris.util import make_tuple
 
@@ -155,3 +156,21 @@ class BendingMagnet(OpticalElement):
                         (special.kv(2.0 / 3, xi) ** 2 + gama_psi ** 2 /
                          (1.0 + gama_psi ** 2) * special.kv(1.0 / 3, xi) ** 2) *
                         angle_step.rescale(q.rad) ** 2 * 1e-3).simplified
+
+
+def make_topotomo(dE=None, trajectory=None, pixel_size=None, ring_current=200 * q.mA):
+    """Make the TopoTomo bending magnet source located at ANKA, KIT. Use *dE* for energy spacing (1
+    keV if not specified), *trajectory* for simulating beam fluctuations. If it is None a (1024,
+    1024) window is used with the beam center in the middle and no fluctuations.  *pixel_size*
+    specifies the pixel spacing between the window points, if not specified 1 um is used.
+    *ring_current* is the storage ring electric current.
+    """
+    if not pixel_size:
+        pixel_size = 1 * q.um
+    if not trajectory:
+        trajectory = Trajectory([(512, 512, 0)] * pixel_size)
+    if not dE:
+        dE = 1 * q.keV
+
+    return BendingMagnet(2.5 * q.GeV, ring_current, 1.5 * q.T, 30 * q.m, dE,
+                         (142, 503) * q.um, pixel_size, trajectory)
