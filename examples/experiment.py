@@ -12,7 +12,7 @@ from syris.devices.cameras import Camera
 from syris.devices.detectors import Detector
 from syris.devices.lenses import Lens
 from syris.devices.filters import Scintillator
-from syris.devices.sources import BendingMagnet
+from syris.devices.sources import make_topotomo
 from syris.geometry import Trajectory
 from syris.gpu.util import get_host
 from syris.experiments import Experiment
@@ -73,8 +73,7 @@ def main():
     # mesh.material = mb.material
     mesh.bind_trajectory(detector.pixel_size)
     source_trajectory = Trajectory([(n / 2, n / 2, 0)] * detector.pixel_size)
-    bm = BendingMagnet(2.5 * q.GeV, 100 * q.mA, 1.5 * q.T, 30 * q.m, dE,
-                       (200, 800) * q.um, detector.pixel_size, source_trajectory)
+    bm = make_topotomo(dE=dE, trajectory=source_trajectory, pixel_size=detector.pixel_size)
     ex = Experiment([bm, mb, mb_2, mesh], bm, detector, 0 * q.m, energies)
 
     for sample in ex.samples:
