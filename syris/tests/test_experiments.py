@@ -27,7 +27,7 @@ class TestExperiments(SyrisTest):
                                    velocity=1 * q.mm / q.s), 1 * q.um)
         mb_1 = MetaBall(Trajectory(points, pixel_size=ps, furthest_point=1 * q.um,
                                    velocity=2 * q.mm / q.s), 1 * q.um)
-        self.experiment = Experiment([mb_0, mb_1], None, detector, 0 * q.m)
+        self.experiment = Experiment([mb_0, mb_1], None, detector, 0 * q.m, None)
 
     def test_pixel_size(self):
         self.assertAlmostEqual(1, self.experiment.time.simplified.magnitude)
