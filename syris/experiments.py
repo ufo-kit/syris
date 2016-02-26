@@ -43,7 +43,8 @@ class Experiment(object):
 
         return image
 
-    def make_sequence(self, t_start, t_end, shape=None, queue=None):
+    def make_sequence(self, t_start, t_end, shape=None, shot_noise=True, amplifier_noise=True,
+                      queue=None):
         """Make images between times *t_start* and *t_end*."""
         if queue is None:
             queue = cfg.OPENCL.queue
@@ -69,6 +70,7 @@ class Experiment(object):
                 t = t_next
                 t_next = self.get_next_time(t, ps)
             image += self.compute_intensity(t, t_0 + frame_time, shape, ps)
-            camera_image = self.detector.camera.get_image(image)
+            camera_image = self.detector.camera.get_image(image, shot_noise=shot_noise,
+                                                          amplifier_noise=amplifier_noise)
             LOG.debug('Image: {} -> {}'.format(t_0, t_0 + frame_time))
             yield camera_image
