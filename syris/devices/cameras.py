@@ -1,4 +1,5 @@
 """Cameras used by experiments."""
+import pkg_resources
 import numpy as np
 import quantities as q
 from pyopencl import array as cl_array
@@ -152,3 +153,13 @@ class Camera(object):
 
         # Apply quantization noise
         return counts.astype(self.dtype)
+
+
+def make_pco_dimax():
+    """Make a pco.dimax camera."""
+    lam, qe = np.load(pkg_resources.resource_filename(__name__,
+                                                      'data/dimax_quantum_efficiencies.npy'))
+    lam = lam * q.m
+
+    return Camera(11 * q.um, 0.1, 53., 23., 12, (2016, 2016),
+                  quantum_efficiencies=qe, wavelengths=lam)
