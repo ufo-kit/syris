@@ -51,7 +51,7 @@ class Experiment(object):
         fps = self.detector.camera.fps
         frame_time = 1 / fps
         times = np.arange(t_start.simplified.magnitude, t_end.simplified.magnitude,
-                          frame_time) * q.s
+                          frame_time.simplified.magnitude) * q.s
 
         image = cl_array.Array(queue, self.detector.camera.shape, dtype=cfg.PRECISION.np_float)
 
