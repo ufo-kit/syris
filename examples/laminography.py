@@ -1,3 +1,4 @@
+"""Laminography data set generation with mesh geometry."""
 import argparse
 import itertools
 import logging
@@ -181,7 +182,7 @@ def process(args, device_index):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Mesh example')
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=str, help='Blender .obj input file name')
     parser.add_argument('--dset', type=str,
                         help='Data set name, if not specified guessed from input')

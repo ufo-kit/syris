@@ -140,7 +140,7 @@ def main():
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=str, help='Output directory for moving objects.')
 
     return parser.parse_args()

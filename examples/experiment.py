@@ -120,7 +120,7 @@ def main():
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=str, help='Output directory for moving objects.')
     parser.add_argument('--show', action='store_true', help='Show images as they are produced')
     parser.add_argument('--show-flat', action='store_true', help='Show a flat field image')

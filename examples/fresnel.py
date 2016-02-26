@@ -102,8 +102,7 @@ def main():
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Check numerical vs. analytical '
-                                     'Fresnel propagation')
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--fn', type=float, default=4.0, help='Fresnel number')
     parser.add_argument('--energy', type=float, default=1.0, help='Energy [keV]')
     parser.add_argument('--aperture', type=float, default=100.0, help='Aperture width [um]')
