@@ -37,14 +37,10 @@ def get_material(name):
     return make_fromfile(os.path.join('examples', 'data', name))
 
 
-def main():
-    syris.init()
-    n = 256
+def make_devices(n, energies):
     shape = (n, n)
-    dE = 1 * q.keV
-    energies = np.arange(5, 30, dE.magnitude) * q.keV
+    dE = energies[1] - energies[0]
     vis_wavelengths = np.arange(500, 700) * q.nm
-    args = parse_args()
 
     camera = Camera(11 * q.um, .1, 500, 23, 32, shape, fps=1000 / q.s,
                     quantum_efficiencies=0.5 * np.ones(len(vis_wavelengths)),
@@ -59,6 +55,19 @@ def main():
                                 vis_wavelengths,
                                 1.84)
     detector = Detector(scintillator, lens, camera)
+    source_trajectory = Trajectory([(n / 2, n / 2, 0)] * detector.pixel_size)
+    bm = make_topotomo(dE=dE, trajectory=source_trajectory, pixel_size=detector.pixel_size)
+
+    return bm, detector
+
+
+def main():
+    args = parse_args()
+    syris.init()
+    n = 256
+    shape = (n, n)
+    energies = np.arange(5, 30, 1) * q.keV
+    bm, detector = make_devices(n, energies)
     mb = create_sample(n, detector.pixel_size, velocity=20 * q.mm / q.s)
     mb_2 = create_sample(n, detector.pixel_size, velocity=10 * q.mm / q.s)
     mb.material = get_material('pmma_5_30_kev.mat')
@@ -70,10 +79,7 @@ def main():
     tr = Trajectory(circle, velocity=10 * q.um / q.s)
     glass = get_material('glass.mat')
     mesh = Mesh(cube, tr, material=glass)
-    # mesh.material = mb.material
     mesh.bind_trajectory(detector.pixel_size)
-    source_trajectory = Trajectory([(n / 2, n / 2, 0)] * detector.pixel_size)
-    bm = make_topotomo(dE=dE, trajectory=source_trajectory, pixel_size=detector.pixel_size)
     ex = Experiment([bm, mb, mb_2, mesh], bm, detector, 0 * q.m, energies)
 
     for sample in ex.samples:
@@ -90,7 +96,7 @@ def main():
 
         t_0 = 0 * q.s
         if args.num_images:
-            t_1 = args.num_images / camera.fps
+            t_1 = args.num_images / detector.camera.fps
         else:
             t_1 = ex.time
 
