@@ -2,7 +2,7 @@ import numpy as np
 import quantities as q
 import syris
 import syris.config as cfg
-from syris.devices.cameras import Camera, FPSError, is_fps_feasible
+from syris.devices.cameras import Camera, is_fps_feasible
 from syris.tests import SyrisTest, slow
 
 
@@ -27,24 +27,14 @@ class TestCamera(SyrisTest):
     def test_constructor(self):
         Camera(1 * q.um, 0.1, 10, 1, 12, None)
         Camera(1 * q.um, 0.1, 10, 1, 12, (64, 64))
-        cam = Camera(1 * q.um, 0.1, 10, 1, 12, None, (64, 64),
-                     exp_time=1 * q.ms)
+        # Exposure time priority
+        cam = Camera(1 * q.um, 0.1, 10, 1, 12, None, (64, 64), exp_time=1 * q.ms, fps=10000 / q.s)
         self.assertEqual(cam.fps.simplified, 1000 / q.s)
 
-        cam = Camera(1 * q.um, 0.1, 10, 1, 12, (64, 64),
-                     fps=1000 / q.s)
-        self.assertEqual(cam.exp_time, 1 * q.ms)
-
-        cam = Camera(1 * q.um, 0.1, 10, 1, 12, (64, 64),
-                     exp_time = 0.5 * q.ms, fps=1000 / q.s)
-
-        self.assertRaises(FPSError, Camera, 1 * q.um, 0.1, 10, 1, 12,
-                          (64, 64), exp_time = 1.5 * q.ms,
-                          fps=1000 / q.s)
-
-        self.assertRaises(FPSError, Camera, 1 * q.um, 0.1, 10, 1, 12,
-                          (64, 64), exp_time = 1.0 * q.ms,
-                          fps=1500 / q.s)
+        # Shorter exposure time than 1 / FPS
+        cam = Camera(1 * q.um, 0.1, 10, 1, 12, (64, 64), exp_time = 0.5 * q.s, fps=1 / q.s)
+        self.assertEqual(cam.exp_time, .5 * q.s)
+        self.assertEqual(cam.fps, 1 / q.s)
 
     def test_is_fps_feasible(self):
         self.assertTrue(is_fps_feasible(1000 / q.s, 1 * q.ms))
@@ -52,20 +42,12 @@ class TestCamera(SyrisTest):
         self.assertFalse(is_fps_feasible(1000 / q.s, 2 * q.ms))
 
     def test_fps_setting(self):
-        self.camera.fps = 0.5 / q.s
-
-        def _set_fps(fps):
-            self.camera.fps = fps
-
-        self.assertRaises(FPSError, _set_fps, 1001 / q.s)
+        self.camera.fps = 1000 / q.s
+        self.assertAlmostEqual(1e-3, self.camera.exp_time.simplified.magnitude)
 
     def test_exp_time_setting(self):
-        self.camera.exp_time = 0.5 * q.ms
-
-        def _set_exp_time(exp_time):
-            self.camera.exp_time = exp_time
-
-        self.assertRaises(FPSError, _set_exp_time, 1.5 * q.s)
+        self.camera.exp_time = 10 * q.s
+        self.assertAlmostEqual(.1, self.camera.fps.simplified.magnitude)
 
     def test_bpp(self):
         self.assertEqual(self.camera.max_grey_value, 2 ** self.camera.bpp - 1)
