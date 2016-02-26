@@ -31,40 +31,44 @@ class Experiment(object):
 
         return self._time
 
-    def get_next_time(self, t):
+    def get_next_time(self, t, pixel_size):
         """Get next time from *t* for all the samples."""
-        return min([obj.get_next_time(t, self.detector.pixel_size) for obj in self.samples])
+        return min([obj.get_next_time(t, pixel_size) for obj in self.samples])
 
-    def compute_intensity(self, t_0, t_1):
+    def compute_intensity(self, t_0, t_1, shape, pixel_size):
         """Compute intensity between times *t_0* and *t_1*."""
         exp_time = (t_1 - t_0).simplified.magnitude
-        image = propagate(self.samples, self.detector.camera.shape, self.energies,
-                          self.propagation_distance, self.detector.pixel_size,
-                          detector=self.detector, t=t_0) * exp_time
+        image = propagate(self.samples, shape, self.energies, self.propagation_distance,
+                          pixel_size, detector=self.detector, t=t_0) * exp_time
 
         return image
 
-    def make_sequence(self, t_start, t_end, queue=None):
+    def make_sequence(self, t_start, t_end, shape=None, queue=None):
         """Make images between times *t_start* and *t_end*."""
         if queue is None:
             queue = cfg.OPENCL.queue
+        shape_0 = self.detector.camera.shape
+        ps_0 = self.detector.camera.pixel_size
+        ps = shape_0[0] / float(shape[0]) * ps_0
         fps = self.detector.camera.fps
         frame_time = 1 / fps
         times = np.arange(t_start.simplified.magnitude, t_end.simplified.magnitude,
                           frame_time.simplified.magnitude) * q.s
+        fmt = 'Making sequence with shape {} and pixel size {} from {} to {}'
+        LOG.debug(fmt.format(shape, ps, t_start, t_end))
 
-        image = cl_array.Array(queue, self.detector.camera.shape, dtype=cfg.PRECISION.np_float)
+        image = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
 
         for t_0 in times:
             image.fill(0)
             t = t_0
-            t_next = self.get_next_time(t)
+            t_next = self.get_next_time(t, ps)
             while t_next < t_0 + frame_time:
                 LOG.debug('Motion blur: {} -> {}'.format(t, t_next))
-                image += self.compute_intensity(t, t_next)
+                image += self.compute_intensity(t, t_next, shape, ps)
                 t = t_next
-                t_next = self.get_next_time(t)
-            image += self.compute_intensity(t, t_0 + frame_time)
+                t_next = self.get_next_time(t, ps)
+            image += self.compute_intensity(t, t_0 + frame_time, shape, ps)
             camera_image = self.detector.camera.get_image(image)
             LOG.debug('Image: {} -> {}'.format(t_0, t_0 + frame_time))
             yield camera_image
