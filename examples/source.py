@@ -21,12 +21,12 @@ def main():
     n = 512
     shape = (n, n)
     ps = 1 * q.um
-    energies = np.arange(5, 30) * q.keV
+    dE = 1 * q.keV
+    energies = np.arange(5, 30, dE.magnitude) * q.keV
     cp = make_triangle(n=16) * 1e-1
-    tr = Trajectory(cp, velocity=10 * q.um / q.s)
+    tr = Trajectory(cp, velocity=10 * q.um / q.s, pixel_size=ps)
 
-    bm = BendingMagnet(2.5 * q.GeV, 100 * q.mA, 1.5 * q.T, 30 * q.m, energies, (200, 800) * q.um,
-                       ps, shape[0], trajectory=tr)
+    bm = BendingMagnet(2.5 * q.GeV, 100 * q.mA, 1.5 * q.T, 30 * q.m, dE, (200, 800) * q.um, ps, tr)
 
     # Flat at time = 0
     flat_0 = (abs(bm.transfer((512, 256), ps, energies[0], t=0 * q.s)) ** 2).real.get()

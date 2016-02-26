@@ -10,18 +10,19 @@ class TestSources(SyrisTest):
 
     def setUp(self):
         syris.init()
-        self.energies = np.arange(14.8, 15, 0.1) * q.keV
+        self.dE = 0.1 * q.keV
+        self.energies = np.arange(14.8, 15, self.dE.magnitude) * q.keV
         self.trajectory = Trajectory([(0, 0, 0)] * q.m)
         self.ps = 10 * q.um
 
         self.source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
-                                    self.energies, np.array([0.2, 0.8]) * q.mm, self.ps,
+                                    self.dE, np.array([0.2, 0.8]) * q.mm, self.ps,
                                     self.trajectory)
 
     @slow
     def test_bending_magnet_approx(self):
         source_2 = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
-                                 self.energies, np.array([0.2, 0.8]) * q.mm, self.ps,
+                                 self.dE, np.array([0.2, 0.8]) * q.mm, self.ps,
                                  self.trajectory, profile_approx=False)
 
         for e in self.energies:
@@ -46,7 +47,7 @@ class TestSources(SyrisTest):
         tr = Trajectory(zip(x, y, z) * q.mm, pixel_size=10 * q.um, furthest_point=0*q.m,
                         velocity=1 * q.mm / q.s)
         source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
-                               self.energies, np.array([0.2, 0.8]) * q.mm, self.ps, trajectory=tr)
+                               self.dE, np.array([0.2, 0.8]) * q.mm, self.ps, trajectory=tr)
         im_0 = source.transfer(shape, self.ps, self.energies[0]).get()
         im_1 = source.transfer(shape, self.ps, self.energies[0], t=tr.time / 2).get()
 

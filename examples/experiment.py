@@ -41,7 +41,8 @@ def main():
     syris.init()
     n = 256
     shape = (n, n)
-    energies = np.arange(5, 30) * q.keV
+    dE = 1 * q.keV
+    energies = np.arange(5, 30, dE.magnitude) * q.keV
     vis_wavelengths = np.arange(500, 700) * q.nm
     args = parse_args()
 
@@ -72,9 +73,9 @@ def main():
     # mesh.material = mb.material
     mesh.bind_trajectory(detector.pixel_size)
     source_trajectory = Trajectory([(n / 2, n / 2, 0)] * detector.pixel_size)
-    bm = BendingMagnet(2.5 * q.GeV, 100 * q.mA, 1.5 * q.T, 30 * q.m, energies,
+    bm = BendingMagnet(2.5 * q.GeV, 100 * q.mA, 1.5 * q.T, 30 * q.m, dE,
                        (200, 800) * q.um, detector.pixel_size, source_trajectory)
-    ex = Experiment([bm, mb, mb_2, mesh], bm, detector, 0 * q.m)
+    ex = Experiment([bm, mb, mb_2, mesh], bm, detector, 0 * q.m, energies)
 
     for sample in ex.samples:
         if sample != bm:

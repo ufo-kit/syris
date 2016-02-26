@@ -14,11 +14,12 @@ class Experiment(object):
 
     """A virtual synchrotron experiment base class."""
 
-    def __init__(self, samples, source, detector, propagation_distance):
+    def __init__(self, samples, source, detector, propagation_distance, energies):
         self.source = source
         self.samples = samples
         self.detector = detector
         self.propagation_distance = propagation_distance
+        self.energies = energies
         self._time = None
 
     @property
@@ -37,8 +38,7 @@ class Experiment(object):
     def compute_intensity(self, t_0, t_1):
         """Compute intensity between times *t_0* and *t_1*."""
         exp_time = (t_1 - t_0).simplified.magnitude
-        energies = self.source.energies
-        image = propagate(self.samples, self.detector.camera.shape, energies,
+        image = propagate(self.samples, self.detector.camera.shape, self.energies,
                           self.propagation_distance, self.detector.pixel_size,
                           detector=self.detector, t=t_0) * exp_time
 

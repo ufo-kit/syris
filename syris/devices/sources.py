@@ -22,26 +22,32 @@ class BendingMagnet(OpticalElement):
 
     _SR_CONST = 3 * fine_structure_constant.simplified / (4 * np.pi ** 2)
 
-    def __init__(self, electron_energy, el_current, magnetic_field, sample_distance, energies, size,
+    def __init__(self, electron_energy, el_current, magnetic_field, sample_distance, dE, size,
                  pixel_size, trajectory, profile_approx=True):
-        """Create a BendingMagnet source with electron beam *electron_energy*, electric
-        *el_current*, *magnetic_field*, place it into *sample_distance* (distance between the source
-        and a sample), take into account all *energies* and set its *size* (y, x) specified as FWHM
-        and approximate it by a Gaussian. *pixel_size* is the effective pixel size. *trajectory* is
-        the trajectory defining the source position in space and time. If *profile_approx* is True,
-        the profile at a given vertical observation angle will not be integrated over the relevant
-        energies but will be calculated for the mean energy and multiplied by :math:`\Delta E`.
+        """The parameters are *electron_energy*, electric *el_current*, *magnetic_field*, place it
+        into *sample_distance* (distance between the source and a sample), take into account energy
+        spacing *dE* which sets the amount of photons obtained for an energy to be:
+
+        .. math::
+
+            \Phi = \int_{E - dE / 2}^{E + dE / 2} \Phi(E) dE
+
+        Set its *size* (y, x) specified as FWHM and approximate it by a Gaussian. *pixel_size* is
+        the effective pixel size. *trajectory* is the trajectory defining the source position in
+        space and time. If *profile_approx* is True, the profile at a given vertical observation
+        angle will not be integrated over the relevant energies but will be calculated for the mean
+        energy and multiplied by *dE*.
         """
+
         super(BendingMagnet, self).__init__()
         self.electron_energy = electron_energy.simplified
         self.el_current = el_current.simplified
         self.magnetic_field = magnetic_field
         self.sample_distance = sample_distance.simplified
-        self.energies = energies
+        self.dE = dE
         self.size = size.simplified
         self.pixel_size = make_tuple(pixel_size, num_dims=2)
         self.trajectory = trajectory
-        self._d_energy = 0 if len(self.energies) == 1 else self.energies[1] - self.energies[0]
         self.profile_approx = profile_approx
 
     @property
@@ -76,17 +82,14 @@ class BendingMagnet(OpticalElement):
             return flux * 1e3 / photon_energy
 
         def _get_flux_at_angle(angle, energy, d_energy):
-            if len(self.energies) > 1:
-                e_0 = energy - d_energy / 2.0
-                e_1 = energy + d_energy / 2.0
-                return integrate.romberg(_get_flux_wrapper, e_0, e_1, args=(angle,))
-            else:
-                return self.get_flux(energy * q.keV, angle * q.rad, pixel_size)
+            e_0 = energy - d_energy / 2.0
+            e_1 = energy + d_energy / 2.0
+            return integrate.romberg(_get_flux_wrapper, e_0, e_1, args=(angle,))
 
         get_profiles = np.vectorize(_get_flux_at_angle)
 
         energy = energy.rescale(q.keV).magnitude
-        d_energy = self._d_energy.rescale(q.keV).magnitude
+        d_energy = self.dE.rescale(q.keV).magnitude
 
         return get_profiles(angles.rescale(q.rad).magnitude, energy, d_energy) / q.s
 
@@ -125,7 +128,7 @@ class BendingMagnet(OpticalElement):
             # Much faster but less precise.
             # dE / E = 1e-3 = 0.1 % BW, we need to convert it to the actual bandwidth of the
             # energies we use, so the result is 1e3 * dE / E
-            bw_conv = 1e3 * (self._d_energy / energy).simplified.magnitude
+            bw_conv = 1e3 * (self.dE / energy).simplified.magnitude
             result = self.get_flux(energy, angles, pixel_size) * bw_conv
         else:
             # Full energy integration.
