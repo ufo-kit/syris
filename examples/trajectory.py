@@ -95,14 +95,19 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
     return times, points
 
 
-def create_sample(n, ps, radius=None, velocity=None):
+def create_sample(n, ps, radius=None, velocity=None, x_ends=None, y_ends=None):
     """Crete a metaball with a sine trajectory."""
     fov = n * ps
     if radius is None:
         radius = n / 16 * ps
-    radius_m = radius.simplified.magnitude
-    fov_m = fov.simplified.magnitude
-    cp = make_sine(n=32, x_ends=(radius_m, fov_m - radius_m) * q.m, y_ends=(n / 4, 3 * n / 4) * ps)
+    if x_ends is None:
+        radius_m = radius.simplified.magnitude
+        fov_m = fov.simplified.magnitude
+        x_ends = (radius_m, fov_m - radius_m) * q.m
+    if y_ends is None:
+        y_ends = (n / 4, 3 * n / 4) * ps
+
+    cp = make_sine(n=32, x_ends=x_ends, y_ends=y_ends)
     if velocity is None:
         velocity = 1 * q.mm / q.s
     tr = Trajectory(cp, velocity=velocity)
