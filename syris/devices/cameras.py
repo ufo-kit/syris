@@ -161,5 +161,5 @@ def make_pco_dimax():
                                                       'data/dimax_quantum_efficiencies.npy'))
     lam = lam * q.m
 
-    return Camera(11 * q.um, 0.1, 53., 23., 12, (2016, 2016),
+    return Camera(11 * q.um, 0.1, 530., 23., 12, (2016, 2016),
                   quantum_efficiencies=qe, wavelengths=lam)
