@@ -8,6 +8,7 @@ import syris.config as cfg
 import syris.gpu.util as gutil
 import syris.imageprocessing as ip
 from syris.bodies.simple import make_grid
+from syris.util import save_image
 from util import show
 
 
@@ -39,6 +40,9 @@ def main():
     radii = ip.crop(radii, (m - 1, m - 1, crop_n, crop_n)).get()
     image = ip.crop(image, (m - 1, m - 1, crop_n, crop_n)).get()
 
+    if args.output:
+        save_image(args.output, result)
+
     show(image, title='Original Image')
     show(2 * radii, title='Blurring Disk Diameters')
     show(result, title='Blurred Image')
@@ -50,6 +54,7 @@ def parse_args():
 
     parser.add_argument('--input', default='grid', choices=['grid', 'lena'],
                         help='Input image')
+    parser.add_argument('--output', type=str, help='Output file name')
     parser.add_argument('--n', type=int, default=512, help='Number of pixels in one dimension')
 
     return parser.parse_args()
