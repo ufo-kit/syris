@@ -5,6 +5,7 @@ import numpy as np
 import quantities as q
 import syris
 import syris.config as cfg
+import syris.gpu.util as gutil
 import syris.imageprocessing as ip
 from syris.bodies.simple import make_grid
 from util import show
@@ -16,10 +17,12 @@ def main():
     m = 20
 
     if args.input == 'grid':
-        image = make_grid(512, m * q.m).thickness.get()
+        image = make_grid(args.n, m * q.m).thickness.get()
     elif args.input == 'lena':
         from scipy.misc import lena
         image = lena().astype(cfg.PRECISION.np_float)
+        if args.n != image.shape[0]:
+            image = gutil.get_host(ip.rescale(image, (args.n, args.n)))
 
     n = image.shape[0]
     crop_n = n - 2 * m - 2
@@ -47,6 +50,7 @@ def parse_args():
 
     parser.add_argument('--input', default='grid', choices=['grid', 'lena'],
                         help='Input image')
+    parser.add_argument('--n', type=int, default=512, help='Number of pixels in one dimension')
 
     return parser.parse_args()
 
