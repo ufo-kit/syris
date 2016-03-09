@@ -4,6 +4,7 @@ compute, m is the base number of operations per pixel powered to k.
 import argparse
 import time
 import pyopencl as cl
+import matplotlib.pyplot as plt
 import numpy as np
 import syris
 import syris.config as cfg
@@ -18,10 +19,10 @@ def get_kernel():
             int idx = get_global_id (0);
             int n = get_global_size (0);
             int i;
-            float result;
+            float result = (float) idx;
 
             for (i = 1; i < stop + 1; i++) {
-                result = log ((float) i + idx);
+                result = result * result;
             }
 
             output[idx] = result;
@@ -37,6 +38,9 @@ def parse_args():
                         help='Time complexity, there are n x m^k operations in total '
                         '(default 1). The argument might have one (single run) or 3 numbers '
                         '(meaning start stop step) when a scan is performed.')
+    parser.add_argument('--runs', type=int, default=1, help='Number of runs per one complexity. '
+                        'The result speedup is the mean.')
+    parser.add_argument('--plot', action='store_true', help='Plot results')
 
     args = parser.parse_args()
     m = args.k
@@ -53,7 +57,7 @@ def run(n, m, complexity, prg):
     stop = int(m ** complexity)
     complexity_fmt = 'complexity: {} x {}^{}, pixel operations: {}'
     print complexity_fmt.format(n, m, complexity, stop)
-    num_items = 2 * len(queues)
+    num_items = len(queues)
     events = []
 
     def process(item, queue):
@@ -101,13 +105,25 @@ def main():
 
     results = []
     for complexity in complexities:
-        results.append(run(args.n, args.m, complexity, prg))
+        runs = []
+        for i in range(args.runs):
+            print 'Run {} / {}'.format(i + 1, args.runs)
+            runs.append(run(args.n, args.m, complexity, prg))
+        results.append(np.mean(runs))
 
     print
     print '==============================='
     for i, result in enumerate(results):
         print 'Complexity: {:.2f}, speedup: {:.2f}'.format(complexities[i], result)
     print '==============================='
+
+    if args.plot:
+        plt.figure()
+        plt.plot(complexities, results)
+        plt.xlabel('Complexity')
+        plt.xlabel('Speedup')
+        plt.grid()
+        plt.show()
 
 
 def get_duration(event):
