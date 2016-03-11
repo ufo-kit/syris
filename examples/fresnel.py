@@ -88,8 +88,8 @@ def main():
     aperture[res.shape[1] / 4:3 * res.shape[1] / 4] = 1
     plt.figure()
     plt.plot(x_data, aperture, label='Aperture')
-    plt.plot(x_data, res[n / 4 / ss], label='Numerical')
-    plt.plot(x_data, res_a[n / 4 / ss], label='Analytical')
+    plt.plot(x_data, res[n / 4 / ss], '--', label='Numerical')
+    plt.plot(x_data, res_a[n / 4 / ss], '-.', label='Analytical')
     plt.title('Analytical vs. Numerical Diffraction Pattern')
     plt.xlabel(r'$\mu m$')
     plt.ylabel(r'$I$')
