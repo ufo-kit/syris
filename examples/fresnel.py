@@ -59,8 +59,8 @@ def crop_to_aperture(image, w, ps):
 
 def main():
     """Main function."""
-    syris.init(loglevel=logging.INFO)
     args = parse_args()
+    syris.init(loglevel=logging.INFO)
     lam = energy_to_wavelength(args.energy * q.keV).simplified
     w = args.aperture / 2 * q.um
     # Width of the aperture is 2w, make the aperture half the image size
