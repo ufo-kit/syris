@@ -1,5 +1,4 @@
 """Laminography data set generation with mesh geometry."""
-import argparse
 import itertools
 import logging
 import os
@@ -11,6 +10,7 @@ from functools import partial
 from multiprocessing import Lock, Pool
 from syris.geometry import X_AX, Y_AX, Z_AX
 from syris.util import save_image
+from util import get_default_parser
 
 
 LOCK = Lock()
@@ -182,7 +182,7 @@ def process(args, device_index):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = get_default_parser(__doc__)
     parser.add_argument('input', type=str, help='Blender .obj input file name')
     parser.add_argument('--dset', type=str,
                         help='Data set name, if not specified guessed from input')

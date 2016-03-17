@@ -1,5 +1,4 @@
 """Experiment example."""
-import argparse
 import os
 import time
 import matplotlib.pyplot as plt
@@ -19,7 +18,7 @@ from syris.experiments import Experiment
 from syris.materials import make_fromfile
 from syris.math import fwnm_to_sigma
 from trajectory import create_sample, make_circle
-from util import show
+from util import get_default_parser, show
 
 
 def get_flat(shape, energies, detector, source, filters=(), shot_noise=False,
@@ -186,7 +185,7 @@ def make_motion(args):
 
 def main():
     """Parse command line arguments and execute one of the experiments."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = get_default_parser(__doc__)
     subparsers = parser.add_subparsers(help='sub-command help')
 
     motion = subparsers.add_parser('motion', help='An experiment with motion')

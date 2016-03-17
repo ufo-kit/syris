@@ -1,5 +1,4 @@
 """Trajectory and motion example."""
-import argparse
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,6 +7,7 @@ import syris
 import scipy.misc
 from syris.geometry import Trajectory
 from syris.bodies.isosurfaces import MetaBall
+from util import get_default_parser
 
 
 def make_triangle(n=128):
@@ -145,7 +145,7 @@ def main():
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = get_default_parser(__doc__)
     parser.add_argument('--output', type=str, help='Output directory for moving objects.')
 
     return parser.parse_args()

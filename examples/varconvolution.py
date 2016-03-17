@@ -1,5 +1,4 @@
 """Example showing variable convolution."""
-import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
@@ -9,7 +8,7 @@ import syris.gpu.util as gutil
 import syris.imageprocessing as ip
 from syris.bodies.simple import make_grid
 from syris.util import save_image
-from util import show
+from util import get_default_parser, show
 
 
 def main():
@@ -50,7 +49,7 @@ def main():
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = get_default_parser(__doc__)
 
     parser.add_argument('--input', default='grid', choices=['grid', 'lena'],
                         help='Input image')

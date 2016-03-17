@@ -1,7 +1,6 @@
 """Show multi-device speedup on a problem of size n x m^k, where n is the number of pixels to
 compute, m is the base number of operations per pixel powered to k.
 """
-import argparse
 import time
 import pyopencl as cl
 import matplotlib.pyplot as plt
@@ -9,6 +8,7 @@ import numpy as np
 import syris
 import syris.config as cfg
 import syris.gpu.util as gutil
+from util import get_default_parser
 
 
 def get_kernel():
@@ -31,7 +31,7 @@ def get_kernel():
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = get_default_parser(__doc__)
     parser.add_argument('--n', type=int, default=512 ** 2, help='Number of pixels (default 512^2)')
     parser.add_argument('--m', type=int, default=64, help='Number of pixel operations (default 64)')
     parser.add_argument('--k', type=float, default=1.0, nargs='*',

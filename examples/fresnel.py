@@ -1,7 +1,6 @@
 """Comparison of analytical and numerical Fresnel diffraction pattern. The object is a square
 aperture from Introduction to Fourier Optics by J. W. Goodmann, 2nd edition.
 """
-import argparse
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,6 +10,7 @@ import syris
 import syris.config as cfg
 from syris.imageprocessing import fft_2, ifft_2, crop
 from syris.physics import compute_propagator, compute_propagation_sampling, energy_to_wavelength
+from util import get_default_parser
 
 
 LOG = logging.getLogger(__name__)
@@ -102,7 +102,7 @@ def main():
 
 def parse_args():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = get_default_parser(__doc__)
     parser.add_argument('--fn', type=float, default=4.0, help='Fresnel number')
     parser.add_argument('--energy', type=float, default=1.0, help='Energy [keV]')
     parser.add_argument('--aperture', type=float, default=100.0, help='Aperture width [um]')
