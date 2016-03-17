@@ -53,15 +53,17 @@ def main():
 
     proj = mesh.project(shape, args.pixel_size, t=None).get()
     offset = syris.gpu.util.make_vfloat3(0, translate[1].simplified, -(fov / 2.).simplified)
-    sl = mesh.compute_slices((1,) + shape, args.pixel_size, offset=offset).get()[0]
 
     if args.projection_filename is not None:
         save_image(args.projection_filename, proj)
-    if args.slice_filename is not None:
-        save_image(args.slice_filename, sl)
+
+    if args.compute_slice:
+        sl = mesh.compute_slices((1,) + shape, args.pixel_size, offset=offset).get()[0]
+        if args.slice_filename is not None:
+            save_image(args.slice_filename, sl)
+        show(sl, title='Slice at y = {}'.format(args.n / 2))
 
     show(proj, title='Projection')
-    show(sl, title='Slice at y = {}'.format(args.n / 2))
     plt.show()
 
 
@@ -79,6 +81,7 @@ def parse_args():
     parser.add_argument('--y-rotate', type=float, default=0., help='Rotation around y axis [deg]')
     parser.add_argument('--margin', type=float, default=1., help='Margin in factor of the full FOV')
     parser.add_argument('--projection-filename', type=str, help='Save projection to this filename')
+    parser.add_argument('--compute-slice', action='store_true', help='Compute also one slice')
     parser.add_argument('--slice-filename', type=str, help='Save slice to this filename')
 
     args = parser.parse_args()
