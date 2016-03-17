@@ -1,6 +1,7 @@
 """Mesh projection and slice."""
 import argparse
 import logging
+import time
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
@@ -51,7 +52,9 @@ def main():
     fmt = 'n: {}, pixel size: {}, FOV: {}'
     LOG.info(fmt.format(args.n, args.pixel_size.rescale(q.um), fov.rescale(q.um)))
 
+    st = time.time()
     proj = mesh.project(shape, args.pixel_size, t=None).get()
+    LOG.info('Duration: {} s'.format(time.time() - st))
     offset = syris.gpu.util.make_vfloat3(0, translate[1].simplified, -(fov / 2.).simplified)
 
     if args.projection_filename is not None:
