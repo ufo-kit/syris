@@ -530,7 +530,11 @@ def qmap(func, items, queues=None, args=(), kwargs=None):
 
         return result
 
-    return pool.map(process, items)
+    results = pool.map(process, items)
+    pool.close()
+    pool.join()
+
+    return results
 
 
 def get_event_duration(event, start=cl.profiling_info.START, stop=cl.profiling_info.END):
