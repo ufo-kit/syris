@@ -34,7 +34,7 @@ def parse_args():
     parser = get_default_parser(__doc__)
     parser.add_argument('--n', type=int, default=512 ** 2, help='Number of pixels (default 512^2)')
     parser.add_argument('--m', type=int, default=64, help='Number of pixel operations (default 64)')
-    parser.add_argument('--k', type=float, default=1.0, nargs='*',
+    parser.add_argument('--k', type=float, default=[1], nargs='*',
                         help='Time complexity, there are n x m^k operations in total '
                         '(default 1). The argument might have one (single run) or 3 numbers '
                         '(meaning start stop step) when a scan is performed.')
