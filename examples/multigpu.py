@@ -43,6 +43,10 @@ def parse_args():
     parser.add_argument('--plot', action='store_true', help='Plot results')
     parser.add_argument('--verbose', action='store_true',
                         help='Print infomation from individual runs')
+    parser.add_argument('--output', type=str, help='Output individual speedups from all '
+                        'runs as a numpy array in this filename k is the complexity. '
+                        'It must conatin a formatting string which will hold the complexity, '
+                        'e.g. speedups{:>04}.npy.')
 
     args = parser.parse_args()
     m = args.k
@@ -115,6 +119,8 @@ def main():
         for i in range(args.runs):
             print 'Run {} / {}'.format(i + 1, args.runs)
             runs.append(run(args.n, args.m, complexity, prg, verbose=args.verbose))
+        if args.output:
+            np.save(args.output.format(complexity), runs)
         results.append(np.mean(runs))
 
     print
