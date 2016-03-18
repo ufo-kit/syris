@@ -41,6 +41,8 @@ def parse_args():
     parser.add_argument('--runs', type=int, default=1, help='Number of runs per one complexity. '
                         'The result speedup is the mean.')
     parser.add_argument('--plot', action='store_true', help='Plot results')
+    parser.add_argument('--verbose', action='store_true',
+                        help='Print infomation from individual runs')
 
     args = parser.parse_args()
     m = args.k
@@ -50,13 +52,14 @@ def parse_args():
     return args
 
 
-def run(n, m, complexity, prg):
+def run(n, m, complexity, prg, verbose=False):
     devices = cfg.OPENCL.devices
     queues = cfg.OPENCL.queues
 
     stop = int(m ** complexity)
     complexity_fmt = 'complexity: {} x {}^{}, pixel operations: {}'
-    print complexity_fmt.format(n, m, complexity, stop)
+    if verbose:
+        print complexity_fmt.format(n, m, complexity, stop)
     num_items = len(queues)
     events = []
 
@@ -72,22 +75,25 @@ def run(n, m, complexity, prg):
     gutil.qmap(process, range(num_items))
     host_duration = time.time() - start
 
-    print '-------------------------------'
-    print '     All duration: {:.2f} s'.format(host_duration)
-    print '-------------------------------'
+    if verbose:
+        print '-------------------------------'
+        print '     All duration: {:.2f} s'.format(host_duration)
+        print '-------------------------------'
 
     all_duration = 0
     for i, event in enumerate(events):
         duration = get_duration(event)
         all_duration += duration
-        print 'Device {} duration: {:.2f} s'.format(i, duration)
+        if verbose:
+            print 'Device {} duration: {:.2f} s'.format(i, duration)
 
     speedup = all_duration / host_duration
-    print '-------------------------------'
-    print '    Mean duration: {:.2f} s'.format(all_duration / len(devices))
-    print '-------------------------------'
-    print '          Speedup: {:.2f} / {}'.format(speedup, len(devices))
-    print '-------------------------------'
+    if verbose:
+        print '-------------------------------'
+        print '    Mean duration: {:.2f} s'.format(all_duration / len(devices))
+        print '-------------------------------'
+        print '          Speedup: {:.2f} / {}'.format(speedup, len(devices))
+        print '-------------------------------'
 
     return speedup
 
@@ -108,7 +114,7 @@ def main():
         runs = []
         for i in range(args.runs):
             print 'Run {} / {}'.format(i + 1, args.runs)
-            runs.append(run(args.n, args.m, complexity, prg))
+            runs.append(run(args.n, args.m, complexity, prg, verbose=args.verbose))
         results.append(np.mean(runs))
 
     print
