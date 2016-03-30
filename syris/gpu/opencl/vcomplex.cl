@@ -8,14 +8,14 @@ typedef vfloat2 vcomplex;
 /*
  * Complex multiplication.
  */
-vcomplex vc_mul(vcomplex *a, vcomplex *b) {
+vcomplex vc_mul(const vcomplex *a, const vcomplex *b) {
 	return (vcomplex)(a->x * b->x - a->y * b->y, a->y * b->x + a->x * b->y);
 }
 
 /*
  * Complex division.
  */
-vcomplex vc_div(vcomplex *a, vcomplex *b) {
+vcomplex vc_div(const vcomplex *a, const vcomplex *b) {
 	return (vcomplex)
 			((a->x * b->x + a->y * b->y) / (b->x * b->x + b->y * b->y),
 			(a->y * b->x - a->x * b->y) / (b->x * b->x + b->y * b->y));

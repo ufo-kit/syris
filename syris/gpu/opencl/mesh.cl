@@ -96,10 +96,10 @@ int compute_intersections (const global vfloat3 *v_1,
      * in x-direction, this way we are sure that if we search until ray.x +
      * max_dx we have searched all the triangles starting to the left from the ray */
     while (i < num_triangles && v_1[i].x <= stop && v_2[i].x <= stop && v_3[i].x <= stop) {
-        if (!(v_1[i].x < xm && v_2[i].x < xm && v_3[i].x < xm ||
-              v_1[i].x > xp && v_2[i].x > xp && v_3[i].x > xp ||
-              v_1[i].y < ym && v_2[i].y < ym && v_3[i].y < ym ||
-              v_1[i].y > yp && v_2[i].y > yp && v_3[i].y > yp)) {
+        if (!((v_1[i].x < xm && v_2[i].x < xm && v_3[i].x < xm) ||
+              (v_1[i].x > xp && v_2[i].x > xp && v_3[i].x > xp) ||
+              (v_1[i].y < ym && v_2[i].y < ym && v_3[i].y < ym) ||
+              (v_1[i].y > yp && v_2[i].y > yp && v_3[i].y > yp))) {
             /* There is a ray-bounding box intersection */
             current = compute_intersection_point (&v_1[i], &v_2[i], &v_3[i], O, D); 
             if (current > -1) {

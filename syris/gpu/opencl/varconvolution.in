@@ -64,19 +64,19 @@ kernel void {} (read_only image2d_t input_real,
     output[idy * width + idx] = result;
 }}
 %nl
-vfloat get_gauss (vfloat2 *p, vfloat2 *sigma)
+vfloat get_gauss (const vfloat2 *p, const vfloat2 *sigma)
 {
     return exp (-((p->x * p->x) / (2 * sigma->x * sigma->x) + (p->y * p->y) / (2 * sigma->y * sigma->y)));
 }
 %nl
-vfloat get_disk (vfloat2 *p, vfloat2 *radius)
+vfloat get_disk (const vfloat2 *p, const vfloat2 *radius)
 {
     /* Stretch y to make an ellipse */
     vfloat y_adj = radius->x / radius->y * p->y;
     return sqrt (p->x * p->x + y_adj * y_adj) < radius->x ? 1 : 0;
 }
 %nl
-vfloat get_disk_smooth (vfloat2 *p, vfloat2 *radius)
+vfloat get_disk_smooth (const vfloat2 *p, const vfloat2 *radius)
 {
     /* Stretch y to make an ellipse */
     vfloat y_adj = radius->x / radius->y * p->y;
@@ -93,7 +93,7 @@ vfloat get_disk_smooth (vfloat2 *p, vfloat2 *radius)
     return result;
 }
 %nl
-vcomplex get_propagator (vfloat2 *p, vfloat lam, vfloat distance, vfloat2 *sigma) {
+vcomplex get_propagator (const vfloat2 *p, vfloat lam, vfloat distance, const vfloat2 *sigma) {
     vfloat cos_value;
     vfloat tmp = M_PI * (p->x * p->x + p->y * p->y) / (lam * distance);
     vfloat sin_value = sincos (tmp, &cos_value);
