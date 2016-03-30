@@ -10,12 +10,12 @@ from syris import profiling as prf
 __version__ = '0.1'
 
 
-def init(device_index=None, profiling=True, profiling_file='profile.dat', loglevel=logging.DEBUG,
-         logfile=None, double_precision=False):
+def init(platform_name=None, device_index=None, profiling=True, profiling_file='profile.dat',
+         loglevel=logging.DEBUG, logfile=None, double_precision=False):
     """Initialize syris with *device_index*."""
     cfg.PRECISION = cfg.Precision(double_precision)
     cfg.OPENCL = cfg.OpenCL()
-    make_opencl_defaults(device_index=device_index, profiling=profiling)
+    make_opencl_defaults(platform_name=platform_name, device_index=device_index, profiling=profiling)
     if profiling:
         _wrap_opencl()
         prf.PROFILER = prf.Profiler(cfg.OPENCL.queues, profiling_file)
