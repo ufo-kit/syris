@@ -49,8 +49,10 @@ class StaticBody(Body):
             proj = crop(self.thickness, crop_region, block=block)
         if pad_region != (0, 0) + crop_region[2:]:
             proj = pad(proj, pad_region, block=block)
+        if proj.shape != shape:
+            proj = rescale(proj, shape, block=block)
 
-        return rescale(proj, shape, block=block)
+        return proj
 
 
 def make_grid(n, period, width=1 * q.m, thickness=1 * q.m, pixel_size=1 * q.m, material=None,
