@@ -52,6 +52,7 @@ def _fft_2(data, inverse=False, plan=None, queue=None, block=True):
             cfg.OPENCL.fft_plans[queue][data.shape] = Plan(data.shape, queue=queue)
         plan = cfg.OPENCL.fft_plans[queue][data.shape]
 
+    LOG.debug('fft_2, shape: %s, inverse: %s', data.shape, inverse)
     plan.execute(data.data, inverse=inverse, wait_for_finish=block)
 
     return data
@@ -65,6 +66,8 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None, block=Fa
     shape = make_tuple(shape)
     pixel_size = get_magnitude(make_tuple(pixel_size))
     sigma = get_magnitude(make_tuple(sigma))
+    LOG.debug('get_gauss_2d, shape: %s, sigma: %s, pixel size: %s, fourier: %s',
+              shape, sigma, pixel_size, fourier)
 
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -115,6 +118,8 @@ def pad(image, region=None, out=None, queue=None, block=False):
     src_origin = (0, 0, 0)
     dst_origin = (n_bytes * x_0, y_0, 0)
     region = (n_bytes * image.shape[1], image.shape[0], 1)
+    LOG.debug('pad, shape: %s, src_origin: %s, dst_origin: %s, region: %s', image.shape,
+              src_origin, dst_origin, region)
 
     _copy_rect(image, out, src_origin, dst_origin, region, queue, block=block)
 
@@ -137,6 +142,8 @@ def crop(image, region, out=None, queue=None, block=False):
     src_origin = (n_bytes * x_0, y_0, 0)
     dst_origin = (0, 0, 0)
     region = (n_bytes * width, height, 1)
+    LOG.debug('crop, shape: %s, src_origin: %s, dst_origin: %s, region: %s', image.shape,
+              src_origin, dst_origin, region)
 
     _copy_rect(image, out, src_origin, dst_origin, region, queue, block=block)
 
@@ -157,6 +164,8 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
     image = g_util.get_array(image, queue=queue)
     region = ((image.shape[0] - offset[0]) / summed_shape[0],
               (image.shape[1] - offset[1]) / summed_shape[1])
+    LOG.debug('bin_image, shape: %s, summed_shape: %s, offset: %s, average: %s', image.shape,
+              summed_shape, offset, average)
 
     ev = cfg.OPENCL.programs['improc'].sum(queue,
                                            (summed_shape[::-1]),
@@ -188,7 +197,8 @@ def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
     if sigma is None:
         sigma = tuple([fwnm_to_sigma(float(image.shape[i]) / shape[i], n=2) for i in range(2)])
 
-    LOG.debug('Decimating {} -> {} with sigma {}'.format(image.shape, shape, sigma))
+    LOG.debug('decimate, shape: %s, final_shape: %s, sigma: %s, average: %s', image.shape, shape,
+              sigma, average)
 
     fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue, block=block)
     image = image.astype(cfg.PRECISION.np_cplx)
@@ -209,6 +219,7 @@ def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
     shape = make_tuple(shape)
     # OpenCL order
     factor = float(shape[1]) / image.shape[1], float(shape[0]) / image.shape[0]
+    LOG.debug('rescale, shape: %s, final_shape: %s, factor: %s', image.shape, shape, factor)
 
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -250,6 +261,7 @@ def varconvolve(kernel_name, shape, kernel_args, local_size=None, program=None, 
         program = cfg.OPENCL.programs['varconv']
     if queue is None:
         queue = cfg.OPENCL.queue
+    LOG.debug('varconvolve, shape: %s, kernel: %s', shape, kernel_name)
 
     ev = getattr(program, kernel_name)(queue, shape[::-1], local_size, *kernel_args)
 
