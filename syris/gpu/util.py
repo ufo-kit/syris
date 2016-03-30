@@ -60,7 +60,9 @@ def make_opencl_defaults(platform_name=None, device_index=None, profiling=True):
         kwargs = {"properties": cl.command_queue_properties.PROFILING_ENABLE}
     else:
         kwargs = {}
+    LOG.debug('Profiling enabled: %s', profiling)
     platform = get_cuda_platform() if platform_name is None else get_platform(platform_name)
+    LOG.debug("Using platform '%s'", platform.name)
     devices = platform.get_devices()
     if device_index is None:
         cfg.OPENCL.devices = devices
