@@ -96,3 +96,18 @@ class TestGPUUtil(SyrisTest):
         ev = cl.enqueue_copy(cfg.OPENCL.queue, mem, data)
         ev.wait()
         gu.get_event_duration(ev)
+
+    def test_get_cuda_platform(self):
+        platform = gu.get_cuda_platform()
+        self.assertTrue('CUDA' in platform.name)
+
+    def test_get_intel_platform(self):
+        platform = gu.get_intel_platform()
+        self.assertTrue('Intel' in platform.name)
+
+    def test_get_platform(self):
+        names = [platform.name for platform in cl.get_platforms()]
+        # All present must pass
+        for name in names:
+            gu.get_platform(name)
+        self.assertRaises(LookupError, gu.get_platform, 'foo')
