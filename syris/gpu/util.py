@@ -12,7 +12,6 @@ import pyopencl.array as cl_array
 import quantities as q
 from multiprocessing.pool import ThreadPool
 from pyopencl.array import vec
-import time
 from syris import profiling as prf
 from syris import config as cfg
 import logging
@@ -52,21 +51,25 @@ def init_programs():
     cfg.OPENCL.programs['varconv'] = get_program(get_all_varconvolutions())
 
 
-def make_opencl_defaults(device_index=None, profiling=True):
-    """Create default OpenCL context and a command queue based on *device_index* to the devices
-    list. If None, all devices are used in the context. If *profiling* is True enable it.
+def make_opencl_defaults(platform_name=None, device_index=None, profiling=True):
+    """Create default OpenCL context from *platform_name* and a command queue based on
+    *device_index* to the devices list. If None, all devices are used in the context. If *profiling*
+    is True enable it.
     """
     if profiling:
         kwargs = {"properties": cl.command_queue_properties.PROFILING_ENABLE}
     else:
         kwargs = {}
+    platform = get_cuda_platform() if platform_name is None else get_platform(platform_name)
+    devices = platform.get_devices()
     if device_index is None:
-        cfg.OPENCL.devices = get_cuda_devices()
+        cfg.OPENCL.devices = devices
     else:
-        cfg.OPENCL.devices = [get_cuda_devices()[device_index]]
+        cfg.OPENCL.devices = [devices[device_index]]
 
-    cfg.OPENCL.ctx = get_cuda_context(devices=cfg.OPENCL.devices)
-    cfg.OPENCL.queues = get_command_queues(cfg.OPENCL.ctx, cfg.OPENCL.devices, queue_kwargs=kwargs)
+    cfg.OPENCL.ctx = cl.Context(cfg.OPENCL.devices)
+    cfg.OPENCL.queues = get_command_queues(cfg.OPENCL.ctx, devices=cfg.OPENCL.devices,
+                                           queue_kwargs=kwargs)
     cfg.OPENCL.queue = cfg.OPENCL.queues[0]
 
 
@@ -339,53 +342,39 @@ def execute_profiled(function):
     return wrapped
 
 
-def get_cuda_platform(platforms):
+def get_platform(name):
+    """Get the first OpenCL platform which contains *name* as its substring."""
+    for platform in cl.get_platforms():
+        if name in platform.name:
+            return platform
+
+    raise LookupError("Platform '{}' not found".format(platform))
+
+
+def get_cuda_platform():
     """Get the NVIDIA CUDA platform if any."""
-    for plat in platforms:
-        if plat.name == "NVIDIA CUDA":
-            return plat
-    return None
+    return get_platform('NVIDIA CUDA')
 
 
-def get_cuda_devices():
-    """Get all CUDA devices."""
-    return get_cuda_platform(cl.get_platforms()).get_devices()
+def get_intel_platform():
+    """Get the Intel platform if any."""
+    return get_platform('Intel')
 
 
-def get_cuda_context(devices=None, properties=None):
-    """Create an NVIDIA CUDA context with *properties* for *devices*,
-    if None are given create the context for all available."""
-    if devices is None:
-        devices = get_cuda_platform(cl.get_platforms()).get_devices()
-
-    LOG.debug("Creating OpenCL context for %d devices." % (len(devices)))
-    start = time.time()
-    ctx = cl.Context(devices, properties)
-    LOG.debug("OpenCL context created in %g s." % (time.time() - start))
-
-    return ctx
-
-
-def get_command_queues(context, devices=None,
-                       queue_args=None, queue_kwargs=None):
-    """Create command queues for each of the *devices* within a specified
-    *context*. If *devices* is None, NVIDIA GPUs are automatically
-    detected and used for creating the command queues.
+def get_command_queues(context, devices=None, queue_kwargs=None):
+    """Create command queues for each of the *devices* within a specified *context*. If *devices* is
+    None, they are obtained from *context*. *queue_kwargs* are passed to the CommandQueue
+    constructor.
     """
     if devices is None:
-        devices = get_cuda_devices()
-    if queue_args is None:
-        queue_args = ()
+        devices = context.devices
     if queue_kwargs is None:
         queue_kwargs = {}
 
-    LOG.debug("Creating %d command queues." % (len(devices)))
+    LOG.debug("Creating %d command queues", len(devices))
     queues = []
     for device in devices:
-        queues.append(cl.CommandQueue(context, device,
-                                      *queue_args, **queue_kwargs))
-
-    LOG.debug("%d command queues created." % (len(devices)))
+        queues.append(cl.CommandQueue(context, device, **queue_kwargs))
 
     return queues
 
