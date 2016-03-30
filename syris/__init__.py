@@ -13,6 +13,7 @@ __version__ = '0.1'
 def init(platform_name=None, device_index=None, profiling=True, profiling_file='profile.dat',
          loglevel=logging.DEBUG, logfile=None, double_precision=False):
     """Initialize syris with *device_index*."""
+    cfg.init_logging(level=loglevel, logger_file=logfile)
     cfg.PRECISION = cfg.Precision(double_precision)
     cfg.OPENCL = cfg.OpenCL()
     make_opencl_defaults(platform_name=platform_name, device_index=device_index, profiling=profiling)
@@ -26,7 +27,6 @@ def init(platform_name=None, device_index=None, profiling=True, profiling_file='
             """Shutdown the profiler on exit."""
             prf.PROFILER.shutdown()
 
-    cfg.init_logging(level=loglevel, logger_file=logfile)
     init_programs()
 
 
