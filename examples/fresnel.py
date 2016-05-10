@@ -18,6 +18,7 @@ LOG = logging.getLogger(__name__)
 
 def propagate_numerically(n, w, ps, d, lam):
     """Propagate square aperture numerically."""
+    LOG.info('Numerical propagation with n: {}, ps: {}'.format(n, ps))
     u_0 = np.zeros((n, n), dtype=cfg.PRECISION.np_cplx)
     wp = int(np.round(w / ps).simplified.magnitude)
     region = slice(n / 2 - wp, n / 2 + wp, 1)
@@ -34,6 +35,7 @@ def propagate_numerically(n, w, ps, d, lam):
 
 def propagate_analytically(n, w, ps, d, lam):
     """Propagate square aperture analytically."""
+    LOG.info('Analytical propagation with n: {}, ps: {}'.format(n, ps))
     x = np.arange(-n / 2 + 0.5, n / 2 + 0.5) * ps
     a_1 = -(np.sqrt(2 / (lam * d)) * (w + x)).simplified.magnitude
     a_2 = (np.sqrt(2 / (lam * d)) * (w - x)).simplified.magnitude
@@ -50,7 +52,10 @@ def propagate_analytically(n, w, ps, d, lam):
 def crop_to_aperture(image, w, ps):
     """Crop *image* to 2x aperture width."""
     n = image.shape[0]
+    fov = image.shape * ps
     wp = int(np.round(w / ps).simplified.magnitude)
+    fmt = 'Cropping image with shape {} and FOV {} to {} and FOV {}'
+    LOG.info(fmt.format(image.shape[::-1], fov[::-1], 2 * wp, 2 * w))
     # Crop to 4w
     region = (n / 2 - 2 * wp, n / 2 - 2 * wp, 4 * wp, 4 * wp)
 
@@ -60,7 +65,7 @@ def crop_to_aperture(image, w, ps):
 def main():
     """Main function."""
     args = parse_args()
-    syris.init(loglevel=logging.INFO)
+    syris.init(loglevel=logging.INFO, device_index=-1)
     lam = energy_to_wavelength(args.energy * q.keV).simplified
     w = args.aperture / 2 * q.um
     # Width of the aperture is 2w, make the aperture half the image size
@@ -70,32 +75,54 @@ def main():
     ns, ps = compute_propagation_sampling(lam, d, fov, fresnel=True)
     # Convolution outlier
     ns *= 2
+    ps /= ss
+    fmt = 'n sampling: {}, ps: {}, FOV: {}, propagation distance: {}'
+    LOG.info(fmt.format(ns, np.round(ps.rescale(q.nm), 2), fov, np.round(d.rescale(q.cm), 2)))
+
+    res_a = propagate_analytically(ns * ss, w, ps, d, lam)
+
     # Power of two for FFT
     n = int(2 ** np.ceil(np.log2(ns)))
     # Supersampling of the pixel size requires supersampling^2 more data points because we enlarge
     # the FOV by changing the diffraction angle via changing the pixel size and this enlarged FOV is
     # then sampled by supersampling-smaller pixel size
-    n *= ss ** 2
-    ps /= ss
-    fmt = 'n sampling: {}, n: {}, ps: {}, FOV: {}, propagation distance: {}'
-    LOG.info(fmt.format(ns, n, np.round(ps.rescale(q.nm), 2), fov, np.round(d.rescale(q.cm), 2)))
+    n_proper = n * ss ** 2
+    numerical_results = {}
+    for divisor in args.numerical_divisors:
+        if np.modf(np.log2(divisor))[0] != 0:
+            raise ValueError('All divisors must be power of two')
+        n_current = n_proper / divisor
+        if n_current < n * ss:
+            raise ValueError('divisor too large, maximum is {}'.format(ss))
+        numerical_results[n_current] = propagate_numerically(n_current, w, ps, d, lam)
 
-    res = propagate_numerically(n, w, ps, d, lam)
-    res_a = propagate_analytically(n, w, ps, d, lam)
+    x_data = np.linspace(-2 * w.magnitude, 2 * w.magnitude, res_a.shape[0])
+    aperture = np.zeros(res_a.shape[1])
+    aperture[res_a.shape[1] / 4:3 * res_a.shape[1] / 4] = res_a[n / 4 / ss].max()
 
-    x_data = np.linspace(-2 * w.magnitude, 2 * w.magnitude, res.shape[0])
-    aperture = np.zeros(res.shape[1])
-    aperture[res.shape[1] / 4:3 * res.shape[1] / 4] = 1
+    if args.txt_output:
+        txt_data = [x_data, aperture, res_a[n / 4 / ss]]
+        txt_header = 'x\taperture\tanalytical'
+
     plt.figure()
     plt.plot(x_data, aperture, label='Aperture')
-    plt.plot(x_data, res[n / 4 / ss], '--', label='Numerical')
+    for n_pixels, num_result in numerical_results.items():
+        fraction = n_pixels / float(n_proper)
+        if args.txt_output:
+            txt_header += '\t{}'.format(fraction)
+            txt_data.append(num_result[n / 4 / ss])
+        plt.plot(x_data, num_result[n / 4 / ss], '--', label='Numerical {}'.format(fraction))
+        LOG.info('MSE: {}'.format(np.mean((num_result - res_a) ** 2)))
     plt.plot(x_data, res_a[n / 4 / ss], '-.', label='Analytical')
     plt.title('Analytical vs. Numerical Diffraction Pattern')
     plt.xlabel(r'$\mu m$')
     plt.ylabel(r'$I$')
     plt.legend(loc='best')
     plt.grid()
-    LOG.info('MSE: {}'.format(np.mean((res - res_a) ** 2)))
+
+    if args.txt_output:
+        txt_data = np.array(txt_data).T
+        np.savetxt(args.txt_output, txt_data, fmt='%g', delimiter='\t', header=txt_header)
 
     plt.show()
 
@@ -105,8 +132,14 @@ def parse_args():
     parser = get_default_parser(__doc__)
     parser.add_argument('--fn', type=float, default=4.0, help='Fresnel number')
     parser.add_argument('--energy', type=float, default=1.0, help='Energy [keV]')
-    parser.add_argument('--aperture', type=float, default=100.0, help='Aperture width [um]')
+    parser.add_argument('--aperture', type=float, default=100.0,
+                        help='Half the aperture width [um]')
     parser.add_argument('--supersampling', type=int, default=4, help='Supersampling')
+    parser.add_argument('--numerical-divisors', type=int, nargs='+', default=[1],
+                        help='A list of divisors which will divide the aliasing-free number '
+                        'of pixels to produce aliased results to show the importance of proper '
+                        'sampling')
+    parser.add_argument('--txt-output', type=str, help='File name where to store the data as text')
 
     return parser.parse_args()
 
