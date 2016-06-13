@@ -60,23 +60,19 @@ void get_meta_ball_equation(vfloat *result, __constant vfloat4 *object, vfloat2 
         return;
     }
 
-    tmp = sqrt(4 * object->w * object->w - dist_2);
+	/* determine R = r + influence for given x,y coordinates */
+    R_2 = 4 * object->w * object->w - dist_2;
+    tmp = sqrt(R_2);
     intersection.x = object->z - tmp;
     intersection.y = object->z + tmp;
 
     /* influence region = 2 * r, thus the coefficient guaranteeing
      * f(r) = 1 is
      * 1 / (R^2 - r^2)^2 = 1 / (4r^2 - r^2)^2 = 1 / 9r^4 */
-
     falloff_const = 1.0 / (9 * object->w * object->w * object->w * object->w);
 
-	/* determine R = r + influence for given x,y coordinates */
-	R_2 = (intersection.y - intersection.x) / 2.0;
-	/* now square it */
-	R_2 = R_2 * R_2;
 	result[5] = intersection.x;
 	result[6] = intersection.y;
-
 
 	/* since (R^2 - r^2)^2 = c, r^2 = R^2 - sqrt(1/c),
 	 * where c = 1/(R^2 - r^2)^2 calculated to fit f(r) = 1.0. */
