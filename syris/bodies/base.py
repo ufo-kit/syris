@@ -387,7 +387,10 @@ class CompositeBody(MovableBody):
         return self.bodies.__iter__()
 
     def __repr__(self):
-        return "CompositeBody{0}".format(self.bodies)
+        strings = ', '.join([repr(item) for item in self.bodies[:min(3, len(self.bodies))]])
+        if len(self.bodies) > 3:
+            strings += ', ...'
+        return "CompositeBody({})".format(strings)
 
     def __str__(self):
         return repr(self)
