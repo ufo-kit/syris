@@ -128,6 +128,8 @@ def parse_args():
                         help='Use random number of metaballs, fixed metaballs or file with '
                         'packed metaball structure')
     parser.add_argument('--num', type=int, default=50, help='Number of random metaballs')
+    parser.add_argument('--distance', type=float,
+                        help='Distance of the two fixed metaballs in pixels')
     parser.add_argument('--min-radius', type=int, default=5,
                         help='Minimum radius of random metaballs in pixels')
     parser.add_argument('--max-radius', type=int, default=25,
@@ -158,8 +160,9 @@ def main():
         values = np.fromfile(args.input, dtype=np.float32) * 1e6
         metaballs, objects_all = create_metaballs(values.reshape(len(values) / 4, 4))
     else:
-        positions = [(args.n / 4, args.n / 2, 0, args.n / 5),
-                     (3 * args.n / 4, args.n / 2, 0, args.n / 5)]
+        distance = args.distance or args.n / 4
+        positions = [(args.n / 2 - distance, args.n / 2, 0, args.n / 6),
+                     (args.n / 2 + distance, args.n / 2, 0, args.n / 6)]
         metaballs, objects_all = create_metaballs(positions)
 
     if args.output:
