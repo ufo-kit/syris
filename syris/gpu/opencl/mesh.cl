@@ -76,17 +76,16 @@ int compute_intersections (const global vfloat3 *v_1,
                            const int num_triangles,
                            vfloat3 *O,
                            vfloat3 *D,
-                           vfloat scale,
                            vfloat max_dx,
                            vfloat *intersections)
 {
     int i, num_intersections = 0;
     vfloat current;
     // Make margins 1 px left and right
-    vfloat xp = O->x + scale;
-    vfloat xm = O->x - scale;
-    vfloat yp = O->y + scale;
-    vfloat ym = O->y - scale;
+    vfloat xp = O->x + 1;
+    vfloat xm = O->x - 1;
+    vfloat yp = O->y + 1;
+    vfloat ym = O->y - 1;
     vfloat stop = xp + max_dx;
 
     /* Find the index for which all the triangles have already ended in
@@ -163,7 +162,6 @@ int remove_duplicates (vfloat *array, int num_elements, vfloat eps)
 void fill_slice (vfloat *intersections,
                  global uchar *slices,
                  int num_intersections,
-                 vfloat scale,
                  int idx,
                  int idy,
                  int width,
@@ -173,8 +171,8 @@ void fill_slice (vfloat *intersections,
     int slice_offset = width * depth * idy;
 
     for (i = 0; i < num_intersections - 1; i += 2) {
-        z_start = max (0, (int) (intersections[i] / scale + .5));
-        z_stop = min (depth, (int) (intersections[i + 1] / scale + .5));
+        z_start = max (0, (int) (intersections[i] + .5));
+        z_stop = min (depth, (int) (intersections[i + 1] + .5));
         for (z = z_start; z < z_stop; z++) {
             slices[slice_offset + z * width + idx] = 1;
         }
@@ -198,18 +196,18 @@ kernel void compute_thickness (const global vfloat3 *v_1,
     int idy = get_global_id (1);
     int i, j, num_intersections;
     vfloat results[16];
-    vfloat x_0 = scale * (idx + offset.x + 0.5) + mesh_offset.x;
-    vfloat y_0 = scale * (idy + offset.y + 0.5) + mesh_offset.y;
+    vfloat x_0 = idx + offset.x + 0.5 + mesh_offset.x;
+    vfloat y_0 = idy + offset.y + 0.5 + mesh_offset.y;
     vfloat3 O, D = (vfloat3)(0, 0, 1);
     vfloat intersections[MAX_INTERSECTIONS];
-    O.z = min_z - scale;
+    O.z = min_z - 1;
 
     for (i = 0; i < supersampling; i++) {
         for (j = 0; j < supersampling; j++) {
-            O.x = scale * ((2 * i - supersampling + 1) / (2 * supersampling)) + x_0;
-            O.y = scale * ((2 * j - supersampling + 1) / (2 * supersampling)) + y_0;
+            O.x = (2 * i - supersampling + 1) / (2 * supersampling) + x_0;
+            O.y = (2 * j - supersampling + 1) / (2 * supersampling) + y_0;
             num_intersections = compute_intersections (v_1, v_2, v_3, num_triangles, &O, &D,
-                                                       scale, max_dx, intersections);
+                                                       max_dx, intersections);
             if (num_intersections == MAX_INTERSECTIONS) {
                 output[(idy + offset.y) * image_width + idx + offset.x] = NAN;
                 return;
@@ -219,7 +217,7 @@ kernel void compute_thickness (const global vfloat3 *v_1,
     }
 
     vf_sort (results, supersampling * supersampling);
-    output[(idy + offset.y) * image_width + idx + offset.x] = results[supersampling * supersampling / 2];
+    output[(idy + offset.y) * image_width + idx + offset.x] = scale * results[supersampling * supersampling / 2];
 }
 
 kernel void compute_slices (const global vfloat3 *v_1,
@@ -229,7 +227,6 @@ kernel void compute_slices (const global vfloat3 *v_1,
                          const int depth,
                          const int num_triangles,
                          const vfloat3 offset,
-                         const vfloat scale,
                          const vfloat max_dx)
 {
     int idx = get_global_id (0);
@@ -239,12 +236,12 @@ kernel void compute_slices (const global vfloat3 *v_1,
     vfloat intersections[MAX_INTERSECTIONS];
     vfloat3 O;
     vfloat3 D = (vfloat3)(0, 0, 1);
-    O.x = scale * (idx + 0.5) + offset.x;
-    O.y = scale * (idy + 0.5) + offset.y;
+    O.x = idx + 0.5 + offset.x;
+    O.y = idy + 0.5 + offset.y;
     O.z = offset.z;
 
     num_intersections = compute_intersections (v_1, v_2, v_3, num_triangles, &O, &D,
-                                               scale, max_dx, intersections);
+                                               max_dx, intersections);
     if (num_intersections == MAX_INTERSECTIONS) {
         for (z = 0; z < depth; z++) {
             output[width * depth * idy + z * width + idx] = NAN;
@@ -252,6 +249,6 @@ kernel void compute_slices (const global vfloat3 *v_1,
     } else {
         /* Make epsilon one pixel */
         num_intersections = remove_duplicates (intersections, num_intersections, EPSILON);
-        fill_slice (intersections, output, num_intersections, scale, idx, idy, width, depth);
+        fill_slice (intersections, output, num_intersections, idx, idy, width, depth);
     }
 }

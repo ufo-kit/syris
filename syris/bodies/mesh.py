@@ -271,7 +271,7 @@ class Mesh(MovableBody):
                                                                np.int32(shape[1]),
                                                                compute_offset,
                                                                offset,
-                                                               cfg.PRECISION.np_float(1),
+                                                               cfg.PRECISION.np_float(psm[1]),
                                                                cfg.PRECISION.np_float(max_dx),
                                                                cfg.PRECISION.np_float(min_z),
                                                                np.int32(self.iterations))
@@ -309,7 +309,6 @@ class Mesh(MovableBody):
                                                    np.int32(shape[1]),
                                                    np.int32(self.num_triangles),
                                                    offset,
-                                                   cfg.PRECISION.np_float(1),
                                                    cfg.PRECISION.np_float(max_dx))
 
 
