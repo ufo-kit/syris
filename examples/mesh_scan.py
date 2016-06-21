@@ -32,7 +32,8 @@ def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=
     shape = tuple([n * ss for n in orig_shape])
     ps = ps / ss
 
-    projection = mesh.project(shape, ps)
+    # t=None for trajectory override
+    projection = mesh.project(shape, ps, t=None)
     if ss > 1:
         projection = bin_image(projection, orig_shape, average=True)
 
@@ -79,13 +80,13 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
                                              lamino_angle, angle, ss=ss))
                 max_vals.append(projs[-1].max())
             best = np.argmin(max_vals)
-            if best > 2 * last or np.isnan(best):
+            if max_vals[best] > 2 * last or np.isnan(max_vals[best]):
                 bad_indices.append(i)
         duration = time.time() - st
         with LOCK:
             LOG.info(log_fmt.format(index, i + 1, num_angles, duration,
                                     float(angle.magnitude), max_vals))
-        save_image(prefix.format(i), projs[best])
+        save_image(prefix.format(i), projs[best][2048-128:2048+128, :])
         last = max_vals[best]
 
     with LOCK:
@@ -123,7 +124,7 @@ def make_ground_truth(args, shape, mesh):
 
     for i in range(0, shape[0], args.z_chunk):
         end = min(i + args.z_chunk, shape[0])
-        offset = gutil.make_vfloat3(0, i * ps.rescale(q.um), 0)
+        offset = (0, i * ps.rescale(q.um).magnitude, 0) * q.um
         slices = mesh.compute_slices((end - i,) + shape, ps, offset=offset).get()
         LOG.info('Computing slices {}-{}'.format(i, end))
         enumerated = list(enumerate(slices))[::args.supersampling]
@@ -153,10 +154,14 @@ def process(args, device_index):
     tri = tri * q.um
 
     tr = Trajectory([(0, 0, 0)] * q.um)
-    mesh = Mesh(tri, tr, center='bbox', iterations=2)
+    mesh = Mesh(tri, tr, center=None, iterations=2)
 
-    fov = max([ends[1] - ends[0] for ends in mesh.extrema[:-1]]) * 1.1
-    n = int(np.ceil((fov / args.pixel_size).simplified.magnitude))
+    if args.n:
+        n = args.n
+        fov = n * args.pixel_size
+    else:
+        fov = max([ends[1] - ends[0] for ends in mesh.extrema[:-1]]) * 1.1
+        n = int(np.ceil((fov / args.pixel_size).simplified.magnitude))
     shape = (n, n)
 
     if args.make_gt:
@@ -165,11 +170,11 @@ def process(args, device_index):
 
         return make_ground_truth(args, shape, mesh)
     else:
-        # 360 degrees -> twice the number of tomographic projections
         num_projs = int(np.pi * n) if args.num_projections is None else args.num_projections
-        angles = np.linspace(0, 360, num_projs, endpoint=False) * q.deg
+        angles = np.linspace(0, args.rotation_angle, num_projs, endpoint=False) * q.deg
         if device_index == 0:
             LOG.info('n: {}, ps: {}, FOV: {}'.format(n, args.pixel_size, fov))
+            LOG.info('Total rotation angle: {} deg'.format(args.rotation_angle))
             LOG.info('Number of projections: {}'.format(num_projs))
             LOG.info('--- Mesh info ---')
             log_attributes(mesh)
@@ -184,6 +189,7 @@ def process(args, device_index):
 def parse_args():
     parser = get_default_parser(__doc__)
     parser.add_argument('input', type=str, help='Blender .obj input file name')
+    parser.add_argument('--n', type=int, help='Number of pixels')
     parser.add_argument('--dset', type=str,
                         help='Data set name, if not specified guessed from input')
     parser.add_argument('--num-projections', type=int, help='Number of projections')
@@ -192,6 +198,8 @@ def parse_args():
                         "or 'out-directory/dset/truth', depending on the --make-gt switch")
     parser.add_argument('--pixel-size', type=float, default=[750.], nargs='+',
                         help='Pixel size in nm')
+    parser.add_argument('--rotation-angle', type=float, default=180,
+                        help='Total rotation angle in degrees')
     parser.add_argument('--lamino-angle', type=float, default=[5], nargs='+',
                         help='Laminographic angle in degrees')
     parser.add_argument('--rotation-axis', type=str, choices=['y', 'z'], default=['y'],
