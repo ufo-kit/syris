@@ -54,7 +54,7 @@ def main():
     st = time.time()
     proj = mesh.project(shape, args.pixel_size, t=None).get()
     LOG.info('Duration: {} s'.format(time.time() - st))
-    offset = syris.gpu.util.make_vfloat3(0, translate[1].simplified, -(fov / 2.).simplified)
+    offset = (0, translate[1].simplified, -(fov / 2.).simplified) * q.m
 
     if args.projection_filename is not None:
         save_image(args.projection_filename, proj)
