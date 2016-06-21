@@ -199,18 +199,18 @@ class Mesh(MovableBody):
         """General function for computations with triangles."""
         return func(self._current[axis, :])
 
-    def _make_vertices(self, index):
+    def _make_vertices(self, index, pixel_size):
         """Make a flat array of vertices belong to *triangles* at *index*."""
         # Convert to meters
-        vertices = self._current[:, index::3] * 1e-6
+        vertices = self._current[:, index::3] / pixel_size.rescale(q.um).magnitude
 
         return vertices.transpose().flatten().astype(cfg.PRECISION.np_float)
 
-    def _make_inputs(self, queue):
+    def _make_inputs(self, queue, pixel_size):
         mf = cl.mem_flags
-        v_1 = cl_array.to_device(queue, self._make_vertices(0))
-        v_2 = cl_array.to_device(queue, self._make_vertices(1))
-        v_3 = cl_array.to_device(queue, self._make_vertices(2))
+        v_1 = cl_array.to_device(queue, self._make_vertices(0, pixel_size[1]))
+        v_2 = cl_array.to_device(queue, self._make_vertices(1, pixel_size[0]))
+        v_3 = cl_array.to_device(queue, self._make_vertices(2, pixel_size[1]))
 
         return v_1, v_2, v_3
 
@@ -234,6 +234,7 @@ class Mesh(MovableBody):
         self.transform()
         self.sort()
 
+        psm = pixel_size.simplified.magnitude
         fov = offset + shape * pixel_size
         fov = np.concatenate((offset.simplified.magnitude[::-1],
                               fov.simplified.magnitude[::-1])).reshape(2, 2).transpose() * q.m
@@ -252,10 +253,11 @@ class Mesh(MovableBody):
             width = min(x_max_px - x_min_px, shape[1])
             height = min(y_max_px - y_min_px, shape[0])
             compute_offset = cl_array.vec.make_int2(x_min_px, y_min_px)
-            v_1, v_2, v_3 = self._make_inputs(queue)
-            max_dx = self.max_triangle_x_diff.simplified.magnitude
-            min_z = self.extrema[2][0].simplified.magnitude
-            ps = pixel_size[0].simplified.magnitude
+            v_1, v_2, v_3 = self._make_inputs(queue, pixel_size)
+            max_dx = self.max_triangle_x_diff.simplified.magnitude / psm[1]
+            # Use the same pixel size as for the x-axis, which will work for objects "not too far"
+            # from the imaging plane
+            min_z = self.extrema[2][0].simplified.magnitude / psm[1]
             offset = gutil.make_vfloat2(*offset.simplified.magnitude[::-1])
 
             ev = cfg.OPENCL.programs['mesh'].compute_thickness(queue,
@@ -269,7 +271,7 @@ class Mesh(MovableBody):
                                                                np.int32(shape[1]),
                                                                compute_offset,
                                                                offset,
-                                                               cfg.PRECISION.np_float(ps),
+                                                               cfg.PRECISION.np_float(1),
                                                                cfg.PRECISION.np_float(max_dx),
                                                                cfg.PRECISION.np_float(min_z),
                                                                np.int32(self.iterations))
@@ -287,11 +289,15 @@ class Mesh(MovableBody):
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=np.uint8)
 
+        pixel_size = make_tuple(pixel_size, num_dims=2)
+        v_1, v_2, v_3 = self._make_inputs(queue, pixel_size)
+        psm = pixel_size.simplified.magnitude
+        max_dx = self.max_triangle_x_diff.simplified.magnitude / psm[1]
         if offset is None:
             offset = gutil.make_vfloat3(0, 0, 0)
-        v_1, v_2, v_3 = self._make_inputs(queue)
-        max_dx = self.max_triangle_x_diff.simplified.magnitude
-        ps = pixel_size.simplified.magnitude
+        else:
+            offset = offset.simplified.magnitude
+            offset = gutil.make_vfloat3(offset[0] / psm[1], offset[1] / psm[0], offset[2] / psm[1])
 
         cfg.OPENCL.programs['mesh'].compute_slices(queue,
                                                    (shape[2], shape[0]),
@@ -303,7 +309,7 @@ class Mesh(MovableBody):
                                                    np.int32(shape[1]),
                                                    np.int32(self.num_triangles),
                                                    offset,
-                                                   cfg.PRECISION.np_float(ps),
+                                                   cfg.PRECISION.np_float(1),
                                                    cfg.PRECISION.np_float(max_dx))
 
 
