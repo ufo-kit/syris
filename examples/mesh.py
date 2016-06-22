@@ -22,7 +22,7 @@ def main():
     triangles = make_cube().magnitude if args.input is None else read_blender_obj(args.input)
     triangles = triangles * units
     tr = geom.Trajectory([(0, 0, 0)] * units)
-    mesh = Mesh(triangles, tr, center=args.center)
+    mesh = Mesh(triangles, tr, center=args.center, iterations=args.supersampling)
     LOG.info('Number of triangles: {}'.format(mesh.num_triangles))
 
     shape = (args.n, args.n)
@@ -76,6 +76,8 @@ def parse_args():
     parser.add_argument('--input', type=str, help='Input .obj file')
     parser.add_argument('--units', type=str, default='um', help='Mesh physical units')
     parser.add_argument('--n', type=int, default=256, help='Number of pixels')
+    parser.add_argument('--supersampling', type=int, default=1,
+                        help='Supersampling for mesh computation')
     parser.add_argument('--pixel-size', type=float, help='Pixel size in um')
     parser.add_argument('--center', type=str, help='Mesh centering on creation')
     parser.add_argument('--translate', type=float, nargs=2, help='Translation as (x, y) in um')
