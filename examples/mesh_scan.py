@@ -155,7 +155,7 @@ def process(args, device_index):
     tri = tri * q.um
 
     tr = Trajectory([(0, 0, 0)] * q.um)
-    mesh = Mesh(tri, tr, center=None, iterations=2)
+    mesh = Mesh(tri, tr, center=None, iterations=args.supersampling_projection)
 
     if args.n:
         n = args.n
@@ -191,6 +191,8 @@ def parse_args():
     parser = get_default_parser(__doc__)
     parser.add_argument('input', type=str, help='Blender .obj input file name')
     parser.add_argument('--n', type=int, help='Number of pixels')
+    parser.add_argument('--supersampling-projection', type=int, default=1,
+                        help='Supersampling for mesh projections computation')
     parser.add_argument('--dset', type=str,
                         help='Data set name, if not specified guessed from input')
     parser.add_argument('--num-projections', type=int, help='Number of projections')
