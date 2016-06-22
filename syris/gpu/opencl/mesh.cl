@@ -204,8 +204,8 @@ kernel void compute_thickness (const global vfloat3 *v_1,
 
     for (i = 0; i < supersampling; i++) {
         for (j = 0; j < supersampling; j++) {
-            O.x = (2 * i - supersampling + 1) / (2 * supersampling) + x_0;
-            O.y = (2 * j - supersampling + 1) / (2 * supersampling) + y_0;
+            O.x = (2. * i - supersampling + 1) / (2 * supersampling) + x_0;
+            O.y = (2. * j - supersampling + 1) / (2 * supersampling) + y_0;
             num_intersections = compute_intersections (v_1, v_2, v_3, num_triangles, &O, &D,
                                                        max_dx, intersections);
             if (num_intersections == MAX_INTERSECTIONS) {
