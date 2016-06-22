@@ -17,7 +17,7 @@ LOG = logging.getLogger(__name__)
 def main():
     """Main function."""
     args = parse_args()
-    syris.init(loglevel=logging.INFO)
+    syris.init(loglevel=logging.INFO, double_precision=args.double_precision)
     units = q.Quantity(1, args.units)
     triangles = make_cube().magnitude if args.input is None else read_blender_obj(args.input)
     triangles = triangles * units
@@ -85,6 +85,7 @@ def parse_args():
     parser.add_argument('--projection-filename', type=str, help='Save projection to this filename')
     parser.add_argument('--compute-slice', action='store_true', help='Compute also one slice')
     parser.add_argument('--slice-filename', type=str, help='Save slice to this filename')
+    parser.add_argument('--double-precision', action='store_true', help='Use double precision')
 
     args = parser.parse_args()
     if args.pixel_size is not None:

@@ -145,7 +145,8 @@ def process(args, device_index):
     from syris.geometry import Trajectory
     from syris.bodies.mesh import Mesh, read_blender_obj
 
-    syris.init(device_index=device_index, logfile=args.logfile)
+    syris.init(device_index=device_index, logfile=args.logfile,
+               double_precision=args.double_precision)
     path, ext = os.path.splitext(args.input)
     if ext == '.obj':
         tri = read_blender_obj(args.input)
@@ -208,6 +209,7 @@ def parse_args():
                         help='Number of compute devices to use')
     parser.add_argument('--supersampling', type=int, default=[1], nargs='+',
                         help='Supersampling computes with n-times more pixels than usual')
+    parser.add_argument('--double-precision', action='store_true', help='Use double precision')
     # Ground truth related
     parser.add_argument('--z-chunk', type=int, default=100,
                         help='Number of ground truth slices to compute during one pass')
