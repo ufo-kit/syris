@@ -245,10 +245,11 @@ def main():
             dset = os.path.splitext(os.path.basename(args.input))[0]
         else:
             dset = args.dset
-        dset += '_lamino_angle_{:>02}_deg'.format(int(lamino_angle))
-        dset += '_axis_{}'.format(rotation_axis)
-        dset += '_ps_{:>04}_nm'.format(int(pixel_size))
-        dset += '_ss_{:>02}'.format(ss)
+        if len(combinations) > 1:
+            dset += '_lamino_angle_{:>02}_deg'.format(int(lamino_angle))
+            dset += '_axis_{}'.format(rotation_axis)
+            dset += '_ps_{:>04}_nm'.format(int(pixel_size))
+            dset += '_ss_{:>02}'.format(ss)
 
         args.prefix = os.path.join(args.out_directory, dset, image_directory, file_prefix)
         args.logfile = os.path.join(args.out_directory, dset, 'simulation.log')
