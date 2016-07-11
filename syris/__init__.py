@@ -11,7 +11,7 @@ __version__ = '0.1'
 
 
 def init(platform_name=None, device_index=None, profiling=True, profiling_file='profile.dat',
-         loglevel=logging.DEBUG, logfile=None, double_precision=False):
+         loglevel=logging.INFO, logfile=None, double_precision=False):
     """Initialize syris with *device_index*."""
     cfg.init_logging(level=loglevel, logger_file=logfile)
     cfg.PRECISION = cfg.Precision(double_precision)
