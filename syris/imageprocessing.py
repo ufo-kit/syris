@@ -190,6 +190,7 @@ def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
     if queue is None:
         queue = cfg.OPENCL.queue
     image = g_util.get_array(image, queue=queue)
+    shape = make_tuple(shape)
     pow_shape = tuple([next_power_of_two(n) for n in image.shape])
     orig_shape = image.shape
     if image.shape != pow_shape:
