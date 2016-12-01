@@ -502,7 +502,7 @@ class CompositeBody(MovableBody):
             self.get_maximum_dt(pixel_size)
 
         for current_time in np.arange(t_0.simplified.magnitude, self.time.simplified.magnitude,
-                                      self._dt) * q.s:
+                                      self._dt.simplified.magnitude) * q.s:
             if self.moved(t_0, current_time, pixel_size):
                 return bisect(func, t_0, current_time, xtol=xtol) * q.s
 
