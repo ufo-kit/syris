@@ -228,7 +228,7 @@ def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
         out = cl.array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
 
     if not sampler:
-        sampler = cl.Sampler(cfg.OPENCL.ctx, False, cl.addressing_mode.CLAMP, cl.filter_mode.LINEAR)
+        sampler = cl.Sampler(cfg.OPENCL.ctx, False, cl.addressing_mode.CLAMP_TO_EDGE, cl.filter_mode.LINEAR)
     image = g_util.get_image(image)
 
     ev = cfg.OPENCL.programs['improc'].rescale(queue,
