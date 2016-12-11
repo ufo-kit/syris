@@ -101,7 +101,7 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
 
 def propagate(samples, shape, energies, distance, pixel_size, region=None,
               apply_phase_factor=False, mollified=True, detector=None, offset=None,
-              queue=None, out=None, t=0 * q.s, block=False):
+              queue=None, out=None, t=None, block=False):
     """Propagate *samples* with *shape* as (y, x) which are
     :class:`syris.opticalelements.OpticalElement` instances at *energies* to *distance*. Use
     *pixel_size*, limit coherence to *region*, *apply_phase_factor* is as by the Fresnel

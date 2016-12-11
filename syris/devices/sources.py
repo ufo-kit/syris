@@ -98,7 +98,7 @@ class BendingMagnet(OpticalElement):
         """Get the next time when the source will have moved more than *distance*."""
         return self.trajectory.get_next_time(t_0)
 
-    def _transfer(self, shape, pixel_size, energy, offset, t=0 * q.s, queue=None, out=None,
+    def _transfer(self, shape, pixel_size, energy, offset, t=None, queue=None, out=None,
                   block=False):
         """Compute the flat field wavefield."""
         if queue is None:

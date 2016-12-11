@@ -26,8 +26,8 @@ class TestSources(SyrisTest):
                                  self.trajectory, profile_approx=False)
 
         for e in self.energies:
-            u_0 = self.source.transfer((16, 16), self.ps, e).get().real
-            u_1 = source_2.transfer((16, 16), self.ps, e).get().real
+            u_0 = self.source.transfer((16, 16), self.ps, e, t=0 * q.s).get().real
+            u_1 = source_2.transfer((16, 16), self.ps, e, t=0 * q.s).get().real
             perc = u_0 / u_1
 
             # Allow 0.1 % difference
@@ -36,9 +36,9 @@ class TestSources(SyrisTest):
     def test_transfer(self):
         shape = 10
         # No trajectory
-        self.source.transfer(shape, self.ps, self.energies[0])
+        self.source.transfer(shape, self.ps, self.energies[0], t=0 * q.s)
         # Width may be larger
-        self.source.transfer((shape, 2 * shape), self.ps, self.energies[0])
+        self.source.transfer((shape, 2 * shape), self.ps, self.energies[0], t=0 * q.s)
 
         # With trajectory
         n = 16
@@ -48,7 +48,7 @@ class TestSources(SyrisTest):
                         velocity=1 * q.mm / q.s)
         source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
                                self.dE, np.array([0.2, 0.8]) * q.mm, self.ps, trajectory=tr)
-        im_0 = source.transfer(shape, self.ps, self.energies[0]).get()
+        im_0 = source.transfer(shape, self.ps, self.energies[0], t=0 * q.s).get()
         im_1 = source.transfer(shape, self.ps, self.energies[0], t=tr.time / 2).get()
 
         # There must be a difference between two different times and given trajectory

@@ -59,7 +59,7 @@ class MetaBall(MovableBody):
 
         return BoundingBox(np.array(transformed) * q.m)
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
+    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
         return project_metaballs([self], shape, pixel_size, offset, queue=queue, out=out,
                                  block=block)
 
@@ -98,7 +98,7 @@ class MetaBalls(CompositeBody):
     def __init__(self, trajectory, metaballs, orientation=geom.Y_AX):
         super(MetaBalls, self).__init__(trajectory, orientation=orientation, bodies=metaballs)
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
+    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
         """Projection implementation."""
         return project_metaballs(self._bodies, shape, pixel_size, offset, queue=queue, out=out,
                                  block=block)

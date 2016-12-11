@@ -23,7 +23,7 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape, pixel_size, offset=None, t=0 * q.s, queue=None, out=None,
+    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None,
                 block=False):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D.
@@ -40,11 +40,11 @@ class Body(OpticalElement):
 
         return self._project(shape, pixel_size, offset, t=t, queue=queue, out=None, block=block)
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
+    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
-    def _transfer(self, shape, pixel_size, energy, offset, t=0 * q.s, queue=None, out=None,
+    def _transfer(self, shape, pixel_size, energy, offset, t=None, queue=None, out=None,
                   block=False):
         """Transfer function implementation based on a refractive index."""
         ri = self.material.get_refractive_index(energy)
@@ -86,7 +86,7 @@ class MovableBody(Body):
         self._cache_projection = cache_projection
         self.update_projection_cache()
 
-    def project(self, shape, pixel_size, offset=None, t=0 * q.s, queue=None, out=None,
+    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None,
                 block=False):
         """Project thickness at time *t* (if it is None no transformation is applied) to the image
         plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.

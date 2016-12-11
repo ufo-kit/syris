@@ -30,7 +30,7 @@ class Filter(OpticalElement):
         """A filter doesn't move, this function returns infinity."""
         return np.inf * q.s
 
-    def _transfer(self, shape, pixel_size, energy, offset, t=0 * q.s, queue=None, out=None,
+    def _transfer(self, shape, pixel_size, energy, offset, t=None, queue=None, out=None,
                   block=False):
         """Transfer function implementation. Only *energy* is relevant becaus a filter has the same
         thickness everywhere.

@@ -219,7 +219,7 @@ class Mesh(MovableBody):
         matrix = self.get_rescaled_transform_matrix(q.um)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
+    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
         """Projection implementation."""
         def get_crop(index, fov):
             minimum = max(self.extrema[index][0], fov[index][0])

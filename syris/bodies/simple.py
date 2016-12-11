@@ -25,7 +25,7 @@ class StaticBody(Body):
         """A simple body doesn't move, this function returns infinity."""
         return np.inf * q.s
 
-    def _project(self, shape, pixel_size, offset, t=0 * q.s, queue=None, out=None, block=False):
+    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
         """Project thickness."""
         orig_shape = self.thickness.shape
         orig_region = (0, 0) + orig_shape

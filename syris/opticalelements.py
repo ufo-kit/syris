@@ -10,7 +10,7 @@ class OpticalElement(object):
 
     """An optical element capable of producing a wavefield as a function of time."""
 
-    def transfer(self, shape, pixel_size, energy, offset=None, t=0 * q.s, queue=None, out=None,
+    def transfer(self, shape, pixel_size, energy, offset=None, t=None, queue=None, out=None,
                  block=False):
         """Transfer function of the element on an image plane of size *shape*, use *pixel_size*,
         *energy*, *offset* is the physical spatial offset of the element as (y, x), transfer at time
@@ -25,7 +25,7 @@ class OpticalElement(object):
         return self._transfer(shape, pixel_size, energy, offset, t=t, queue=queue, out=out,
                               block=block)
 
-    def _transfer(self, shape, pixel_size, energy, offset, t=0 * q.s, queue=None, out=None,
+    def _transfer(self, shape, pixel_size, energy, offset, t=None, queue=None, out=None,
                   block=False):
         """Transfer function implementation."""
         raise NotImplementedError
