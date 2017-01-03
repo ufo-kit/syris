@@ -26,7 +26,6 @@ Application Programming Interface
    api/gpu
    api/imageprocessing
    api/geometry
-   api/graphicalobjects
    api/materials
    api/opticalelements
    api/math

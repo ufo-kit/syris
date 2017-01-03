@@ -1,5 +1,5 @@
 Experiments
 ===========
 
-.. automodule:: syris.experiments.base
+.. automodule:: syris.experiments
     :members:

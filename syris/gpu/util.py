@@ -122,40 +122,40 @@ def get_varconvolution_source(name, header='', inputs='', init='', compute_outer
     initialization code, *compute_outer* is called at every iteration of the outer (y) loop,
     *compute_inner* is called in the inner (x) loop. *after* is the code after both loops. If *cplx*
     is True, the complex version of the kernel is used.
-    Pseudo-code of the OpenCL source for the noncomplex version will look like this:
+    Pseudo-code of the OpenCL source for the noncomplex version will look like this::
 
-    *header*
+        *header*
 
-    kernel void *name* (read_only image2d_t input,
-                        global vfloat *output,
-                        const sampler_t sampler,
-                        int2 window, *inputs*)
-    {
-        int idx = get_global_id (0);
-        int idy = get_global_id (1);
-        int width = get_global_size (0);
-        int i, j, tx, ty, imx, imy;
-        vfloat value, weight, result = 0.0;
+        kernel void *name* (read_only image2d_t input,
+                            global vfloat *output,
+                            const sampler_t sampler,
+                            int2 window, *inputs*)
+        {
+            int idx = get_global_id (0);
+            int idy = get_global_id (1);
+            int width = get_global_size (0);
+            int i, j, tx, ty, imx, imy;
+            vfloat value, weight, result = 0.0;
 
-        *init*
+            *init*
 
-        for (j = 0; j < window.y; j++) {
-            ty = window.y - j - 1;
-            imy = idy + j - window.y / 2;
-            *compute_outer*
-            for (i = 0; i < window.x; i++) {
-                imx = idx + i - window.x / 2;
-                value = read_imagef (input, sampler, (int2)(imx, imy)).x;
-                tx = window.x - i - 1;
-                *compute_inner*
-                result += value * weight;
+            for (j = 0; j < window.y; j++) {
+                ty = window.y - j - 1;
+                imy = idy + j - window.y / 2;
+                *compute_outer*
+                for (i = 0; i < window.x; i++) {
+                    imx = idx + i - window.x / 2;
+                    value = read_imagef (input, sampler, (int2)(imx, imy)).x;
+                    tx = window.x - i - 1;
+                    *compute_inner*
+                    result += value * weight;
+                }
             }
+
+            *after*
+
+            output[idy * width + idx] = result;
         }
-
-        *after*
-
-        output[idy * width + idx] = result;
-    }
 
     The complex version uses two inputs, *input_real* and *input_imag* which are also image2d_t
     instances.
