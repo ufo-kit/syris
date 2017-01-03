@@ -59,7 +59,7 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
 
     while t is not None:
         t = obj.get_next_time(t, ps)
-        if t is None:
+        if t is None or t.magnitude == np.inf:
             break
         times.append(t.simplified.magnitude)
 
@@ -124,6 +124,8 @@ def main():
     syris.init()
 
     mb = create_sample(n, ps)
+    mb.bind_trajectory(ps)
+
     tr = mb.trajectory
     print 'Length: {}, time: {}'.format(tr.length.rescale(q.mm), tr.time)
 

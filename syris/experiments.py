@@ -64,7 +64,9 @@ class Experiment(object):
         if queue is None:
             queue = cfg.OPENCL.queue
         shape_0 = self.detector.camera.shape
-        ps_0 = self.detector.camera.pixel_size
+        if shape is None:
+            shape = shape_0
+        ps_0 = self.detector.pixel_size
         ps = shape_0[0] / float(shape[0]) * ps_0
         fps = self.detector.camera.fps
         frame_time = 1 / fps

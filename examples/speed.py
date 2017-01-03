@@ -28,7 +28,9 @@ def run(n, ps, num_runs, queues):
     shape = (n, n)
     distance = 5 * q.m
     material = make_fromfile(os.path.join('examples', 'data', 'pmma_5_30_kev.mat'))
-    energies = np.linspace(material.energies[0], material.energies[-1], 100, endpoint=False)
+    energies = np.linspace(material.energies[0].magnitude,
+                           material.energies[-1].magnitude,
+                           100, endpoint=False) * material.energies.units
     spheres = {queue: make_sphere(n, n / 4 * ps, pixel_size=ps, material=material, queue=queue)
                for queue in queues}
 

@@ -26,9 +26,9 @@ def get_flat(shape, energies, detector, source, filters=(), shot_noise=False,
     image = np.zeros(shape)
 
     for e in energies:
-        u = source.transfer(shape, detector.pixel_size, e)
+        u = source.transfer(shape, detector.pixel_size, e, t=0 * q.s)
         for oe in filters:
-            u *= oe.transfer(shape, detector.pixel_size, e)
+            u *= oe.transfer(shape, detector.pixel_size, e, t=0 * q.s)
         flat = (abs(u) ** 2).get()
         det = detector.convert(flat, e)
         image += det * detector.camera.exp_time.simplified.magnitude
@@ -51,7 +51,7 @@ def make_devices(n, energies, camera=None, highspeed=True):
 
     if not camera:
         vis_wavelengths = np.arange(500, 700) * q.nm
-        camera = Camera(11 * q.um, .1, 500, 23, 32, shape, fps=1000 / q.s,
+        camera = Camera(11 * q.um, .1, 500, 23, 32, shape, exp_time=1 * q.ms, fps=1000 / q.s,
                         quantum_efficiencies=0.5 * np.ones(len(vis_wavelengths)),
                         wavelengths=vis_wavelengths, dtype=np.float32)
     else:
@@ -138,7 +138,6 @@ def make_motion(args):
     tr = Trajectory(circle, velocity=10 * q.um / q.s)
     glass = get_material('glass.mat')
     mesh = Mesh(cube, tr, material=glass)
-    mesh.bind_trajectory(detector.pixel_size)
     ex = Experiment([bm, mb, mb_2, mesh], bm, detector, 0 * q.m, energies)
 
     for sample in ex.samples:
