@@ -1,7 +1,9 @@
 """Example utility functions."""
 
+import os
 import argparse
 import matplotlib.pyplot as plt
+from syris.materials import make_fromfile
 
 
 def get_default_parser(description):
@@ -17,3 +19,8 @@ def show(image, title=''):
     plt.title(title)
     plt.colorbar()
     plt.show(False)
+
+
+def get_material(name):
+    """Load material from file *name*."""
+    return make_fromfile(os.path.join(os.path.dirname(__file__), 'data', name))

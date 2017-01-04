@@ -15,10 +15,9 @@ from syris.devices.sources import make_topotomo
 from syris.geometry import Trajectory
 from syris.gpu.util import get_host
 from syris.experiments import Experiment
-from syris.materials import make_fromfile
 from syris.math import fwnm_to_sigma
 from trajectory import create_sample, make_circle
-from util import get_default_parser, show
+from util import get_default_parser, get_material, show
 
 
 def get_flat(shape, energies, detector, source, filters=(), shot_noise=False,
@@ -35,11 +34,6 @@ def get_flat(shape, energies, detector, source, filters=(), shot_noise=False,
 
     return detector.camera.get_image(image, shot_noise=shot_noise,
                                      amplifier_noise=amplifier_noise, psf=psf)
-
-
-def get_material(name):
-    """Load material from file *name*."""
-    return make_fromfile(os.path.join('examples', 'data', name))
 
 
 def make_devices(n, energies, camera=None, highspeed=True):
