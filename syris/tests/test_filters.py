@@ -14,8 +14,8 @@ class TestFilters(SyrisTest):
         syris.init(device_index=0)
         self.energies = np.arange(10, 20) * q.keV
         self.energy = 15 * q.keV
-        delta = np.random.uniform(low=1e-5, high=1e-6, size=len(self.energies))
-        beta = np.random.uniform(low=1e-8, high=1e-9, size=len(self.energies))
+        delta = np.linspace(1e-5, 1e-6, len(self.energies))
+        beta = np.linspace(1e-8, 1e-9, len(self.energies))
         self.material = Material('foo', delta + beta * 1j, self.energies)
         self.thickness = 1 * q.mm
         self.fltr = Filter(self.thickness, self.material)
