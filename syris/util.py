@@ -60,3 +60,15 @@ def read_image(filename):
         image = scipy.misc.imread(filename, image)
 
     return image
+
+
+def get_gauss(x, center, sigma, normalized=False):
+    """Get 1D gaussian function over *x* centered around *center* and std *sigma*. If *normalized*
+    is True, the sum of the function is 1.
+    """
+    y = np.exp(-(x - float(center)) ** 2 / (2 * sigma ** 2))
+    if normalized:
+        # Don't use 1/(2 sigma^2) because if the peak is too broad the sum won't be 1
+        y /= np.sum(y)
+
+    return y
