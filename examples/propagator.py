@@ -43,13 +43,14 @@ def main():
     np_propagator = get_fresnel_kernel_f(n, lam, distance, ps)
     diff = propagator - np_propagator
 
-    print diff.real.min(), diff.real.max()
-    print diff.imag.min(), diff.imag.max()
+    fmt = '{} part: minimum difference: {}, maximum difference: {}'
+    print fmt.format('real', diff.real.min(), diff.real.max())
+    print fmt.format('imaginary', diff.imag.min(), diff.imag.max())
 
     show(np.fft.fftshift(propagator.real), 'Syris Propagator')
     show(np.fft.fftshift(np_propagator.real), 'Numpy propagator')
-    show(diff.real, 'Difference Real Part')
-    show(diff.imag, 'Difference Imaginary Part')
+    show(np.fft.fftshift(diff.real), 'Difference Real Part')
+    show(np.fft.fftshift(diff.imag), 'Difference Imaginary Part')
     plt.show()
 
 
