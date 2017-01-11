@@ -76,3 +76,7 @@ class TestPhysics(SyrisTest):
         exponent = - 2 * np.pi * thickness.simplified / wavelength.simplified
         truth = np.exp(exponent * np.complex(refractive_index.imag, refractive_index.real))
         np.testing.assert_almost_equal(truth, wavefield)
+
+        # Exponent
+        wavefield = physics.transfer(thickness, refractive_index, wavelength, exponent=True).get()
+        np.testing.assert_almost_equal(truth, np.exp(wavefield))

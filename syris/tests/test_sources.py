@@ -53,3 +53,8 @@ class TestSources(SyrisTest):
 
         # There must be a difference between two different times and given trajectory
         self.assertGreater(np.abs(im_1 - im_0).max(), 0)
+
+        # Test exponent
+        u = source.transfer(shape, self.ps, self.energies[0], exponent=False).get()
+        u_exp = source.transfer(shape, self.ps, self.energies[0], exponent=True).get()
+        np.testing.assert_almost_equal(u, np.exp(u_exp))
