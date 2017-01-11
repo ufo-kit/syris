@@ -13,7 +13,7 @@ from syris.tests import SyrisTest
 class TestPhysics(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(double_precision=True)
         self.energy = 20 * q.keV
         self.lam = 6.19920937165e-11 * q.m
         self.size = 64
@@ -39,21 +39,29 @@ class TestPhysics(SyrisTest):
         gt = 4 * np.pi * ref_index.imag / lam.simplified
         self.assertAlmostEqual(gt, physics.ref_index_to_attenuation_coeff(ref_index, lam))
 
-    def _get_propagator(self, apply_phase_factor=False):
+    def _get_propagator(self, apply_phase_factor=False, fresnel=True):
         return physics.compute_propagator(self.size, self.distance,
                                           self.lam, self.pixel_size,
+                                          fresnel=fresnel,
                                           apply_phase_factor=apply_phase_factor,
                                           mollified=False).get()
 
-    def _cpu_propagator(self, phase_factor=1):
+    def _cpu_propagator(self, phase_factor=1, fresnel=True):
         j, i = np.mgrid[-0.5:0.5:1.0 / self.size, -0.5:0.5:1.0 / self.size].\
             astype(cfg.PRECISION.np_float)
 
-        return cfg.PRECISION.np_cplx(phase_factor) * \
-            np.fft.fftshift(np.exp(- np.pi * self.lam.simplified *
+        if fresnel:
+            return cfg.PRECISION.np_cplx(phase_factor) * \
+                np.fft.fftshift(np.exp(- np.pi * self.lam.simplified *
+                                       self.distance.simplified *
+                                       (i ** 2 + j ** 2) /
+                                       self.pixel_size.simplified ** 2 * 1j))
+        else:
+            return np.fft.fftshift(np.exp(1j * 2 * np.pi / self.lam.simplified *
                                    self.distance.simplified *
-                                   (i ** 2 + j ** 2) /
-                                   self.pixel_size.simplified ** 2 * 1j))
+                                   np.sqrt(1 -
+                                   (i / self.pixel_size.simplified * self.lam.simplified) ** 2 -
+                                   (j / self.pixel_size.simplified * self.lam.simplified) ** 2)))
 
     def test_no_phase_factor(self):
         self.res = self._get_propagator()
@@ -169,3 +177,8 @@ class TestPhysics(SyrisTest):
                                phase_profile='parabola')
         u = source.transfer((n, n), ps, energy, exponent=True)
         self.assertTrue(physics.is_wavefield_sampling_ok(u))
+
+    def test_full_propagator(self):
+        gt = self._cpu_propagator(fresnel=False)
+        propagator = self._get_propagator(fresnel=False)
+        np.testing.assert_almost_equal(gt, propagator, decimal=4)
