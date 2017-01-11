@@ -10,7 +10,7 @@ from syris.bodies.mesh import make_cube, Mesh
 from syris.devices.cameras import Camera, make_pco_dimax
 from syris.devices.detectors import Detector
 from syris.devices.lenses import Lens
-from syris.devices.filters import Filter, Scintillator
+from syris.devices.filters import MaterialFilter, Scintillator
 from syris.devices.sources import make_topotomo
 from syris.geometry import Trajectory
 from syris.gpu.util import get_host
@@ -97,7 +97,7 @@ def make_topo_tomo_flat(args):
     bm, detector = make_devices(n, energies, camera=dimax, highspeed=True)
 
     # Customize the setup for the 2013_03_07-08 experiment
-    air = Filter(1 * q.m, get_material('air_5_30_kev.mat'))
+    air = MaterialFilter(1 * q.m, get_material('air_5_30_kev.mat'))
     filters = [air]
     dimax.bpp = 32
     dimax.dtype = np.float32

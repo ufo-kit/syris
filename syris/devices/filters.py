@@ -10,7 +10,7 @@ from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength
 
 
-class Filter(OpticalElement):
+class MaterialFilter(Filter):
 
     """Beam frequency filter."""
 
@@ -46,7 +46,7 @@ class Filter(OpticalElement):
         return result.astype(cfg.PRECISION.np_cplx)
 
 
-class Scintillator(Filter):
+class Scintillator(MaterialFilter):
 
     """Scintillator emits visible light when it is irradiated by X-rays."""
 

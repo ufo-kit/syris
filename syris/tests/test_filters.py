@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 import syris
-from syris.devices.filters import Filter
+from syris.devices.filters import MaterialFilter
 from syris.materials import Material
 from syris.physics import energy_to_wavelength
 from syris.tests import SyrisTest, slow
@@ -18,7 +18,7 @@ class TestFilters(SyrisTest):
         beta = np.linspace(1e-8, 1e-9, len(self.energies))
         self.material = Material('foo', delta + beta * 1j, self.energies)
         self.thickness = 1 * q.mm
-        self.fltr = Filter(self.thickness, self.material)
+        self.fltr = MaterialFilter(self.thickness, self.material)
 
     def test_transfer(self):
         thickness = self.thickness.simplified.magnitude
