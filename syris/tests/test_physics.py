@@ -109,3 +109,63 @@ class TestPhysics(SyrisTest):
         u = physics.transfer_many([wedge], shape, ps, energy, exponent=False).get()
         u_exp = physics.transfer_many([wedge], shape, ps, energy, exponent=True).get()
         np.testing.assert_almost_equal(u, np.exp(u_exp))
+
+    def test_transmission_sampling(self):
+        def compute_transmission_function(n, ps, energy, material):
+            wedge = np.tile(np.arange(n), [n, 1]) * ps
+            wedge = StaticBody(wedge, ps, material=material)
+
+            return wedge.transfer((n, n), ps, energy, exponent=True)
+
+        def compute_distance(n, ps, lam, ps_per_lam):
+            ca = (lam / (ps_per_lam * ps)).simplified.magnitude
+            alpha = np.arccos(ca)
+            theta = np.pi / 2 - alpha
+            return (n * ps / (2 * np.tan(theta))).simplified
+
+        n = 32
+        ps = 1 * q.um
+        energies = np.arange(5, 30) * q.keV
+        energy = 10 * q.keV
+        lam = physics.energy_to_wavelength(energy)
+        # Delta causes phase shift between two adjacent pixels by 2 Pi
+        delta = (lam / ps).simplified.magnitude
+        ri = np.ones_like(energies.magnitude, dtype=np.complex) * delta + 0j
+        material = Material('dummy', ri, energies)
+
+        # Single object
+        u = compute_transmission_function(n, ps, energy, material)
+        self.assertFalse(physics.is_wavefield_sampling_ok(u))
+
+        # 4x supersampling => phase shift Pi/2
+        u = compute_transmission_function(4 * n, ps / 4, energy, material)
+        self.assertTrue(physics.is_wavefield_sampling_ok(u))
+
+        # 4x supersampling with 2 objects => phase shift Pi
+        n *= 4
+        ps /= 4
+        wedge = np.tile(np.arange(n), [n, 1]) * ps
+        wedge = StaticBody(wedge, ps, material=material)
+        u = physics.transfer_many([wedge, wedge], (n, n), ps, energy, exponent=True)
+        self.assertFalse(physics.is_wavefield_sampling_ok(u))
+
+        # X-ray source with a parabolic phase profile
+        n = 128
+        ps = 1 * q.um
+        trajectory = Trajectory([(n / 2, n / 2, 0)] * ps)
+        # 1 pixel per wavelength => insufficient sampling
+        d = compute_distance(n, ps, lam, 1)
+
+        source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, d,
+                               1, np.array([0.2, 0.8]) * q.mm, ps, trajectory,
+                               phase_profile='parabola')
+        u = source.transfer((n, n), ps, energy, exponent=True)
+        self.assertFalse(physics.is_wavefield_sampling_ok(u))
+
+        # 4 pixel per wavelength => good sampling
+        d = compute_distance(n, ps, lam, 4)
+        source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, d,
+                               1, np.array([0.2, 0.8]) * q.mm, ps, trajectory,
+                               phase_profile='parabola')
+        u = source.transfer((n, n), ps, energy, exponent=True)
+        self.assertTrue(physics.is_wavefield_sampling_ok(u))
