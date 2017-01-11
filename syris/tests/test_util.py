@@ -20,3 +20,21 @@ def test_get_magnitude():
     assert get_magnitude(1 * q.mm) == 0.001
     assert get_magnitude(1) == 1
     assert tuple(get_magnitude((1, 2) * q.mm)) == (0.001, 0.002)
+
+
+def test_gauss():
+    n = 64
+    sigma = 2
+    mean = n / 2
+    x = np.arange(n)
+    gt = np.exp(-(x - float(mean)) ** 2 / (2 * sigma ** 2))
+
+    g = get_gauss(x, mean, sigma, normalized=False)
+    g_norm = get_gauss(n, mean, sigma, normalized=True)
+
+    np.testing.assert_almost_equal(gt, g)
+    assert np.abs(np.sum(g_norm) - 1) < 1e-7
+
+    # Extremely broad peak, sum must be 1 anyway
+    g = get_gauss(x, mean, n, normalized=True)
+    assert np.abs(np.sum(g_norm) - 1) < 1e-7
