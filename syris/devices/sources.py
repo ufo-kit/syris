@@ -217,6 +217,25 @@ class BendingMagnet(OpticalElement):
                         angle_step.rescale(q.rad) ** 2 * 1e-3).simplified
 
 
+class Wiggler(BendingMagnet):
+
+    """Wiggler source."""
+
+    def __init__(self, electron_energy, el_current, magnetic_field, sample_distance, dE, size,
+                 pixel_size, trajectory, num_periods, profile_approx=True, phase_profile='plane'):
+        """All parameters are the same as by :class:`.BendingMagnet` and *num_periods* is the number
+        of wiggler periods.
+        """
+        super(Wiggler, self).__init__(electron_energy, el_current, magnetic_field,
+                                      sample_distance, dE, size, pixel_size, trajectory,
+                                      profile_approx=True, phase_profile='plane')
+        self.num_periods = num_periods
+
+    def get_flux(self, photon_energy, vertical_angle, pixel_size):
+        return super(Wiggler, self).get_flux(photon_energy, vertical_angle, pixel_size) * \
+            self.num_periods
+
+
 class XRaySourceError(Exception):
     """X-ray source related exceptions."""
     pass
