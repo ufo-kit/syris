@@ -10,6 +10,7 @@ from syris.tests import SyrisTest
 class TestImageTiling(SyrisTest):
 
     def setUp(self):
+        syris.init()
         self.data = []
 
         sizes = [8, 32]
@@ -132,7 +133,6 @@ class TestImageTiling(SyrisTest):
                         tile)
 
     def test_sum(self):
-        syris.init()
         for shape, tiles_count in self.data:
             tiler = Tiler(shape, tiles_count, outlier=False, supersampling=4)
             ones = np.ones(tiler.tile_shape, dtype=cfg.PRECISION.np_float)
