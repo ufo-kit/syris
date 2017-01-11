@@ -2,7 +2,7 @@ import numpy as np
 import quantities as q
 import syris
 from pyopencl import clmath
-from syris.devices.sources import BendingMagnet, XRaySourceError
+from syris.devices.sources import BendingMagnet, Wiggler, XRaySourceError
 from syris.geometry import Trajectory
 from syris.physics import energy_to_wavelength
 from syris.tests import SyrisTest, slow
@@ -109,3 +109,17 @@ class TestSources(SyrisTest):
 
         test_one_phase_profile('parabola')
         test_one_phase_profile('sphere')
+
+    def test_wiggler(self):
+        wiggler = Wiggler(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m, self.dE,
+                          np.array([0.2, 0.8]) * q.mm, self.ps, self.trajectory, 4)
+        energy = 10 * q.keV
+
+        w_flux = wiggler.get_flux(energy, 0 * q.mrad, self.ps)
+        flux = self.source.get_flux(energy, 0 * q.mrad, self.ps)
+        self.assertAlmostEqual((w_flux / flux).magnitude, 4)
+
+        shape = (128, 128)
+        w_u = np.abs(wiggler.transfer(shape, self.ps, energy).get()) ** 2
+        u = np.abs(self.source.transfer(shape, self.ps, energy).get()) ** 2
+        np.testing.assert_almost_equal(w_u / u, 4)
