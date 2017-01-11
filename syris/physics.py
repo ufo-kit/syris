@@ -67,13 +67,15 @@ def transfer(thickness, refractive_index, wavelength, exponent=False, queue=None
     return out
 
 
-def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase_factor=False,
-                       mollified=True, queue=None, block=False):
+def compute_propagator(size, distance, lam, pixel_size, fresnel=True, region=None,
+                       apply_phase_factor=False, mollified=True, queue=None, block=False):
     """Create a propagator with (*size*, *size*) dimensions for propagation *distance*, wavelength
-    *lam* and *pixel_size*. *region* is the diameter of the the wavefront area which is capable of
-    interference. If *apply_phase_factor* is True, apply the phase factor defined by Fresnel
-    approximation. If *mollified* is True the aliased frequencies are suppressed. If command *queue*
-    is specified, execute the kernel on it. If *block* is True, wait for the kernel to finish.
+    *lam* and *pixel_size*. If *fresnel* is True, use the Fresnel approximation, if it is False, use
+    the full propagator (don't approximate the square root). *region* is the diameter of the the
+    wavefront area which is capable of interference. If *apply_phase_factor* is True, apply the
+    phase factor defined by Fresnel approximation. If *mollified* is True the aliased frequencies
+    are suppressed. If command *queue* is specified, execute the kernel on it. If *block* is True,
+    wait for the kernel to finish.
     """
     if size % 2:
         raise ValueError('Only even sizes are supported')
@@ -102,7 +104,8 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
                                                    cfg.PRECISION.np_float(distance.simplified),
                                                    cfg.PRECISION.np_float(lam.simplified),
                                                    cfg.PRECISION.np_float(pixel_size.simplified),
-                                                   g_util.make_vcomplex(phase_factor))
+                                                   g_util.make_vcomplex(phase_factor),
+                                                   np.int32(fresnel))
     if block:
         ev.wait()
 

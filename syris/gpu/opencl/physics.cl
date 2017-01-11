@@ -13,7 +13,8 @@ __kernel void propagator(__global vcomplex *out,
 							const vfloat distance,
 							const vfloat lam,
 							const vfloat pixel_size,
-							const vcomplex phase_factor) {
+							const vcomplex phase_factor,
+                            const int fresnel) {
 
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
@@ -27,16 +28,11 @@ __kernel void propagator(__global vcomplex *out,
 	i = (vfloat) ix / n;
 	j = (vfloat) iy / n;
 
-	/*
-	 * Fresnel propagator in the Fourier domain:
-	 *
-	 * \begin{align}
-	 * F(i, j) = e ^ {\frac{2 * pi * distance * i} {lam}} *
-	 * e ^ {- i * \pi * lam * distance * (i ^ 2 + j ^ 2)}.
-	 * \end{align}
-	 */
-	tmp = - M_PI * lam * distance * (i * i + j * j) /
-			(pixel_size * pixel_size);
+    if (fresnel) {
+        tmp = - M_PI * lam * distance * (i * i + j * j) / (pixel_size * pixel_size);
+    } else {
+        tmp = 2 * M_PI / lam * distance * sqrt(1 - lam * lam * (i * i + j * j) / (pixel_size * pixel_size));
+    }
     sine = sincos(tmp, &cosine);
 	if (phase_factor.x == 0 && phase_factor.y == 0) {
 		result = (vcomplex)(cosine, sine);
