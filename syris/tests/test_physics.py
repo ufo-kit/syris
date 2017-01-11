@@ -3,6 +3,10 @@ import pyopencl as cl
 import quantities as q
 import syris
 from syris import physics, config as cfg
+from syris.bodies.simple import StaticBody
+from syris.devices.sources import BendingMagnet
+from syris.geometry import Trajectory
+from syris.materials import Material
 from syris.tests import SyrisTest
 
 
@@ -80,3 +84,28 @@ class TestPhysics(SyrisTest):
         # Exponent
         wavefield = physics.transfer(thickness, refractive_index, wavelength, exponent=True).get()
         np.testing.assert_almost_equal(truth, np.exp(wavefield))
+
+    def test_transfer_many(self):
+        n = 32
+        shape = (n, n)
+        ps = 1 * q.um
+        energies = np.arange(5, 30) * q.keV
+        energy = 10 * q.keV
+        lam = physics.energy_to_wavelength(energy)
+        # Delta causes phase shift between two adjacent pixels by Pi / 16
+        delta = (lam / (32 * ps)).simplified.magnitude
+        ri = np.ones_like(energies.magnitude, dtype=np.complex) * delta + 0j
+        material = Material('dummy', ri, energies)
+        wedge = np.tile(np.arange(n), [n, 1]) * ps
+        wedge = StaticBody(wedge, ps, material=material)
+
+        # Test more objects
+        u_many = physics.transfer_many([wedge, wedge], shape, ps, energy).get()
+        # 2 objects
+        u = wedge.transfer(shape, ps, energy).get() ** 2
+        np.testing.assert_almost_equal(u, u_many)
+
+        # Test exponent
+        u = physics.transfer_many([wedge], shape, ps, energy, exponent=False).get()
+        u_exp = physics.transfer_many([wedge], shape, ps, energy, exponent=True).get()
+        np.testing.assert_almost_equal(u, np.exp(u_exp))
