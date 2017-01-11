@@ -79,8 +79,7 @@ __kernel void transfer(__global vcomplex *wavefield,
     vfloat phase = exponent * refractive_index.x;
 
     sine = sincos(phase, &cosine);
-    wavefield[mem_index] = (vcomplex)(exp_absorp * cosine,
-                                      exp_absorp * sine);
+    wavefield[mem_index] = (vcomplex)(exp_absorp * cosine, exp_absorp * sine);
 }
 
 
@@ -90,57 +89,92 @@ __kernel void transfer(__global vcomplex *wavefield,
  * into account.
  */
 __kernel void transmission_add(__global vcomplex *transmissions,
-								__global vfloat *thickness,
-								const vcomplex refractive_index,
-								const int clear) {
+							   __global vfloat *thickness,
+							   const vcomplex refractive_index,
+							   const vfloat wavenumber,
+							   const int clear) {
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
 	int mem_index = iy * get_global_size(0) + ix;
+    vcomplex current = (vcomplex)(-wavenumber * thickness[mem_index] * refractive_index.y,
+							      -wavenumber * thickness[mem_index] * refractive_index.x);
 
 	if (clear) {
-		transmissions[mem_index] = (vcomplex)(
-							thickness[mem_index] * refractive_index.x,
-							thickness[mem_index] * refractive_index.y);
+		transmissions[mem_index] = current;
 	} else {
-		transmissions[mem_index] = (vcomplex)(transmissions[mem_index].x +
-					thickness[mem_index] * refractive_index.x,
-					transmissions[mem_index].y +
-					thickness[mem_index] * refractive_index.y);
+		transmissions[mem_index] = transmissions[mem_index] + current;
 	}
 }
 
-/*
- * Transfer function T(x,y), which defines photon absorption
- * and phase changes. It depends on wavelength and material.
- */
-__kernel void transfer_coeffs(__global vcomplex *transmission_coeffs,
-						const vfloat lambda) {
-	int ix = get_global_id(0);
-	int iy = get_global_id(1);
-	int width = get_global_size(0);
-    vfloat sine, cosine;
-
-	vfloat phase, absorp, e_a, k;
-	k = -2 * M_PI / lambda;
-
-	/* Imaginary part - phase. */
-	phase = k * (transmission_coeffs[iy * width + ix].x);
-	/* Real part - absorption. */
-	absorp = k * (transmission_coeffs[iy * width + ix].y);
-	e_a = exp(absorp);
-    sine = sincos(phase, &cosine);
-
-	transmission_coeffs[iy * width + ix] = (vcomplex)(e_a * cosine,
-														e_a * sine);
-}
 
 /*
  * Make flat field wavefield out of a vertical profile of intensities.
  */
 __kernel void make_flat(__global vcomplex *output,
-                        __global vfloat *input) {
+                        __global vfloat *input,
+                        const vfloat3 center,
+                        const vfloat2 pixel_size,
+                        const vfloat z,
+                        const vfloat lambda,
+                        const int exponent,
+                        const int phase,
+                        const int parabola) {
 	int ix = get_global_id(0);
 	int iy = get_global_id(1);
+    vfloat x, y, c_phi, s_phi, r, real, imag;
+    vfloat amplitude = sqrt(input[iy]);
+    amplitude = sqrt(input[iy]);
 
-    output[iy * get_global_size(0) + ix] = (vfloat2)(sqrt(input[iy]), 0);
+    if (phase) {
+        x = ix * pixel_size.x - center.x;
+        y = iy * pixel_size.y - center.y;
+        if (parabola) {
+            r = (x * x + y * y) / (2 * z);
+        }
+        else {
+            r = sqrt(x * x + y * y + z * z);
+        }
+    } else {
+        r = 0;
+    }
+
+    if (exponent) {
+        real = log(amplitude);
+        imag = 2 * M_PI / lambda * r;
+    } else {
+        s_phi = sincos(2 * M_PI / lambda * r, &c_phi);
+        real = amplitude * c_phi;
+        imag = amplitude * s_phi;
+    }
+
+    output[iy * get_global_size(0) + ix] = (vfloat2)(real, imag);
+}
+
+/*
+ * Check the sampling of a transfer function
+ */
+__kernel void check_transmission_function(__global vfloat *exponent,
+                                          __global bool *out,
+                                          const int width,
+                                          const int height) {
+	int ix = 2 * get_global_id(0);
+	int iy = 2 * get_global_id(1);
+    int index = iy * width + ix;
+    int dx, dy;
+    vfloat current;
+
+    if (exponent[index] != 0) {
+        for (dx = -1; dx < 2; dx++) {
+            if (ix + dx >= 0 && ix + dx < width) {
+                for (dy = -1; dy < 2; dy++) {
+                    if (iy + dy >= 0 && iy + dy < height) {
+                        current = exponent[(iy + dy) * width + ix + dx];
+                        if (current != 0 && fabs(current - exponent[index]) >= M_PI) {
+                            out[index] = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

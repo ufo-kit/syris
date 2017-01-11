@@ -4,17 +4,24 @@ Synchrotron radiation sources provide high photon flux of photons with
 different energies, which form a spectrum characteristic for a given source
 type.
 """
+import logging
 import numpy as np
 import quantities as q
 import quantities.constants.electron as qe
 import pyopencl.array as cl_array
+from pyopencl import clmath
 from quantities.quantity import Quantity
 from quantities.constants import fine_structure_constant
 from scipy import integrate, special
 import syris.config as cfg
 from syris.geometry import Trajectory
 from syris.opticalelements import OpticalElement
+from syris.physics import energy_to_wavelength, is_wavefield_sampling_ok
 from syris.util import make_tuple
+import syris.gpu.util as gutil
+
+
+LOG = logging.getLogger(__name__)
 
 
 class BendingMagnet(OpticalElement):
@@ -24,7 +31,7 @@ class BendingMagnet(OpticalElement):
     _SR_CONST = 3 * fine_structure_constant.simplified / (4 * np.pi ** 2)
 
     def __init__(self, electron_energy, el_current, magnetic_field, sample_distance, dE, size,
-                 pixel_size, trajectory, profile_approx=True):
+                 pixel_size, trajectory, profile_approx=True, phase_profile='plane'):
         """The parameters are *electron_energy*, electric *el_current*, *magnetic_field*, place it
         into *sample_distance* (distance between the source and a sample), take into account energy
         spacing *dE* which sets the amount of photons obtained for an energy to be:
@@ -37,7 +44,9 @@ class BendingMagnet(OpticalElement):
         the effective pixel size. *trajectory* is the trajectory defining the source position in
         space and time. If *profile_approx* is True, the profile at a given vertical observation
         angle will not be integrated over the relevant energies but will be calculated for the mean
-        energy and multiplied by *dE*.
+        energy and multiplied by *dE*. *phase_profile* can be one of 'plane', 'parabola' and
+        'sphere', where plane denotes constant phase profile (plane wave approximation) and parabola
+        is the parabolic approximation of the real spherical profile.
         """
 
         super(BendingMagnet, self).__init__()
@@ -50,6 +59,8 @@ class BendingMagnet(OpticalElement):
         self.pixel_size = make_tuple(pixel_size, num_dims=2)
         self.trajectory = trajectory
         self.profile_approx = profile_approx
+        self._phase_profile = None
+        self.phase_profile = phase_profile
 
     @property
     def gama(self):
@@ -65,6 +76,16 @@ class BendingMagnet(OpticalElement):
         """
         return 0.665 * self.electron_energy.rescale(q.GeV).magnitude ** 2 * \
             self.magnetic_field.rescale(q.T).magnitude * q.keV
+
+    @property
+    def phase_profile(self):
+        return self._phase_profile
+
+    @phase_profile.setter
+    def phase_profile(self, phase_profile):
+        if phase_profile not in ['plane', 'parabola', 'sphere']:
+            raise XRaySourceError("Unknown phase profile: '{}'".format(phase_profile))
+        self._phase_profile = phase_profile
 
     def _get_full_profile(self, energy, angles, pixel_size):
         """Get the vertical profile based on energies integration.  If there are two energies e_0
@@ -98,15 +119,23 @@ class BendingMagnet(OpticalElement):
         """Get the next time when the source will have moved more than *distance*."""
         return self.trajectory.get_next_time(t_0)
 
-    def _transfer(self, shape, pixel_size, energy, offset, t=None, queue=None, out=None,
-                  block=False):
-        """Compute the flat field wavefield."""
+    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None, queue=None,
+                  out=None, check=True, block=False):
+        """Compute the flat field wavefield. Returned *out* array is different from the input one."""
         if queue is None:
             queue = cfg.OPENCL.queue
 
         ps = make_tuple(pixel_size)
-        y = self.trajectory.get_point(t)[1]
-        fov = np.arange(0, shape[0]) * ps[0] - y + offset[0]
+        if t is None:
+            x, y, z = self.trajectory.control_points.simplified.magnitude[0]
+        else:
+            x, y, z = self.trajectory.get_point(t).simplified.magnitude
+        x += offset[1].simplified.magnitude
+        y += offset[0].simplified.magnitude
+        center = (x, y, z)
+        cl_center = gutil.make_vfloat3(*center)
+        cl_ps = gutil.make_vfloat2(*pixel_size.simplified.magnitude[::-1])
+        fov = np.arange(0, shape[0]) * ps[0] - y * q.m
         angles = np.arctan((fov / self.sample_distance).simplified)
         profile = self._create_vertical_profile(energy, angles, ps[0]).rescale(1 / q.s).magnitude
 
@@ -114,11 +143,41 @@ class BendingMagnet(OpticalElement):
         if out is None:
             out = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
 
-        ev = cfg.OPENCL.programs['physics'].make_flat(queue,
-                                                      shape[::-1],
-                                                      None,
-                                                      out.data,
-                                                      profile.data)
+        z_sample = self.sample_distance.simplified.magnitude
+        lam = energy_to_wavelength(energy).simplified.magnitude
+        phase = self.phase_profile != 'plane'
+        parabola = self.phase_profile == 'parabola'
+        if exponent or check and phase:
+            ev = cfg.OPENCL.programs['physics'].make_flat(queue,
+                                                          shape[::-1],
+                                                          None,
+                                                          out.data,
+                                                          profile.data,
+                                                          cl_center,
+                                                          cl_ps,
+                                                          cfg.PRECISION.np_float(z_sample),
+                                                          cfg.PRECISION.np_float(lam),
+                                                          np.int32(True),
+                                                          np.int32(phase),
+                                                          np.int32(parabola))
+            if check and phase and not is_wavefield_sampling_ok(out, queue=queue):
+                LOG.error('Insufficient beam phase sampling')
+            if not exponent:
+                out = clmath.exp(out, queue=queue)
+        else:
+            ev = cfg.OPENCL.programs['physics'].make_flat(queue,
+                                                          shape[::-1],
+                                                          None,
+                                                          out.data,
+                                                          profile.data,
+                                                          cl_center,
+                                                          cl_ps,
+                                                          cfg.PRECISION.np_float(z_sample),
+                                                          cfg.PRECISION.np_float(lam),
+                                                          np.int32(exponent),
+                                                          np.int32(phase),
+                                                          np.int32(parabola))
+
         if block:
             ev.wait()
 
@@ -156,6 +215,11 @@ class BendingMagnet(OpticalElement):
                         (special.kv(2.0 / 3, xi) ** 2 + gama_psi ** 2 /
                          (1.0 + gama_psi ** 2) * special.kv(1.0 / 3, xi) ** 2) *
                         angle_step.rescale(q.rad) ** 2 * 1e-3).simplified
+
+
+class XRaySourceError(Exception):
+    """X-ray source related exceptions."""
+    pass
 
 
 def make_topotomo(dE=None, trajectory=None, pixel_size=None, ring_current=200 * q.mA):

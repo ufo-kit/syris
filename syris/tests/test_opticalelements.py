@@ -10,8 +10,8 @@ from syris.tests import SyrisTest, slow
 
 class DummyOpticalElement(OpticalElement):
 
-    def _transfer(self, shape, pixel_size, energy, offset, t=None, queue=None, out=None,
-                  block=False):
+    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None, queue=None,
+                  out=None, check=True, block=False):
         return shape, pixel_size
 
 

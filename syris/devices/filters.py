@@ -30,17 +30,20 @@ class Filter(OpticalElement):
         """A filter doesn't move, this function returns infinity."""
         return np.inf * q.s
 
-    def _transfer(self, shape, pixel_size, energy, offset, t=None, queue=None, out=None,
-                  block=False):
-        """Transfer function implementation. Only *energy* is relevant becaus a filter has the same
+    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None, queue=None,
+                  out=None, check=True, block=False):
+        """Transfer function implementation. Only *energy* is relevant because a filter has the same
         thickness everywhere.
         """
         lam = energy_to_wavelength(energy).simplified.magnitude
         thickness = self.thickness.simplified.magnitude
         ri = self.material.get_refractive_index(energy)
-        coeff = -2 * np.pi * thickness / lam
+        result = thickness * (ri.imag + ri.real * 1j)
 
-        return np.exp(coeff * (ri.imag + ri.real * 1j)).astype(cfg.PRECISION.np_cplx)
+        if not exponent:
+            result = np.exp(-2 * np.pi / lam * result)
+
+        return result.astype(cfg.PRECISION.np_cplx)
 
 
 class Scintillator(Filter):

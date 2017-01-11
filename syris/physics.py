@@ -5,6 +5,7 @@ import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
 import quantities.constants.quantum as cq
+from pyopencl import clmath
 from syris.gpu import util as g_util
 from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2
 from syris.math import fwnm_to_sigma
@@ -14,10 +15,14 @@ from syris import config as cfg
 LOG = logging.getLogger(__name__)
 
 
-def transfer(thickness, refractive_index, wavelength, queue=None, out=None, block=False):
+def transfer(thickness, refractive_index, wavelength, exponent=False, queue=None, out=None,
+             check=True, block=False):
     """Transfer *thickness* (can be either a numpy or pyopencl array) with *refractive_index* and
-    given *wavelength*. Use command *queue* for computation and *out* pyopencl array. If *block* is
-    True, wait for the kernel to finish.
+    given *wavelength*. If *exponent* is True, compute the exponent of the function without applying
+    the wavenumber. Use command *queue* for computation and *out* pyopencl array. If *block* is
+    True, wait for the kernel to finish. If *check* is True, the function is checked for aliasing
+    artefacts. Returned *out* array is different from the input one because of the pyopencl.clmath
+    behavior.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -31,14 +36,31 @@ def transfer(thickness, refractive_index, wavelength, queue=None, out=None, bloc
     if out is None:
         out = cl_array.Array(queue, thickness_mem.shape, cfg.PRECISION.np_cplx)
 
-    ev = cfg.OPENCL.programs['physics'].transfer(queue,
-                                                 thickness_mem.shape[::-1],
-                                                 None,
-                                                 out.data,
-                                                 thickness_mem.data,
-                                                 cfg.PRECISION.np_cplx(refractive_index),
-                                                 cfg.PRECISION.np_float(
-                                                     wavelength.simplified.magnitude))
+    if exponent or check:
+        wavenumber = cfg.PRECISION.np_float(2 * np.pi / wavelength.simplified.magnitude)
+        ev = cfg.OPENCL.programs['physics'].transmission_add(queue,
+                                                             thickness_mem.shape[::-1],
+                                                             None,
+                                                             out.data,
+                                                             thickness_mem.data,
+                                                             cfg.PRECISION.np_cplx(
+                                                                 refractive_index),
+                                                             wavenumber,
+                                                             np.int32(1))
+        if check and not is_wavefield_sampling_ok(out, queue=queue):
+            LOG.error('Insufficient transmission function sampling')
+        if not exponent:
+            # Apply the exponent
+            out = clmath.exp(out, queue=queue)
+    else:
+        ev = cfg.OPENCL.programs['physics'].transfer(queue,
+                                                     thickness_mem.shape[::-1],
+                                                     None,
+                                                     out.data,
+                                                     thickness_mem.data,
+                                                     cfg.PRECISION.np_cplx(refractive_index),
+                                                     cfg.PRECISION.np_float(
+                                                         wavelength.simplified.magnitude))
     if block:
         ev.wait()
 
@@ -99,14 +121,65 @@ def compute_propagator(size, distance, lam, pixel_size, region=None, apply_phase
     return out
 
 
+def is_wavefield_sampling_ok(wavefield_exponent, queue=None, out=None):
+    """Check the sampling of the *wavefield_exponent*. Use OpenCL *queue* and *out* array. Return
+    True if the sampling is OK, False otherwise.
+    """
+    shape = wavefield_exponent.shape
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    if out is None:
+        out = cl_array.zeros(queue, shape, np.int8)
+    y, x = shape[0] / 2, shape[1] / 2
+
+    cfg.OPENCL.programs['physics'].check_transmission_function(queue,
+                                                               (x, y),
+                                                               None,
+                                                               wavefield_exponent.imag.data,
+                                                               out.data,
+                                                               np.int32(shape[1]),
+                                                               np.int32(shape[0]))
+    return not out.any()
+
+
+def transfer_many(objects, shape, pixel_size, energy, exponent=False, offset=None, queue=None,
+                  out=None, t=None, check=True, block=False):
+    """Compute transmission from more *objects*. If *exponent* is True, compute only the exponent,
+    if it is False, evaluate the exponent. Use *shape* (y, x), *pixel_size*, *energy*, *offset* as
+    (y, x), OpenCL command *queue*, *out* array, time *t*, check the sampling if *check* is True and
+    wait for OpenCL kernels if *block* is True. Returned *out* array is different from the input one
+    because of the pyopencl.clmath behavior.
+    """
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    if out is None:
+        out = cl_array.zeros(queue, shape, cfg.PRECISION.np_cplx)
+    u_sample = cl_array.Array(queue, shape, cfg.PRECISION.np_cplx)
+    lam = energy_to_wavelength(energy)
+
+    for i, sample in enumerate(objects):
+        out += sample.transfer(shape, pixel_size, energy, exponent=True, offset=offset, t=t,
+                               queue=queue, out=u_sample, check=False, block=block)
+
+    if check and not is_wavefield_sampling_ok(out, queue=queue):
+        LOG.error('Insufficient transmission function sampling')
+
+    # Apply the exponent
+    if not exponent:
+        out = clmath.exp(out, queue=queue)
+
+    return out
+
+
 def propagate(samples, shape, energies, distance, pixel_size, region=None,
               apply_phase_factor=False, mollified=True, detector=None, offset=None,
-              queue=None, out=None, t=None, block=False):
+              queue=None, out=None, t=None, check=True, block=False):
     """Propagate *samples* with *shape* as (y, x) which are
     :class:`syris.opticalelements.OpticalElement` instances at *energies* to *distance*. Use
     *pixel_size*, limit coherence to *region*, *apply_phase_factor* is as by the Fresnel
     approximation phase factor, *offset* is the sample offset. *queue* an OpenCL command queue,
-    *out* a PyOpenCL Array. If *block* is True, wait for the kernels to finish.
+    *out* a PyOpenCL Array. If *block* is True, wait for the kernels to finish. If *check* is True,
+    check the transmission function sampling.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -114,12 +187,11 @@ def propagate(samples, shape, energies, distance, pixel_size, region=None,
     intensity = cl_array.zeros(queue, shape, cfg.PRECISION.np_float)
 
     for energy in energies:
-        u.fill(1)
-        lam = energy_to_wavelength(energy)
-        for sample in samples:
-            u *= sample.transfer(shape, pixel_size, energy, offset=offset,
-                                 queue=queue, out=out, t=t, block=block)
+        u.fill(0)
+        u = transfer_many(samples, shape, pixel_size, energy, offset=offset,
+                            queue=queue, out=u, t=t, check=check, block=block)
         if distance != 0 * q.m:
+            lam = energy_to_wavelength(energy)
             propagator = compute_propagator(u.shape[0], distance, lam, pixel_size, region=region,
                                             apply_phase_factor=apply_phase_factor,
                                             mollified=mollified, queue=queue, block=block)
