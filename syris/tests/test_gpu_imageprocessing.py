@@ -176,6 +176,18 @@ class TestGPUImageProcessing(SyrisTest):
         ip.ifft_2(data, plan=plan)
         np.testing.assert_almost_equal(orig, data.get().real, decimal=4)
 
+        # Test double precision
+        syris.init(double_precision=True)
+        data = gpu_util.get_array(np.random.normal(100, 100,
+                                                   size=(4, 4)).astype(cfg.PRECISION.np_float))
+        gt = np.fft.fft2(data.get())
+        data = ip.fft_2(data)
+        np.testing.assert_almost_equal(gt, data.get(), decimal=4)
+
+        gt = np.fft.ifft2(data.get())
+        data = ip.ifft_2(data)
+        np.testing.assert_almost_equal(gt, data.get(), decimal=4)
+
     def test_varconvolve_disk(self):
         n = 4
         shape = (n, n)
