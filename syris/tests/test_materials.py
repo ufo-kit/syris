@@ -5,7 +5,7 @@ from distutils.spawn import find_executable
 from syris import config as cfg
 from syris.materials import Material, MaterialError, make_pmasf, make_henke
 import os
-from syris.tests import SyrisTest, pmasf_required, slow
+from syris.tests import SyrisTest, slow
 
 
 class TestMaterial(SyrisTest):
@@ -50,7 +50,6 @@ class TestMaterial(SyrisTest):
 
 
 @slow
-@pmasf_required
 class TestPMASFMaterial(SyrisTest):
 
     def setUp(self):
