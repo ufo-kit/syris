@@ -1,5 +1,6 @@
 import numpy as np
 import quantities as q
+from distutils.spawn import find_executable
 from syris import config as cfg
 from syris.materials import Material, MaterialError, make_pmasf, make_henke
 import os
@@ -54,20 +55,23 @@ class TestPMASFMaterial(SyrisTest):
         self.energies = np.arange(1, 5, 1) * q.keV
         self.refractive_indices = np.array([i + i * 1j for i in range(1, len(self.energies) + 1)])
 
-        if not os.path.exists(cfg.PMASF_FILE):
-            # Remote access.
-            cfg.PMASF_FILE = "ssh ufo /home/ws/jd2392/software/asf/pmasf"
-
     def test_multiple_energies(self):
-        energies = np.linspace(15, 25, 10) * q.keV
-        material = make_pmasf("PMMA", energies)
-        self.assertEqual(len(material.refractive_indices), 10)
+        if find_executable(cfg.PMASF_FILE):
+            energies = np.linspace(15, 25, 10) * q.keV
+            material = make_pmasf("PMMA", energies)
+            self.assertEqual(len(material.refractive_indices), 10)
 
     def test_wrong_energy(self):
-        self.assertRaises(RuntimeError, make_pmasf, "PMMA", [0] * q.keV)
+        if find_executable(cfg.PMASF_FILE):
+            self.assertRaises(RuntimeError, make_pmasf, "PMMA", [0] * q.keV)
 
     def test_wrong_material(self):
-        self.assertRaises(RuntimeError, make_pmasf, "asd", [0] * q.keV)
+        if find_executable(cfg.PMASF_FILE):
+            self.assertRaises(RuntimeError, make_pmasf, "asd", [0] * q.keV)
+
+    def test_wrong_executable(self):
+        cfg.PMASF_FILE = 'dskjfhjsaf'
+        self.assertRaises(RuntimeError, make_pmasf, "PMMA", [0] * q.keV)
 
 
 @slow
