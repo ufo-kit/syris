@@ -11,7 +11,7 @@ from syris.util import get_magnitude
 class TestMesh(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         self.triangles = make_cube()
         self.trajectory = Trajectory([(0, 0, 0)] * q.m)
         self.mesh = Mesh(self.triangles, self.trajectory)

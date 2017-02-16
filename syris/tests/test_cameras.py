@@ -10,7 +10,7 @@ from syris.tests import SyrisTest, slow
 class TestCamera(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         wavelengths = np.arange(10) * q.nm
         qe = np.ones(len(wavelengths))
         self.camera = Camera(1e-3 * q.um,

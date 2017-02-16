@@ -10,7 +10,7 @@ from syris.tests import SyrisTest
 class TestImageTiling(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         self.data = []
 
         sizes = [8, 32]

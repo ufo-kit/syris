@@ -30,7 +30,7 @@ class TestSources(SyrisTest):
 
     def setUp(self):
         # Double precision needed for spherical phase profile
-        syris.init(double_precision=True)
+        syris.init(double_precision=True, device_index=0)
         self.dE = 0.1 * q.keV
         self.energies = np.arange(14.8, 15, self.dE.magnitude) * q.keV
         self.trajectory = Trajectory([(0, 0, 0)] * q.m)

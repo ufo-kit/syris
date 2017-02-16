@@ -10,7 +10,7 @@ from syris.tests import SyrisTest
 class TestThickness(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         self.pixel_size = 1e-3
         self.precision_places = int(np.log10(1 / self.pixel_size))
         self.prg = g_util.get_program(g_util.get_metaobjects_source())

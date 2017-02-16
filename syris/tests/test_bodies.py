@@ -23,7 +23,7 @@ def get_control_points():
 
 
 def test_simple():
-    syris.init()
+    syris.init(device_index=0)
     n = 8
     ps = 1 * q.um
     thickness = np.arange(n ** 2).reshape(n, n).astype(cfg.PRECISION.np_float) * q.m
@@ -77,7 +77,7 @@ def test_simple():
 class TestBodies(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         self.pixel_size = 1 * q.um
 
         control_points = get_linear_points(geom.X, start=(1, 1, 1))

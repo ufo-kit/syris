@@ -9,7 +9,7 @@ from syris.tests import SyrisTest
 class TestPrecision(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         self.n = 2
         self.kernel_fn = "vfloat_test.cl"
 

@@ -49,7 +49,7 @@ def get_gauss_2d(shape, sigma, pixel_size=None, fourier=False):
 class TestGPUImageProcessing(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         self.pixel_size = 1 * q.um
 
     def _test_gauss(self, shape, fourier):
@@ -168,7 +168,7 @@ class TestGPUImageProcessing(SyrisTest):
         np.testing.assert_almost_equal(orig, data.get().real, decimal=4)
 
         # Test double precision
-        syris.init(double_precision=True)
+        syris.init(double_precision=True, device_index=0)
         data = gpu_util.get_array(np.random.normal(100, 100,
                                                    size=(4, 4)).astype(cfg.PRECISION.np_float))
         gt = np.fft.fft2(data.get())

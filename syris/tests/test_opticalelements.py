@@ -19,7 +19,7 @@ class DummyOpticalElement(OpticalElement):
 class TestOpticalElement(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         energies = range(10, 20) * q.keV
         self.energy = energies[len(energies) / 2]
         self.material = Material('foo', np.arange(len(energies), dtype=np.complex), energies)

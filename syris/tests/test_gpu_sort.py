@@ -10,7 +10,7 @@ from syris.tests import SyrisTest, slow
 class TestGPUSorting(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         self.prg = g_util.get_program(
             g_util.get_source(["polyobject.cl",
                                "heapsort.cl"],

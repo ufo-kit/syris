@@ -13,7 +13,7 @@ class TestVComplex(SyrisTest):
         kernel(cfg.OPENCL.queue, (1,), None, self.mem_0, self.mem_1, self.mem_out)
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         self.num_0 = np.array([17 - 38j], dtype=cfg.PRECISION.np_cplx)
         self.num_1 = np.array([-135 + 563j], dtype=cfg.PRECISION.np_cplx)
         self.mem_0 = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |

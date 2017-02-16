@@ -11,7 +11,7 @@ from syris.tests import SyrisTest, slow
 class TestPolynomials(SyrisTest):
 
     def setUp(self):
-        syris.init()
+        syris.init(device_index=0)
         self.poly_deg = 4
         self.coeffs = np.array([5, 87, -2, 37, 17], dtype=cfg.PRECISION.np_float)
 

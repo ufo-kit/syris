@@ -12,7 +12,7 @@ from syris.tests import SyrisTest
 class TestPhysics(SyrisTest):
 
     def setUp(self):
-        syris.init(double_precision=True)
+        syris.init(double_precision=True, device_index=0)
         self.energy = 20 * q.keV
         self.lam = 6.19920937165e-11 * q.m
         self.size = 64
