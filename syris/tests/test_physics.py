@@ -1,5 +1,4 @@
 import numpy as np
-import pyopencl as cl
 import quantities as q
 import syris
 from syris import physics, config as cfg
@@ -17,9 +16,6 @@ class TestPhysics(SyrisTest):
         self.energy = 20 * q.keV
         self.lam = 6.19920937165e-11 * q.m
         self.size = 64
-        self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                             size=self.size ** 2 * cfg.PRECISION.cl_cplx)
-        self.res = np.empty((self.size, self.size), dtype=cfg.PRECISION.np_cplx)
         self.distance = 1 * q.m
         self.pixel_size = 1 * q.um
 
@@ -64,19 +60,19 @@ class TestPhysics(SyrisTest):
                                    (j / self.pixel_size.simplified * self.lam.simplified) ** 2)))
 
     def test_no_phase_factor(self):
-        self.res = self._get_propagator()
+        res = self._get_propagator()
         cpu = self._cpu_propagator()
 
-        np.testing.assert_almost_equal(self.res, cpu, 5)
+        np.testing.assert_almost_equal(res, cpu, 5)
 
     def test_with_phase_factor(self):
         phase = np.exp(2 * np.pi / self.lam.simplified *
                        self.distance.simplified * 1j)
 
-        self.res = self._get_propagator(True)
+        res = self._get_propagator(True)
         cpu = self._cpu_propagator(phase)
 
-        np.testing.assert_almost_equal(self.res, cpu, 5)
+        np.testing.assert_almost_equal(res, cpu, 5)
 
     def test_transfer(self):
         thickness = np.linspace(0, 0.01, 16).reshape(4, 4) * q.mm

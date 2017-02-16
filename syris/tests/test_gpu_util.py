@@ -15,6 +15,9 @@ class TestGPUUtil(SyrisTest):
         self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                              cl.mem_flags.COPY_HOST_PTR, hostbuf=self.data)
 
+    def tearDown(self):
+        del self.mem
+
     def test_cache(self):
         self.assertEqual(gu.cache(self.mem, self.data.shape, cfg.PRECISION.np_float,
                                   cfg.CACHE_DEVICE), self.mem)

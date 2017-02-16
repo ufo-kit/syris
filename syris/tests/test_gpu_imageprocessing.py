@@ -50,15 +50,6 @@ class TestGPUImageProcessing(SyrisTest):
 
     def setUp(self):
         syris.init()
-        src = gpu_util.get_source(["vcomplex.cl",
-                                   "imageprocessing.cl"])
-        self.prg = cl.Program(cfg.OPENCL.ctx, src).build()
-        self.size = 256
-        self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                             size=self.size ** 2 * cfg.PRECISION.cl_float)
-        self.res = np.empty((self.size, self.size), dtype=cfg.PRECISION.np_float)
-        self.distance = 1 * q.m
-        self.lam = 4.9594e-11 * q.m
         self.pixel_size = 1 * q.um
 
     def _test_gauss(self, shape, fourier):

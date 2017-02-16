@@ -27,6 +27,12 @@ class TestPolynomials(SyrisTest):
         self.roots_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
                                    size=(self.poly_deg + 1) * cfg.PRECISION.cl_float)
 
+    def tearDown(self):
+        del self.coeffs_mem
+        del self.scalar_mem
+        del self.roots_mem
+        del self.prg
+
     def get_roots(self, coeffs, interval, previous_coeffs=None,
                   next_coeffs=None):
         if previous_coeffs is None:
