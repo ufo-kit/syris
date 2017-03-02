@@ -279,3 +279,11 @@ class TestBodies(SyrisTest):
         comp = CompositeBody(traj, bodies=[ball])
 
         self.assertEqual(np.inf * q.s, comp.get_next_time(0 * q.s, ps))
+
+    def test_static_composite(self):
+        ps = 1 * q.um
+        traj = Trajectory([(0, 0, 0)] * q.m)
+        mb_0 = MetaBall(traj, 10 * q.um)
+        mb_1 = MetaBall(traj, 10 * q.um)
+        comp = CompositeBody(traj, bodies=[mb_0, mb_1])
+        self.assertEqual(np.inf * q.s, comp.get_next_time(0 * q.s, ps))
