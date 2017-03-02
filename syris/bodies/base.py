@@ -474,10 +474,13 @@ class CompositeBody(MovableBody):
         self.bind_trajectory(pixel_size)
 
         if self._dt is None:
-            dts = [MovableBody.get_maximum_dt(self, pixel_size / len(self.all_bodies))]
+            if self.trajectory.stationary:
+                dts = []
+            else:
+                dts = [MovableBody.get_maximum_dt(self, pixel_size / len(self.all_bodies))]
             dts += [body.get_maximum_dt(pixel_size / len(self.all_bodies))
                     for body in self if not body.trajectory.stationary]
-            self._dt = np.min(dts) * q.s
+            self._dt = np.min(dts) * q.s if dts else None
 
         return self._dt
 
@@ -501,6 +504,10 @@ class CompositeBody(MovableBody):
         self.bind_trajectory(pixel_size)
         if self._dt is None:
             self.get_maximum_dt(pixel_size)
+
+        if self._dt is None:
+            # All bodies are stationary
+            return np.inf * q.s
 
         for current_time in np.arange(t_0.simplified.magnitude, self.time.simplified.magnitude,
                                       self._dt.simplified.magnitude) * q.s:
