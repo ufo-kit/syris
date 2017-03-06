@@ -6,6 +6,7 @@ from syris import geometry as geom
 from syris.geometry import Trajectory
 from syris.bodies.base import CompositeBody
 from syris.bodies.isosurfaces import MetaBall
+from syris.bodies.mesh import make_cube, Mesh
 from syris.bodies.simple import StaticBody
 from syris.imageprocessing import crop, pad, rescale
 from syris.materials import Material
@@ -287,3 +288,29 @@ class TestBodies(SyrisTest):
         mb_1 = MetaBall(traj, 10 * q.um)
         comp = CompositeBody(traj, bodies=[mb_0, mb_1])
         self.assertEqual(np.inf * q.s, comp.get_next_time(0 * q.s, ps))
+
+    @slow
+    def test_project_composite(self):
+        n = 64
+        shape = (n, n)
+        ps = 1 * q.um
+        x = np.linspace(0, n, num=10)
+        y = z = np.zeros(x.shape)
+        traj_x = Trajectory(zip(x, y, z) * ps, velocity=ps / q.s)
+        traj_y = Trajectory(zip(y, x, z) * ps, velocity=ps / q.s)
+        traj_xy = Trajectory(zip(n - x, x, z) * ps, velocity=ps / q.s)
+        mb = MetaBall(traj_x, n * ps / 16)
+        cube = make_cube() / q.m * 16 * ps / 4
+        mesh = Mesh(cube, traj_xy)
+        composite = CompositeBody(traj_y, bodies=[mb, mesh])
+        composite.bind_trajectory(ps)
+
+        composite.move(n / 2 * q.s)
+        p = composite.project(shape, ps).get()
+        composite.clear_transformation()
+
+        # Compute
+        composite.move(n / 2 * q.s)
+        p_separate = (mb.project(shape, ps) + mesh.project(shape, ps)).get()
+
+        np.testing.assert_almost_equal(p, p_separate)
