@@ -1,13 +1,14 @@
 """A base module for pysical bodies, which are optical elements having spatial extent."""
 import logging
 import numpy as np
+import pyopencl.array as cl_array
 import quantities as q
 import syris.config as cfg
 import syris.geometry as geom
 from quantities.quantity import Quantity
 from scipy.optimize import bisect
 from syris.opticalelements import OpticalElement
-from syris.physics import energy_to_wavelength, transfer
+from syris.physics import energy_to_wavelength, transfer, transfer_many
 from syris.util import make_tuple
 
 
@@ -566,3 +567,22 @@ class CompositeBody(MovableBody):
     def moved(self, t_0, t_1, pixel_size):
         """Return True if the body moves more than *pixel_size* in time interval *t_0*, *t_1*."""
         return self.get_distance(t_0, t_1) > pixel_size
+
+    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+        """Projection function implementation. *shape* and *pixel_size* are 2D."""
+        if out is None:
+            out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
+        for body in self.bodies:
+            out += body.project(shape, pixel_size, offset=offset, t=t, queue=queue, out=None,
+                                block=block)
+
+        return out
+
+    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None,
+                  queue=None, out=None, check=True, block=False):
+        """Transfer function implementation based on a refractive index."""
+        if out is None:
+            out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_cplx)
+
+        return transfer_many(self.bodies, shape, pixel_size, energy, offset=offset,
+                             queue=queue, out=out, t=None, check=check, block=block)
