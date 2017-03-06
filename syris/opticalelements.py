@@ -2,6 +2,7 @@
 Optical Elements are entities capable of producing wavefields as a function of time.
 """
 import quantities as q
+import syris.config as cfg
 from syris.physics import transfer, energy_to_wavelength
 from syris.util import make_tuple
 
@@ -23,6 +24,8 @@ class OpticalElement(object):
         pixel_size = make_tuple(pixel_size, num_dims=2)
         if offset is None:
             offset = (0, 0) * q.m
+        if queue is None:
+            queue = cfg.OPENCL.queue
 
         return self._transfer(shape, pixel_size, energy, offset, exponent=exponent, t=t,
                               queue=queue, out=out, check=check, block=block)
