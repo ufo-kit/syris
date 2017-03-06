@@ -350,7 +350,7 @@ def get_platform(name):
         if name in platform.name:
             return platform
 
-    raise LookupError("Platform '{}' not found".format(platform))
+    raise LookupError("Platform '{}' not found".format(name))
 
 
 def get_cuda_platform():
