@@ -585,4 +585,5 @@ class CompositeBody(MovableBody):
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_cplx)
 
         return transfer_many(self.bodies, shape, pixel_size, energy, offset=offset,
-                             queue=queue, out=out, t=None, check=check, block=block)
+                             exponent=exponent, queue=queue, out=out, t=None, check=check,
+                             block=block)
