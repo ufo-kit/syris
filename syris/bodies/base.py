@@ -583,6 +583,9 @@ class CompositeBody(MovableBody):
         """Transfer function implementation based on a refractive index."""
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_cplx)
+        else:
+            # transmission_many adds values, make sure it start with a zeroed array
+            out.fill(0)
 
         return transfer_many(self.bodies, shape, pixel_size, energy, offset=offset,
                              exponent=exponent, queue=queue, out=out, t=None, check=check,
