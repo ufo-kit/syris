@@ -26,8 +26,7 @@ def main():
 
     u = bm.transfer(shape, ps, energy, t=0 * q.s)
     u = sample.transfer(shape, ps, energy)
-    u = propagate([sample], shape, [energy], d, ps)
-    intensity = (abs(u) ** 2).real.get()
+    intensity = propagate([sample], shape, [energy], d, ps).get()
     incoh = bm.apply_blur(intensity, d, ps).get()
 
     region = (n / 4, n / 4, n / 2, n / 2)

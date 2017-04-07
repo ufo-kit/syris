@@ -19,8 +19,8 @@ LOG = logging.getLogger(__name__)
 def propagate_one(unused, queue, shape, energies, distance, ps, spheres):
     # Make sure we use the sample created by this *queue*
     sample = spheres[queue]
-    return (abs(propagate([sample], shape, energies, distance, ps,
-                          mollified=False, queue=queue, block=True)) ** 2).get().real
+    return propagate([sample], shape, energies, distance, ps,
+                     mollified=False, queue=queue, block=True).real.get()
 
 
 def run(n, ps, num_runs, queues):
