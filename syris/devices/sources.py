@@ -14,6 +14,8 @@ from quantities.quantity import Quantity
 from quantities.constants import fine_structure_constant
 from scipy import integrate, special
 import syris.config as cfg
+import syris.imageprocessing as ip
+import syris.math as smath
 from syris.geometry import Trajectory
 from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength, is_wavefield_sampling_ok
@@ -215,6 +217,15 @@ class BendingMagnet(OpticalElement):
                         (special.kv(2.0 / 3, xi) ** 2 + gama_psi ** 2 /
                          (1.0 + gama_psi ** 2) * special.kv(1.0 / 3, xi) ** 2) *
                         angle_step.rescale(q.rad) ** 2 * 1e-3).simplified
+
+    def apply_blur(self, intensity, distance, pixel_size, queue=None, block=False):
+        """Apply source blur based on van Cittert-Zernike theorem at *distance*."""
+        fwhm = (distance * self.size / self.sample_distance).simplified
+        sigma = smath.fwnm_to_sigma(fwhm, n=2)
+        psf = ip.get_gauss_2d(intensity.shape, sigma, pixel_size=pixel_size, fourier=True,
+                              queue=queue, block=block)
+
+        return ip.ifft_2(ip.fft_2(intensity) * psf).real
 
 
 class Wiggler(BendingMagnet):
