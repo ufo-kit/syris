@@ -97,12 +97,12 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None, block=Fa
     return out
 
 
-def pad(image, region=None, out=None, queue=None, block=False):
+def pad(image, region=None, out=None, value=0, queue=None, block=False):
     """Pad a 2D *image*. *region* is the region to pad as (y_0, x_0, height, width). If not
     specified, the next power of two dimensions are used and the image is centered in the padded
     one. The final image dimensions are height x width and the filling starts at (y_0, x_0), *out*
-    is the pyopencl Array instance, if not specified it will be created. *out* is also returned. If
-    *block* is True, wait for the copy to finish.
+    is the pyopencl Array instance, if not specified it will be created. *out* is also returned.
+    *value* is the padded value. If *block* is True, wait for the copy to finish.
     """
     if region is None:
         shape = tuple([next_power_of_two(n) for n in image.shape])
@@ -112,7 +112,7 @@ def pad(image, region=None, out=None, queue=None, block=False):
     if queue is None:
         queue = cfg.OPENCL.queue
     if out is None:
-        out = cl_array.zeros(queue, (region[2], region[3]), dtype=image.dtype)
+        out = cl_array.zeros(queue, (region[2], region[3]), dtype=image.dtype) + value
     image = g_util.get_array(image, queue=queue)
 
     n_bytes = image.dtype.itemsize
