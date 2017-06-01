@@ -85,10 +85,10 @@ class MaterialFilter(Filter):
         lam = energy_to_wavelength(energy).simplified.magnitude
         thickness = self.thickness.simplified.magnitude
         ri = self.material.get_refractive_index(energy)
-        result = thickness * (ri.imag + ri.real * 1j)
+        result = -2 * np.pi / lam * thickness * (ri.imag + ri.real * 1j)
 
         if not exponent:
-            result = np.exp(-2 * np.pi / lam * result)
+            result = np.exp(result)
 
         return result.astype(cfg.PRECISION.np_cplx)
 

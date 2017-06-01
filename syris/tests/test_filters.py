@@ -40,11 +40,9 @@ class TestFilters(SyrisTest):
         self.assertAlmostEqual(gt, fltr)
 
     def test_exponent(self):
-        lam = energy_to_wavelength(self.energy).simplified.magnitude
-        k = -2 * np.pi / lam
         transmitted = self.fltr.transfer(None, None, self.energy)
         exponent = self.fltr.transfer(None, None, self.energy, exponent=True)
-        self.assertAlmostEqual(transmitted, np.exp(k * exponent), places=5)
+        self.assertAlmostEqual(transmitted, np.exp(exponent), places=5)
 
     def test_gaussian(self):
         energies = np.arange(5, 30, 0.1) * q.keV
