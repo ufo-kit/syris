@@ -211,3 +211,8 @@ class TestGPUImageProcessing(SyrisTest):
         gt = gaussian_filter(image, sigma)
         result = ip.varconvolve_gauss(image, (sigmas, sigmas), normalized=True).get()
         np.testing.assert_almost_equal(gt, result)
+
+    def test_compute_intensity(self):
+        shape = (32, 32)
+        u = (np.ones(shape) + 1j * np.ones(shape) * 3).astype(cfg.PRECISION.np_cplx)
+        np.testing.assert_almost_equal(np.abs(u) ** 2, ip.compute_intensity(u).get())
