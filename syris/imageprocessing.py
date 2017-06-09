@@ -246,6 +246,24 @@ def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
     return out
 
 
+def compute_intensity(wavefield, queue=None, out=None, block=False):
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    if out is None:
+        out = cl.array.Array(queue, wavefield.shape, dtype=cfg.PRECISION.np_float)
+    wavefield = g_util.get_array(wavefield, queue=queue)
+
+    ev = cfg.OPENCL.programs['improc'].compute_intensity(queue,
+                                                         wavefield.shape[::-1],
+                                                         None,
+                                                         wavefield.data,
+                                                         out.data)
+    if block:
+        ev.wait()
+
+    return out
+
+
 def varconvolve(kernel_name, shape, kernel_args, local_size=None, program=None, queue=None,
                 block=False):
     """Variable convolution with OpenCL kernel function *kernel_name*, gloal size *shape* (y, x),

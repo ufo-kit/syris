@@ -97,3 +97,17 @@ __kernel void rescale (read_only image2d_t input,
                                                        (ix / factor.x + 0.5f,
                                                         iy / factor.y + 0.5f)).x;
 }
+
+/*
+ * Compute intensity of a wavefield.
+ */
+__kernel void compute_intensity (__global vcomplex *wavefield,
+                                 __global vfloat *out)
+{
+    int ix = get_global_id (0);
+    int iy = get_global_id (1);
+    int index = iy * get_global_size(0) + ix;
+    vcomplex value = wavefield[index];
+
+    out[index] = value.x * value.x + value.y * value.y;
+}
