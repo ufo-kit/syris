@@ -1,7 +1,7 @@
 import numpy as np
 import quantities as q
 import syris
-from syris.devices.filters import GaussianFilter, MaterialFilter
+from syris.devices.filters import GaussianFilter, MaterialFilter, Scintillator
 from syris.materials import Material
 from syris.math import fwnm_to_sigma, sigma_to_fwnm
 from syris.physics import energy_to_wavelength
@@ -66,3 +66,18 @@ class TestFilters(SyrisTest):
         u_f = fltr.transfer(None, None, energy_10, exponent=True)
         u = u_0 * np.exp(u_f)
         self.assertAlmostEqual(np.abs(u) ** 2, 5, places=4)
+
+    def test_scintillator_conservation(self):
+        """Test if the integral of luminescence is really 1."""
+        wavelengths = np.linspace(100, 700, 128) * q.nm
+        wavelengths_dense = np.linspace(wavelengths[0], wavelengths[-1], 4 * len(wavelengths))
+        sigma = 20.
+        luminescence = np.exp(-(wavelengths.magnitude - 400) ** 2 / (2 * sigma ** 2))
+        sc = Scintillator(1 * q.m, None, np.ones(30) / q.keV, np.arange(30) * q.keV, luminescence,
+                          wavelengths, 1)
+        lum_orig = sc.get_luminescence(wavelengths)
+        self.assertAlmostEqual((np.sum(lum_orig) * sc.d_wavelength).simplified.magnitude, 1)
+
+        lum = sc.get_luminescence(wavelengths_dense)
+        d_wavelength = wavelengths_dense[1] - wavelengths_dense[0]
+        self.assertAlmostEqual((np.sum(lum) * d_wavelength).simplified.magnitude, 1)
