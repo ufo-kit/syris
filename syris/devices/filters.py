@@ -100,20 +100,31 @@ class Scintillator(MaterialFilter):
     def __init__(self, thickness, material, light_yields, energies, luminescence, wavelengths,
                  optical_ref_index):
         """Create a scintillator with *light_yields* [1 / keV] at *energies*, *luminescence* are the
-        portions of total emmitted photons [1 / nm] with respect to visible light *wavelengths*,
+        portions of total emmitted photons per some portion of wavelengths [1 / nm] (they are
+        normalized so that their integral is 1) with respect to visible light *wavelengths*,
         *optical_ref_index* is the refractive index between the scintillator material and air.
         """
         super(Scintillator, self).__init__(thickness, material)
         self._lights_yields = light_yields
         self._energies = energies
-        self._luminescence = luminescence
         self._wavelengths = wavelengths
+        self._luminescence = luminescence / luminescence.sum() / self.d_wavelength
         self.opt_ref_index = optical_ref_index
 
         self._ly_tck = interp.splrep(self._energies.rescale(q.keV).magnitude,
                                      self._lights_yields.rescale(1 / q.keV).magnitude)
         self._lum_tck = interp.splrep(self._wavelengths.rescale(q.nm).magnitude,
                                       self._luminescence.rescale(1 / q.nm).magnitude)
+
+    @property
+    def wavelengths(self):
+        """Wavelengths for which the emission is defined."""
+        return self._wavelengths
+
+    @property
+    def d_wavelength(self):
+        """Wavelength spacing."""
+        return (self.wavelengths[1] - self.wavelengths[0]).rescale(q.nm)
 
     def get_light_yield(self, energy):
         """Get light yield at *energy* [1 / keV]."""
