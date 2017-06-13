@@ -58,7 +58,7 @@ def make_devices(n, energies, camera=None, highspeed=True):
         # High speed setup
         lens = Lens(3, f_number=1.4, focal_length=50 * q.mm, transmission_eff=0.7, sigma=None)
         sigma = fwnm_to_sigma(50)
-        emission = np.exp(-(x - 450) ** 2 / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi)) * dx
+        emission = np.exp(-(x - 450) ** 2 / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
         luag = get_material('luag.mat')
         scintillator = Scintillator(50 * q.um,
                                     luag,
@@ -71,7 +71,7 @@ def make_devices(n, energies, camera=None, highspeed=True):
         # High resolution setup
         lens = Lens(9, na=0.28, sigma=None)
         sigma = fwnm_to_sigma(50)
-        emission = np.exp(-(x - 420) ** 2 / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi)) * dx
+        emission = np.exp(-(x - 420) ** 2 / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
         lso = get_material('lso_5_30_kev.mat')
         scintillator = Scintillator(13 * q.um,
                                     lso,
