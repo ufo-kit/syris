@@ -69,15 +69,16 @@ class TestFilters(SyrisTest):
 
     def test_scintillator_conservation(self):
         """Test if the integral of luminescence is really 1."""
-        wavelengths = np.linspace(100, 700, 128) * q.nm
+        wavelengths = np.linspace(100, 700, 512) * q.nm
         wavelengths_dense = np.linspace(wavelengths[0], wavelengths[-1], 4 * len(wavelengths))
-        sigma = 20.
-        luminescence = np.exp(-(wavelengths.magnitude - 400) ** 2 / (2 * sigma ** 2))
+        d_wavelength_dense = wavelengths_dense[1] - wavelengths_dense[0]
+        sigma = 20. * q.nm
+        luminescence = np.exp(-(wavelengths - 400 * q.nm) ** 2 / (2 * sigma ** 2)) / \
+            (sigma * np.sqrt(2 * np.pi))
         sc = Scintillator(1 * q.m, None, np.ones(30) / q.keV, np.arange(30) * q.keV, luminescence,
                           wavelengths, 1)
         lum_orig = sc.get_luminescence(wavelengths)
         self.assertAlmostEqual((np.sum(lum_orig) * sc.d_wavelength).simplified.magnitude, 1)
 
         lum = sc.get_luminescence(wavelengths_dense)
-        d_wavelength = wavelengths_dense[1] - wavelengths_dense[0]
-        self.assertAlmostEqual((np.sum(lum) * d_wavelength).simplified.magnitude, 1)
+        self.assertAlmostEqual((np.sum(lum) * d_wavelength_dense).simplified.magnitude, 1)
