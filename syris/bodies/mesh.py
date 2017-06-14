@@ -258,7 +258,7 @@ class Mesh(MovableBody):
             # Use the same pixel size as for the x-axis, which will work for objects "not too far"
             # from the imaging plane
             min_z = self.extrema[2][0].simplified.magnitude / psm[1]
-            offset = gutil.make_vfloat2(*offset.simplified.magnitude[::-1])
+            offset = gutil.make_vfloat2(*(offset / pixel_size).simplified.magnitude[::-1])
 
             ev = cfg.OPENCL.programs['mesh'].compute_thickness(queue,
                                                                (width, height),
