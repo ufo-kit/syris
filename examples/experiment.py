@@ -36,7 +36,7 @@ def get_flat(shape, energies, detector, source, filters=(), shot_noise=False,
                                      amplifier_noise=amplifier_noise, psf=psf)
 
 
-def make_devices(n, energies, camera=None, highspeed=True):
+def make_devices(n, energies, camera=None, highspeed=True, scintillator=None):
     """Create devices with image shape (*n*, *n*), X-ray *energies*, *camera* and use the high speed
     setup if *highspeed* is True.
     """
@@ -53,10 +53,18 @@ def make_devices(n, energies, camera=None, highspeed=True):
 
     x = vis_wavelengths.rescale(q.nm).magnitude
     dx = x[1] - x[0]
-
-    if highspeed:
-        # High speed setup
-        lens = Lens(3, f_number=1.4, focal_length=50 * q.mm, transmission_eff=0.7, sigma=None)
+    if scintillator == 'lso' or not (scintillator or highspeed):
+        sigma = fwnm_to_sigma(50)
+        emission = np.exp(-(x - 545) ** 2 / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
+        lso = get_material('lso_5_30_kev.mat')
+        scintillator = Scintillator(13 * q.um,
+                                    lso,
+                                    36 * np.ones(len(energies)) / q.keV,
+                                    energies,
+                                    emission / q.nm,
+                                    vis_wavelengths,
+                                    1.82)
+    elif scintillator == 'luag' or (not scintillator and highspeed):
         sigma = fwnm_to_sigma(50)
         emission = np.exp(-(x - 450) ** 2 / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
         luag = get_material('luag.mat')
@@ -67,19 +75,13 @@ def make_devices(n, energies, camera=None, highspeed=True):
                                     emission / q.nm,
                                     vis_wavelengths,
                                     1.84)
+
+    if highspeed:
+        # High speed setup
+        lens = Lens(3, f_number=1.4, focal_length=50 * q.mm, transmission_eff=0.7, sigma=None)
     else:
         # High resolution setup
         lens = Lens(9, na=0.28, sigma=None)
-        sigma = fwnm_to_sigma(50)
-        emission = np.exp(-(x - 420) ** 2 / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
-        lso = get_material('lso_5_30_kev.mat')
-        scintillator = Scintillator(13 * q.um,
-                                    lso,
-                                    36 * np.ones(len(energies)) / q.keV,
-                                    energies,
-                                    emission / q.nm,
-                                    vis_wavelengths,
-                                    1.82)
 
     detector = Detector(scintillator, lens, camera)
     source_trajectory = Trajectory([(n / 2, n / 2, 0)] * detector.pixel_size)
@@ -88,13 +90,14 @@ def make_devices(n, energies, camera=None, highspeed=True):
     return bm, detector
 
 
-def make_topo_tomo_flat(args):
+def make_topo_tomo_flat(args, highspeed=True, scintillator=None):
     syris.init(device_index=0, loglevel='INFO')
     dimax = make_pco_dimax()
     n = dimax.shape[0]
     energies = np.arange(5, 30) * q.keV
 
-    bm, detector = make_devices(n, energies, camera=dimax, highspeed=True)
+    bm, detector = make_devices(n, energies, camera=dimax, highspeed=highspeed,
+                                scintillator=scintillator)
 
     # Customize the setup for the 2013_03_07-08 experiment
     air = MaterialFilter(1 * q.m, get_material('air_5_30_kev.mat'))
@@ -113,6 +116,8 @@ def make_topo_tomo_flat(args):
 
     show(flat)
     plt.show()
+
+    return flat
 
 
 def make_motion(args):
