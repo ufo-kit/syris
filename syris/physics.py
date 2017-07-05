@@ -10,6 +10,7 @@ from syris.gpu import util as g_util
 from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2
 from syris.math import fwnm_to_sigma
 from syris import config as cfg
+from syris.util import make_tuple
 
 
 LOG = logging.getLogger(__name__)
@@ -81,15 +82,20 @@ def compute_propagator(size, distance, lam, pixel_size, fresnel=True, region=Non
         raise ValueError('Only even sizes are supported')
     if queue is None:
         queue = cfg.OPENCL.queue
+    pixel_size = make_tuple(pixel_size)
 
-    # Check the sampling
-    r_cutoff = compute_aliasing_limit(size, lam, pixel_size, distance, fov=region, fourier=False)
-    min_n = 4
-    if r_cutoff < min_n:
-        LOG.error('Propagator too narrow, propagation distance too small or pixel size too large')
-    f_cutoff = compute_aliasing_limit(size, lam, pixel_size, distance, fov=region, fourier=True)
-    if f_cutoff < min_n:
-        LOG.error('Propagator too wide, propagation distance too large or pixel size too small')
+    def check_cutoff(ps):
+        # Check the sampling
+        r_cutoff = compute_aliasing_limit(size, lam, ps, distance, fov=region, fourier=False)
+        min_n = 4
+        if r_cutoff < min_n:
+            LOG.error('Propagator too narrow, propagation distance too small or pixel size too large')
+        f_cutoff = compute_aliasing_limit(size, lam, ps, distance, fov=region, fourier=True)
+        if f_cutoff < min_n:
+            LOG.error('Propagator too wide, propagation distance too large or pixel size too small')
+
+    check_cutoff(pixel_size[1])
+    check_cutoff(pixel_size[0])
 
     out = cl_array.Array(queue, (size, size), cfg.PRECISION.np_cplx)
     if apply_phase_factor:
@@ -103,21 +109,25 @@ def compute_propagator(size, distance, lam, pixel_size, fresnel=True, region=Non
                                                    out.data,
                                                    cfg.PRECISION.np_float(distance.simplified),
                                                    cfg.PRECISION.np_float(lam.simplified),
-                                                   cfg.PRECISION.np_float(pixel_size.simplified),
+                                                   g_util.make_vfloat2(*pixel_size[::-1].simplified),
                                                    g_util.make_vcomplex(phase_factor),
                                                    np.int32(fresnel))
     if block:
         ev.wait()
 
     if mollified:
-        fwtm = compute_aliasing_limit(size, lam, pixel_size, distance,
-                                      fov=size * pixel_size, fourier=True)
-        if region is not None:
-            fwtm_region = compute_aliasing_limit(size, lam, pixel_size, distance, region,
-                                                 fourier=True)
-            fwtm = min(fwtm_region, fwtm)
+        def compute_sigma_component(ps):
+            fwtm = compute_aliasing_limit(size, lam, ps, distance,
+                                          fov=size * ps, fourier=True)
+            if region is not None:
+                fwtm_region = compute_aliasing_limit(size, lam, ps, distance, region,
+                                                     fourier=True)
+                fwtm = min(fwtm_region, fwtm)
+            sigma = fwnm_to_sigma(fwtm, n=10)
 
-        sigma = fwnm_to_sigma(fwtm, n=10)
+            return sigma
+
+        sigma = (compute_sigma_component(pixel_size[0]), compute_sigma_component(pixel_size[1]))
         mollifier = get_gauss_2d(size, sigma, fourier=False, queue=queue, block=block)
         out = out * mollifier
 

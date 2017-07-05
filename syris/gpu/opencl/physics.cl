@@ -12,7 +12,7 @@
 __kernel void propagator(__global vcomplex *out,
 							const vfloat distance,
 							const vfloat lam,
-							const vfloat pixel_size,
+							const vfloat2 pixel_size,
 							const vcomplex phase_factor,
                             const int fresnel) {
 
@@ -27,11 +27,12 @@ __kernel void propagator(__global vcomplex *out,
      * because of the square in the computation. */
 	i = (vfloat) ix / n;
 	j = (vfloat) iy / n;
+    vfloat freq = (i * i / (pixel_size.x * pixel_size.x) + j * j / (pixel_size.y * pixel_size.y));
 
     if (fresnel) {
-        tmp = - M_PI * lam * distance * (i * i + j * j) / (pixel_size * pixel_size);
+        tmp = - M_PI * lam * distance * freq;
     } else {
-        tmp = 2 * M_PI / lam * distance * sqrt(1 - lam * lam * (i * i + j * j) / (pixel_size * pixel_size));
+        tmp = 2 * M_PI / lam * distance * sqrt(1 - lam * lam * freq);
     }
     sine = sincos(tmp, &cosine);
 	if (phase_factor.x == 0 && phase_factor.y == 0) {
