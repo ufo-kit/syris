@@ -94,3 +94,12 @@ def sigma_to_fwnm(sigma, n=2):
 def fwnm_to_sigma(fwnm, n=2):
     """Return Gaussian sigma from full width at *n*-th maximum *fwnm*."""
     return fwnm / (2 * np.sqrt(2 * np.log(n)))
+
+
+def fftfreq(n, pixel_size):
+    """Compute spatial frequencies for a 2D grid (*n*, *n*) with spacing *pixel_size*. Returns
+    spatial frequencies f as (f_y, f_x).
+    """
+    frequencies = np.fft.fftfreq(n)
+
+    return np.meshgrid(frequencies, frequencies) / pixel_size
