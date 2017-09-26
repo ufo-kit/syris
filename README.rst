@@ -26,6 +26,36 @@ There are numerous examples of how to use *syris* described below which ship
 directly with the code. Enjoy!
 
 
+Usage
+-----
+
+The first thing you have to do is to initialize *syris* by the ``syris.init()``
+function. After that you only need to do whatever is necessary for your program.
+A simple white beam propagation example looks like this:
+
+.. code-block:: python
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import quantities as q
+    import syris
+    from syris.physics import propagate
+    from syris.bodies.simple import make_sphere
+    from syris.materials import make_henke
+
+    syris.init()
+    energies = np.arange(10, 30) * q.keV
+    n = 1024
+    pixel_size = 0.4 * q.um
+    distance = 2 * q.m
+    material = make_henke('PMMA', energies)
+
+    sample = make_sphere(n, n / 4 * pixel_size, pixel_size, material=material)
+    image = propagate([sample], (n, n), energies, distance, pixel_size).get()
+    plt.imshow(image)
+    plt.show()
+
+
 Citation
 --------
 

@@ -122,6 +122,15 @@ X-ray Source Blur
     :members:
 
 
+Simple
+------
+
+**simple.py**
+
+.. automodule:: examples.simple
+    :members:
+
+
 Trajectory
 ----------
 
