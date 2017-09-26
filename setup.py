@@ -14,7 +14,4 @@ setup(
     # exclude_package_data={'': ['README.rst']},
     description="X-ray imaging simulation",
     # long_description=open('README.rst').read(),
-    install_requires=['numpy',
-                      'pyopencl',
-                      'quantities'],
 )
