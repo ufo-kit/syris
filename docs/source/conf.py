@@ -20,12 +20,12 @@ class Mock(MagicMock):
             return MagicMock()
 
 MOCK_MODULES = ['pyfft', 'pyopencl', 'quantities', 'numpy', 'scipy']
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath(os.path.join('..', '..')))
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 from syris import __version__
 
