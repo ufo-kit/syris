@@ -1,5 +1,5 @@
-Welcome to Syris's documentation!
-=================================
+Syris
+=====
 
 *syris* (**sy**\ nchrotron **r**\ adiation **i**\ maging **s**\ imulation) is a
 framework for simulations of X-ray absorption and phase contrast dynamic imaging
@@ -17,39 +17,13 @@ execute the code on graphic cards.
 There are numerous examples of how to use *syris* described below which ship
 directly with the code. Enjoy!
 
+You can read more about *Concert* in the official `documentation`_.
 
-Application Programming Interface
-=================================
-
-.. toctree::
-   :maxdepth: 2
-
-   api/config
-   api/imageprocessing
-   api/geometry
-   api/materials
-   api/opticalelements
-   api/math
-   api/physics
-   api/experiments
-
-   api/bodies
-   api/devices
-   api/gpu
+.. _documentation: https://syris.readthedocs.io/en/latest/
 
 
-Usage
-=====
+Citation
+--------
 
-.. toctree::
-   :maxdepth: 2
-
-   usage/examples
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+Faragó, T., Mikulík, P., Ershov, A., Vogelgesang, M., Hänschke, D. & Baumbach,
+T. (2017). J. Synchrotron Rad. 24, https://doi.org/10.1107/S1600577517012255

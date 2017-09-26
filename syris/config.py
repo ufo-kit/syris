@@ -1,5 +1,7 @@
 """
-Utility functions.
+OpenCL, logging and precision configuration. This module also defines global variables which
+hold the configuration objects for precision and OpenCL. Furthermore, pmasf path is specified
+here and caching policy for data as well.
 """
 import logging
 import numpy as np

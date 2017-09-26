@@ -1,4 +1,6 @@
-"""Geometry operations.
+"""Geometrical operations from primitive mathematical routines like rotation and
+translation to complex motion description by a spline-based :class:`.Trajectory` class.
+:class:`.BoundingBox` used to constraint physical bodies is defined here as well.
 
 All the transformation operations are in the backward form, which means if
 the order of operations is:

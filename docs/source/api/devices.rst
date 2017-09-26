@@ -10,5 +10,8 @@ Devices
 .. automodule:: syris.devices.filters
     :members:
 
+.. automodule:: syris.devices.detectors
+    :members:
+
 .. automodule:: syris.devices.sources
     :members:
