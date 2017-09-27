@@ -1,6 +1,5 @@
+mock
 numpy>=1.6.1
 quantities>=0.10.1
-pyopencl>=2012.1
-pyfft>=0.3.7
 scipy>=0.11.0
 testfixtures>=3.0.0
