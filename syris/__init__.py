@@ -10,13 +10,25 @@ from syris import profiling as prf
 __version__ = '0.1'
 
 
+LOG = logging.getLogger(__name__)
+
+
 def init(platform_name=None, device_index=None, profiling=True, profiling_file='profile.dat',
          loglevel=logging.INFO, logfile=None, double_precision=False):
     """Initialize syris with *device_index*."""
     cfg.init_logging(level=loglevel, logger_file=logfile)
     cfg.PRECISION = cfg.Precision(double_precision)
     cfg.OPENCL = cfg.OpenCL()
-    make_opencl_defaults(platform_name=platform_name, device_index=device_index, profiling=profiling)
+    platforms = []
+    try:
+        platforms = cl.get_platforms()
+    except Exception as e:
+        LOG.exception(str(e))
+    else:
+        if not platforms:
+            LOG.warning('No OpenCL platforms found, GPU computing will not be available')
+        else:
+            make_opencl_defaults(platform_name=platform_name, device_index=device_index, profiling=profiling)
     if profiling:
         _wrap_opencl()
         prf.PROFILER = prf.Profiler(cfg.OPENCL.queues, profiling_file)
@@ -27,7 +39,8 @@ def init(platform_name=None, device_index=None, profiling=True, profiling_file='
             """Shutdown the profiler on exit."""
             prf.PROFILER.shutdown()
 
-    init_programs()
+    if platforms:
+        init_programs()
 
 
 def _wrap_opencl():
