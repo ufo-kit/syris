@@ -19,7 +19,7 @@ class Mock(MagicMock):
     def __getattr__(cls, name):
             return MagicMock()
 
-MOCK_MODULES = ['pyfft', 'pyopencl', 'quantities', 'numpy', 'scipy']
+MOCK_MODULES = ['pyfft', 'pyfft.cl', 'pyopencl', 'pyopencl.array', 'matplotlib', 'matplotlib.pyplot']
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
