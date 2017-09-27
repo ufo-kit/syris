@@ -70,7 +70,8 @@ class TestFilters(SyrisTest):
     def test_scintillator_conservation(self):
         """Test if the integral of luminescence is really 1."""
         wavelengths = np.linspace(100, 700, 512) * q.nm
-        wavelengths_dense = np.linspace(wavelengths[0], wavelengths[-1], 4 * len(wavelengths))
+        wavelengths_dense = np.linspace(wavelengths[0].magnitude,
+                                        wavelengths[-1].magnitude, 4 * len(wavelengths)) * q.nm
         d_wavelength_dense = wavelengths_dense[1] - wavelengths_dense[0]
         sigma = 20. * q.nm
         luminescence = np.exp(-(wavelengths - 400 * q.nm) ** 2 / (2 * sigma ** 2)) / \
