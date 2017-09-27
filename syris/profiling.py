@@ -11,7 +11,6 @@ import logging
 import time
 import re
 import sys
-from matplotlib import pyplot as plt
 from optparse import OptionParser
 import os
 
@@ -370,6 +369,7 @@ def plot(data, attribute, states, file_units, out_units, start_from=0,
     * *delta* - plot only events with duration >= delta
     * *only_averages* - outputs only the average timings
     """
+    from matplotlib import pyplot as plt
     y_limits = set([])  # make plot well visible in vertical direction
     func_colors = {}
     averages = {}
