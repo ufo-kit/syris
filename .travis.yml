@@ -16,3 +16,6 @@ install:
 
 script:
     - nosetests -a '!opencl' --with-coverage --cover-package=syris syris
+
+after_success:
+    - coveralls
