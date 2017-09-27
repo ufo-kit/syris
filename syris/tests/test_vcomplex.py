@@ -3,9 +3,10 @@ import pyopencl as cl
 import syris
 from syris.gpu import util as gpu_util
 from syris import config as cfg
-from syris.tests import SyrisTest, slow
+from syris.tests import SyrisTest, opencl, slow
 
 
+@opencl
 @slow
 class TestVComplex(SyrisTest):
 

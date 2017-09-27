@@ -10,7 +10,7 @@ from syris.bodies.mesh import make_cube, Mesh
 from syris.bodies.simple import StaticBody
 from syris.imageprocessing import crop, pad, rescale
 from syris.materials import Material
-from syris.tests import SyrisTest, slow
+from syris.tests import SyrisTest, opencl, slow
 import itertools
 from syris.tests.graphics_util import get_linear_points
 
@@ -23,6 +23,7 @@ def get_control_points():
                      (1, 1, 1)]) * q.mm
 
 
+@opencl
 def test_simple():
     syris.init(device_index=0)
     n = 8
@@ -289,6 +290,7 @@ class TestBodies(SyrisTest):
         comp = CompositeBody(traj, bodies=[mb_0, mb_1])
         self.assertEqual(np.inf * q.s, comp.get_next_time(0 * q.s, ps))
 
+    @opencl
     @slow
     def test_project_composite(self):
         n = 64

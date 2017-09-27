@@ -5,7 +5,7 @@ from pyopencl import clmath
 from syris.devices.sources import BendingMagnet, Wiggler, XRaySourceError
 from syris.geometry import Trajectory
 from syris.physics import energy_to_wavelength
-from syris.tests import SyrisTest, slow
+from syris.tests import SyrisTest, opencl, slow
 
 
 def make_phase(n, ps, d, energy, phase_profile):
@@ -40,6 +40,7 @@ class TestSources(SyrisTest):
                                     self.dE, np.array([0.2, 0.8]) * q.mm, self.ps,
                                     self.trajectory)
 
+    @opencl
     @slow
     def test_bending_magnet_approx(self):
         source_2 = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
@@ -54,6 +55,7 @@ class TestSources(SyrisTest):
             # Allow 0.1 % difference
             np.testing.assert_allclose(perc, 1, rtol=1e-3)
 
+    @opencl
     def test_transfer(self):
         shape = 10
         # No trajectory
@@ -88,6 +90,7 @@ class TestSources(SyrisTest):
         self.source.phase_profile = 'parabola'
         self.source.phase_profile = 'sphere'
 
+    @opencl
     def test_phase_profile(self):
         n = 64
         shape = (n, n)
@@ -110,6 +113,7 @@ class TestSources(SyrisTest):
         test_one_phase_profile('parabola')
         test_one_phase_profile('sphere')
 
+    @opencl
     def test_wiggler(self):
         wiggler = Wiggler(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m, self.dE,
                           np.array([0.2, 0.8]) * q.mm, self.ps, self.trajectory, 4)

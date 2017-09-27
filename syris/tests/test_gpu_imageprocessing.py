@@ -9,7 +9,7 @@ from syris import imageprocessing as ip
 from syris.math import fwnm_to_sigma
 from syris.util import get_magnitude, make_tuple
 import itertools
-from syris.tests import SyrisTest, slow
+from syris.tests import SyrisTest, opencl, slow
 
 
 def bin_cpu(image, shape):
@@ -45,6 +45,7 @@ def get_gauss_2d(shape, sigma, pixel_size=None, fourier=False):
         return np.fft.ifftshift(gauss)
 
 
+@opencl
 @slow
 class TestGPUImageProcessing(SyrisTest):
 
