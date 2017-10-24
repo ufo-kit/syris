@@ -131,6 +131,15 @@ Simple
     :members:
 
 
+Tomographic Rotation
+--------------------
+
+**tomographic_rotation.py**
+
+.. automodule:: examples.tomographic_rotation
+    :members:
+
+
 Trajectory
 ----------
 

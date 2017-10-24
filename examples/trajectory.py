@@ -26,11 +26,25 @@ def make_power_2(n=128):
     return zip(x, y, z) * q.mm
 
 
-def make_circle(n=128):
+def make_circle(n=128, axis='z'):
+    """Axis specifies the axis of rotation, which can be 'x', 'y' or 'z'."""
     t = np.linspace(0, 2 * np.pi, n)
-    x = np.cos(t)
-    y = np.sin(t)
-    z = np.zeros(n)
+    a = np.cos(t)
+    b = np.sin(t)
+    c = np.zeros(n)
+
+    if axis == 'z':
+        x = a
+        y = b
+        z = c
+    elif axis == 'y':
+        x = a
+        z = b
+        y = c
+    elif axis == 'x':
+        y = a
+        z = b
+        x = c
 
     return zip(x, y, z) * q.mm
 
