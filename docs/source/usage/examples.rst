@@ -140,6 +140,15 @@ Tomographic Rotation
     :members:
 
 
+4D Tomography
+-------------
+
+**tomography_4D.py**
+
+.. automodule:: examples.tomography_4D
+    :members:
+
+
 Trajectory
 ----------
 
