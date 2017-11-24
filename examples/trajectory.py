@@ -26,9 +26,14 @@ def make_power_2(n=128):
     return zip(x, y, z) * q.mm
 
 
-def make_circle(n=128, axis='z'):
+def make_circle(n=128, axis='z', overall_angle=None, phase_shift=None):
     """Axis specifies the axis of rotation, which can be 'x', 'y' or 'z'."""
-    t = np.linspace(0, 2 * np.pi, n)
+    if overall_angle is None:
+        overall_angle = 2 * np.pi * q.rad
+    if phase_shift is None:
+        phase_shift = 0 * q.rad
+    t = np.linspace(phase_shift.rescale(q.rad).magnitude,
+                    (phase_shift + overall_angle).rescale(q.rad).magnitude, n)
     a = np.cos(t)
     b = np.sin(t)
     c = np.zeros(n)
