@@ -165,7 +165,7 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
         density = density.rescale(q.g / q.cm ** 3).magnitude
         mat = '&coway=2&chem={}&rho={}'.format(formula, density)
 
-    base = 'http://x-server.gmca.aps.anl.gov/cgi/X0h_form.exe?xway=2'
+    base = 'http://x-server.gmca.aps.anl.gov/cgi/x0h_form.exe?xway=2'
     apdx_fmt = '&wave={}&i1=1&i2=1&i3=1&df1df2=-1&modeout=1'
 
     indices = []
@@ -174,9 +174,9 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
         url = base + mat + apdx
         res = urllib2.urlopen(url)
         txt = res.read()
-        delta, beta = txt[txt.find('delta='):].split('\r\n')[:2]
-        delta = float(delta.split('=')[1])
-        beta = - float(beta.split('=')[1])
+        lines = txt[txt.find('delta='):].split()
+        delta = float(lines[1])
+        beta = - float(lines[2].split('=')[1])
         indices.append(cfg.PRECISION.np_cplx(float(delta) + float(beta) * 1j))
         # Don't cause a DOS
         time.sleep(0.1)
