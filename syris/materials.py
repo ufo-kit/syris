@@ -175,8 +175,8 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
         res = urllib2.urlopen(url)
         txt = res.read()
         lines = txt[txt.find('delta='):].split('\n')
-        delta = float(lines[1].split('=')[1])
-        beta = - float(lines[2].split('=')[1])
+        delta = float(lines[0].split('=')[1])
+        beta = - float(lines[1].split('=')[1])
         indices.append(cfg.PRECISION.np_cplx(float(delta) + float(beta) * 1j))
         # Don't cause a DOS
         time.sleep(0.1)
