@@ -86,6 +86,15 @@ Metaballs
     :members:
 
 
+Paganin Phase Retrieval
+-----------------------
+
+**paganin.py**
+
+.. automodule:: examples.paganin
+    :members:
+
+
 Platform Benchmark
 ------------------
 
