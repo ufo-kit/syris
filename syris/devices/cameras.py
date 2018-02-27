@@ -7,7 +7,7 @@ from pyopencl import array as cl_array
 import scipy.interpolate as interp
 import syris.gpu.util as gutil
 from syris import config as cfg
-from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2, decimate
+from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2, decimate, bin_image
 from syris.math import fwnm_to_sigma
 
 
@@ -118,8 +118,12 @@ class Camera(object):
         electrons = dark + gutil.get_host(photons)
 
         if self._bin_factor != (1, 1):
-            sigma = (fwnm_to_sigma(self._bin_factor[0]), fwnm_to_sigma(self._bin_factor[1]))
-            electrons = gutil.get_host(decimate(electrons, self.shape, sigma=sigma, queue=queue))
+            if psf:
+                sigma = (fwnm_to_sigma(self._bin_factor[0]), fwnm_to_sigma(self._bin_factor[1]))
+                small = decimate(electrons, self.shape, sigma=sigma, queue=queue)
+            else:
+                small = bin_image(electrons, self.shape, queue=queue)
+            electrons = gutil.get_host(small)
 
         if shot_noise:
             electrons = np.random.poisson(electrons)
