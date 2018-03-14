@@ -18,7 +18,6 @@ wavelengths_GaAs= energy_to_wavelength(np.array((1.00000E-03, 1.05613E-03, 1.115
 mu_GaAs = np.array((1.917E+03, 1.685E+03, 1.481E+03, 2.772E+03, 3.180E+03, 3.532E+03, 4.372E+03, 4.130E+03, 3.657E+03, 4.066E+03, 3.971E+03, 3.879E+03, 5.652E+03, 5.525E+03, 5.415E+03, 6.266E+03, 5.159E+03, 4.939E+03, 5.278E+03, 2.731E+03, 9.702E+02, 4.539E+02, 2.495E+02, 1.524E+02, 6.960E+01, 3.780E+01, 3.425E+01, 1.260E+02, 1.059E+02, 8.899E+01, 1.685E+02, 9.220E+01, 4.258E+01, 1.397E+01, 6.262E+00, 3.365E+00, 2.042E+00, 9.587E-01, 5.598E-01, 2.509E-01, 1.671E-01, 1.137E-01, 9.371E-02, 8.248E-02, 7.484E-02, 6.452E-02, 5.751E-02, 5.122E-02, 4.676E-02, 4.102E-02, 3.538E-02, 3.288E-02, 3.172E-02, 3.121E-02, 3.117E-02, 3.170E-02, 3.354E-02, 3.543E-02))*5.32/q.cm
 
 
-
 class TimepixHexa(Camera):
     def __init__(self, wavelengths=wavelengths_GaAs, mu=mu_GaAs,sensor_thickness=500*q.um, threshold=7*q.keV, exp_time=1*q.s, psf_sigma = 20*q.um, erf_sigma=1.5*q.keV, thl_dispersion=1.*q.keV, fixed_dispersion=True):
         self._threshold = threshold
@@ -40,13 +39,17 @@ class TimepixHexa(Camera):
     def thl(self):
         return self._threshold
 
+    @property
+    def max_grey_value(self):
+        return self._max_grey_value
+
     @thl.setter
     def thl(self, th):
         if th > self._lowest_threshold:
             self._threshold = th
         else:
             raise(Exception("Threshold can not be set below %s"%self._lowest_threshold))
-            
+
     @property
     def thl_dispersion(self):
         return self._thl_dispersion
@@ -82,6 +85,10 @@ class TimepixHexa(Camera):
         sigma = self.erf_sigma.rescale(q.keV).magnitude
         probability = 1 - 0.5 * (1 + erf( ((thl-energy) / (sigma * np.sqrt(2) )) ) )
 
-        img = np.random.binomial(p, probability)
-        
+        img = np.zeros_like(p)
+        #photon noise
+        img[p>=1] = np.random.poisson(p[p>=1])
+        # threshold-noise
+        img[img>=1] = np.random.binomial(img[img>=1], probability[img>=1])
+        img[img>=self.max_grey_value] = self.max_grey_value
         return img
