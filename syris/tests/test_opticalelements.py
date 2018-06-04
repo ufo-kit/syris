@@ -1,6 +1,8 @@
 import numpy as np
+import pyopencl.array as cl_array
 import quantities as q
 import syris
+import syris.config as cfg
 from syris.bodies.simple import StaticBody
 from syris.materials import Material
 from syris.opticalelements import OpticalElement
@@ -14,6 +16,12 @@ class DummyOpticalElement(OpticalElement):
                   out=None, check=True, block=False):
         return shape, pixel_size
 
+    def _transfer_fourier(self, shape, pixel_size, energy, t=None, queue=None,
+                          out=None, block=False):
+        if out is None:
+            out = cl_array.zeros(queue, shape, cfg.PRECISION.np_cplx)
+
+        return out
 
 @slow
 class TestOpticalElement(SyrisTest):
@@ -37,3 +45,10 @@ class TestOpticalElement(SyrisTest):
         gt = transfer(go.thickness, self.material.get_refractive_index(self.energy),
                       energy_to_wavelength(self.energy)).get()
         np.testing.assert_almost_equal(gt, transferred)
+
+    @opencl
+    def test_transfer_fourier(self):
+        elem = DummyOpticalElement()
+        print elem.__class__._transfer_fourier == OpticalElement._transfer_fourier
+        u = elem.transfer_fourier((4, 4), 1 * q.um, 10 * q.keV).get()
+        np.testing.assert_almost_equal(u, 0 + 0j)
