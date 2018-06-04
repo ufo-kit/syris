@@ -199,6 +199,12 @@ def propagate(samples, shape, energies, distance, pixel_size, region=None,
                                             apply_phase_factor=apply_phase_factor,
                                             mollified=mollified, queue=queue, block=block)
             fft_2(u, queue=queue, block=block)
+            for sample in samples:
+                try:
+                    u *= sample.transfer_fourier(shape, pixel_size, energy, t=t, queue=queue,
+                                                 out=None, block=block)
+                except NotImplementedError:
+                    LOG.debug('%s does not support fourier space transfer', sample)
             u *= propagator
             ifft_2(u, queue=queue, block=block)
         if detector:
