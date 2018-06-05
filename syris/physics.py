@@ -171,8 +171,11 @@ def transfer_many(objects, shape, pixel_size, energy, exponent=False, offset=Non
     lam = energy_to_wavelength(energy)
 
     for i, sample in enumerate(objects):
-        out += sample.transfer(shape, pixel_size, energy, exponent=True, offset=offset, t=t,
-                               queue=queue, out=u_sample, check=False, block=block)
+        try:
+            out += sample.transfer(shape, pixel_size, energy, exponent=True, offset=offset, t=t,
+                                   queue=queue, out=u_sample, check=False, block=block)
+        except NotImplementedError:
+            LOG.debug('%s does not support real space transfer', sample)
 
     if check and not is_wavefield_sampling_ok(out, queue=queue):
         LOG.error('Insufficient transmission function sampling')
