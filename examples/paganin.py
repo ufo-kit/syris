@@ -40,6 +40,8 @@ def compute_tie_kernel(n, pixel_size, distance, material, energy):
     print fmt.format(delta)
     fmt = '                           beta: {}'
     print fmt.format(beta)
+    fmt = '    Regularization rate for UFO: {}'
+    print fmt.format(np.log10(delta / beta))
 
     return mju / (distance * ri.real * (f ** 2 + g ** 2) + mju)
     # Alternative forms
