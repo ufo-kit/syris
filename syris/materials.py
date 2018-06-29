@@ -76,7 +76,9 @@ class Material(object):
         return physics.ref_index_to_attenuation_coeff(ref_index, lam)
 
     def _get_interpolated(self, tck, energy):
-        if energy < self._energies[0] or energy > self._energies[-1]:
+        minimum = np.min(energy)
+        maximum = np.max(energy)
+        if minimum < self._energies[0] or maximum > self._energies[-1]:
             raise ValueError('Energy \'{}\' not within limits \'[{}, {}]\''.
                              format(energy, self._energies[0], self._energies[-1]))
         energy = energy.rescale(self._energies.units).magnitude
