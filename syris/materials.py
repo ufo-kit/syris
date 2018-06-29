@@ -17,23 +17,34 @@ from syris import config as cfg, physics
 
 
 LOG = logging.getLogger(__name__)
+ELEMENTS = ['ac', 'ag', 'al', 'ar', 'as', 'at', 'au', 'b', 'ba', 'be', 'bi', 'br', 'c', 'ca',
+            'cd', 'ce', 'cl', 'co', 'cr', 'cs', 'cu', 'dy', 'er', 'eu', 'f', 'fe', 'fr', 'ga',
+            'gd', 'ge', 'h', 'he', 'hf', 'hg', 'ho', 'i', 'in', 'ir', 'k', 'kr', 'la', 'li',
+            'lu', 'mg', 'mn', 'mo', 'n', 'na', 'nb', 'nd', 'ne', 'ni', 'o', 'os', 'p', 'pa',
+            'pb', 'pd', 'pm', 'po', 'pr', 'pt', 'ra', 'rb', 're', 'rh', 'rn', 'ru', 's', 'sb',
+            'sc', 'se', 'si', 'sm', 'sn', 'sr', 'ta', 'tb', 'tc', 'te', 'th', 'ti', 'tl', 'tm',
+            'u', 'v', 'w', 'xe', 'y', 'yb', 'zn', 'zr']
 
 
 class Material(object):
 
     """A material represented by its *name* and *refractive_indices* calculated for *energies*."""
 
-    def __init__(self, name, refractive_indices, energies):
+    def __init__(self, name, refractive_indices, energies, f_1=None, f_2=None):
         """Create material with *name* and store its complex *refractive_indices* (delta + ibeta)
-        for all given *energies*.
+        for all given *energies*. *f_1* and *f_2* are atomic scattering factors.
         """
         self._name = name
         self._refractive_indices = np.array(refractive_indices)
+        self._f_1 = None if f_1 is None else np.array(f_1)
+        self._f_2 = None if f_2 is None else np.array(f_2)
         # To keep track which energies were used.
         self._energies = energies
         if len(self._energies) > 3:
             self._tckr = interp.splrep(self._energies, self.refractive_indices.real)
             self._tcki = interp.splrep(self._energies, self.refractive_indices.imag)
+            self._tckf_1 = interp.splrep(self._energies, f_1)
+            self._tckf_2 = interp.splrep(self._energies, f_2)
         else:
             raise MaterialError('Number of energy points \'{}\' '.format(len(self.energies)) +
                                 'is too few for interpolation')
@@ -64,16 +75,31 @@ class Material(object):
 
         return physics.ref_index_to_attenuation_coeff(ref_index, lam)
 
-    def get_refractive_index(self, energy):
-        """Interpolate refractive indices to obtain the one at *energy*."""
+    def _get_interpolated(self, tck, energy):
         if energy < self._energies[0] or energy > self._energies[-1]:
             raise ValueError('Energy \'{}\' not within limits \'[{}, {}]\''.
                              format(energy, self._energies[0], self._energies[-1]))
         energy = energy.rescale(self._energies.units).magnitude
-        real = interp.splev(energy, self._tckr)
-        imag = interp.splev(energy, self._tcki)
+        value = interp.splev(energy, tck)
+
+        return cfg.PRECISION.np_float(value)
+
+    def get_refractive_index(self, energy):
+        """Interpolate refractive indices to obtain the one at *energy*."""
+        real = self._get_interpolated(self._tckr, energy)
+        imag = self._get_interpolated(self._tcki, energy)
 
         return cfg.PRECISION.np_cplx(real + imag * 1j)
+
+    def get_f_1(self, energy):
+        if self._f_1 is None:
+            raise MaterialError('Scattering factor f_1 not specified in material')
+        return self._get_interpolated(self._tckf_1, energy)
+
+    def get_f_2(self, energy):
+        if self._f_2 is None:
+            raise MaterialError('Scattering factor f_2 not specified in material')
+        return self._get_interpolated(self._tckf_2, energy)
 
     def save(self, filename=None):
         """Save this instance to a *filename*."""
@@ -145,8 +171,27 @@ def make_henke(name, energies, formula=None, density=None):
     specified chemical *formula* and *density*.
     """
     indices = _HenkeQuery(name, energies, formula=formula, density=density).refractive_indices
+    element = formula or name
+    element = element.lower()
+    f_1 = f_2 = None
+    if element in ELEMENTS:
+        # Get the scattering factors
+        response = urllib2.urlopen('http://henke.lbl.gov/optical_constants' +
+                                   '/sf/{}.nff'.format(element))
+        data = response.read()
+        response.close()
+        data = np.fromstring(data[data.find('\r\n'):], sep='\t')
+        data = data.reshape(data.shape[0] / 3, 3)
+        # Henke returns eV
+        sf_energies = data[:, 0] * 1e-3
+        f_1 = data[:, 1]
+        f_2 = data[:, 2]
+        tck = interp.splrep(sf_energies, f_1)
+        f_1 = interp.splev(energies, tck)
+        tck = interp.splrep(sf_energies, f_2)
+        f_2 = interp.splev(energies, tck)
 
-    return Material(name, indices, energies)
+    return Material(name, indices, energies, f_1=f_1, f_2=f_2)
 
 
 def make_stepanov(name, energies, density=None, formula=None, crystal=None):
