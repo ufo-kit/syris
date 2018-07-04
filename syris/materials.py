@@ -43,8 +43,10 @@ class Material(object):
         if len(self._energies) > 3:
             self._tckr = interp.splrep(self._energies, self.refractive_indices.real)
             self._tcki = interp.splrep(self._energies, self.refractive_indices.imag)
-            self._tckf_1 = interp.splrep(self._energies, f_1)
-            self._tckf_2 = interp.splrep(self._energies, f_2)
+            if self._f_1 is not None:
+                self._tckf_1 = interp.splrep(self._energies, f_1)
+            if self._f_2 is not None:
+                self._tckf_2 = interp.splrep(self._energies, f_2)
         else:
             raise MaterialError('Number of energy points \'{}\' '.format(len(self.energies)) +
                                 'is too few for interpolation')
