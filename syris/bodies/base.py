@@ -588,5 +588,5 @@ class CompositeBody(MovableBody):
             out.fill(0)
 
         return transfer_many(self.bodies, shape, pixel_size, energy, offset=offset,
-                             exponent=exponent, queue=queue, out=out, t=None, check=check,
+                             exponent=exponent, queue=queue, out=out, t=t, check=check,
                              block=block)
