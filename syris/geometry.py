@@ -554,9 +554,11 @@ def translate(vec):
     return trans_matrix
 
 
-def rotate(phi, axis, total_start=None):
-    """Rotate the object by *phi* around vector *axis*, where *total_start* is the center of
-    rotation point which results in transformation TRT. The angle is _always_ rescaled to radians.
+def rotate(phi, axis, shift=None):
+    """Rotate the object by *phi* around vector *axis*, where *shift* is the translation which takes
+    place before the rotation and -*shift* takes place afterward, resulting in the transformation
+    TRT^-1. Rotation around an arbitrary point in space can be modeled in this way.  The angle is
+    _always_ rescaled to radians.
     """
     axis = normalize(axis)
 
@@ -567,9 +569,9 @@ def rotate(phi, axis, total_start=None):
     v_y = axis[1]
     v_z = axis[2]
 
-    if total_start is not None:
-        total_start = total_start.simplified
-        t_1 = translate(total_start)
+    if shift is not None:
+        shift = shift.simplified
+        t_1 = translate(shift)
 
     rot_matrix = np.identity(4)
     rot_matrix[0][0] = cos + v_x ** 2 * (1 - cos)
@@ -582,9 +584,9 @@ def rotate(phi, axis, total_start=None):
     rot_matrix[2][1] = v_z * v_y * (1 - cos) + v_x * sin
     rot_matrix[2][2] = cos + v_z ** 2 * (1 - cos)
 
-    if total_start is not None:
-        t_2 = translate(-total_start)
-        rot_matrix = np.dot(np.dot(t_2, rot_matrix), t_1)
+    if shift is not None:
+        t_2 = translate(-shift)
+        rot_matrix = np.dot(np.dot(t_1, rot_matrix), t_2)
 
     return rot_matrix
 
