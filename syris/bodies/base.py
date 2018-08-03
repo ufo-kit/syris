@@ -268,6 +268,40 @@ class MovableBody(Body):
 
         return max(total_displacement) > pixel_size
 
+    def _find_next_rotation_time(self, abs_time):
+        if not self.trajectory.bound:
+            raise geom.TrajectoryError('Trajectory not bound')
+        orientation = self.orientation.simplified.magnitude
+        t = np.copy(abs_time.simplified.magnitude) * q.s
+
+        def compute_rotation_axis(current_time):
+            vec = self.trajectory.get_direction(current_time)
+            rot_ax = np.cross(orientation, vec)
+
+            return rot_ax
+
+        rot_ax = compute_rotation_axis(t)
+        vec = self.trajectory.get_direction(t).simplified.magnitude
+        angle = geom.angle(orientation, vec)
+
+        if np.all(np.isclose(rot_ax, 0)) and not (np.all(np.isclose(vec, orientation)) or
+                                                  self.trajectory.stationary):
+            # Orientation does not coincide with trajectory direction and trajectory is not
+            # stationary.
+            dt = self.get_maximum_dt(self.trajectory.pixel_size)
+            t += dt
+            while t < self.trajectory.time and np.all(np.isclose(rot_ax, 0)):
+                # Orientation and trajectory direction are opposite, the angle between them is 180
+                # deg
+                rot_ax = compute_rotation_axis(t)
+                t += dt
+            if t >= self.trajectory.time:
+                # Orientation and trajectory direction don't deviate at all from abs_time forward,
+                # just use z axis
+                rot_ax = geom.Z_AX
+
+        return (rot_ax, angle)
+
     def move(self, abs_time, clear=True):
         """Move to a position of the body in time *abs_time*. If *clear* is true clear the
         transformation matrix first.
@@ -276,15 +310,13 @@ class MovableBody(Body):
             self.clear_transformation()
         abs_time = abs_time.simplified
         p_0 = self.trajectory.get_point(abs_time).simplified
-        vec = self.trajectory.get_direction(abs_time)
 
         # First translate to the point at time abs_time
         self.translate(p_0)
 
         # Then rotate about rotation axis given by trajectory direction
         # and body orientation.
-        rot_ax = geom.normalize(np.cross(self._orientation, vec))
-        angle = geom.angle(self._orientation, vec)
+        rot_ax, angle = self._find_next_rotation_time(abs_time)
         self.rotate(angle, rot_ax)
 
     def translate(self, vec):
@@ -445,15 +477,13 @@ class CompositeBody(MovableBody):
         # Move the whole body.
         abs_time = abs_time.simplified
         p_0 = self.trajectory.get_point(abs_time).simplified
-        vec = self.trajectory.get_direction(abs_time)
 
         # First translate to the point at time abs_time
         self.translate(p_0)
 
         # Then rotate about rotation axis given by trajectory direction
         # and body orientation.
-        rot_ax = geom.normalize(np.cross(self._orientation, vec))
-        angle = geom.angle(self._orientation, vec)
+        rot_ax, angle = self._find_next_rotation_time(abs_time)
 
         # Don't rotate the sub-bodies around this body as in CompositeBody.rotate(), they will do it
         # in their own move() functions
