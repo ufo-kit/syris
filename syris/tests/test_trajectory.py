@@ -250,7 +250,7 @@ class TestTrajectory(SyrisTest):
 
         # Moving trajectory
         tr, dtck, ps, times = create_maxima_testing_data()
-        max_dt = tr.get_maximum_dt(distance=ps)
+        max_dt = tr.get_maximum_dt(distance=ps).simplified.magnitude
         # Make sure we are actually making too large steps with the original interpolation
         assert max_dt < np.max(np.gradient(tr.times.simplified.magnitude))
         times = np.arange(times[0].simplified.magnitude, times[-1].simplified.magnitude, max_dt)
