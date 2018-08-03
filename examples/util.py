@@ -15,10 +15,12 @@ def get_default_parser(description):
 def show(image, title=''):
     """Show *image* with *title* on its own figure."""
     plt.figure()
-    plt.imshow(image)
+    image = plt.imshow(image)
     plt.title(title)
     plt.colorbar()
     plt.show(False)
+
+    return image
 
 
 def get_material(name):
