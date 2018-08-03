@@ -291,12 +291,12 @@ class MovableBody(Body):
         """Translate the body by a vector *vec*."""
         self.transform_matrix = np.dot(self.transform_matrix, geom.translate(vec))
 
-    def rotate(self, angle, axis, total_start=None):
-        """Rotate the body by *angle* around vector *axis*, where
-        *total_start* is the center of rotation point which results in
+    def rotate(self, angle, axis, shift=None):
+        """Rotate the body by *angle* around vector *vec*, where *shift* is the translation which
+        takes place before the rotation and -*shift* takes place afterward, resulting in the
         transformation TRT^-1.
         """
-        self.transform_matrix = np.dot(self.transform_matrix, geom.rotate(angle, axis, total_start))
+        self.transform_matrix = np.dot(self.transform_matrix, geom.rotate(angle, axis, shift=shift))
 
 
 class CompositeBody(MovableBody):
