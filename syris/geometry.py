@@ -372,7 +372,7 @@ class Trajectory(object):
         # dt = *distance* / max|(x(u(t)))'|
         max_dt = distance.simplified.magnitude / max_f_der
 
-        return max_dt
+        return max_dt * q.s
 
     def get_maximum_du(self, distance=None):
         """
