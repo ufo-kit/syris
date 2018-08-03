@@ -316,3 +316,24 @@ class TestBodies(SyrisTest):
         p_separate = (mb.project(shape, ps) + mesh.project(shape, ps)).get()
 
         np.testing.assert_almost_equal(p, p_separate)
+
+    def _run_parallel_or_opposite(self, sgn, gt):
+        n = 64
+        ps = 1 * q.um
+        y = np.linspace(0, sgn * n, num=10)
+        x = z = np.zeros(y.shape)
+        traj = Trajectory(zip(x, y, z) * ps, velocity=ps / q.s, pixel_size=ps)
+        mb = MetaBall(traj, n * ps / 16, orientation=geom.Y_AX)
+
+        mb.move(0 * q.s)
+        np.testing.assert_almost_equal(gt, mb.transform_matrix)
+
+    def test_opposite_trajectory(self):
+        """Body's orientation is exactly opposite of the trajectory direction."""
+        gt = geom.rotate(180 * q.deg, geom.Z_AX)
+        self._run_parallel_or_opposite(-1, gt)
+
+    def test_parallel_trajectory(self):
+        """Body's orientation is exactly same as the trajectory direction."""
+        gt = np.identity(4)
+        self._run_parallel_or_opposite(1, gt)
