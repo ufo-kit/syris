@@ -426,19 +426,42 @@ class CompositeBody(MovableBody):
         for body in self:
             body.translate(vec)
 
-    def rotate(self, angle, vec, total_start=None):
-        """Rotate all sub-bodies by *angle* around vector *vec*, where
-        *total_start* is the center of rotation point which results in
-        transformation TRT^-1.
+    def rotate(self, angle, vec, shift=None):
+        """Rotate the body by *angle* around vector *vec*, where *shift* is the translation which
+        takes place before the rotation and -*shift* takes place afterward, resulting in the
+        transformation TRT^-1. Sub-bodies are rotated with respect to their relative position to the
+        composite body.
         """
-        MovableBody.rotate(self, angle, vec, total_start)
+        local_shift = None
+        MovableBody.rotate(self, angle, vec, shift=shift)
         for body in self:
-            body.rotate(angle, vec, total_start)
+            local_shift = -body.trajectory.control_points[0]
+            if shift is not None:
+                local_shift += shift
+            body.rotate(angle, vec, shift=local_shift)
 
     def move(self, abs_time):
         """Move to a position of the body in time *abs_time*."""
         # Move the whole body.
-        MovableBody.move(self, abs_time)
+        abs_time = abs_time.simplified
+        p_0 = self.trajectory.get_point(abs_time).simplified
+        vec = self.trajectory.get_direction(abs_time)
+
+        # First translate to the point at time abs_time
+        self.translate(p_0)
+
+        # Then rotate about rotation axis given by trajectory direction
+        # and body orientation.
+        rot_ax = geom.normalize(np.cross(self._orientation, vec))
+        angle = geom.angle(self._orientation, vec)
+
+        # Don't rotate the sub-bodies around this body as in CompositeBody.rotate(), they will do it
+        # in their own move() functions
+        MovableBody.rotate(self, angle, rot_ax)
+        for body in self:
+            body.rotate(angle, rot_ax)
+
+        # Recursive motion of the sub-bodies
         for body in self:
             # Then move its sub-bodies.
             body.move(abs_time, clear=False)
