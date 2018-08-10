@@ -61,7 +61,11 @@ def make_opencl_defaults(platform_name=None, device_index=None, profiling=True):
     else:
         kwargs = {}
     LOG.debug('Profiling enabled: %s', profiling)
-    platform = get_cuda_platform() if platform_name is None else get_platform(platform_name)
+    try:
+        platform = get_cuda_platform() if platform_name is None else get_platform(platform_name)
+    except LookupError:
+        LOG.error('Platform %s not found, using first one which can be found', platform_name)
+        platform = get_platform('')
     LOG.debug("Using platform '%s'", platform.name)
     devices = platform.get_devices()
     if device_index is None:
