@@ -103,28 +103,25 @@ __kernel void transmission_add(__global vcomplex *transmissions,
 	}
 }
 
-
-/*
- * Make flat field wavefield out of a vertical profile of intensities.
- */
-__kernel void make_flat(__global vcomplex *output,
-                        __global vfloat *input,
-                        const vfloat3 center,
-                        const vfloat2 pixel_size,
-                        const vfloat z,
-                        const vfloat lambda,
-                        const int exponent,
-                        const int phase,
-                        const int parabola) {
-	int ix = get_global_id(0);
-	int iy = get_global_id(1);
+void make_flat_field(__global vcomplex *output,
+                     int ix,
+                     int iy,
+                     const vfloat flux,
+                     const vfloat3 *center,
+                     const vfloat2 *pixel_size,
+                     const vfloat z,
+                     const vfloat lambda,
+                     const int exponent,
+                     const int phase,
+                     const int parabola)
+{
+    vfloat2 result;
     vfloat x, y, c_phi, s_phi, r, real, imag;
-    vfloat amplitude = sqrt(input[iy]);
-    amplitude = sqrt(input[iy]);
+    vfloat amplitude = sqrt(flux);
 
     if (phase) {
-        x = ix * pixel_size.x - center.x;
-        y = iy * pixel_size.y - center.y;
+        x = ix * pixel_size->x - center->x;
+        y = iy * pixel_size->y - center->y;
         if (parabola) {
             r = (x * x + y * y) / (2 * z);
         }
@@ -145,6 +142,44 @@ __kernel void make_flat(__global vcomplex *output,
     }
 
     output[iy * get_global_size(0) + ix] = (vfloat2)(real, imag);
+}
+
+/*
+ * Make flat field wavefield out of a scalar intensity value.
+ */
+__kernel void make_flat_from_scalar(__global vcomplex *output,
+                                    const vfloat flux,
+                                    const vfloat3 center,
+                                    const vfloat2 pixel_size,
+                                    const vfloat z,
+                                    const vfloat lambda,
+                                    const int exponent,
+                                    const int phase,
+                                    const int parabola) {
+	int ix = get_global_id(0);
+	int iy = get_global_id(1);
+
+    make_flat_field (output, ix, iy, flux, &center, &pixel_size, z,
+                     lambda, exponent, phase, parabola);
+}
+
+/*
+ * Make flat field wavefield out of a vertical profile of intensities.
+ */
+__kernel void make_flat_from_vertical_profile(__global vcomplex *output,
+                                              __global vfloat *input,
+                                              const vfloat3 center,
+                                              const vfloat2 pixel_size,
+                                              const vfloat z,
+                                              const vfloat lambda,
+                                              const int exponent,
+                                              const int phase,
+                                              const int parabola) {
+	int ix = get_global_id(0);
+	int iy = get_global_id(1);
+
+    make_flat_field (output, ix, iy, input[iy], &center, &pixel_size, z,
+                     lambda, exponent, phase, parabola);
 }
 
 /*

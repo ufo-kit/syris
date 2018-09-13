@@ -13,6 +13,7 @@ from pyopencl import clmath
 from quantities.quantity import Quantity
 from quantities.constants import fine_structure_constant
 from scipy import integrate, special
+from scipy import interpolate as interp
 import syris.config as cfg
 import syris.imageprocessing as ip
 import syris.math as smath
@@ -26,7 +27,121 @@ import syris.gpu.util as gutil
 LOG = logging.getLogger(__name__)
 
 
-class BendingMagnet(OpticalElement):
+class XRaySource(OpticalElement):
+    def __init__(self, sample_distance, size, trajectory, phase_profile='plane'):
+        self.sample_distance = sample_distance.simplified
+        self.size = size.simplified
+        self.trajectory = trajectory
+        self.phase_profile = phase_profile
+
+    @property
+    def phase_profile(self):
+        return self._phase_profile
+
+    @phase_profile.setter
+    def phase_profile(self, phase_profile):
+        if phase_profile not in ['plane', 'parabola', 'sphere']:
+            raise XRaySourceError("Unknown phase profile: '{}'".format(phase_profile))
+        self._phase_profile = phase_profile
+
+    def get_next_time(self, t_0, distance):
+        """Get the next time when the source will have moved more than *distance*."""
+        return self.trajectory.get_next_time(t_0)
+
+    def _transfer_real(self, shape, center, pixel_size, energy, exponent, compute_phase,
+                       is_parabola, out, queue, block, flux=1):
+        """Compte the actual wavefield. *center*, *pixel_size*, *sample_distance* and *wavelength*
+        are all unitless values which can be passed directly to OpenCL kernels.
+        """
+        cl_center = gutil.make_vfloat3(*center)
+        cl_ps = gutil.make_vfloat2(*pixel_size.simplified.magnitude[::-1])
+        z_sample = self.sample_distance.simplified.magnitude
+        lam = energy_to_wavelength(energy).simplified.magnitude
+        kernel = cfg.OPENCL.programs['physics'].make_flat_from_scalar
+
+        ev = kernel(queue,
+                    shape[::-1],
+                    None,
+                    out.data,
+                    cfg.PRECISION.np_float(flux),
+                    cl_center,
+                    cl_ps,
+                    cfg.PRECISION.np_float(z_sample),
+                    cfg.PRECISION.np_float(lam),
+                    np.int32(exponent),
+                    np.int32(compute_phase),
+                    np.int32(is_parabola))
+
+        if block:
+            ev.wait()
+
+    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None, queue=None,
+                  out=None, check=True, block=False):
+        """Compute the flat field wavefield. Returned *out* array is different from the input
+        one.
+        """
+        if queue is None:
+            queue = cfg.OPENCL.queue
+        if out is None:
+            out = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
+
+        ps = make_tuple(pixel_size)
+        if t is None:
+            x, y, z = self.trajectory.control_points.simplified.magnitude[0]
+        else:
+            x, y, z = self.trajectory.get_point(t).simplified.magnitude
+        x += offset[1].simplified.magnitude
+        y += offset[0].simplified.magnitude
+        center = (x, y, z)
+        phase = self.phase_profile != 'plane'
+        parabola = self.phase_profile == 'parabola'
+        compute_exponent = exponent or check and phase
+
+        self._transfer_real(shape, center, ps, energy, compute_exponent,
+                            phase, parabola, out, queue, block)
+
+        if compute_exponent:
+            if check and phase and not is_wavefield_sampling_ok(out, queue=queue):
+                LOG.error('Insufficient beam phase sampling')
+            if not exponent:
+                out = clmath.exp(out, queue=queue)
+
+        return out
+
+    def apply_blur(self, intensity, distance, pixel_size, queue=None, block=False):
+        """Apply source blur based on van Cittert-Zernike theorem at *distance*."""
+        fwhm = (distance * self.size / self.sample_distance).simplified
+        sigma = smath.fwnm_to_sigma(fwhm, n=2)
+        psf = ip.get_gauss_2d(intensity.shape, sigma, pixel_size=pixel_size, fourier=True,
+                              queue=queue, block=block)
+
+        return ip.ifft_2(ip.fft_2(intensity) * psf).real
+
+    def get_flux(self, photon_energy, vertical_angle, pixel_size):
+        raise NotImplementedError
+
+
+class FixedSpectrumSource(XRaySource):
+    def __init__(self, energies, flux, sample_distance, size, trajectory, phase_profile='plane'):
+        super(FixedSpectrumSource, self).__init__(sample_distance, size, trajectory,
+                                                  phase_profile=phase_profile)
+        self._energies = energies.rescale(q.keV).magnitude
+        self._flux = flux.rescale(1 / q.s).magnitude
+        self._tck = interp.splrep(self._energies, self._flux)
+
+    def get_flux(self, photon_energy, vertical_angle, pixel_size):
+        return interp.splev(photon_energy.rescale(q.keV).magnitude, self._tck) / q.s
+
+    def _transfer_real(self, shape, center, pixel_size, energy, exponent, compute_phase,
+                       is_parabola, out, queue, block, flux=1):
+        flux = self.get_flux(energy, 0 * q.rad, pixel_size).magnitude
+        super(FixedSpectrumSource, self)._transfer_real(shape, center, pixel_size,
+                                                        energy, exponent, compute_phase,
+                                                        is_parabola, out, queue, block,
+                                                        flux=flux)
+
+
+class BendingMagnet(XRaySource):
 
     """Bending magnet X-ray source."""
 
@@ -51,18 +166,14 @@ class BendingMagnet(OpticalElement):
         is the parabolic approximation of the real spherical profile.
         """
 
-        super(BendingMagnet, self).__init__()
+        super(BendingMagnet, self).__init__(sample_distance, size, trajectory,
+                                            phase_profile=phase_profile)
         self.electron_energy = electron_energy.simplified
         self.el_current = el_current.simplified
         self.magnetic_field = magnetic_field
-        self.sample_distance = sample_distance.simplified
         self.dE = dE
-        self.size = size.simplified
         self.pixel_size = make_tuple(pixel_size, num_dims=2)
-        self.trajectory = trajectory
         self.profile_approx = profile_approx
-        self._phase_profile = None
-        self.phase_profile = phase_profile
 
     @property
     def gama(self):
@@ -78,16 +189,6 @@ class BendingMagnet(OpticalElement):
         """
         return 0.665 * self.electron_energy.rescale(q.GeV).magnitude ** 2 * \
             self.magnetic_field.rescale(q.T).magnitude * q.keV
-
-    @property
-    def phase_profile(self):
-        return self._phase_profile
-
-    @phase_profile.setter
-    def phase_profile(self, phase_profile):
-        if phase_profile not in ['plane', 'parabola', 'sphere']:
-            raise XRaySourceError("Unknown phase profile: '{}'".format(phase_profile))
-        self._phase_profile = phase_profile
 
     def _get_full_profile(self, energy, angles, pixel_size):
         """Get the vertical profile based on energies integration.  If there are two energies e_0
@@ -121,69 +222,37 @@ class BendingMagnet(OpticalElement):
         """Get the next time when the source will have moved more than *distance*."""
         return self.trajectory.get_next_time(t_0)
 
-    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None, queue=None,
-                  out=None, check=True, block=False):
-        """Compute the flat field wavefield. Returned *out* array is different from the input one."""
-        if queue is None:
-            queue = cfg.OPENCL.queue
-
-        ps = make_tuple(pixel_size)
-        if t is None:
-            x, y, z = self.trajectory.control_points.simplified.magnitude[0]
-        else:
-            x, y, z = self.trajectory.get_point(t).simplified.magnitude
-        x += offset[1].simplified.magnitude
-        y += offset[0].simplified.magnitude
-        center = (x, y, z)
+    def _transfer_real(self, shape, center, pixel_size, energy, exponent, compute_phase,
+                       is_parabola, out, queue, block):
+        """Compute the flat field wavefield. Returned *out* array is different from the input
+        one.
+        """
         cl_center = gutil.make_vfloat3(*center)
         cl_ps = gutil.make_vfloat2(*pixel_size.simplified.magnitude[::-1])
-        fov = np.arange(0, shape[0]) * ps[0] - y * q.m
+        fov = np.arange(0, shape[0]) * pixel_size[0] - center[1] * q.m
         angles = np.arctan((fov / self.sample_distance).simplified)
-        profile = self._create_vertical_profile(energy, angles, ps[0]).rescale(1 / q.s).magnitude
-
+        profile = self._create_vertical_profile(energy, angles,
+                                                pixel_size[0]).rescale(1 / q.s).magnitude
         profile = cl_array.to_device(queue, profile.astype(cfg.PRECISION.np_float))
-        if out is None:
-            out = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
-
         z_sample = self.sample_distance.simplified.magnitude
         lam = energy_to_wavelength(energy).simplified.magnitude
-        phase = self.phase_profile != 'plane'
-        parabola = self.phase_profile == 'parabola'
-        if exponent or check and phase:
-            ev = cfg.OPENCL.programs['physics'].make_flat(queue,
-                                                          shape[::-1],
-                                                          None,
-                                                          out.data,
-                                                          profile.data,
-                                                          cl_center,
-                                                          cl_ps,
-                                                          cfg.PRECISION.np_float(z_sample),
-                                                          cfg.PRECISION.np_float(lam),
-                                                          np.int32(True),
-                                                          np.int32(phase),
-                                                          np.int32(parabola))
-            if check and phase and not is_wavefield_sampling_ok(out, queue=queue):
-                LOG.error('Insufficient beam phase sampling')
-            if not exponent:
-                out = clmath.exp(out, queue=queue)
-        else:
-            ev = cfg.OPENCL.programs['physics'].make_flat(queue,
-                                                          shape[::-1],
-                                                          None,
-                                                          out.data,
-                                                          profile.data,
-                                                          cl_center,
-                                                          cl_ps,
-                                                          cfg.PRECISION.np_float(z_sample),
-                                                          cfg.PRECISION.np_float(lam),
-                                                          np.int32(exponent),
-                                                          np.int32(phase),
-                                                          np.int32(parabola))
+        kernel = cfg.OPENCL.programs['physics'].make_flat_from_vertical_profile
+
+        ev = kernel(queue,
+                    shape[::-1],
+                    None,
+                    out.data,
+                    profile.data,
+                    cl_center,
+                    cl_ps,
+                    cfg.PRECISION.np_float(z_sample),
+                    cfg.PRECISION.np_float(lam),
+                    np.int32(exponent),
+                    np.int32(compute_phase),
+                    np.int32(is_parabola))
 
         if block:
             ev.wait()
-
-        return out
 
     def _create_vertical_profile(self, energy, angles, pixel_size):
         if self.profile_approx:
@@ -217,15 +286,6 @@ class BendingMagnet(OpticalElement):
                         (special.kv(2.0 / 3, xi) ** 2 + gama_psi ** 2 /
                          (1.0 + gama_psi ** 2) * special.kv(1.0 / 3, xi) ** 2) *
                         angle_step.rescale(q.rad) ** 2 * 1e-3).simplified
-
-    def apply_blur(self, intensity, distance, pixel_size, queue=None, block=False):
-        """Apply source blur based on van Cittert-Zernike theorem at *distance*."""
-        fwhm = (distance * self.size / self.sample_distance).simplified
-        sigma = smath.fwnm_to_sigma(fwhm, n=2)
-        psf = ip.get_gauss_2d(intensity.shape, sigma, pixel_size=pixel_size, fourier=True,
-                              queue=queue, block=block)
-
-        return ip.ifft_2(ip.fft_2(intensity) * psf).real
 
 
 class Wiggler(BendingMagnet):
