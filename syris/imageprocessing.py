@@ -213,6 +213,19 @@ def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
     return bin_image(image, shape, average=average, queue=queue, block=block)
 
 
+def blur_with_gaussian(image, sigma, queue=None, block=False):
+    """Blur *image* with a gaussian kernel, where *sigma* is the standard deviation. Use command
+    *queue*, if *block* is True, wait for the copy to finish.
+    """
+    fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue, block=block)
+    image = image.astype(cfg.PRECISION.np_cplx)
+    image = fft_2(image, queue=queue, block=block)
+    image *= fltr
+    ifft_2(image, queue=queue, block=block)
+
+    return image.real
+
+
 def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
     """Rescale *image* to *shape* and use *sampler* which is a :class:`pyopencl.Sampler` instance.
     Use OpenCL *queue* and *out* pyopencl Array. If *block* is True, wait for the copy to finish.
