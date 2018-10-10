@@ -88,6 +88,11 @@ class TestGPUImageProcessing(SyrisTest):
             res = ip.bin_image(cl_im, shape, average=True)
             np.testing.assert_equal(gt / (region[0] * region[1]), res)
 
+        # Not a divisor
+        self.assertRaises(RuntimeError, ip.bin_image, cl_im, (4, 10))
+        self.assertRaises(RuntimeError, ip.bin_image, cl_im, (5, 8))
+        self.assertRaises(RuntimeError, ip.bin_image, cl_im, (4, 7), offset=(2, 2))
+
     def test_decimate(self):
         n = 16
         sigma = fwnm_to_sigma(1)
