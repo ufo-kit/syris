@@ -154,18 +154,22 @@ def crop(image, region, out=None, queue=None, block=False):
 
 def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue=None,
               block=False):
-    """Bin a *image*. The resulting buffer has shape *summer_shape* (y, x).  *Offset* (y, x) is the
-    offset to the original *image*.  If *average* is True, the summed pixel is normalized by the
-    region area. *out* is the pyopencl Array instance, if not specified it will be created. *out* is
-    also returned. If *block* is True, wait for the copy to finish.
+    """Bin an *image*. The resulting buffer has shape *summed_shape* (y, x). *Offset* (y, x) is the
+    offset to the original *image*. *summed_shape* has to be a divisor of the original shape minus
+    the *offset*. If *average* is True, the summed pixel is normalized by the region area.  *out* is
+    the pyopencl Array instance, if not specified it will be created. *out* is also returned. If
+    *block* is True, wait for the copy to finish.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl.array.Array(queue, summed_shape, dtype=cfg.PRECISION.np_float)
     image = g_util.get_array(image, queue=queue)
-    region = ((image.shape[0] - offset[0]) / summed_shape[0],
-              (image.shape[1] - offset[1]) / summed_shape[1])
+    orig_shape = (image.shape[0] - offset[0], image.shape[1] - offset[1])
+    region = (orig_shape[0] / summed_shape[0], orig_shape[1] / summed_shape[1])
+    if orig_shape[0] % summed_shape[0] or orig_shape[1] % summed_shape[1]:
+        raise RuntimeError('Final shape {} must be a divisor '.format(summed_shape) +
+                           'of the original shape {}'.format(image.shape))
     LOG.debug('bin_image, shape: %s, summed_shape: %s, offset: %s, average: %s', image.shape,
               summed_shape, offset, average)
 
@@ -185,9 +189,10 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
 
 
 def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
-    """Decimate *image* so that its dimensions match the final *shape*. Remove low frequencies by a
-    Gaussian filter with *sigma* pixels. If *sigma* is None, use the FWHM of one low resolution
-    pixel. Use command *queue*, if *block* is True, wait for the copy to finish.
+    """Decimate *image* so that its dimensions match the final *shape*, which has to be a divisor of
+    the original shape. Remove low frequencies by a Gaussian filter with *sigma* pixels. If *sigma*
+    is None, use the FWHM of one low resolution pixel. Use command *queue*, if *block* is True, wait
+    for the copy to finish.
     """
     if queue is None:
         queue = cfg.OPENCL.queue
