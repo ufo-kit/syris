@@ -90,7 +90,7 @@ def main():
     retrieved = - 1 / mju * np.log(retrieved) * 1e6
 
     show(hd, title='High resolution')
-    show(ld, title='Low resolution (decector)')
+    show(ld, title='Low resolution (detector)')
     show(retrieved, title='Retrieved [um]')
     show(projection, title='Projection [um]')
     show(projection - retrieved, title='Projection - retrieved')
