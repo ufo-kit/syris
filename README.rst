@@ -62,5 +62,7 @@ A simple white beam propagation example looks like this:
 Citation
 --------
 
+If you use this software for publishing your data, we kindly ask to cite the article below.
+
 Faragó, T., Mikulík, P., Ershov, A., Vogelgesang, M., Hänschke, D. & Baumbach,
 T. (2017). J. Synchrotron Rad. 24, https://doi.org/10.1107/S1600577517012255
