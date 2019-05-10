@@ -58,6 +58,8 @@ A simple white beam propagation example looks like this:
     plt.imshow(image)
     plt.show()
 
+For more detailed information please see the [reference](https://syris.readthedocs.io/en/latest).
+
 
 Citation
 --------
