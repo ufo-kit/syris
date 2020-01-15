@@ -49,7 +49,7 @@ def transfer(thickness, refractive_index, wavelength, exponent=False, queue=None
                                                              wavenumber,
                                                              np.int32(1))
         if check and not is_wavefield_sampling_ok(out, queue=queue):
-            LOG.error('Insufficient transmission function sampling')
+            LOG.warning('Insufficient transmission function sampling')
         if not exponent:
             # Apply the exponent
             out = clmath.exp(out, queue=queue)
@@ -89,10 +89,10 @@ def compute_propagator(size, distance, lam, pixel_size, fresnel=True, region=Non
         r_cutoff = compute_aliasing_limit(size, lam, ps, distance, fov=region, fourier=False)
         min_n = 4
         if r_cutoff < min_n:
-            LOG.error('Propagator too narrow, propagation distance too small or pixel size too large')
+            LOG.warning('Propagator too narrow, propagation distance too small or pixel size too large')
         f_cutoff = compute_aliasing_limit(size, lam, ps, distance, fov=region, fourier=True)
         if f_cutoff < min_n:
-            LOG.error('Propagator too wide, propagation distance too large or pixel size too small')
+            LOG.warning('Propagator too wide, propagation distance too large or pixel size too small')
 
     check_cutoff(pixel_size[1])
     check_cutoff(pixel_size[0])
@@ -178,7 +178,7 @@ def transfer_many(objects, shape, pixel_size, energy, exponent=False, offset=Non
             LOG.debug('%s does not support real space transfer', sample)
 
     if check and not is_wavefield_sampling_ok(out, queue=queue):
-        LOG.error('Insufficient transmission function sampling')
+        LOG.warning('Insufficient transmission function sampling')
 
     # Apply the exponent
     if not exponent:
