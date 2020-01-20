@@ -94,8 +94,8 @@ __kernel void rescale (read_only image2d_t input,
     int iy = get_global_id (1);
 
     output[iy * get_global_size(0) + ix] = read_imagef(input, sampler, (float2)
-                                                       (ix / factor.x + 0.5f,
-                                                        iy / factor.y + 0.5f)).x;
+                                                       (ix / factor.x + 1.0f / (2 * factor.x),
+                                                        iy / factor.y + 1.0f / (2 * factor.y))).x;
 }
 
 /*
