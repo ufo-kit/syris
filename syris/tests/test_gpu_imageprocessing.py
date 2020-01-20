@@ -45,6 +45,19 @@ def get_gauss_2d(shape, sigma, pixel_size=None, fourier=False):
         return np.fft.ifftshift(gauss)
 
 
+def rescale_scipy(image, factor):
+    from scipy.interpolate import RectBivariateSpline
+    m, n = image.shape
+    x = np.arange(n)
+    y = np.arange(m)
+    hd_y = np.arange(factor[0] * m) / float(factor[0]) - 0.5 + 1. / (2. * factor[0])
+    hd_x = np.arange(factor[1] * n) / float(factor[1]) - 0.5 + 1. / (2. * factor[1])
+    spl = RectBivariateSpline(y, x, image, kx=1, ky=1)
+
+    return spl(hd_y.astype(cfg.PRECISION.np_float),
+               hd_x.astype(cfg.PRECISION.np_float), grid=True)
+
+
 @opencl
 @slow
 class TestGPUImageProcessing(SyrisTest):
@@ -112,21 +125,18 @@ class TestGPUImageProcessing(SyrisTest):
         np.testing.assert_almost_equal(gt, res, decimal=6)
 
     def test_rescale(self):
-        from scipy.interpolate import RectBivariateSpline
         orig_shape = 8, 4
         shape = 4, 8
         image = np.arange(orig_shape[0] *
                           orig_shape[1]).reshape(orig_shape).astype(cfg.PRECISION.np_float)
         res = ip.rescale(image, shape).get()
-        xx = np.linspace(0, orig_shape[1], shape[1], endpoint=False)
-        yy = np.linspace(0, orig_shape[0], shape[0], endpoint=False)
-        spl = RectBivariateSpline(range(orig_shape[0]), range(orig_shape[1]), image, kx=1, ky=1)
+        gt = rescale_scipy(image, (0.5, 2))
 
-        np.testing.assert_almost_equal(res, spl(yy, xx))
+        np.testing.assert_almost_equal(res, gt)
 
         cfg.PRECISION.set_precision(True)
         image = image.astype(cfg.PRECISION.np_float)
-        self.assertRaises(TypeError,ip.rescale, image, shape)
+        self.assertRaises(TypeError, ip.rescale, image, shape)
 
     def test_crop(self):
         shape = 8, 4
@@ -222,3 +232,39 @@ class TestGPUImageProcessing(SyrisTest):
         shape = (32, 32)
         u = (np.ones(shape) + 1j * np.ones(shape) * 3).astype(cfg.PRECISION.np_cplx)
         np.testing.assert_almost_equal(np.abs(u) ** 2, ip.compute_intensity(u).get())
+
+    def test_rescale_up(self):
+        # Use spline and not zoom or imresize because they don't behave exactly as we define
+        n = 8
+        square = np.zeros((n, n), dtype=np.float32)
+        square[2:-2, 2:-2] = 1
+
+        # Same
+        res = ip.rescale(square, (n, n)).get()
+        np.testing.assert_almost_equal(res, square)
+
+        # Various odd/even combinations in the x, y directions
+        for (ss_y, ss_x) in itertools.product((2, 3), (2, 3)):
+            hd_n = ss_x * n
+            hd_m = ss_y * n
+            res = ip.rescale(square, (hd_m, hd_n)).get()
+            gt = rescale_scipy(square, (ss_y, ss_x)).astype(cfg.PRECISION.np_float)
+            np.testing.assert_almost_equal(res, gt, decimal=2)
+
+    def test_rescale_down(self):
+        # Use spline and not zoom or imresize because they don't behave exactly as we define
+        n = 18
+        square = np.zeros((n, n), dtype=np.float32)
+        square[4:-4, 4:-4] = 1
+
+        # Same
+        res = ip.rescale(square, (n, n)).get()
+        np.testing.assert_almost_equal(res, square)
+
+        # Various odd/even combinations in the x, y directions
+        for (ss_y, ss_x) in itertools.product((1. / 2, 1. / 3), (1. / 2, 1. / 3)):
+            hd_n = int(ss_x * n)
+            hd_m = int(ss_y * n)
+            res = ip.rescale(square, (hd_m, hd_n)).get()
+            gt = rescale_scipy(square, (ss_y, ss_x))
+            np.testing.assert_almost_equal(res, gt, decimal=2)
