@@ -616,7 +616,7 @@ def angle(vec_0, vec_1):
         dot = length(vec_0 * vec_1)
     else:
         dot = np.dot(vec_0.T, vec_1)
-    cross = np.cross(vec_0, vec_1, axis=0) * q.dimensionless
+    cross = np.cross(vec_0, vec_1, axis=0)
     lngth = length(cross)
 
     return np.arctan2(lngth, dot) * q.rad
