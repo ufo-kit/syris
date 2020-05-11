@@ -8,10 +8,6 @@ Syris
     :target: http://syris.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
-.. image:: https://badge.waffle.io/ufo-kit/syris.png?label=in%20progress&title=In%20Progress
-    :target: https://waffle.io/ufo-kit/syris
-    :alt: 'Stories in In Progress'
-
 *Syris* (**sy**\ nchrotron **r**\ adiation **i**\ maging **s**\ imulation) is a
 framework for simulations of X-ray absorption and phase contrast dynamic imaging
 experiments, like time-resolved radiography, tomography or laminography. It
