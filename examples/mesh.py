@@ -8,7 +8,7 @@ import syris
 import syris.geometry as geom
 from syris.bodies.mesh import Mesh, make_cube, read_blender_obj
 from syris.util import save_image
-from util import get_default_parser, show
+from .util import get_default_parser, show
 
 
 LOG = logging.getLogger(__name__)

@@ -13,7 +13,7 @@ import syris
 from syris.bodies.simple import StaticBody
 from syris.materials import Material
 from syris.physics import energy_to_wavelength
-from util import get_default_parser, show
+from .util import get_default_parser, show
 
 
 def compute_transmission_function(n, ps, supersampling, energy, material):
@@ -43,10 +43,10 @@ def main():
     wedge = np.tile(np.arange(n), [n, 1]) * ps
     # Non-supersampled object shape causes phase shifts 0, 2Pi, 4Pi, ..., thus the phase is constant
     # as an extreme result of aliasing
-    print fmt.format(n, ps)
+    print(fmt.format(n, ps))
     u = compute_transmission_function(n, ps, 1, energy, material)
     # Supersampling helps resolve the transmission function
-    print fmt.format(n * args.supersampling, ps / args.supersampling)
+    print(fmt.format(n * args.supersampling, ps / args.supersampling))
     u_s = compute_transmission_function(n, ps, args.supersampling, energy, material)
 
     show(wedge.magnitude, title='Projected Object [um]')

@@ -7,7 +7,7 @@ import syris
 import scipy.misc
 from syris.geometry import Trajectory
 from syris.bodies.isosurfaces import MetaBall
-from util import get_default_parser
+from .util import get_default_parser
 
 
 def make_triangle(n=128):
@@ -15,7 +15,7 @@ def make_triangle(n=128):
     y = np.abs(x - 1)
     z = np.zeros(n)
 
-    return zip(x, y, z) * q.mm
+    return list(zip(x, y, z)) * q.mm
 
 
 def make_power_2(n=128):
@@ -23,7 +23,7 @@ def make_power_2(n=128):
     y = x ** 2
     z = np.zeros(n)
 
-    return zip(x, y, z) * q.mm
+    return list(zip(x, y, z)) * q.mm
 
 
 def make_circle(n=128, axis='z', overall_angle=None, phase_shift=None):
@@ -51,7 +51,7 @@ def make_circle(n=128, axis='z', overall_angle=None, phase_shift=None):
         z = b
         x = c
 
-    return zip(x, y, z) * q.mm
+    return list(zip(x, y, z)) * q.mm
 
 
 def make_sine(n=128, x_ends=(0, 1) * q.mm, y_ends=(0, 1) * q.mm):
@@ -63,7 +63,7 @@ def make_sine(n=128, x_ends=(0, 1) * q.mm, y_ends=(0, 1) * q.mm):
     y = (1 + np.sin(t)) * amplitude + y_ends[0]
     z = np.zeros(n)
 
-    return zip(x, y, z) * q.m
+    return list(zip(x, y, z)) * q.m
 
 
 def get_ds(points):
@@ -83,7 +83,7 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
         times.append(t.simplified.magnitude)
 
     times = times * q.s
-    points = np.array(zip(*[obj.trajectory.get_point(tt).rescale(q.um).magnitude for tt in times]))
+    points = np.array(list(zip(*[obj.trajectory.get_point(tt).rescale(q.um).magnitude for tt in times])))
     dt = np.gradient(times)
 
     plt.figure()
@@ -109,7 +109,7 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
         max_dx = max(d_points[0])
         max_dy = max(d_points[1])
         max_dz = max(d_points[2])
-        print 'Maxima: {}, {}, {}'.format(max_dx, max_dy, max_dz)
+        print('Maxima: {}, {}, {}'.format(max_dx, max_dy, max_dz))
 
     return times, points
 
@@ -146,7 +146,7 @@ def main():
     mb.bind_trajectory(ps)
 
     tr = mb.trajectory
-    print 'Length: {}, time: {}'.format(tr.length.rescale(q.mm), tr.time)
+    print('Length: {}, time: {}'.format(tr.length.rescale(q.mm), tr.time))
 
     plt.figure()
     plt.plot(tr.points[0].rescale(q.um), tr.points[1].rescale(q.um))

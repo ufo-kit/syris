@@ -12,8 +12,8 @@ import syris
 import syris.geometry as geom
 from syris.bodies.base import CompositeBody
 from syris.bodies.mesh import Mesh, make_cube
-from trajectory import make_circle
-from util import get_default_parser, show
+from .trajectory import make_circle
+from .util import get_default_parser, show
 
 
 def make_cube_body(n, ps, cube_edge, phase_shift=None):
@@ -47,7 +47,7 @@ def main():
     # Vertical motion component has such velocity that the cubes are displaced by their edge length
     # 1 pixel for making sure we have one "complete" sinogram
     velocity = (cube_edge - ps) / cube_0.trajectory.time
-    traj_y = geom.Trajectory(zip(y, x, z) * ps, pixel_size=ps, velocity=velocity)
+    traj_y = geom.Trajectory(list(zip(y, x, z)) * ps, pixel_size=ps, velocity=velocity)
     composite = CompositeBody(traj_y, bodies=[cube_0, cube_1])
     # Total time is the rotation time because we want one tomographic data set
     total_time = cube_0.trajectory.time
@@ -56,10 +56,10 @@ def main():
     if num_projections is None:
         num_projections = int(np.ceil((total_time / dt).simplified.magnitude))
 
-    print '              num_projs:', num_projections
-    print '          rotation time:', cube_0.trajectory.time
-    print '   vertical motion time:', traj_y.time
-    print '        simulation time:', total_time
+    print('              num_projs:', num_projections)
+    print('          rotation time:', cube_0.trajectory.time)
+    print('   vertical motion time:', traj_y.time)
+    print('        simulation time:', total_time)
 
     for i in range(num_projections):
         t = total_time / num_projections * i

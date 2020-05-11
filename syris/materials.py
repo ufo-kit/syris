@@ -1,15 +1,15 @@
 """Sample material represented by a complex refractive index."""
-import cPickle
+import pickle
 import logging
 import os
 import sys
 import time
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 from distutils.spawn import find_executable
-from HTMLParser import HTMLParser
+from html.parser import HTMLParser
 from subprocess import Popen, PIPE
-from urlparse import urljoin
+from urllib.parse import urljoin
 import numpy as np
 import quantities as q
 from scipy import interpolate as interp
@@ -109,7 +109,7 @@ class Material(object):
         """Save this instance to a *filename*."""
         if filename is None:
             filename = '{}.mat'.format(self.name)
-        cPickle.dump(self, open(filename, 'wb'))
+        pickle.dump(self, open(filename, 'wb'))
 
     def __eq__(self, other):
         return isinstance(other, Material) and self.name == other.name
@@ -180,7 +180,7 @@ def make_henke(name, energies, formula=None, density=None):
     f_1 = f_2 = None
     if element in ELEMENTS:
         # Get the scattering factors
-        response = urllib2.urlopen('http://henke.lbl.gov/optical_constants' +
+        response = urllib.request.urlopen('http://henke.lbl.gov/optical_constants' +
                                    '/sf/{}.nff'.format(element))
         data = response.read()
         response.close()
@@ -221,7 +221,7 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
     for energy in energies:
         apdx = apdx_fmt.format(energy.rescale(q.keV).magnitude)
         url = base + mat + apdx
-        res = urllib2.urlopen(url)
+        res = urllib.request.urlopen(url)
         txt = res.read()
         lines = txt[txt.find('delta='):].split('\n')
         delta = float(lines[0].split('=')[1])
@@ -235,7 +235,7 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
 
 def make_fromfile(filename):
     """Load saved material from *filename*."""
-    return cPickle.load(open(filename, 'r'))
+    return pickle.load(open(filename, 'r'))
 
 
 class _HenkeQuery(object):
@@ -282,11 +282,11 @@ class _HenkeQuery(object):
             parser.feed(response)
             link = urljoin(self._URL, parser.link)
             # First two lines are description
-            values = urllib2.urlopen(link).readlines()[2:]
+            values = urllib.request.urlopen(link).readlines()[2:]
             energies_henke, indices = _parse_henke(values)
             self.refractive_indices = self._interpolate(energies_henke, indices)
-        except urllib2.URLError:
-            print >> sys.stderr, 'Cannot contact server, please check your Internet connection'
+        except urllib.error.URLError:
+            print('Cannot contact server, please check your Internet connection', file=sys.stderr)
             raise
 
     def _query_server(self, formula, density):
@@ -302,12 +302,12 @@ class _HenkeQuery(object):
         # to be spaced like we want
         data['Npts'] = str(500)
         data['Output'] = 'Text File'
-        url_values = urllib.urlencode(data)
+        url_values = urllib.parse.urlencode(data)
 
         url = urljoin(self._URL, '/cgi-bin/getdb.pl')
 
-        req = urllib2.Request(url, url_values)
-        response = urllib2.urlopen(req)
+        req = urllib.request.Request(url, url_values)
+        response = urllib.request.urlopen(req)
         result = response.read()
         response.close()
 
@@ -335,7 +335,7 @@ def _parse_henke(response):
     (energies, ref_indices).
     """
     split = [line.split() for line in response]
-    energies, delta, beta = zip(*split)
+    energies, delta, beta = list(zip(*split))
     delta = np.array(delta).astype(np.float)
     beta = np.array(beta).astype(np.float)
     energies = np.array(energies).astype(np.float)

@@ -10,7 +10,7 @@ import syris
 import syris.config as cfg
 from syris.imageprocessing import fft_2, ifft_2, crop
 from syris.physics import compute_propagator, compute_propagation_sampling, energy_to_wavelength
-from util import get_default_parser
+from .util import get_default_parser
 
 
 LOG = logging.getLogger(__name__)
@@ -106,7 +106,7 @@ def main():
 
     plt.figure()
     plt.plot(x_data, aperture, label='Aperture')
-    for n_pixels, num_result in numerical_results.items():
+    for n_pixels, num_result in list(numerical_results.items()):
         fraction = n_pixels / float(n_proper)
         if args.txt_output:
             txt_header += '\t{}'.format(fraction)

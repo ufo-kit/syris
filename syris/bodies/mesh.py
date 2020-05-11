@@ -359,7 +359,7 @@ def make_cube():
     """Create a cube triangle mesh from -1 to 1 m in all dimensions."""
     seed = (-1, 1)
     points = list(itertools.product(seed, seed, seed))
-    points = np.array(zip(*points)).reshape(3, 8)
+    points = np.array(list(zip(*points))).reshape(3, 8)
     indices = [0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7]
     triangles = points[:, indices]
     for i in range(1, 3):

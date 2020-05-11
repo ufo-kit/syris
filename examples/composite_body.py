@@ -34,8 +34,8 @@ from syris.bodies.base import CompositeBody
 from syris.bodies.isosurfaces import MetaBall
 from syris.bodies.mesh import make_cube, Mesh
 from syris.geometry import Trajectory
-from util import get_default_parser, show
-from trajectory import make_circle
+from .util import get_default_parser, show
+from .trajectory import make_circle
 
 
 def _make_metaballs(args):
@@ -116,11 +116,11 @@ def make_complex_trajectory_sequence(args):
     x = np.linspace(0, args.n / 2 - args.n / 4 - edge - 5, num=10)
     y = z = np.zeros(x.shape)
     # Move along x axis
-    traj_x = Trajectory(zip(x, y, z) * args.ps, velocity=args.ps / q.s, pixel_size=args.ps)
+    traj_x = Trajectory(list(zip(x, y, z)) * args.ps, velocity=args.ps / q.s, pixel_size=args.ps)
     # Move along y axis
-    traj_y = Trajectory(zip(y, x, z) * args.ps, velocity=args.ps / q.s, pixel_size=args.ps)
+    traj_y = Trajectory(list(zip(y, x, z)) * args.ps, velocity=args.ps / q.s, pixel_size=args.ps)
     # Move along both x and y axes
-    traj_xy = Trajectory(zip(x, x, z) * args.ps, velocity=args.ps / q.s, pixel_size=args.ps)
+    traj_xy = Trajectory(list(zip(x, x, z)) * args.ps, velocity=args.ps / q.s, pixel_size=args.ps)
     # Circular trajectory of the composite body rotates around the image center and with radius
     # n / 4 pixels.
     circle = args.n / 2 * args.ps + make_circle().magnitude * args.n / 4 * args.ps

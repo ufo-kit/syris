@@ -4,8 +4,8 @@ import quantities as q
 import syris
 import syris.geometry as geom
 from syris.bodies.mesh import Mesh, make_cube
-from trajectory import make_circle
-from util import show
+from .trajectory import make_circle
+from .util import show
 
 
 def main():

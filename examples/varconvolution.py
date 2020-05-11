@@ -8,7 +8,7 @@ import syris.gpu.util as gutil
 import syris.imageprocessing as ip
 from syris.bodies.simple import make_grid
 from syris.util import save_image
-from util import get_default_parser, show
+from .util import get_default_parser, show
 
 
 def main():

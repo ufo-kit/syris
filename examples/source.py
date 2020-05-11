@@ -12,7 +12,7 @@ def make_triangle(n=128):
     y = np.abs(lin - 1)
     z = np.zeros(n)
 
-    return zip(z, y, z) * q.mm
+    return list(zip(z, y, z)) * q.mm
 
 
 def main():

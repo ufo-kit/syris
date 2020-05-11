@@ -10,7 +10,7 @@ from functools import partial
 from multiprocessing import Lock, Pool
 from syris.geometry import X_AX, Y_AX, Z_AX
 from syris.util import save_image
-from util import get_default_parser
+from .util import get_default_parser
 
 
 LOCK = Lock()
@@ -236,7 +236,7 @@ def main():
 
     file_prefix += '_{:>04}.tif'
 
-    devices = range(args.num_devices)
+    devices = list(range(args.num_devices))
     pool = Pool(processes=args.num_devices)
 
     for lamino_angle, pixel_size, rotation_axis, ss in combinations:

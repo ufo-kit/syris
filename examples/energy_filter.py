@@ -9,7 +9,7 @@ from syris.geometry import Trajectory
 from syris.devices.sources import make_topotomo
 from syris.devices.filters import GaussianFilter
 from syris.physics import propagate
-from util import get_default_parser, show
+from .util import get_default_parser, show
 
 
 def get_spectrum(source, energies, pixel_size):
@@ -31,7 +31,7 @@ def main():
                          energy_center + 2 * fwhm,
                          fwhm / 25) * q.keV
     dE = energies[1] - energies[0]
-    print 'Energy from, to, step, number:', energies[0], energies[-1], dE, len(energies)
+    print('Energy from, to, step, number:', energies[0], energies[-1], dE, len(energies))
 
     bm = make_topotomo(dE=dE, pixel_size=ps, trajectory=tr)
     spectrum_energies = np.arange(1, 50, 1) * q.keV

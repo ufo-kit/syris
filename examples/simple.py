@@ -6,7 +6,7 @@ import syris
 from syris.physics import propagate
 from syris.bodies.simple import make_sphere
 from syris.materials import make_henke
-from util import show
+from .util import show
 
 
 def main():

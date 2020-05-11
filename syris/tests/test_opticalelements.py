@@ -28,7 +28,7 @@ class TestOpticalElement(SyrisTest):
 
     def setUp(self):
         syris.init(device_index=0)
-        energies = range(10, 20) * q.keV
+        energies = list(range(10, 20)) * q.keV
         self.energy = energies[len(energies) / 2]
         self.material = Material('foo', np.arange(len(energies), dtype=np.complex), energies)
 
@@ -49,6 +49,6 @@ class TestOpticalElement(SyrisTest):
     @opencl
     def test_transfer_fourier(self):
         elem = DummyOpticalElement()
-        print elem.__class__._transfer_fourier == OpticalElement._transfer_fourier
+        print(elem.__class__._transfer_fourier == OpticalElement._transfer_fourier)
         u = elem.transfer_fourier((4, 4), 1 * q.um, 10 * q.keV).get()
         np.testing.assert_almost_equal(u, 0 + 0j)

@@ -7,7 +7,7 @@ from syris.geometry import Trajectory
 from syris.bodies.simple import make_sphere
 from syris.devices.sources import make_topotomo
 from syris.physics import propagate
-from util import get_default_parser, get_material, show
+from .util import get_default_parser, get_material, show
 
 
 def main():
@@ -22,7 +22,7 @@ def main():
     sample = make_sphere(n, n / 30 * ps, pixel_size=ps, material=get_material('air_5_30_kev.mat'))
 
     bm = make_topotomo(pixel_size=ps, trajectory=tr)
-    print 'Source size FWHM (height x width): {}'.format(bm.size.rescale(q.um))
+    print('Source size FWHM (height x width): {}'.format(bm.size.rescale(q.um)))
 
     u = bm.transfer(shape, ps, energy, t=0 * q.s)
     u = sample.transfer(shape, ps, energy)

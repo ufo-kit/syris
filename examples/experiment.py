@@ -16,8 +16,8 @@ from syris.geometry import Trajectory
 from syris.gpu.util import get_host
 from syris.experiments import Experiment
 from syris.math import fwnm_to_sigma
-from trajectory import create_sample, make_circle
-from util import get_default_parser, get_material, show
+from .trajectory import create_sample, make_circle
+from .util import get_default_parser, get_material, show
 
 
 def get_flat(shape, energies, detector, source, filters=(), shot_noise=False,
@@ -112,7 +112,7 @@ def make_topo_tomo_flat(args, highspeed=True, scintillator=None):
     flat = get_flat(dimax.shape, energies, detector, bm, filters=filters, shot_noise=True,
                     amplifier_noise=True)
     fmt = 'min: {}, max: {}, mean: {}, middle row std: {}'
-    print fmt.format(flat.min(), flat.max(), flat.mean(), flat[n / 2].std())
+    print(fmt.format(flat.min(), flat.max(), flat.mean(), flat[n / 2].std()))
 
     show(flat)
     plt.show()
@@ -175,8 +175,8 @@ def make_motion(args):
                 path = os.path.join(args.output, 'projection_{:>05}.png').format(i)
                 scipy.misc.imsave(path, image)
 
-        print 'Maximum intensity:', image.max()
-        print 'Duration: {} s'.format(time.time() - st)
+        print('Maximum intensity:', image.max())
+        print('Duration: {} s'.format(time.time() - st))
 
     plt.show()
 

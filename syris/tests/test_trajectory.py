@@ -16,7 +16,7 @@ def make_circle(n=128):
         y = np.sin(t)
         z = np.zeros(n)
 
-        return zip(x, y, z) * q.mm
+        return list(zip(x, y, z)) * q.mm
 
 
 def make_square(n=128):
@@ -25,7 +25,7 @@ def make_square(n=128):
         y = t ** 2
         z = np.zeros(n)
 
-        return zip(x, y, z) * q.mm
+        return list(zip(x, y, z)) * q.mm
 
 
 def create_maxima_testing_data():
@@ -39,7 +39,7 @@ def create_maxima_testing_data():
     t = np.linspace(0, 2 * duration, n) * q.s
     # Sine-like velocity profile
     s = 0.5 * tr.length * (np.sin(t.magnitude / duration * 2 * np.pi) + 1)
-    time_dist = zip(t, s)
+    time_dist = list(zip(t, s))
     # Use small num_points to make sure we move more than 1 px
     tr = Trajectory(points, ps, furthest, time_dist=time_dist, num_points=n)
     distances = tr.get_distances()
@@ -56,8 +56,8 @@ class TestTrajectory(SyrisTest):
         # + 1 not to go below zero.
         y = 1 + np.sin(x)
         z = np.zeros(self.n)
-        self.time_dist = zip(x * q.s, y * q.m)
-        self.control_points = zip(x, y, z) * q.m
+        self.time_dist = list(zip(x * q.s, y * q.m))
+        self.control_points = list(zip(x, y, z)) * q.m
 
         self.traj = Trajectory(self.control_points, pixel_size=1 * q.mm,
                                furthest_point=1 * q.mm, time_dist=self.time_dist)
@@ -75,7 +75,7 @@ class TestTrajectory(SyrisTest):
         dist = np.sin(times)
 
         # Length is zero but velocities given.
-        traj = Trajectory([(0, 0, 0)] * q.m, zip(times, dist))
+        traj = Trajectory([(0, 0, 0)] * q.m, list(zip(times, dist)))
         test_stationary(traj)
 
         # Length is non-zero but no velocities given.
@@ -89,13 +89,13 @@ class TestTrajectory(SyrisTest):
 
         # Constant velocity and times and distances
         self.assertRaises(ValueError, Trajectory, self.control_points,
-                          time_dist=zip(times, dist),
+                          time_dist=list(zip(times, dist)),
                           velocity=10 * q.mm / q.s)
 
         # Invalid velocity profile (negative distance).
         self.assertRaises(ValueError, Trajectory, self.control_points,
                           1 * q.m, 1 * q.m,
-                          zip(times * q.s, dist * q.m))
+                          list(zip(times * q.s, dist * q.m)))
         # Time not monotonic.
         time_dist = [(1 * q.s, 1 * q.m), (1 * q.s, 1 * q.m)]
         self.assertRaises(ValueError, Trajectory, self.control_points,
@@ -141,7 +141,7 @@ class TestTrajectory(SyrisTest):
         y = np.cos(u)
         z = np.zeros(len(u))
 
-        traj = Trajectory(zip(x, y, z) * q.m, velocity=1 * q.m / q.s, pixel_size=1 * q.m,
+        traj = Trajectory(list(zip(x, y, z)) * q.m, velocity=1 * q.m / q.s, pixel_size=1 * q.m,
                           furthest_point=1 * q.m)
         self.assertAlmostEqual(traj.length, 2 * np.pi * q.m, places=5)
 
@@ -150,7 +150,7 @@ class TestTrajectory(SyrisTest):
         traj = Trajectory(self.control_points, pixel_size=1 * q.m, furthest_point=1 * q.m)
         np.testing.assert_equal(traj.get_point(1 * q.s), traj.control_points[0])
 
-        tck = interp.splprep(zip(*self.control_points), s=0)[0]
+        tck = interp.splprep(list(zip(*self.control_points)), s=0)[0]
 
         def evaluate_point(t):
             if t > 1:
@@ -165,7 +165,7 @@ class TestTrajectory(SyrisTest):
         dist = (self.traj.length + self.traj.length * np.sin(times.magnitude)) * q.m
 
         traj = Trajectory(self.control_points, pixel_size=1 * q.m, furthest_point=1 * q.m,
-                          time_dist=zip(times, dist))
+                          time_dist=list(zip(times, dist)))
 
         for i in range(len(times)):
             np.testing.assert_almost_equal(traj.get_point(times[i]),
@@ -178,7 +178,7 @@ class TestTrajectory(SyrisTest):
             return np.round(v, decimals)
 
         points = make_circle(n=128) * 1e-3
-        x, y, z = zip(*points)
+        x, y, z = list(zip(*points))
         furthest = 1 * q.mm
         ps = 10 * q.um
         tr = Trajectory(points, ps, furthest, velocity=1 * q.mm / q.s)
@@ -209,18 +209,18 @@ class TestTrajectory(SyrisTest):
     def test_get_distances(self):
         """Compare analytically computed distances with the ones obtained from trajectory."""
         points = make_circle(n=128)
-        x, y, z = zip(*points)
+        x, y, z = list(zip(*points))
         furthest = 3 * q.mm
         ps = 10 * q.um
         tr = Trajectory(points, ps, furthest, velocity=1 * q.mm / q.s)
 
         d_points = np.abs(tr.points[:, 0][:, np.newaxis] - tr.points)
         t = np.linspace(0, 2 * np.pi, tr.points.shape[1])
-        x, y, z = zip(*make_circle(n=tr.points.shape[1]))
+        x, y, z = list(zip(*make_circle(n=tr.points.shape[1])))
         dx = -np.sin(t)
         dy = np.cos(t)
         dz = z
-        derivatives = np.array(zip(dx, dy, dz)).T.copy()
+        derivatives = np.array(list(zip(dx, dy, dz))).T.copy()
         d_derivatives = get_rotation_displacement(derivatives[:, 0], derivatives, furthest)
         distances = (d_points + d_derivatives).simplified.magnitude
 

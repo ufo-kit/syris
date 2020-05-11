@@ -14,12 +14,12 @@ def get_base():
 def get_directions(units):
     """Create directions in 3D space and apply *units*."""
     base = np.array(list(itertools.product([0, 1], [0, 1], [0, 1])))[1:]
-    x_points, y_points, z_points = np.array(zip(*base))
-    return np.array(zip(x_points, y_points, z_points) +
-                    zip(-x_points, y_points, z_points) +
-                    zip(x_points, -y_points, z_points) +
-                    zip(x_points, y_points, -z_points) +
-                    zip(-x_points, -y_points, -z_points)) * units
+    x_points, y_points, z_points = np.array(list(zip(*base)))
+    return np.array(list(zip(x_points, y_points, z_points)) +
+                    list(zip(-x_points, y_points, z_points)) +
+                    list(zip(x_points, -y_points, z_points)) +
+                    list(zip(x_points, y_points, -z_points)) +
+                    list(zip(-x_points, -y_points, -z_points))) * units
 
 
 def get_vec_0():

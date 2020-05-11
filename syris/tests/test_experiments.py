@@ -22,7 +22,7 @@ class TestExperiments(SyrisTest):
         x = t
         y = np.zeros(len(t))
         z = np.zeros(len(t))
-        points = zip(x, y, z) * q.mm
+        points = list(zip(x, y, z)) * q.mm
         mb_0 = MetaBall(Trajectory(points, pixel_size=ps, furthest_point=1 * q.um,
                                    velocity=1 * q.mm / q.s), 1 * q.um)
         mb_1 = MetaBall(Trajectory(points, pixel_size=ps, furthest_point=1 * q.um,

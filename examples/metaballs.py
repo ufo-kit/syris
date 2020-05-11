@@ -9,7 +9,7 @@ from syris import config as cfg
 from syris.bodies.isosurfaces import MetaBall, MetaBalls, project_metaballs_naive
 from syris.geometry import Trajectory
 from syris.util import make_tuple, save_image
-from util import get_default_parser, show
+from .util import get_default_parser, show
 
 
 LOG = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ def load_params(file_name):
 
 
 def create_metaballs(params):
-    x, y, z, r = zip(*params)
+    x, y, z, r = list(zip(*params))
 
     objects = ""
     metaballs = []
@@ -115,7 +115,7 @@ def intersections_to_slice(n, height, intersections_mem, z_start, pixel_size, pr
                                         cfg.PRECISION.np_float(z_start.rescale(q.um).magnitude),
                                         cfg.PRECISION.np_float(pixel_size.rescale(q.um).magnitude))
     ev.wait()
-    print "duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms
+    print("duration:", (ev.profile.end - ev.profile.start) * 1e-6 * q.ms)
 
     cl.enqueue_copy(cfg.OPENCL.queue, slice, slice_mem)
     return slice
@@ -170,14 +170,14 @@ def main():
             out_file.write(objects_all)
 
     z_min, z_max = get_z_range(metaballs)
-    print 'z min, max:', z_min.rescale(q.um), z_max.rescale(q.um), args.n * pixel_size + z_min
+    print('z min, max:', z_min.rescale(q.um), z_max.rescale(q.um), args.n * pixel_size + z_min)
 
     if args.algorithm == 'fast':
         traj = Trajectory([(0, 0, 0)] * q.m)
         comp = MetaBalls(traj, metaballs)
         thickness = comp.project(shape, pixel_size).get()
     else:
-        print 'Z steps:', int(((z_max - z_min) / pixel_size).simplified.magnitude + 0.5)
+        print('Z steps:', int(((z_max - z_min) / pixel_size).simplified.magnitude + 0.5))
         thickness = project_metaballs_naive(metaballs, shape, make_tuple(pixel_size)).get()
 
     if args.output_thickness:
