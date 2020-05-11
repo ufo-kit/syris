@@ -99,7 +99,7 @@ def get_source(file_names, precision_sensitive=True):
     """
     string = ""
     for file_name in file_names:
-        string += pkg_resources.resource_string(__name__, 'opencl/{}'.format(file_name))
+        string += pkg_resources.resource_string(__name__, 'opencl/{}'.format(file_name)).decode()
 
     if precision_sensitive:
         string = get_precision_header() + string
