@@ -39,8 +39,8 @@ class Precision(object):
             self.np_float = np.float32
             self.np_cplx = np.complex64
         self.numpy_to_opencl = {self.np_float: self.cl_float, self.np_cplx: self.cl_cplx}
-        self.opencl_to_numpy = dict(zip(self.numpy_to_opencl.values(),
-                                        self.numpy_to_opencl.keys()))
+        self.opencl_to_numpy = dict(list(zip(list(self.numpy_to_opencl.values()),
+                                        list(self.numpy_to_opencl.keys()))))
 
         dtype_base = 'double' if double else 'float'
         for i in [2, 3, 4, 8, 16]:

@@ -16,7 +16,7 @@ from syris.devices.lenses import Lens
 from syris.devices.sources import make_topotomo
 from syris.math import fwnm_to_sigma
 from syris.physics import propagate, compute_propagator, energy_to_wavelength
-from util import get_default_parser, get_material, show
+from .util import get_default_parser, get_material, show
 
 
 def get_propagator_psf(n, d, ps, energy):
@@ -65,10 +65,10 @@ def main():
     ps = detector.pixel_size / args.supersampling
 
     fmt = 'Pixel size used for propagation: {}'
-    print fmt.format(ps.rescale(q.um))
+    print(fmt.format(ps.rescale(q.um)))
     fmt = '  Effective detector pixel size: {}'
-    print fmt.format(detector.pixel_size.rescale(q.um))
-    print '                  Field of view: {}'.format(n * ps.rescale(q.um))
+    print(fmt.format(detector.pixel_size.rescale(q.um)))
+    print('                  Field of view: {}'.format(n * ps.rescale(q.um)))
 
     # Bending magnet source
     trajectory = Trajectory([(n / 2, n / 2, 0)] * ps)
@@ -83,7 +83,7 @@ def main():
     coherent_ld = camera.get_image(coherent, shot_noise=False, amplifier_noise=False)
 
     # Propagation which takes into account polychromaticity
-    poly = propagate([source, sample], shape, range(10, 30) * q.keV, d, ps, t=0 * q.s,
+    poly = propagate([source, sample], shape, list(range(10, 30)) * q.keV, d, ps, t=0 * q.s,
                      detector=detector).get()
     poly *= camera.exp_time.simplified.magnitude
     poly_ld = camera.get_image(poly, shot_noise=args.noise, amplifier_noise=args.noise)

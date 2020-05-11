@@ -505,7 +505,7 @@ class CompositeBody(MovableBody):
 
     def restore_transformation_matrices(self):
         """Restore transformation matrices of all bodies."""
-        for body, matrix in self._saved_matrices.iteritems():
+        for body, matrix in self._saved_matrices.items():
             body.transform_matrix = matrix
 
         self._saved_matrices = {}

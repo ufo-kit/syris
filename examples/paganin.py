@@ -13,7 +13,7 @@ from syris.bodies.simple import make_sphere
 from syris.gpu.util import get_array
 from syris.imageprocessing import decimate, fft_2, ifft_2
 from syris.physics import propagate, compute_propagator, energy_to_wavelength
-from util import get_default_parser, get_material, show
+from .util import get_default_parser, get_material, show
 
 
 def get_propagator_psf(n, d, ps, energy):
@@ -35,13 +35,13 @@ def compute_tie_kernel(n, pixel_size, distance, material, energy):
     beta = ri.imag
     mju = material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
     fmt = '                            mju: {}'
-    print fmt.format(mju)
+    print(fmt.format(mju))
     fmt = '                          delta: {}'
-    print fmt.format(delta)
+    print(fmt.format(delta))
     fmt = '                           beta: {}'
-    print fmt.format(beta)
+    print(fmt.format(beta))
     fmt = '    Regularization rate for UFO: {}'
-    print fmt.format(np.log10(delta / beta))
+    print(fmt.format(np.log10(delta / beta)))
 
     return mju / (distance * ri.real * (f ** 2 + g ** 2) + mju)
     # Alternative forms
@@ -68,12 +68,12 @@ def main():
     radius = n / 4. * ps_hd
 
     fmt = '                     Wavelength: {}'
-    print fmt.format(energy_to_wavelength(energy))
+    print(fmt.format(energy_to_wavelength(energy)))
     fmt = 'Pixel size used for propagation: {}'
-    print fmt.format(ps_hd.rescale(q.um))
-    print '                  Field of view: {}'.format(n * ps_hd.rescale(q.um))
+    print(fmt.format(ps_hd.rescale(q.um)))
+    print('                  Field of view: {}'.format(n * ps_hd.rescale(q.um)))
     fmt = '                Sphere diameter: {}'
-    print fmt.format(2 * radius)
+    print(fmt.format(2 * radius))
 
     sample = make_sphere(n, radius, pixel_size=ps_hd, material=material)
     projection = sample.project((n, n), ps_hd).get() * 1e6

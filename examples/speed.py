@@ -10,7 +10,7 @@ import syris.gpu.util as gutil
 from syris.bodies.simple import make_sphere
 from syris.materials import make_fromfile
 from syris.physics import propagate
-from util import get_default_parser
+from .util import get_default_parser
 
 
 LOG = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ def run(n, ps, num_runs, queues):
     durations = []
     for i in range(num_runs):
         st = time.time()
-        gutil.qmap(propagate_one, range(len(queues)), queues=queues,
+        gutil.qmap(propagate_one, list(range(len(queues))), queues=queues,
                    args=(shape, energies, distance, ps, spheres))
         durations.append((time.time() - st) / len(queues))
         LOG.info('%d. run, duration: %.2f s', i + 1, durations[-1])

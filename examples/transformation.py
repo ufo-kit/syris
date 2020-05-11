@@ -15,21 +15,21 @@ def transform(point=(1, 0, 0) * q.m, x_rot=90 * q.deg, y_rot=90 * q.deg, z_rot=0
     mat = np.dot(mat_x, mat_y)
     mat = np.dot(mat, mat_z)
 
-    print 'x rotation matrix'
+    print('x rotation matrix')
     print_rounded(mat_x)
-    print 'y rotation matrix'
+    print('y rotation matrix')
     print_rounded(mat_y)
-    print 'combined'
+    print('combined')
     print_rounded(mat)
 
-    print
-    print 'mat_x . point'
+    print()
+    print('mat_x . point')
     print_rounded(np.dot(mat_x, point))
-    print 'mat_y . point'
+    print('mat_y . point')
     print_rounded(np.dot(mat_y, point))
-    print '---------- Result: mat . point ----------'
+    print('---------- Result: mat . point ----------')
     print_rounded(np.dot(mat, point))
-    print '-----------------------------------------'
+    print('-----------------------------------------')
 
 
 def print_rounded(vector, decimals=2):
@@ -39,7 +39,7 @@ def print_rounded(vector, decimals=2):
     else:
         vector = vector[:-1]
 
-    print np.round(vector, decimals)
+    print(np.round(vector, decimals))
 
 
 def main():

@@ -4,7 +4,7 @@ Module for profiling OpenCL GPU code execution.
 
 import pyopencl as cl
 from threading import Thread
-from Queue import Queue, Empty
+from queue import Queue, Empty
 import quantities as q
 import itertools
 import logging
@@ -37,7 +37,7 @@ class Profiler(Thread):
     """An OpenCL GPU code PROFILER."""
     states = [cl.profiling_info.QUEUED, cl.profiling_info.SUBMIT,
               cl.profiling_info.START, cl.profiling_info.END]
-    state_strs = dict(zip(states, ["QUEUED", "SUBMIT", "START", "END"]))
+    state_strs = dict(list(zip(states, ["QUEUED", "SUBMIT", "START", "END"])))
     format_string = "%d\t%d\t%d\t%s\t%s\t%d"
 
     def __init__(self, queues, file_name):
@@ -46,9 +46,9 @@ class Profiler(Thread):
         """
         Thread.__init__(self)
         self._events = Queue()
-        self._event_next = itertools.count().next
-        self._clqeue_next = itertools.count().next
-        self._cldevice_next = itertools.count().next
+        self._event_next = itertools.count().__next__
+        self._clqeue_next = itertools.count().__next__
+        self._cldevice_next = itertools.count().__next__
         self._clqueues = {}             # {queue: id}
         self._cldevices = {}            # {device: id}
         self.daemon = True
@@ -87,7 +87,7 @@ class Profiler(Thread):
             starts[devices[i]] = cl.enqueue_marker(unique_queues[i])
         d_t = (time.time() - start) * q.s
 
-        cl.wait_for_events(starts.values())
+        cl.wait_for_events(list(starts.values()))
 
         for device in starts:
             starts[device] = starts[device].profile.queued
@@ -226,7 +226,7 @@ class ProfileReconstructor(object):
         units based on string *str_units*.
         """
         self._profile_file_name = file_name
-        self._min_time = sys.maxint
+        self._min_time = sys.maxsize
         self._records = []
         self._events = {}
             # event objects dictionary {event_id: event}
@@ -264,7 +264,7 @@ class ProfileReconstructor(object):
                 match.group(ProfileReconstructor.attributes[4]),
                 int(match.group(ProfileReconstructor.attributes[5]))
                 ]
-        args = zip(ProfileReconstructor.attributes, vals)
+        args = list(zip(ProfileReconstructor.attributes, vals))
 
         return _Record(*args)
 
@@ -302,9 +302,9 @@ class ProfileReconstructor(object):
             line = file_obj.readline()
             if not line.startswith("#"):
                 d_t = float(line.strip())
-                print "Relative device time error: %g %s" % \
+                print("Relative device time error: %g %s" % \
                     (q.Quantity(d_t, self.file_units).rescale(self.units),
-                     self.units.symbol)
+                     self.units.symbol))
 
     def _process(self):
         """Process the whole profile file."""
@@ -332,7 +332,7 @@ class ProfileReconstructor(object):
         """Create events from individual *records* for each event based on
         computational status (QUEUED, SUBMIT, START, END).
         """
-        for event_records in records.values():
+        for event_records in list(records.values()):
             for rec in event_records:
                 if rec.EVENT_ID not in self._events:
                     self._events[rec.EVENT_ID] = _Event()
@@ -377,7 +377,7 @@ def plot(data, attribute, states, file_units, out_units, start_from=0,
     max_func_name = 0
     events_infos = []
 
-    print "Retreiving data..."
+    print("Retreiving data...")
 
     if not only_averages:
         plt.figure()
@@ -411,29 +411,29 @@ def plot(data, attribute, states, file_units, out_units, start_from=0,
                     counts[event.FUNC_NAME] = 1
 
     if not only_averages:
-        print "Functions and times spent in them:"
+        print("Functions and times spent in them:")
         for ev_info in events_infos:
-            print "{0:>{1}} - duration: {2:10.5f} start: {3:10.5f} ".format(
+            print("{0:>{1}} - duration: {2:10.5f} start: {3:10.5f} ".format(
                 ev_info[0], max_func_name, float(ev_info[1].magnitude),
                 float(ev_info[2].magnitude)) +\
                 "stop: {0:10.5f} {1}".format(float(ev_info[3].magnitude),
-                                             ev_info[4].symbol)
-        print
-    print "Plot information:"
-    print "states:", states, "start from:", start_from, "stop at:", stop_at, \
-        "minimum event duration:", delta, out_units.symbol
-    print
-    print "Timing statistics:"
+                                             ev_info[4].symbol))
+        print()
+    print("Plot information:")
+    print("states:", states, "start from:", start_from, "stop at:", stop_at, \
+        "minimum event duration:", delta, out_units.symbol)
+    print()
+    print("Timing statistics:")
     for f_name in averages:
-        print "{0:>{1}}: called {2:5} times, average time {3:10.5f} {4}".\
+        print("{0:>{1}}: called {2:5} times, average time {3:10.5f} {4}".\
             format(f_name, max_func_name, counts[f_name],
-                   float(averages[f_name]) / counts[f_name], out_units.symbol)
+                   float(averages[f_name]) / counts[f_name], out_units.symbol))
     if not only_averages:
-        print
-        print "Legend:"
+        print()
+        print("Legend:")
         for f_name in func_colors:
-            print "{0:>{1}}: {2}".format(
-                f_name, max_func_name, COLORS[func_colors[f_name]])
+            print("{0:>{1}}: {2}".format(
+                f_name, max_func_name, COLORS[func_colors[f_name]]))
         plt.ylim(min(y_limits) - 0.5, max(y_limits) + 0.5)
         plt.xlabel(out_units.symbol)
         plt.ylabel(attribute)
@@ -469,7 +469,7 @@ if __name__ == '__main__':
                       ", (default: %default)")
     PARSER.add_option("-u", "--units", metavar="UNITS", default="ms",
                       dest="units", help="Time units. One of %s" %
-                      (ProfileReconstructor.str_to_qtime.keys()) +
+                      (list(ProfileReconstructor.str_to_qtime.keys())) +
                       ", (default: %default)")
     PARSER.add_option("-d", "--delta", metavar="DELTA", type="float",
                       default=0.0, dest="delta",
@@ -489,26 +489,26 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if not os.path.exists(ARGS[0]):
-        print >> sys.stderr, "File \"%s\" does not exist." % ARGS[0]
+        print("File \"%s\" does not exist." % ARGS[0], file=sys.stderr)
         sys.exit(0)
 
     if OPTS.attribute.upper() not in ProfileReconstructor.attributes:
-        print >> sys.stderr, "Attribute \"%s\" not from %s." % \
-            (OPTS.attribute, ProfileReconstructor.attributes[:3])
+        print("Attribute \"%s\" not from %s." % \
+            (OPTS.attribute, ProfileReconstructor.attributes[:3]), file=sys.stderr)
         sys.exit(0)
 
     if OPTS.entry.upper() not in ProfileReconstructor.cl_states:
-        print >> sys.stderr, "Entry level \"%s\" not from %s." % \
-            (OPTS.entry, ProfileReconstructor.cl_states)
+        print("Entry level \"%s\" not from %s." % \
+            (OPTS.entry, ProfileReconstructor.cl_states), file=sys.stderr)
         sys.exit(0)
 
     if OPTS.exit.upper() not in ProfileReconstructor.cl_states:
-        print >> sys.stderr, "Exit level \"%s\" not from %s." % \
-            (OPTS.entry, ProfileReconstructor.cl_states)
+        print("Exit level \"%s\" not from %s." % \
+            (OPTS.entry, ProfileReconstructor.cl_states), file=sys.stderr)
         sys.exit(0)
 
-    print "\n\n\n***** Warning *****"
-    print "Relative device timings are only estimates!\n\n\n"
+    print("\n\n\n***** Warning *****")
+    print("Relative device timings are only estimates!\n\n\n")
 
     # init OK, plot the data
     PROF_RECO = ProfileReconstructor(ARGS[0], OPTS.units)

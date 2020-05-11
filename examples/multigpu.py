@@ -8,7 +8,7 @@ import numpy as np
 import syris
 import syris.config as cfg
 import syris.gpu.util as gutil
-from util import get_default_parser
+from .util import get_default_parser
 
 
 def get_kernel():
@@ -63,7 +63,7 @@ def run(n, m, complexity, prg, verbose=False):
     stop = int(m ** complexity)
     complexity_fmt = 'complexity: {} x {}^{}, pixel operations: {}'
     if verbose:
-        print complexity_fmt.format(n, m, complexity, stop)
+        print(complexity_fmt.format(n, m, complexity, stop))
     num_items = len(queues)
     events = []
 
@@ -76,28 +76,28 @@ def run(n, m, complexity, prg, verbose=False):
         event.wait()
 
     start = time.time()
-    gutil.qmap(process, range(num_items))
+    gutil.qmap(process, list(range(num_items)))
     host_duration = time.time() - start
 
     if verbose:
-        print '-------------------------------'
-        print '     All duration: {:.2f} s'.format(host_duration)
-        print '-------------------------------'
+        print('-------------------------------')
+        print('     All duration: {:.2f} s'.format(host_duration))
+        print('-------------------------------')
 
     all_duration = 0
     for i, event in enumerate(events):
         duration = get_duration(event)
         all_duration += duration
         if verbose:
-            print 'Device {} duration: {:.2f} s'.format(i, duration)
+            print('Device {} duration: {:.2f} s'.format(i, duration))
 
     speedup = all_duration / host_duration
     if verbose:
-        print '-------------------------------'
-        print '    Mean duration: {:.2f} s'.format(all_duration / len(devices))
-        print '-------------------------------'
-        print '          Speedup: {:.2f} / {}'.format(speedup, len(devices))
-        print '-------------------------------'
+        print('-------------------------------')
+        print('    Mean duration: {:.2f} s'.format(all_duration / len(devices)))
+        print('-------------------------------')
+        print('          Speedup: {:.2f} / {}'.format(speedup, len(devices)))
+        print('-------------------------------')
 
     return speedup
 
@@ -111,23 +111,23 @@ def main():
         complexities = args.k
     else:
         complexities = np.arange(args.k[0], args.k[1] + args.k[2], args.k[2])
-    print 'Complexities: {}'.format(complexities)
+    print('Complexities: {}'.format(complexities))
 
     results = []
     for complexity in complexities:
         runs = []
         for i in range(args.runs):
-            print 'Run {} / {}'.format(i + 1, args.runs)
+            print('Run {} / {}'.format(i + 1, args.runs))
             runs.append(run(args.n, args.m, complexity, prg, verbose=args.verbose))
         if args.output:
             np.save(args.output.format(complexity), runs)
         results.append(np.mean(runs))
 
-    print
-    print '==============================='
+    print()
+    print('===============================')
     for i, result in enumerate(results):
-        print 'Complexity: {:.2f}, speedup: {:.2f}'.format(complexities[i], result)
-    print '==============================='
+        print('Complexity: {:.2f}, speedup: {:.2f}'.format(complexities[i], result))
+    print('===============================')
 
     if args.plot:
         plt.figure()

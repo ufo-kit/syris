@@ -12,7 +12,7 @@ T = ABC yielding x' = ABCx = Tx. Backward form means that we calculate
 the matrix in the form T^{-1} = C^{-1}B^{-1}A^{-1} = (ABC)^{-1}. Thus, we can
 easily obtain x = T^{-1}x'.
 """
-from __future__ import absolute_import
+
 import collections
 import numpy as np
 import quantities as q
@@ -154,7 +154,7 @@ class Trajectory(object):
 
     def _interpolate(self):
         # Extract x, y, z points
-        points = zip(*self._control_points)
+        points = list(zip(*self._control_points))
         self._tck, self._u = interp.splprep(points, s=0)
         if self._num_points is None:
             # Reinterpolate with so many points that the trajectory doesn't move (both
@@ -187,7 +187,7 @@ class Trajectory(object):
             time_dist = self._time_dist
 
         if time_dist is not None:
-            t_0, s_0 = zip(*time_dist)
+            t_0, s_0 = list(zip(*time_dist))
             t_0 = np.array(t_0)
             s_0 = np.array(s_0)
             # Time must be monotonic and distances cannot be negative
@@ -670,7 +670,7 @@ def get_constant_velocity(v_0, duration):
     times = np.linspace(0 * duration.magnitude, duration.magnitude, 5) * duration.units
     dist = v_0 * times
 
-    return zip(times, dist)
+    return list(zip(times, dist))
 
 
 def get_rotation_displacement(d_0, d_1, length):

@@ -4,7 +4,7 @@ Utility functions concerning GPU programming.
 
 import itertools
 import pkg_resources
-import Queue
+import queue
 import sys
 import numpy as np
 import pyopencl as cl
@@ -506,7 +506,7 @@ def qmap(func, items, queues=None, args=(), kwargs=None):
     to be used for computation, if not specified, all the default ones are used. *args* is a list
     and *kwargs* a dictionary, both passed to *func*.
     """
-    queue_of_queues = Queue.Queue()
+    queue_of_queues = queue.Queue()
     if queues is None:
         queues = cfg.OPENCL.queues
     for queue in queues:

@@ -67,7 +67,7 @@ class TestSources(SyrisTest):
         n = 16
         x = z = np.zeros(n)
         y = np.linspace(0, 1, n) * q.mm
-        tr = Trajectory(zip(x, y, z) * q.mm, pixel_size=10 * q.um, furthest_point=0*q.m,
+        tr = Trajectory(list(zip(x, y, z)) * q.mm, pixel_size=10 * q.um, furthest_point=0*q.m,
                         velocity=1 * q.mm / q.s)
         source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
                                self.dE, np.array([0.2, 0.8]) * q.mm, self.ps, trajectory=tr)

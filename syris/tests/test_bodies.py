@@ -176,7 +176,7 @@ class TestBodies(SyrisTest):
         transformed_1 = self._get_moved_bounding_box(mb_1, -90 * q.deg)
 
         def get_concatenated(t_0, t_1, index):
-            return np.concatenate((zip(*t_0)[index], zip(*t_1)[index])) * \
+            return np.concatenate((list(zip(*t_0))[index], list(zip(*t_1))[index])) * \
                 t_0[0].units
 
         x_points = get_concatenated(transformed_0, transformed_1, 0)
@@ -222,7 +222,7 @@ class TestBodies(SyrisTest):
 
         # Simple body
         # -----------
-        traj = Trajectory(zip(cos, sin, zeros) * q.m, velocity=1 * q.m / q.s)
+        traj = Trajectory(list(zip(cos, sin, zeros)) * q.m, velocity=1 * q.m / q.s)
         ball = MetaBall(traj, .5 * q.m)
         ball.bind_trajectory(ps)
         dist = ball.get_distance(0 * q.s, ball.trajectory.time)
@@ -258,11 +258,11 @@ class TestBodies(SyrisTest):
         cos = np.cos(p) * 1e-3
         zeros = np.zeros(n)
 
-        traj_m_0 = Trajectory(zip(p * 1e-3, zeros, zeros) * q.m, velocity=1 * q.mm / q.s)
+        traj_m_0 = Trajectory(list(zip(p * 1e-3, zeros, zeros)) * q.m, velocity=1 * q.mm / q.s)
         traj_m_1 = Trajectory([(0, 0, 0)] * q.m)
         ball_0 = MetaBall(traj_m_0, .5 * q.m)
         ball_1 = MetaBall(traj_m_1, .5 * q.m)
-        traj = Trajectory(zip(cos, sin, zeros) * q.m, velocity=1 * q.mm / q.s)
+        traj = Trajectory(list(zip(cos, sin, zeros)) * q.m, velocity=1 * q.mm / q.s)
         comp = CompositeBody(traj, bodies=[ball_0, ball_1])
         dt = comp.get_maximum_dt(ps)
 
@@ -275,9 +275,9 @@ class TestBodies(SyrisTest):
             np.testing.assert_almost_equal(psm, d)
 
         # Trajectories which sum up to no movement
-        traj_m = Trajectory(zip(zeros, -p, zeros) * q.m, velocity=1 * q.mm / q.s)
+        traj_m = Trajectory(list(zip(zeros, -p, zeros)) * q.m, velocity=1 * q.mm / q.s)
         ball = MetaBall(traj_m, .5 * q.m)
-        traj = Trajectory(zip(p, zeros, zeros) * q.m, velocity=1 * q.mm / q.s)
+        traj = Trajectory(list(zip(p, zeros, zeros)) * q.m, velocity=1 * q.mm / q.s)
         comp = CompositeBody(traj, bodies=[ball])
 
         self.assertEqual(np.inf * q.s, comp.get_next_time(0 * q.s, ps))
@@ -298,9 +298,9 @@ class TestBodies(SyrisTest):
         ps = 1 * q.um
         x = np.linspace(0, n, num=10)
         y = z = np.zeros(x.shape)
-        traj_x = Trajectory(zip(x, y, z) * ps, velocity=ps / q.s)
-        traj_y = Trajectory(zip(y, x, z) * ps, velocity=ps / q.s)
-        traj_xy = Trajectory(zip(n - x, x, z) * ps, velocity=ps / q.s)
+        traj_x = Trajectory(list(zip(x, y, z)) * ps, velocity=ps / q.s)
+        traj_y = Trajectory(list(zip(y, x, z)) * ps, velocity=ps / q.s)
+        traj_xy = Trajectory(list(zip(n - x, x, z)) * ps, velocity=ps / q.s)
         mb = MetaBall(traj_x, n * ps / 16)
         cube = make_cube() / q.m * 16 * ps / 4
         mesh = Mesh(cube, traj_xy)
@@ -322,7 +322,7 @@ class TestBodies(SyrisTest):
         ps = 1 * q.um
         y = np.linspace(0, sgn * n, num=10)
         x = z = np.zeros(y.shape)
-        traj = Trajectory(zip(x, y, z) * ps, velocity=ps / q.s, pixel_size=ps)
+        traj = Trajectory(list(zip(x, y, z)) * ps, velocity=ps / q.s, pixel_size=ps)
         mb = MetaBall(traj, n * ps / 16, orientation=geom.Y_AX)
 
         mb.move(0 * q.s)

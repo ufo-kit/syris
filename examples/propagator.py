@@ -5,7 +5,7 @@ import quantities as q
 from numpy.fft import fftfreq
 import syris
 from syris.physics import energy_to_wavelength, compute_propagator
-from util import show
+from .util import show
 
 
 def compute_fourier_propagator(n, lam, z, ps, fresnel=True):
@@ -44,7 +44,7 @@ def main():
     ca = (lam / 2 / ps).simplified.magnitude
     tga = np.tan(np.arccos(ca))
     distance = (tga * n * ps / 2).simplified
-    print 'Propagation distance:', distance
+    print('Propagation distance:', distance)
 
     propagator = compute_propagator(n, distance, lam, ps, apply_phase_factor=True,
                                     mollified=False).get()
