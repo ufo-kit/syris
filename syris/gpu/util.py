@@ -51,10 +51,11 @@ def init_programs():
     cfg.OPENCL.programs['varconv'] = get_program(get_all_varconvolutions())
 
 
-def make_opencl_defaults(platform_name=None, device_index=None, profiling=True):
+def make_opencl_defaults(platform_name=None, device_type=None, device_index=None, profiling=True):
     """Create default OpenCL context from *platform_name* and a command queue based on
-    *device_index* to the devices list. If None, all devices are used in the context. If *profiling*
-    is True enable it.
+    *device_index* to the devices list. If None, all devices are used in the context. If
+    *platform_name* is not specified and *device_type* is, get a platform which has devices of that
+    type. If *profiling* is True enable it.
     """
     if profiling:
         kwargs = {"properties": cl.command_queue_properties.PROFILING_ENABLE}
@@ -62,7 +63,12 @@ def make_opencl_defaults(platform_name=None, device_index=None, profiling=True):
         kwargs = {}
     LOG.debug('Profiling enabled: %s', profiling)
     try:
-        platform = get_cuda_platform() if platform_name is None else get_platform(platform_name)
+        if platform_name:
+            platform = get_platform(platform_name)
+        elif device_type:
+            platform = get_platform_by_device_type(device_type)
+        else:
+            platform = get_cuda_platform()
     except LookupError:
         LOG.error('Platform %s not found, using first one which can be found', platform_name)
         platform = get_platform('')
