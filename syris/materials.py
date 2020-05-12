@@ -182,7 +182,7 @@ def make_henke(name, energies, formula=None, density=None):
         # Get the scattering factors
         response = urllib.request.urlopen('http://henke.lbl.gov/optical_constants' +
                                    '/sf/{}.nff'.format(element))
-        data = response.read()
+        data = response.read().decode('utf-8')
         response.close()
         data = np.fromstring(data[data.find('\r\n'):], sep='\t')
         data = data.reshape(data.shape[0] / 3, 3)
@@ -277,9 +277,9 @@ class _HenkeQuery(object):
 
         try:
             response = self._query_server(formula, density)
-            if 'error' in response.lower():
+            if b'error' in response.lower():
                 raise MaterialError('Error looking up material `{}`'.format(name))
-            parser.feed(response)
+            parser.feed(response.decode('utf-8'))
             link = urljoin(self._URL, parser.link)
             # First two lines are description
             values = urllib.request.urlopen(link).readlines()[2:]
@@ -306,7 +306,7 @@ class _HenkeQuery(object):
 
         url = urljoin(self._URL, '/cgi-bin/getdb.pl')
 
-        req = urllib.request.Request(url, url_values)
+        req = urllib.request.Request(url, bytes(url_values, 'utf-8'))
         response = urllib.request.urlopen(req)
         result = response.read()
         response.close()
