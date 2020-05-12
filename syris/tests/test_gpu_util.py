@@ -7,6 +7,14 @@ from syris.gpu import util as gu
 from syris.tests import SyrisTest, opencl
 
 
+def _has_platform_type(device_type):
+    for platform in cl.get_platforms():
+        device = platform.get_devices()[0]
+        if device.type == device_type:
+            return True
+    return False
+
+
 @opencl
 class TestGPUUtil(SyrisTest):
 
@@ -107,3 +115,17 @@ class TestGPUUtil(SyrisTest):
         for name in names:
             gu.get_platform(name)
         self.assertRaises(LookupError, gu.get_platform, 'foo')
+
+    def test_get_platform_by_device_type(self):
+        platforms = cl.get_platforms()
+        if platforms:
+            device_type = platforms[0].get_devices()[0].type
+            self.assertIsNotNone(gu.get_platform_by_device_type(device_type))
+
+    def test_get_cpu_platform(self):
+        if _has_platform_type(cl.device_type.CPU):
+            self.assertIsNotNone(gu.get_cpu_platform())
+
+    def test_get_gpu_platform(self):
+        if _has_platform_type(cl.device_type.GPU):
+            self.assertIsNotNone(gu.get_gpu_platform())
