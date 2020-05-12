@@ -6,7 +6,8 @@ import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
 from pyopencl.array import vec
-from pyfft.cl import Plan
+from reikna.cluda import ocl_api
+from reikna.fft import FFT
 from syris import config as cfg
 from syris.gpu import util as g_util
 from syris.math import fwnm_to_sigma
@@ -16,46 +17,45 @@ from syris.util import get_magnitude, make_tuple, next_power_of_two, read_image,
 LOG = logging.getLogger(__name__)
 
 
-def fft_2(data, plan=None, queue=None, block=True):
-    """2D FFT executed on *data* by a *plan*. If *plan* is None, it is created either for *queue* if
-    given, otherwise for the default opencl queue. *block* specifies if the execution will wait
-    until the scheduled FFT kernels finish. The transformation is done in-place if *data* is a
-    pyopencl Array class and has complex data type, otherwise the data is converted first.
+def fft_2(data, queue=None, block=True):
+    """2D FFT executed on *data*. *block* specifies if the execution will wait until the scheduled
+    FFT kernels finish. The transformation is done in-place if *data* is a pyopencl Array class and
+    has complex data type, otherwise the data is converted first.
     """
-    return _fft_2(data, inverse=False, plan=plan, queue=queue, block=block)
+    return _fft_2(data, inverse=False, queue=queue, block=block)
 
 
-def ifft_2(data, plan=None, queue=None, block=True):
-    """2D inverse FFT executed on *data* by a *plan*. If *plan* is None, it is created either for
-    *queue* if given, otherwise for the default opencl queue. *block* specifies if the execution
-    will wait until the scheduled FFT kernels finish. The transformation is done in-place if *data*
-    is a pyopencl Array class and has complex data type, otherwise the data is converted first.
-    """
-    return _fft_2(data, inverse=True, plan=plan, queue=queue, block=block)
+def ifft_2(data, queue=None, block=True):
+    """2D inverse FFT executed on *data*. *block* specifies if the execution will wait until the
+    scheduled FFT kernels finish. The transformation is done in-place if *data* is a pyopencl Array
+    class and has complex data type, otherwise the data is converted first.  """
+    return _fft_2(data, inverse=True, queue=queue, block=block)
 
 
-def _fft_2(data, inverse=False, plan=None, queue=None, block=True):
+def _fft_2(data, inverse=False, queue=None, block=True):
     """Execute FFT on *data*, which is first converted to a pyopencl array and retyped to
     complex.
     """
+    if not queue:
+        queue = cfg.OPENCL.queue
+    thread = ocl_api().Thread(queue)
     data = g_util.get_array(data, queue=queue)
     if data.dtype != cfg.PRECISION.np_cplx:
         data = data.astype(cfg.PRECISION.np_cplx)
 
-    if not plan:
-        if not queue:
-            queue = cfg.OPENCL.queue
-        if queue not in cfg.OPENCL.fft_plans:
-            cfg.OPENCL.fft_plans[queue] = {}
-        if data.shape not in cfg.OPENCL.fft_plans[queue]:
-            LOG.debug('Creating FFT Plan for {} and shape {}'.format(queue, data.shape))
-            cfg.OPENCL.fft_plans[queue][data.shape] = Plan(data.shape,
-                                                           dtype=cfg.PRECISION.np_cplx,
-                                                           queue=queue)
-        plan = cfg.OPENCL.fft_plans[queue][data.shape]
+    if queue not in cfg.OPENCL.fft_plans:
+        cfg.OPENCL.fft_plans[queue] = {}
+    if data.shape not in cfg.OPENCL.fft_plans[queue]:
+        LOG.debug('Creating FFT Plan for {} and shape {}'.format(queue, data.shape))
+        _fft = FFT(data, axes=(0, 1))
+        cfg.OPENCL.fft_plans[queue][data.shape] = _fft.compile(thread, fast_math=False)
+    plan = cfg.OPENCL.fft_plans[queue][data.shape]
 
     LOG.debug('fft_2, shape: %s, inverse: %s', data.shape, inverse)
-    plan.execute(data.data, inverse=inverse, wait_for_finish=block)
+    # plan.execute(data.data, inverse=inverse, wait_for_finish=block)
+    plan(data, data, inverse=inverse)
+    if block:
+        thread.synchronize()
 
     return data
 
