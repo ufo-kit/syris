@@ -7,7 +7,7 @@ from syris.bodies.simple import StaticBody
 from syris.materials import Material
 from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength, transfer
-from syris.tests import SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest, opencl, slow
 
 
 class DummyOpticalElement(OpticalElement):
@@ -27,9 +27,9 @@ class DummyOpticalElement(OpticalElement):
 class TestOpticalElement(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         energies = list(range(10, 20)) * q.keV
-        self.energy = energies[len(energies) / 2]
+        self.energy = energies[len(energies) // 2]
         self.material = Material('foo', np.arange(len(energies), dtype=np.complex), energies)
 
     def test_2d_conversion(self):

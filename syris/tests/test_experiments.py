@@ -6,14 +6,14 @@ from syris.devices.cameras import Camera
 from syris.devices.lenses import Lens
 from syris.devices.detectors import Detector
 from syris.geometry import Trajectory
-from syris.tests import SyrisTest
+from syris.tests import default_syris_init, SyrisTest
 from syris.experiments import Experiment
 
 
 class TestExperiments(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         lens = Lens(3., f_number=1.4, focal_length=100.0 * q.mm)
         camera = Camera(1 * q.um, 0.1, 10, 1.0, 12, (64, 64))
         detector = Detector(None, lens, camera)

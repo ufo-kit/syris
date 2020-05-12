@@ -4,7 +4,7 @@ import pyopencl as cl
 import syris
 from syris import config as cfg
 from syris.gpu import util as gu
-from syris.tests import SyrisTest, opencl
+from syris.tests import default_syris_init, SyrisTest, opencl
 
 
 def _has_platform_type(device_type):
@@ -19,7 +19,7 @@ def _has_platform_type(device_type):
 class TestGPUUtil(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0, profiling=True)
+        default_syris_init(profiling=True)
         self.data = np.arange(10).astype(cfg.PRECISION.np_float)
         self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                              cl.mem_flags.COPY_HOST_PTR, hostbuf=self.data)

@@ -5,14 +5,14 @@ from syris.devices.filters import GaussianFilter, MaterialFilter, Scintillator
 from syris.materials import Material
 from syris.math import fwnm_to_sigma, sigma_to_fwnm
 from syris.physics import energy_to_wavelength
-from syris.tests import SyrisTest, slow
+from syris.tests import default_syris_init, SyrisTest, slow
 
 
 @slow
 class TestFilters(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         self.energies = np.arange(10, 20) * q.keV
         self.energy = 15 * q.keV
         delta = np.linspace(1e-5, 1e-6, len(self.energies))

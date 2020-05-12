@@ -5,13 +5,13 @@ from distutils.spawn import find_executable
 from syris import config as cfg
 from syris.materials import Material, MaterialError, make_pmasf, make_henke
 import os
-from syris.tests import SyrisTest, slow
+from syris.tests import default_syris_init, SyrisTest, slow
 
 
 class TestMaterial(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         self.energies = np.arange(1, 5, 1) * q.keV
         self.refractive_indices = np.array([i + i * 1j for i in range(1, len(self.energies) + 1)])
 
@@ -53,7 +53,7 @@ class TestMaterial(SyrisTest):
 class TestPMASFMaterial(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         self.energies = np.arange(1, 5, 1) * q.keV
         self.refractive_indices = np.array([i + i * 1j for i in range(1, len(self.energies) + 1)])
 
@@ -80,7 +80,7 @@ class TestPMASFMaterial(SyrisTest):
 class TestHenkeMaterial(SyrisTest):
 
     def test_creation(self):
-        syris.init(device_index=0)
+        default_syris_init()
         energies = np.arange(1, 10, 1) * q.keV
         make_henke('foo', energies, formula='H')
 

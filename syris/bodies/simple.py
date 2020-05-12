@@ -67,7 +67,7 @@ def make_grid(n, period, width=1 * q.m, thickness=1 * q.m, pixel_size=1 * q.m, m
 
     image = np.zeros((n, n), dtype=cfg.PRECISION.np_float)
 
-    for i in range(-width / 2, width / 2):
+    for i in range(-width // 2, width // 2):
         if i < 0:
             i = period + i
         image[i::period, :] = 1
@@ -82,7 +82,7 @@ def make_sphere(n, radius, pixel_size=1 * q.m, material=None, queue=None):
     an OpenCL command queue, are used to create :class:`.StaticBody`.
     """
     image = np.zeros((n, n), dtype=cfg.PRECISION.np_float)
-    y, x = np.mgrid[-n / 2:n / 2, -n / 2:n / 2]
+    y, x = np.mgrid[-n // 2:n // 2, -n // 2:n // 2]
     x = (x + .5) * pixel_size.simplified.magnitude
     y = (y + .5) * pixel_size.simplified.magnitude
     radius = radius.simplified.magnitude

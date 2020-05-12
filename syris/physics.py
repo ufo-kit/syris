@@ -104,7 +104,7 @@ def compute_propagator(size, distance, lam, pixel_size, fresnel=True, region=Non
         phase_factor = 0 + 0j
 
     ev = cfg.OPENCL.programs['physics'].propagator(queue,
-                                                   (size / 2 + 1, size / 2 + 1),
+                                                   (size // 2 + 1, size // 2 + 1),
                                                    None,
                                                    out.data,
                                                    cfg.PRECISION.np_float(distance.simplified),
@@ -143,7 +143,7 @@ def is_wavefield_sampling_ok(wavefield_exponent, queue=None, out=None):
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl_array.zeros(queue, shape, np.int8)
-    y, x = shape[0] / 2, shape[1] / 2
+    y, x = shape[0] // 2, shape[1] // 2
 
     cfg.OPENCL.programs['physics'].check_transmission_function(queue,
                                                                (x, y),

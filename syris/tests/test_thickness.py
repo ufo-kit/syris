@@ -4,14 +4,14 @@ import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
 from .graphics_util import derivative, f, sgn, Metaball
-from syris.tests import SyrisTest, opencl
+from syris.tests import default_syris_init, SyrisTest, opencl
 
 
 @opencl
 class TestThickness(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         self.pixel_size = 1e-3
         self.precision_places = int(np.log10(1 / self.pixel_size))
         self.prg = g_util.get_program(g_util.get_metaobjects_source())

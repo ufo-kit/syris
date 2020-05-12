@@ -141,7 +141,7 @@ def project_metaballs(metaballs, shape, pixel_size, offset=None, queue=None, out
     is the physical spatial body offset as (y, x). Use OpenCL *queue* and *out* pyopencl Array
     instance for returning the result. If *block* is True, wait for the kernel to finish.
     """
-    string = ''.join([body.pack() for body in metaballs])
+    string = b''.join([body.pack() for body in metaballs])
     n, m = shape
     ps = pixel_size.simplified.magnitude
     if offset is None:
@@ -203,7 +203,7 @@ def project_metaballs_naive(metaballs, shape, pixel_size, offset=None, z_step=No
     if out is None:
         out = cl_array.Array(queue, shape, cfg.PRECISION.np_float)
 
-    string = ''.join([body.pack() for body in metaballs])
+    string = b''.join([body.pack() for body in metaballs])
     data = np.fromstring(string, dtype=np.float32)
     data = cl_array.to_device(queue, data)
     n, m = shape

@@ -43,8 +43,8 @@ class Experiment(object):
         """
         l = self.source.sample_distance
         size = self.source.size
-        width = (self.propagation_distance * size[1] / l).simplified.magnitude
-        height = (self.propagation_distance * size[0] / l).simplified.magnitude
+        width = (self.propagation_distance * size[1] // l).simplified.magnitude
+        height = (self.propagation_distance * size[0] // l).simplified.magnitude
         sigma = (smath.fwnm_to_sigma(height, n=2), smath.fwnm_to_sigma(width, n=2)) * q.m
 
         return ip.get_gauss_2d(shape, sigma, pixel_size=pixel_size, fourier=True,

@@ -3,7 +3,7 @@ import pyopencl as cl
 import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
-from syris.tests import SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest, opencl, slow
 
 
 @slow
@@ -11,7 +11,7 @@ from syris.tests import SyrisTest, opencl, slow
 class TestGPUSorting(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         self.prg = g_util.get_program(
             g_util.get_source(["polyobject.cl",
                                "heapsort.cl"],

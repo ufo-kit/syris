@@ -65,7 +65,7 @@ class Mesh(MovableBody):
     @property
     def num_triangles(self):
         """Number of triangles in the mesh."""
-        return self._current.shape[1] / 3
+        return self._current.shape[1] // 3
 
     @property
     def extrema(self):
