@@ -11,7 +11,7 @@ from syris.tests import SyrisTest, opencl
 class TestGPUUtil(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        syris.init(device_index=0, profiling=True)
         self.data = np.arange(10).astype(cfg.PRECISION.np_float)
         self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
                              cl.mem_flags.COPY_HOST_PTR, hostbuf=self.data)
