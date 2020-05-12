@@ -572,7 +572,8 @@ def _copy_rect(src, dst, src_origin, dst_origin, region, queue, block=False):
     src_pitches = (n_bytes * src.shape[1], n_bytes * src.shape[1] * src.shape[0])
     dst_pitches = (n_bytes * dst.shape[1], n_bytes * dst.shape[1] * dst.shape[0])
 
-    ev = cl.enqueue_copy_buffer_rect(queue, src.data, dst.data, src_origin, dst_origin, region,
-                                     src_pitches, dst_pitches)
+    ev = cl.enqueue_copy(queue, dst.data, src.data, src_origin=src_origin,
+                         dst_origin=dst_origin, region=region,
+                         src_pitches=src_pitches, dst_pitches=dst_pitches)
     if block:
         ev.wait()
