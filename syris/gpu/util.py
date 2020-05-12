@@ -357,6 +357,26 @@ def get_platform(name):
     raise LookupError("Platform '{}' not found".format(name))
 
 
+def get_platform_by_device_type(device_type):
+    """Get platform with specific device type (CPU, GPU, ...)."""
+    for platform in cl.get_platforms():
+        device = platform.get_devices()[0]
+        if device.type == device_type:
+            return platform
+
+    raise LookupError("There is no platform with device type '{}'", device_type)
+
+
+def get_gpu_platform():
+    """Get any platform with GPUs."""
+    return get_platform_by_device_type(cl.device_type.GPU)
+
+
+def get_cpu_platform():
+    """Get any platform with CPUs."""
+    return get_platform_by_device_type(cl.device_type.CPU)
+
+
 def get_cuda_platform():
     """Get the NVIDIA CUDA platform if any."""
     return get_platform('NVIDIA CUDA')
