@@ -6,13 +6,13 @@ from syris.bodies.simple import StaticBody
 from syris.devices.sources import BendingMagnet
 from syris.geometry import Trajectory
 from syris.materials import Material
-from syris.tests import SyrisTest, opencl
+from syris.tests import default_syris_init, SyrisTest, opencl
 
 
 class TestPhysics(SyrisTest):
 
     def setUp(self):
-        syris.init(double_precision=True, device_index=0)
+        default_syris_init(double_precision=True)
         self.energy = 20 * q.keV
         self.lam = 6.19920937165e-11 * q.m
         self.size = 64

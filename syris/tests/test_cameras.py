@@ -3,14 +3,14 @@ import quantities as q
 import syris
 import syris.config as cfg
 from syris.devices.cameras import Camera, is_fps_feasible
-from syris.tests import SyrisTest, slow
+from syris.tests import default_syris_init, SyrisTest, slow
 
 
 @slow
 class TestCamera(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         wavelengths = np.arange(10) * q.nm
         qe = np.ones(len(wavelengths))
         self.camera = Camera(1e-3 * q.um,

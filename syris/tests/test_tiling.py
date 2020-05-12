@@ -4,13 +4,13 @@ import pyopencl.array as cl_array
 import syris
 from syris import config as cfg
 from syris.imageprocessing import Tiler
-from syris.tests import SyrisTest, opencl
+from syris.tests import SyrisTest, opencl, default_syris_init
 
 
 class TestImageTiling(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         self.data = []
 
         sizes = [8, 32]
@@ -28,14 +28,14 @@ class TestImageTiling(SyrisTest):
             for i in range(tiles_count[1]):
                 if outlier:
                     self.assertEqual(tiles[j, i][0],
-                                     size[0] / tiles_count[0] * (j - 0.5))
+                                     size[0] // tiles_count[0] * (j - 0.5))
                     self.assertEqual(tiles[j, i][1],
-                                     size[1] / tiles_count[1] * (i - 0.5))
+                                     size[1] // tiles_count[1] * (i - 0.5))
                 else:
                     self.assertEqual(
-                        tiles[j, i][0], j * size[0] / tiles_count[0])
+                        tiles[j, i][0], j * size[0] // tiles_count[0])
                     self.assertEqual(
-                        tiles[j, i][1], i * size[1] / tiles_count[1])
+                        tiles[j, i][1], i * size[1] // tiles_count[1])
 
     def test_invalid_tiles(self):
         size = 16, 16
@@ -52,15 +52,15 @@ class TestImageTiling(SyrisTest):
     def test_tile_shape(self):
         for size, tiles_count in self.data:
             tiler = Tiler(size, tiles_count, True)
-            self.assertEqual(2 * size[0] / tiles_count[0],
+            self.assertEqual(2 * size[0] // tiles_count[0],
                              tiler.tile_shape[0])
-            self.assertEqual(2 * size[1] / tiles_count[1],
+            self.assertEqual(2 * size[1] // tiles_count[1],
                              tiler.tile_shape[1])
 
             tiler = Tiler(size, tiles_count, False)
-            self.assertEqual(size[0] / tiles_count[0],
+            self.assertEqual(size[0] // tiles_count[0],
                              tiler.tile_shape[0])
-            self.assertEqual(size[1] / tiles_count[1],
+            self.assertEqual(size[1] // tiles_count[1],
                              tiler.tile_shape[1])
 
     def test_result_tile_shape(self):
@@ -70,21 +70,21 @@ class TestImageTiling(SyrisTest):
             self.assertEqual(tiler.result_tile_shape, ground_truth)
 
             tiler = Tiler(shape, tiles_count, outlier=False, supersampling=2)
-            ground_truth = tuple([dim / tiler.supersampling
+            ground_truth = tuple([dim // tiler.supersampling
                                   for dim in tiler.tile_shape])
             self.assertEqual(tiler.result_tile_shape, ground_truth)
 
             tiler = Tiler(shape, tiles_count, outlier=True, supersampling=1)
-            ground_truth = tuple([dim / 2 for dim in tiler.tile_shape])
+            ground_truth = tuple([dim // 2 for dim in tiler.tile_shape])
             self.assertEqual(tiler.result_tile_shape, ground_truth)
 
             tiler = Tiler(shape, tiles_count, outlier=True, supersampling=2)
-            ground_truth = tuple([dim / 2 / tiler.supersampling
+            ground_truth = tuple([dim // 2 // tiler.supersampling
                                   for dim in tiler.tile_shape])
             self.assertEqual(tiler.result_tile_shape, ground_truth)
 
             tiler = Tiler(shape, tiles_count, outlier=True, supersampling=4)
-            ground_truth = tuple([dim / 2 / tiler.supersampling
+            ground_truth = tuple([dim // 2 // tiler.supersampling
                                   for dim in tiler.tile_shape])
             self.assertEqual(tiler.result_tile_shape, ground_truth)
 
@@ -110,7 +110,7 @@ class TestImageTiling(SyrisTest):
     def test_insert(self):
         shape = 16, 32
         tiles_count = 4, 2
-        tile_shape = [shape[i] / tiles_count[i] for i in range(len(shape))]
+        tile_shape = [shape[i] // tiles_count[i] for i in range(len(shape))]
 
         tilers = [Tiler(shape, tiles_count, outlier=True, supersampling=1),
                   Tiler(shape, tiles_count, outlier=False, supersampling=1),

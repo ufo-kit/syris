@@ -106,8 +106,8 @@ def pad(image, region=None, out=None, value=0, queue=None, block=False):
     """
     if region is None:
         shape = tuple([next_power_of_two(n) for n in image.shape])
-        y_0 = (shape[0] - image.shape[0]) / 2
-        x_0 = (shape[1] - image.shape[1]) / 2
+        y_0 = (shape[0] - image.shape[0]) // 2
+        x_0 = (shape[1] - image.shape[1]) // 2
         region = (y_0, x_0) + shape
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -166,7 +166,7 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
         out = cl.array.Array(queue, summed_shape, dtype=cfg.PRECISION.np_float)
     image = g_util.get_array(image, queue=queue)
     orig_shape = (image.shape[0] - offset[0], image.shape[1] - offset[1])
-    region = (orig_shape[0] / summed_shape[0], orig_shape[1] / summed_shape[1])
+    region = (orig_shape[0] // summed_shape[0], orig_shape[1] // summed_shape[1])
     if orig_shape[0] % summed_shape[0] or orig_shape[1] % summed_shape[1]:
         raise RuntimeError('Final shape {} must be a divisor '.format(summed_shape) +
                            'of the original shape {}'.format(image.shape))
@@ -413,14 +413,14 @@ class Tiler(object):
 
         ar_type = cfg.PRECISION.np_cplx if cplx else cfg.PRECISION.np_float
 
-        self._overall = np.empty((self.shape[0] / self.supersampling,
-                                  self.shape[1] / self.supersampling),
+        self._overall = np.empty((self.shape[0] // self.supersampling,
+                                  self.shape[1] // self.supersampling),
                                  dtype=ar_type)
 
     @property
     def result_tile_shape(self):
         """Result tile shape without outlier and supersampling."""
-        return tuple([dim / self.supersampling / self._outlier_coeff
+        return tuple([dim // self.supersampling // self._outlier_coeff
                       for dim in self.tile_shape])
 
     @property
@@ -436,25 +436,25 @@ class Tiler(object):
         """Get the supersampled tile shape based on tile counts
         *tile_counts* as (y, x) and *shape* (y, x).
         """
-        return self._outlier_coeff * self.shape[0] / self.tiles_count[0], \
-            self._outlier_coeff * self.shape[1] / self.tiles_count[1]
+        return self._outlier_coeff * self.shape[0] // self.tiles_count[0], \
+            self._outlier_coeff * self.shape[1] // self.tiles_count[1]
 
     @property
     def tile_indices(self):
         """Get the supersampled tile indices which are starting points
         of a given tile in (y, x) fashion.
         """
-        y_ind = np.array([i * self.tile_shape[0] / self._outlier_coeff
+        y_ind = np.array([i * self.tile_shape[0] // self._outlier_coeff
                           for i in range(self.tiles_count[0])])
-        x_ind = np.array([i * self.tile_shape[1] / self._outlier_coeff
+        x_ind = np.array([i * self.tile_shape[1] // self._outlier_coeff
                           for i in range(self.tiles_count[1])])
 
         if self.outlier:
             # If the tile starts at x and has a shape n, then with outlier
             # treatment it starts at x - n / 2 and ends in x + n / 2, thus
             # has shape 2 * n
-            y_ind = y_ind - self.tile_shape[0] / 4
-            x_ind = x_ind - self.tile_shape[1] / 4
+            y_ind = y_ind - self.tile_shape[0] // 4
+            x_ind = x_ind - self.tile_shape[1] // 4
 
         return np.array(list(itertools.product(y_ind, x_ind))).\
             reshape(self.tiles_count + (2,))
@@ -464,7 +464,7 @@ class Tiler(object):
         for the tiler. If *out* is not None, it will be used for returning the sum.
         """
         summed_shape = self.result_tile_shape
-        offset = [(self._outlier_coeff - 1) * dim / 4 for dim in self.tile_shape]
+        offset = [(self._outlier_coeff - 1) * dim // 4 for dim in self.tile_shape]
 
         return bin_image(tile, summed_shape, offset, average=True, out=out)
 
@@ -488,8 +488,8 @@ def make_tile_offsets(shape, tile_shape, outlier=(0, 0)):
     be cropped to (m / 2, n - n / 2) before it can be placed into the resulting image. This is
     convenient for convolution outlier treatment.
     """
-    y_starts = np.arange(0, shape[0], tile_shape[0] - outlier[0]) - outlier[0] / 2
-    x_starts = np.arange(0, shape[1], tile_shape[1] - outlier[1]) - outlier[1] / 2
+    y_starts = np.arange(0, shape[0], tile_shape[0] - outlier[0]) - outlier[0] // 2
+    x_starts = np.arange(0, shape[1], tile_shape[1] - outlier[1]) - outlier[1] // 2
 
     return list(itertools.product(y_starts, x_starts))
 
@@ -543,8 +543,8 @@ def merge_tiles(tiles, num_tiles=None, outlier=(0, 0)):
 
     for j in range(n):
         for i in range(m):
-            tile = g_util.get_host(tiles[j * m + i])[outlier[0] / 2:tile_shape[0] - outlier[0] / 2,
-                                                     outlier[1] / 2:tile_shape[1] - outlier[1] / 2]
+            tile = g_util.get_host(tiles[j * m + i])[outlier[0] // 2:tile_shape[0] - outlier[0] // 2,
+                                                     outlier[1] // 2:tile_shape[1] - outlier[1] // 2]
             result[j * crop_shape[0]:(j + 1) * crop_shape[0],
                    i * crop_shape[1]:(i + 1) * crop_shape[1]] = tile
 

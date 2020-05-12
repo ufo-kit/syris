@@ -4,7 +4,7 @@ import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
 from .graphics_util import f, derivative, filter_close, np_roots, Metaball
-from syris.tests import SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest, opencl, slow
 
 
 @opencl
@@ -12,7 +12,7 @@ from syris.tests import SyrisTest, opencl, slow
 class TestPolynomials(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         self.poly_deg = 4
         self.coeffs = np.array([5, 87, -2, 37, 17], dtype=cfg.PRECISION.np_float)
 

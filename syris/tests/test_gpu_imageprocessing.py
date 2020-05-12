@@ -9,11 +9,11 @@ from syris import imageprocessing as ip
 from syris.math import fwnm_to_sigma
 from syris.util import get_magnitude, make_tuple
 import itertools
-from syris.tests import SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest, opencl, slow
 
 
 def bin_cpu(image, shape):
-    factor = (image.shape[0] / shape[0], image.shape[1] / shape[1])
+    factor = (image.shape[0] // shape[0], image.shape[1] // shape[1])
     im = np.copy(image)
     for k in range(1, factor[0]):
         im[::factor[0], :] += im[k::factor[0], :]
@@ -37,8 +37,8 @@ def get_gauss_2d(shape, sigma, pixel_size=None, fourier=False):
 
         return np.exp(-2 * np.pi ** 2 * ((i * sigma[1]) ** 2 + (j * sigma[0]) ** 2))
     else:
-        x = (np.arange(shape[1]) - shape[1] / 2) * pixel_size[1]
-        y = (np.arange(shape[0]) - shape[0] / 2) * pixel_size[0]
+        x = (np.arange(shape[1]) - shape[1] // 2) * pixel_size[1]
+        y = (np.arange(shape[0]) - shape[0] // 2) * pixel_size[0]
         x, y = np.meshgrid(x, y)
         gauss = np.exp(- x ** 2 / (2. * sigma[1] ** 2) - y ** 2 / (2. * sigma[0] ** 2))
 
@@ -63,7 +63,7 @@ def rescale_scipy(image, factor):
 class TestGPUImageProcessing(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         self.pixel_size = 1 * q.um
 
     def _test_gauss(self, shape, fourier):
@@ -92,7 +92,7 @@ class TestGPUImageProcessing(SyrisTest):
         cl_im = cl_array.to_device(cfg.OPENCL.queue, image)
         sizes = (1, 2, 4)
         for shape in itertools.product(sizes, sizes):
-            region = (m / shape[0], n / shape[1])
+            region = (m // shape[0], n // shape[1])
             gt = bin_cpu(image, shape)
             res = ip.bin_image(cl_im, shape)
             np.testing.assert_equal(gt, res)
@@ -109,9 +109,9 @@ class TestGPUImageProcessing(SyrisTest):
     def test_decimate(self):
         n = 16
         sigma = fwnm_to_sigma(1)
-        shape = (n / 2, n / 2)
+        shape = (n // 2,  n // 2)
 
-        image = np.arange(n * n).reshape(n, n).astype(cfg.PRECISION.np_float) / n ** 2
+        image = np.arange(n * n).reshape(n, n).astype(cfg.PRECISION.np_float) // n ** 2
         fltr = get_gauss_2d((n, n), sigma, fourier=True)
         filtered = np.fft.ifft2(np.fft.fft2(image) * fltr).real
         gt = bin_cpu(filtered, shape)
@@ -176,15 +176,8 @@ class TestGPUImageProcessing(SyrisTest):
         ip.ifft_2(data)
         np.testing.assert_almost_equal(orig, data.get().real, decimal=4)
 
-        # With a plan
-        from pyfft.cl import Plan
-        plan = Plan((4, 4), queue=cfg.OPENCL.queue)
-        data = ip.fft_2(np.copy(orig), plan=plan)
-        ip.ifft_2(data, plan=plan)
-        np.testing.assert_almost_equal(orig, data.get().real, decimal=4)
-
         # Test double precision
-        syris.init(double_precision=True, device_index=0)
+        default_syris_init(double_precision=True)
         data = gpu_util.get_array(np.random.normal(100, 100,
                                                    size=(4, 4)).astype(cfg.PRECISION.np_float))
         gt = np.fft.fft2(data.get())
@@ -199,7 +192,7 @@ class TestGPUImageProcessing(SyrisTest):
         n = 4
         shape = (n, n)
         image = np.zeros(shape, dtype=cfg.PRECISION.np_float)
-        image[n / 2, n / 2] = 1
+        image[ n // 2,  n // 2] = 1
         radii = np.ones_like(image) * 1e-3
         result = ip.varconvolve_disk(image, (radii, radii), normalized=False, smooth=False).get()
         # At least one pixel in the midle must exist (just copies the original image)
@@ -215,7 +208,7 @@ class TestGPUImageProcessing(SyrisTest):
         n = 128
         shape = (n, n)
         image = np.zeros(shape, dtype=cfg.PRECISION.np_float)
-        image[n / 2, n / 2] = 1
+        image[n // 2,  n // 2] = 1
         sigmas = np.ones_like(image) * 1e-3
         result = ip.varconvolve_gauss(image, (sigmas, sigmas), normalized=False).get()
         # At least one pixel in the midle must exist (just copies the original image)

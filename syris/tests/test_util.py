@@ -25,7 +25,7 @@ def test_get_magnitude():
 def test_gauss():
     n = 64
     sigma = 2
-    mean = n / 2
+    mean = n // 2
     x = np.arange(n)
     gt = np.exp(-(x - float(mean)) ** 2 / (2 * sigma ** 2))
 

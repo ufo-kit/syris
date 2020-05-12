@@ -5,11 +5,11 @@ from pyopencl import clmath
 from syris.devices.sources import BendingMagnet, Wiggler, XRaySourceError
 from syris.geometry import Trajectory
 from syris.physics import energy_to_wavelength
-from syris.tests import SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest, opencl, slow
 
 
 def make_phase(n, ps, d, energy, phase_profile):
-    y, x = np.mgrid[-n / 2:n / 2, -n / 2:n / 2] * ps
+    y, x = np.mgrid[-n // 2:n // 2, -n // 2:n // 2] * ps
     x = x.simplified.magnitude
     y = y.simplified.magnitude
     d = d.simplified.magnitude
@@ -30,7 +30,7 @@ class TestSources(SyrisTest):
 
     def setUp(self):
         # Double precision needed for spherical phase profile
-        syris.init(double_precision=True, device_index=0)
+        default_syris_init(double_precision=True)
         self.dE = 0.1 * q.keV
         self.energies = np.arange(14.8, 15, self.dE.magnitude) * q.keV
         self.trajectory = Trajectory([(0, 0, 0)] * q.m)
@@ -96,7 +96,7 @@ class TestSources(SyrisTest):
         shape = (n, n)
         ps = 1 * q.um
         energy = 10 * q.keV
-        offset = (n / 2, n / 2) * ps
+        offset = (n // 2, n // 2) * ps
 
         def test_one_phase_profile(phase_profile):
             self.source.phase_profile = phase_profile

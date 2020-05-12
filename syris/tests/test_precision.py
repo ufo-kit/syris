@@ -3,14 +3,14 @@ import pyopencl as cl
 import syris
 import syris.config as cfg
 from syris.gpu import util as gpu_util
-from syris.tests import SyrisTest, opencl
+from syris.tests import default_syris_init, SyrisTest, opencl
 
 
 @opencl
 class TestPrecision(SyrisTest):
 
     def setUp(self):
-        syris.init(device_index=0)
+        default_syris_init()
         self.n = 2
         self.kernel_fn = "vfloat_test.cl"
 

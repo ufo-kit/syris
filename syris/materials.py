@@ -185,7 +185,7 @@ def make_henke(name, energies, formula=None, density=None):
         data = response.read().decode('utf-8')
         response.close()
         data = np.fromstring(data[data.find('\r\n'):], sep='\t')
-        data = data.reshape(data.shape[0] / 3, 3)
+        data = data.reshape(data.shape[0] // 3, 3)
         # Henke returns eV
         sf_energies = data[:, 0] * 1e-3
         f_1 = data[:, 1]
