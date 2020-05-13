@@ -333,7 +333,7 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
 
 def make_fromfile(filename):
     """Load saved material from *filename*."""
-    return pickle.load(open(filename, "r"))
+    return pickle.load(open(filename, "rb"))
 
 
 class _HenkeQuery(object):
