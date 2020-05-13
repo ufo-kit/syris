@@ -318,6 +318,7 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
     for energy in energies:
         apdx = apdx_fmt.format(energy.rescale(q.keV).magnitude)
         url = base + mat + apdx
+        LOG.debug(url)
         res = urllib.request.urlopen(url)
         txt = res.read()
         lines = txt[txt.find("delta=") :].split("\n")
