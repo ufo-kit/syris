@@ -1,6 +1,5 @@
 import numpy as np
 import quantities as q
-import syris
 from syris.devices.filters import GaussianFilter, MaterialFilter, Scintillator
 from syris.materials import Material
 from syris.math import fwnm_to_sigma, sigma_to_fwnm
@@ -9,14 +8,13 @@ from syris.tests import default_syris_init, SyrisTest
 
 
 class TestFilters(SyrisTest):
-
     def setUp(self):
         default_syris_init()
         self.energies = np.arange(10, 20) * q.keV
         self.energy = 15 * q.keV
         delta = np.linspace(1e-5, 1e-6, len(self.energies))
         beta = np.linspace(1e-8, 1e-9, len(self.energies))
-        self.material = Material('foo', delta + beta * 1j, self.energies)
+        self.material = Material("foo", delta + beta * 1j, self.energies)
         self.thickness = 1 * q.mm
         self.fltr = MaterialFilter(self.thickness, self.material)
 
@@ -69,14 +67,18 @@ class TestFilters(SyrisTest):
     def test_scintillator_conservation(self):
         """Test if the integral of luminescence is really 1."""
         wavelengths = np.linspace(100, 700, 512) * q.nm
-        wavelengths_dense = np.linspace(wavelengths[0].magnitude,
-                                        wavelengths[-1].magnitude, 4 * len(wavelengths)) * q.nm
+        wavelengths_dense = (
+            np.linspace(wavelengths[0].magnitude, wavelengths[-1].magnitude, 4 * len(wavelengths))
+            * q.nm
+        )
         d_wavelength_dense = wavelengths_dense[1] - wavelengths_dense[0]
-        sigma = 20. * q.nm
-        luminescence = np.exp(-(wavelengths - 400 * q.nm) ** 2 / (2 * sigma ** 2)) / \
-            (sigma * np.sqrt(2 * np.pi))
-        sc = Scintillator(1 * q.m, None, np.ones(30) / q.keV, np.arange(30) * q.keV, luminescence,
-                          wavelengths, 1)
+        sigma = 20.0 * q.nm
+        luminescence = np.exp(-((wavelengths - 400 * q.nm) ** 2) / (2 * sigma ** 2)) / (
+            sigma * np.sqrt(2 * np.pi)
+        )
+        sc = Scintillator(
+            1 * q.m, None, np.ones(30) / q.keV, np.arange(30) * q.keV, luminescence, wavelengths, 1
+        )
         lum_orig = sc.get_luminescence(wavelengths)
         self.assertAlmostEqual((np.sum(lum_orig) * sc.d_wavelength).simplified.magnitude, 1)
 
