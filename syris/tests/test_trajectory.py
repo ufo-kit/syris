@@ -7,7 +7,7 @@ import numpy as np
 import quantities as q
 from scipy import interpolate as interp
 from syris.geometry import get_rotation_displacement, Trajectory
-from syris.tests import SyrisTest, slow
+from syris.tests import SyrisTest
 
 
 def make_circle(n=128):
@@ -171,7 +171,6 @@ class TestTrajectory(SyrisTest):
             np.testing.assert_almost_equal(traj.get_point(times[i]),
                                            evaluate_point(dist[i] / traj.length), decimal=4)
 
-    @slow
     def test_get_next_time(self):
         """Very small rotation circle but large object extent."""
         def pr(v, decimals=2):
@@ -205,7 +204,6 @@ class TestTrajectory(SyrisTest):
         ps = ps.rescale(q.um).magnitude
         np.testing.assert_almost_equal(ps, max_diff, decimal=2)
 
-    @slow
     def test_get_distances(self):
         """Compare analytically computed distances with the ones obtained from trajectory."""
         points = make_circle(n=128)

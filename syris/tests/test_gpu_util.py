@@ -4,7 +4,7 @@ import pyopencl as cl
 import syris
 from syris import config as cfg
 from syris.gpu import util as gu
-from syris.tests import default_syris_init, SyrisTest, opencl
+from syris.tests import default_syris_init, SyrisTest
 
 
 def _has_platform_type(device_type):
@@ -15,7 +15,6 @@ def _has_platform_type(device_type):
     return False
 
 
-@opencl
 class TestGPUUtil(SyrisTest):
 
     def setUp(self):
@@ -67,7 +66,7 @@ class TestGPUUtil(SyrisTest):
                 # host -> host
                 host_data = gu.get_host(np_data)
                 np.testing.assert_equal(np_data, host_data)
-                if dtype.kind != 'c':
+                if gu.are_images_supported() and dtype.kind != 'c':
                     # numpy -> Image and Image -> Array
                     image = gu.get_image(np_data)
                     back = gu.get_array(image).get()
@@ -94,12 +93,13 @@ class TestGPUUtil(SyrisTest):
         # Unrecognized data types
         self.assertRaises(TypeError, gu.get_array, 1)
         self.assertRaises(TypeError, gu.get_array, None)
-        self.assertRaises(TypeError, gu.get_image, 1)
-        self.assertRaises(TypeError, gu.get_image, None)
+        if gu.are_images_supported():
+            self.assertRaises(TypeError, gu.get_image, 1)
+            self.assertRaises(TypeError, gu.get_image, None)
 
-        # Complex Image
-        data = np.ones((4, 4), dtype=np.complex)
-        self.assertRaises(TypeError, gu.get_image, data)
+            # Complex Image
+            data = np.ones((4, 4), dtype=np.complex)
+            self.assertRaises(TypeError, gu.get_image, data)
 
     def test_get_duration(self):
         data = np.arange(64, dtype=cfg.PRECISION.np_float)

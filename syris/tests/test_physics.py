@@ -6,7 +6,7 @@ from syris.bodies.simple import StaticBody
 from syris.devices.sources import BendingMagnet
 from syris.geometry import Trajectory
 from syris.materials import Material
-from syris.tests import default_syris_init, SyrisTest, opencl
+from syris.tests import default_syris_init, SyrisTest
 
 
 class TestPhysics(SyrisTest):
@@ -59,14 +59,12 @@ class TestPhysics(SyrisTest):
                                    (i / self.pixel_size.simplified * self.lam.simplified) ** 2 -
                                    (j / self.pixel_size.simplified * self.lam.simplified) ** 2)))
 
-    @opencl
     def test_no_phase_factor(self):
         res = self._get_propagator()
         cpu = self._cpu_propagator()
 
         np.testing.assert_almost_equal(res, cpu, 5)
 
-    @opencl
     def test_with_phase_factor(self):
         phase = np.exp(2 * np.pi / self.lam.simplified *
                        self.distance.simplified * 1j)
@@ -76,7 +74,6 @@ class TestPhysics(SyrisTest):
 
         np.testing.assert_almost_equal(res, cpu, 5)
 
-    @opencl
     def test_transfer(self):
         thickness = np.linspace(0, 0.01, 16).reshape(4, 4) * q.mm
         energy = 10 * q.keV
@@ -92,7 +89,6 @@ class TestPhysics(SyrisTest):
         wavefield = physics.transfer(thickness, refractive_index, wavelength, exponent=True).get()
         np.testing.assert_almost_equal(truth, np.exp(wavefield))
 
-    @opencl
     def test_transfer_many(self):
         n = 32
         shape = (n, n)
@@ -118,7 +114,6 @@ class TestPhysics(SyrisTest):
         u_exp = physics.transfer_many([wedge], shape, ps, energy, exponent=True).get()
         np.testing.assert_almost_equal(u, np.exp(u_exp))
 
-    @opencl
     def test_transmission_sampling(self):
         def compute_transmission_function(n, ps, energy, material):
             wedge = np.tile(np.arange(n), [n, 1]) * ps
@@ -179,7 +174,6 @@ class TestPhysics(SyrisTest):
         u = source.transfer((n, n), ps, energy, exponent=True)
         self.assertTrue(physics.is_wavefield_sampling_ok(u))
 
-    @opencl
     def test_full_propagator(self):
         gt = self._cpu_propagator(fresnel=False)
         propagator = self._get_propagator(fresnel=False)

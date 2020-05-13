@@ -3,11 +3,9 @@ import pyopencl as cl
 import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
-from syris.tests import default_syris_init, SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest
 
 
-@slow
-@opencl
 class TestGPUSorting(SyrisTest):
 
     def setUp(self):
