@@ -11,6 +11,9 @@ Syris
     :target: http://syris.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
 
+.. image:: https://codecov.io/gh/ufo-kit/syris/branch/master/graph/badge.svg
+  :target: https://codecov.io/gh/ufo-kit/syris
+
 *Syris* (**sy**\ nchrotron **r**\ adiation **i**\ maging **s**\ imulation) is a
 framework for simulations of X-ray absorption and phase contrast dynamic imaging
 experiments, like time-resolved radiography, tomography or laminography. It
