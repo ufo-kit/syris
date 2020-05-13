@@ -7,16 +7,15 @@ python:
     - 3.8
 
 before_install:
-    - sudo apt-get install -qq python-coverage
-    - sudo apt-get install -qq python-pyopencl
+    - sudo apt-get install -qq python3-pyopencl
 
 install:
-    - pip install python-coveralls
+    - pip install codecov
     - pip install -r requirements.txt
     - pip install .
 
 script:
-    - nosetests --with-coverage --cover-package=syris syris
+    - coverage run -m --source=syris unittest discover
 
 after_success:
-    - coveralls
+    - codecov
