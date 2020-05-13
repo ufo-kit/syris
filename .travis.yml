@@ -10,12 +10,14 @@ before_install:
     - sudo apt-get install -qq python3-pyopencl
 
 install:
+    - pip install flake8
     - pip install codecov
     - pip install -r requirements.txt
     - pip install .
 
 script:
     - coverage run -m --source=syris unittest discover
+    - flake8 syris
 
 after_success:
     - codecov
