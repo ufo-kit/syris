@@ -13,7 +13,7 @@ the matrix in the form T^{-1} = C^{-1}B^{-1}A^{-1} = (ABC)^{-1}. Thus, we can
 easily obtain x = T^{-1}x'.
 """
 
-import collections
+import collections.abc
 import numpy as np
 import quantities as q
 from scipy import interpolate as interp
@@ -321,7 +321,7 @@ class Trajectory(object):
 
         points = np.array(interp.splev(u, self._tck))
         initial_point = np.array(interp.splev(u_0, self._tck))
-        if isinstance(u, collections.Iterable):
+        if isinstance(u, collections.abc.Iterable):
             initial_point = initial_point[:, np.newaxis]
         distances = np.abs(points - initial_point)
 
