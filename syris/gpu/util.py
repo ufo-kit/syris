@@ -488,6 +488,14 @@ def get_array(data, queue=None):
     return result
 
 
+def are_images_supported():
+    """Is the INTENSITY|FLOAT image format supported?"""
+    fmt = cl.ImageFormat(cl.channel_order.INTENSITY, cl.channel_type.FLOAT)
+
+    return fmt in cl.get_supported_image_formats(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY,
+                                                 cl.mem_object_type.IMAGE2D)
+
+
 def get_image(data, access=cl.mem_flags.READ_ONLY, queue=None):
     """Get pyopencl.Image from *data* which can be a numpy array, a pyopencl.array.Array or a
     pyopencl.Image. The image channel order is pyopencl.channel_order.INTENSITY and channel_type is
@@ -499,6 +507,10 @@ def get_image(data, access=cl.mem_flags.READ_ONLY, queue=None):
 
     fmt = cl.ImageFormat(cl.channel_order.INTENSITY, cl.channel_type.FLOAT)
     mf = cl.mem_flags
+
+    if fmt not in cl.get_supported_image_formats(queue.context, access,
+                                                 cl.mem_object_type.IMAGE2D):
+        raise RuntimeError('INTENSITY|FLOAT image format not supported by this platform')
 
     if isinstance(data, cl.Image):
         result = data
