@@ -698,10 +698,6 @@ def get_rotation_displacement(d_0, d_1, length):
         principal axis angle and multiplying with the local displacement.
         """
         axis_sin = np.sin(angle(axis, rot_axis).rescale(q.rad).magnitude)
-        # print axis
-        # print rot_axis
-        # print axis_sin, 'axis sin'
-        # print phi, 'phi'
 
         return np.abs(axis_sin * 2 * get_magnitude(length) * np.sin(phi / 2))
 
