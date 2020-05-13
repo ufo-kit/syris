@@ -2,6 +2,7 @@ import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
 import quantities as q
+import unittest
 import syris
 from syris.gpu import util as gpu_util
 from syris import config as cfg
@@ -9,7 +10,7 @@ from syris import imageprocessing as ip
 from syris.math import fwnm_to_sigma
 from syris.util import get_magnitude, make_tuple
 import itertools
-from syris.tests import default_syris_init, SyrisTest, opencl, slow
+from syris.tests import are_images_supported, default_syris_init, SyrisTest
 
 
 def bin_cpu(image, shape):
@@ -58,8 +59,6 @@ def rescale_scipy(image, factor):
                hd_x.astype(cfg.PRECISION.np_float), grid=True)
 
 
-@opencl
-@slow
 class TestGPUImageProcessing(SyrisTest):
 
     def setUp(self):
@@ -124,6 +123,7 @@ class TestGPUImageProcessing(SyrisTest):
         gt = gt / 4
         np.testing.assert_almost_equal(gt, res, decimal=6)
 
+    @unittest.skipIf(not are_images_supported(), 'Images not supported')
     def test_rescale(self):
         orig_shape = 8, 4
         shape = 4, 8
@@ -188,6 +188,7 @@ class TestGPUImageProcessing(SyrisTest):
         data = ip.ifft_2(data)
         np.testing.assert_almost_equal(gt, data.get(), decimal=4)
 
+    @unittest.skipIf(not are_images_supported(), 'Images not supported')
     def test_varconvolve_disk(self):
         n = 4
         shape = (n, n)
@@ -203,6 +204,7 @@ class TestGPUImageProcessing(SyrisTest):
                                           smooth=False).get()
         self.assertAlmostEqual(1, np.sum(norm_result))
 
+    @unittest.skipIf(not are_images_supported(), 'Images not supported')
     def test_varconvolve_gauss(self):
         from scipy.ndimage import gaussian_filter
         n = 128
@@ -226,6 +228,7 @@ class TestGPUImageProcessing(SyrisTest):
         u = (np.ones(shape) + 1j * np.ones(shape) * 3).astype(cfg.PRECISION.np_cplx)
         np.testing.assert_almost_equal(np.abs(u) ** 2, ip.compute_intensity(u).get())
 
+    @unittest.skipIf(not are_images_supported(), 'Images not supported')
     def test_rescale_up(self):
         # Use spline and not zoom or imresize because they don't behave exactly as we define
         n = 8
@@ -244,6 +247,7 @@ class TestGPUImageProcessing(SyrisTest):
             gt = rescale_scipy(square, (ss_y, ss_x)).astype(cfg.PRECISION.np_float)
             np.testing.assert_almost_equal(res, gt, decimal=2)
 
+    @unittest.skipIf(not are_images_supported(), 'Images not supported')
     def test_rescale_down(self):
         # Use spline and not zoom or imresize because they don't behave exactly as we define
         n = 18

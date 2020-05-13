@@ -11,7 +11,7 @@ from syris.bodies.mesh import make_cube, Mesh
 from syris.bodies.simple import StaticBody
 from syris.imageprocessing import crop, pad, rescale
 from syris.materials import Material
-from syris.tests import default_syris_init, SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest
 import itertools
 from syris.tests.graphics_util import get_linear_points
 
@@ -24,7 +24,6 @@ def get_control_points():
                      (1, 1, 1)]) * q.mm
 
 
-@opencl
 def test_simple():
     default_syris_init()
     n = 8
@@ -246,7 +245,6 @@ class TestBodies(SyrisTest):
         gt = 1 + comp.furthest_point.simplified.magnitude * np.sqrt(2)
         self.assertAlmostEqual(gt, d, places=4)
 
-    @slow
     def test_get_next_time(self):
         n = 100
         ps = 100 * q.mm
@@ -288,8 +286,6 @@ class TestBodies(SyrisTest):
         comp = CompositeBody(traj, bodies=[mb_0, mb_1])
         self.assertEqual(np.inf * q.s, comp.get_next_time(0 * q.s, ps))
 
-    @opencl
-    @slow
     def test_project_composite(self):
         n = 64
         shape = (n, n)

@@ -5,10 +5,8 @@ import syris
 import syris.physics
 import syris.profiling
 from syris import config as cfg
-from syris.tests import opencl
 
 
-@opencl
 def test_init():
     syris.init(profiling=True, loglevel=logging.DEBUG, double_precision=True)
     assert logging.DEBUG == syris.physics.LOG.getEffectiveLevel()

@@ -7,7 +7,7 @@ from syris.bodies.simple import StaticBody
 from syris.materials import Material
 from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength, transfer
-from syris.tests import default_syris_init, SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest
 
 
 class DummyOpticalElement(OpticalElement):
@@ -23,7 +23,6 @@ class DummyOpticalElement(OpticalElement):
 
         return out
 
-@slow
 class TestOpticalElement(SyrisTest):
 
     def setUp(self):
@@ -38,7 +37,6 @@ class TestOpticalElement(SyrisTest):
         self.assertEqual(len(shape), 2)
         self.assertEqual(len(ps), 2)
 
-    @opencl
     def test_transfer(self):
         go = StaticBody(np.arange(4 ** 2).reshape(4, 4) * q.um, 1 * q.um, material=self.material)
         transferred = go.transfer((4, 4), 1 * q.um, self.energy).get()
@@ -46,7 +44,6 @@ class TestOpticalElement(SyrisTest):
                       energy_to_wavelength(self.energy)).get()
         np.testing.assert_almost_equal(gt, transferred)
 
-    @opencl
     def test_transfer_fourier(self):
         elem = DummyOpticalElement()
         print(elem.__class__._transfer_fourier == OpticalElement._transfer_fourier)

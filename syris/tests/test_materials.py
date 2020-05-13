@@ -5,7 +5,7 @@ from distutils.spawn import find_executable
 from syris import config as cfg
 from syris.materials import Material, MaterialError, make_pmasf, make_henke
 import os
-from syris.tests import default_syris_init, SyrisTest, slow
+from syris.tests import default_syris_init, SyrisTest
 
 
 class TestMaterial(SyrisTest):
@@ -49,7 +49,6 @@ class TestMaterial(SyrisTest):
         self.assertRaises(MaterialError, Material, 'foo', indices, energies)
 
 
-@slow
 class TestPMASFMaterial(SyrisTest):
 
     def setUp(self):
@@ -76,7 +75,6 @@ class TestPMASFMaterial(SyrisTest):
         self.assertRaises(RuntimeError, make_pmasf, "PMMA", [0] * q.keV)
 
 
-@slow
 class TestHenkeMaterial(SyrisTest):
 
     def test_creation(self):

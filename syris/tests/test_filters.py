@@ -5,10 +5,9 @@ from syris.devices.filters import GaussianFilter, MaterialFilter, Scintillator
 from syris.materials import Material
 from syris.math import fwnm_to_sigma, sigma_to_fwnm
 from syris.physics import energy_to_wavelength
-from syris.tests import default_syris_init, SyrisTest, slow
+from syris.tests import default_syris_init, SyrisTest
 
 
-@slow
 class TestFilters(SyrisTest):
 
     def setUp(self):

@@ -4,11 +4,9 @@ import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
 from .graphics_util import f, derivative, filter_close, np_roots, Metaball
-from syris.tests import default_syris_init, SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest
 
 
-@opencl
-@slow
 class TestPolynomials(SyrisTest):
 
     def setUp(self):

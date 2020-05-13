@@ -4,10 +4,9 @@ import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
 from .graphics_util import derivative, f, sgn, Metaball
-from syris.tests import default_syris_init, SyrisTest, opencl
+from syris.tests import default_syris_init, SyrisTest
 
 
-@opencl
 class TestThickness(SyrisTest):
 
     def setUp(self):

@@ -4,7 +4,7 @@ import pyopencl.array as cl_array
 import syris
 from syris import config as cfg
 from syris.imageprocessing import Tiler
-from syris.tests import SyrisTest, opencl, default_syris_init
+from syris.tests import SyrisTest, default_syris_init
 
 
 class TestImageTiling(SyrisTest):
@@ -132,7 +132,6 @@ class TestImageTiling(SyrisTest):
                                             tile_shape[1] * (i + 1)],
                         tile)
 
-    @opencl
     def test_sum(self):
         for shape, tiles_count in self.data:
             tiler = Tiler(shape, tiles_count, outlier=False, supersampling=4)

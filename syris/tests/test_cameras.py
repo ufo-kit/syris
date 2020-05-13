@@ -3,10 +3,9 @@ import quantities as q
 import syris
 import syris.config as cfg
 from syris.devices.cameras import Camera, is_fps_feasible
-from syris.tests import default_syris_init, SyrisTest, slow
+from syris.tests import default_syris_init, SyrisTest
 
 
-@slow
 class TestCamera(SyrisTest):
 
     def setUp(self):
