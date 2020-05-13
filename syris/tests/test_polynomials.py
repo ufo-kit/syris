@@ -12,7 +12,7 @@ from syris.tests import default_syris_init, SyrisTest, opencl, slow
 class TestPolynomials(SyrisTest):
 
     def setUp(self):
-        default_syris_init()
+        default_syris_init(double_precision=True)
         self.poly_deg = 4
         self.coeffs = np.array([5, 87, -2, 37, 17], dtype=cfg.PRECISION.np_float)
 
@@ -107,12 +107,12 @@ class TestPolynomials(SyrisTest):
         interval = (0, mb.upper)
         self._test_result(coeffs, interval, 1, np.nan)
 
-        # Put interval end points to roots.
+        # Put interval end points almost to roots.
         # In right endpoint.
-        interval = mb.lower, -1.0
+        interval = mb.lower, -0.999
         self._test_result(coeffs, interval, -1.0)
         # In left endpoint.
-        interval = -1.0, 0.0
+        interval = -0.999, 0.0
         self._test_result(coeffs, interval)
         # By epsilon too far -> no root expected
         interval = mb.lower, - 1 - self.pixel_size
