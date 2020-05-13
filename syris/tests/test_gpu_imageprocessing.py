@@ -1,9 +1,7 @@
 import numpy as np
-import pyopencl as cl
 import pyopencl.array as cl_array
 import quantities as q
 import unittest
-import syris
 from syris.gpu import util as gpu_util
 from syris import config as cfg
 from syris import imageprocessing as ip
@@ -17,10 +15,10 @@ def bin_cpu(image, shape):
     factor = (image.shape[0] // shape[0], image.shape[1] // shape[1])
     im = np.copy(image)
     for k in range(1, factor[0]):
-        im[::factor[0], :] += im[k::factor[0], :]
+        im[:: factor[0], :] += im[k :: factor[0], :]
     for k in range(1, factor[1]):
-        im[:, ::factor[1]] += im[:, k::factor[1]]
-    return im[::factor[0], ::factor[1]]
+        im[:, :: factor[1]] += im[:, k :: factor[1]]
+    return im[:: factor[0], :: factor[1]]
 
 
 def get_gauss_2d(shape, sigma, pixel_size=None, fourier=False):
@@ -41,26 +39,25 @@ def get_gauss_2d(shape, sigma, pixel_size=None, fourier=False):
         x = (np.arange(shape[1]) - shape[1] // 2) * pixel_size[1]
         y = (np.arange(shape[0]) - shape[0] // 2) * pixel_size[0]
         x, y = np.meshgrid(x, y)
-        gauss = np.exp(- x ** 2 / (2. * sigma[1] ** 2) - y ** 2 / (2. * sigma[0] ** 2))
+        gauss = np.exp(-(x ** 2) / (2.0 * sigma[1] ** 2) - y ** 2 / (2.0 * sigma[0] ** 2))
 
         return np.fft.ifftshift(gauss)
 
 
 def rescale_scipy(image, factor):
     from scipy.interpolate import RectBivariateSpline
+
     m, n = image.shape
     x = np.arange(n)
     y = np.arange(m)
-    hd_y = np.arange(factor[0] * m) / float(factor[0]) - 0.5 + 1. / (2. * factor[0])
-    hd_x = np.arange(factor[1] * n) / float(factor[1]) - 0.5 + 1. / (2. * factor[1])
+    hd_y = np.arange(factor[0] * m) / float(factor[0]) - 0.5 + 1.0 / (2.0 * factor[0])
+    hd_x = np.arange(factor[1] * n) / float(factor[1]) - 0.5 + 1.0 / (2.0 * factor[1])
     spl = RectBivariateSpline(y, x, image, kx=1, ky=1)
 
-    return spl(hd_y.astype(cfg.PRECISION.np_float),
-               hd_x.astype(cfg.PRECISION.np_float), grid=True)
+    return spl(hd_y.astype(cfg.PRECISION.np_float), hd_x.astype(cfg.PRECISION.np_float), grid=True)
 
 
 class TestGPUImageProcessing(SyrisTest):
-
     def setUp(self):
         default_syris_init()
         self.pixel_size = 1 * q.um
@@ -69,11 +66,13 @@ class TestGPUImageProcessing(SyrisTest):
         """Test if the gauss in Fourier space calculated on a GPU is
         the same as Fourier transform of a gauss in real space.
         """
-        sigma = (shape[0] * self.pixel_size.magnitude,
-                 shape[1] / 2 * self.pixel_size.magnitude) * self.pixel_size.units
+        sigma = (
+            shape[0] * self.pixel_size.magnitude,
+            shape[1] / 2 * self.pixel_size.magnitude,
+        ) * self.pixel_size.units
         if fourier:
             # Make the profile broad
-            sigma = (1. / sigma[0].magnitude, 1. / sigma[1].magnitude) * sigma.units
+            sigma = (1.0 / sigma[0].magnitude, 1.0 / sigma[1].magnitude) * sigma.units
         gauss = ip.get_gauss_2d(shape, sigma, self.pixel_size, fourier=fourier).get()
         gt = get_gauss_2d(shape, sigma, self.pixel_size, fourier=fourier)
         np.testing.assert_almost_equal(gauss, gt)
@@ -108,7 +107,7 @@ class TestGPUImageProcessing(SyrisTest):
     def test_decimate(self):
         n = 16
         sigma = fwnm_to_sigma(1)
-        shape = (n // 2,  n // 2)
+        shape = (n // 2, n // 2)
 
         image = np.arange(n * n).reshape(n, n).astype(cfg.PRECISION.np_float) // n ** 2
         fltr = get_gauss_2d((n, n), sigma, fourier=True)
@@ -123,12 +122,15 @@ class TestGPUImageProcessing(SyrisTest):
         gt = gt / 4
         np.testing.assert_almost_equal(gt, res, decimal=6)
 
-    @unittest.skipIf(not are_images_supported(), 'Images not supported')
+    @unittest.skipIf(not are_images_supported(), "Images not supported")
     def test_rescale(self):
         orig_shape = 8, 4
         shape = 4, 8
-        image = np.arange(orig_shape[0] *
-                          orig_shape[1]).reshape(orig_shape).astype(cfg.PRECISION.np_float)
+        image = (
+            np.arange(orig_shape[0] * orig_shape[1])
+            .reshape(orig_shape)
+            .astype(cfg.PRECISION.np_float)
+        )
         res = ip.rescale(image, shape).get()
         gt = rescale_scipy(image, (0.5, 2))
 
@@ -147,7 +149,7 @@ class TestGPUImageProcessing(SyrisTest):
         height = 4
         res = ip.crop(image, (y_0, x_0, height, width)).get()
 
-        np.testing.assert_equal(image[y_0:y_0 + height, x_0:x_0 + width], res)
+        np.testing.assert_equal(image[y_0 : y_0 + height, x_0 : x_0 + width], res)
 
         # Identity
         np.testing.assert_equal(image, ip.crop(image, (0, 0, shape[0], shape[1])).get())
@@ -162,15 +164,16 @@ class TestGPUImageProcessing(SyrisTest):
         res = ip.pad(image, (y_0, x_0, height, width)).get()
 
         gt = np.zeros((height, width), dtype=image.dtype)
-        gt[y_0:y_0 + shape[0], x_0:x_0 + shape[1]] = image
+        gt[y_0 : y_0 + shape[0], x_0 : x_0 + shape[1]] = image
         np.testing.assert_equal(gt, res)
 
         # Identity
         np.testing.assert_equal(image, ip.pad(image, (0, 0, shape[0], shape[1])).get())
 
     def test_fft(self):
-        data = gpu_util.get_array(np.random.normal(100, 100,
-                                                   size=(4, 4)).astype(cfg.PRECISION.np_float))
+        data = gpu_util.get_array(
+            np.random.normal(100, 100, size=(4, 4)).astype(cfg.PRECISION.np_float)
+        )
         orig = gpu_util.get_host(data)
         data = ip.fft_2(data)
         ip.ifft_2(data)
@@ -178,8 +181,9 @@ class TestGPUImageProcessing(SyrisTest):
 
         # Test double precision
         default_syris_init(double_precision=True)
-        data = gpu_util.get_array(np.random.normal(100, 100,
-                                                   size=(4, 4)).astype(cfg.PRECISION.np_float))
+        data = gpu_util.get_array(
+            np.random.normal(100, 100, size=(4, 4)).astype(cfg.PRECISION.np_float)
+        )
         gt = np.fft.fft2(data.get())
         data = ip.fft_2(data)
         np.testing.assert_almost_equal(gt, data.get(), decimal=4)
@@ -188,29 +192,31 @@ class TestGPUImageProcessing(SyrisTest):
         data = ip.ifft_2(data)
         np.testing.assert_almost_equal(gt, data.get(), decimal=4)
 
-    @unittest.skipIf(not are_images_supported(), 'Images not supported')
+    @unittest.skipIf(not are_images_supported(), "Images not supported")
     def test_varconvolve_disk(self):
         n = 4
         shape = (n, n)
         image = np.zeros(shape, dtype=cfg.PRECISION.np_float)
-        image[ n // 2,  n // 2] = 1
+        image[n // 2, n // 2] = 1
         radii = np.ones_like(image) * 1e-3
         result = ip.varconvolve_disk(image, (radii, radii), normalized=False, smooth=False).get()
         # At least one pixel in the midle must exist (just copies the original image)
         self.assertEqual(1, np.sum(result))
 
         radii = np.ones_like(image) * 2
-        norm_result = ip.varconvolve_disk(image, (radii, radii), normalized=True,
-                                          smooth=False).get()
+        norm_result = ip.varconvolve_disk(
+            image, (radii, radii), normalized=True, smooth=False
+        ).get()
         self.assertAlmostEqual(1, np.sum(norm_result))
 
-    @unittest.skipIf(not are_images_supported(), 'Images not supported')
+    @unittest.skipIf(not are_images_supported(), "Images not supported")
     def test_varconvolve_gauss(self):
         from scipy.ndimage import gaussian_filter
+
         n = 128
         shape = (n, n)
         image = np.zeros(shape, dtype=cfg.PRECISION.np_float)
-        image[n // 2,  n // 2] = 1
+        image[n // 2, n // 2] = 1
         sigmas = np.ones_like(image) * 1e-3
         result = ip.varconvolve_gauss(image, (sigmas, sigmas), normalized=False).get()
         # At least one pixel in the midle must exist (just copies the original image)
@@ -228,7 +234,7 @@ class TestGPUImageProcessing(SyrisTest):
         u = (np.ones(shape) + 1j * np.ones(shape) * 3).astype(cfg.PRECISION.np_cplx)
         np.testing.assert_almost_equal(np.abs(u) ** 2, ip.compute_intensity(u).get())
 
-    @unittest.skipIf(not are_images_supported(), 'Images not supported')
+    @unittest.skipIf(not are_images_supported(), "Images not supported")
     def test_rescale_up(self):
         # Use spline and not zoom or imresize because they don't behave exactly as we define
         n = 8
@@ -247,7 +253,7 @@ class TestGPUImageProcessing(SyrisTest):
             gt = rescale_scipy(square, (ss_y, ss_x)).astype(cfg.PRECISION.np_float)
             np.testing.assert_almost_equal(res, gt, decimal=2)
 
-    @unittest.skipIf(not are_images_supported(), 'Images not supported')
+    @unittest.skipIf(not are_images_supported(), "Images not supported")
     def test_rescale_down(self):
         # Use spline and not zoom or imresize because they don't behave exactly as we define
         n = 18
@@ -259,7 +265,7 @@ class TestGPUImageProcessing(SyrisTest):
         np.testing.assert_almost_equal(res, square)
 
         # Various odd/even combinations in the x, y directions
-        for (ss_y, ss_x) in itertools.product((1. / 2, 1. / 3), (1. / 2, 1. / 3)):
+        for (ss_y, ss_x) in itertools.product((1.0 / 2, 1.0 / 3), (1.0 / 2, 1.0 / 3)):
             hd_n = int(ss_x * n)
             hd_m = int(ss_y * n)
             res = ip.rescale(square, (hd_m, hd_n)).get()

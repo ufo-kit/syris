@@ -1,7 +1,6 @@
 import itertools
 import numpy as np
 import pyopencl as cl
-import syris
 from syris import config as cfg
 from syris.gpu import util as gu
 from syris.tests import default_syris_init, SyrisTest
@@ -16,21 +15,21 @@ def _has_platform_type(device_type):
 
 
 class TestGPUUtil(SyrisTest):
-
     def setUp(self):
         default_syris_init(profiling=True)
         self.data = np.arange(10).astype(cfg.PRECISION.np_float)
-        self.mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
-                             cl.mem_flags.COPY_HOST_PTR, hostbuf=self.data)
+        self.mem = cl.Buffer(
+            cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE | cl.mem_flags.COPY_HOST_PTR, hostbuf=self.data
+        )
 
     def tearDown(self):
         del self.mem
 
     def test_cache(self):
-        self.assertEqual(gu.cache(self.mem, self.data.shape, cfg.PRECISION.np_float,
-                                  cfg.CACHE_DEVICE), self.mem)
-        host_cache = gu.cache(self.mem, self.data.shape, self.data.dtype,
-                              cfg.CACHE_HOST)
+        self.assertEqual(
+            gu.cache(self.mem, self.data.shape, cfg.PRECISION.np_float, cfg.CACHE_DEVICE), self.mem
+        )
+        host_cache = gu.cache(self.mem, self.data.shape, self.data.dtype, cfg.CACHE_HOST)
 
         np.testing.assert_equal(self.data, host_cache)
 
@@ -45,13 +44,15 @@ class TestGPUUtil(SyrisTest):
     def test_conversion(self):
         def _test():
             shape = 8, 4
-            dtypes = ['i', 'u', 'f']
+            dtypes = ["i", "u", "f"]
             lengths = [2, 4, 8]
-            types = [np.dtype('{}{}'.format(dt, length))
-                     for dt, length in itertools.product(dtypes, lengths)]
-            types.append(np.dtype('i1'))
-            types.append(np.dtype('u1'))
-            types += [np.dtype('c8'), np.dtype('c16')]
+            types = [
+                np.dtype("{}{}".format(dt, length))
+                for dt, length in itertools.product(dtypes, lengths)
+            ]
+            types.append(np.dtype("i1"))
+            types.append(np.dtype("u1"))
+            types += [np.dtype("c8"), np.dtype("c16")]
             for dtype in types:
                 np_data = np.arange(shape[0] * shape[1]).reshape(shape).astype(dtype)
                 # host -> Array
@@ -66,7 +67,7 @@ class TestGPUUtil(SyrisTest):
                 # host -> host
                 host_data = gu.get_host(np_data)
                 np.testing.assert_equal(np_data, host_data)
-                if gu.are_images_supported() and dtype.kind != 'c':
+                if gu.are_images_supported() and dtype.kind != "c":
                     # numpy -> Image and Image -> Array
                     image = gu.get_image(np_data)
                     back = gu.get_array(image).get()
@@ -114,7 +115,7 @@ class TestGPUUtil(SyrisTest):
         # All present must pass
         for name in names:
             gu.get_platform(name)
-        self.assertRaises(LookupError, gu.get_platform, 'foo')
+        self.assertRaises(LookupError, gu.get_platform, "foo")
 
     def test_get_platform_by_device_type(self):
         platforms = cl.get_platforms()

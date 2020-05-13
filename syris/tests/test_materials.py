@@ -1,15 +1,12 @@
 import numpy as np
 import quantities as q
-import syris
 from distutils.spawn import find_executable
 from syris import config as cfg
 from syris.materials import Material, MaterialError, make_pmasf, make_henke
-import os
 from syris.tests import default_syris_init, SyrisTest
 
 
 class TestMaterial(SyrisTest):
-
     def setUp(self):
         default_syris_init()
         self.energies = np.arange(1, 5, 1) * q.keV
@@ -33,24 +30,23 @@ class TestMaterial(SyrisTest):
         self.assertEqual(len(set([m_1, m_0, m_1, m_2])), 2)
 
     def test_interpolation(self):
-        mat = Material('foo', self.refractive_indices, self.energies)
+        mat = Material("foo", self.refractive_indices, self.energies)
         index = mat.get_refractive_index(2400 * q.eV)
         self.assertAlmostEqual(2.4, index.real, places=5)
         self.assertAlmostEqual(2.4, index.imag, places=5)
 
     def test_interpolation_out_of_bounds(self):
-        mat = Material('foo', self.refractive_indices, self.energies)
+        mat = Material("foo", self.refractive_indices, self.energies)
         self.assertRaises(ValueError, mat.get_refractive_index, 1 * q.eV)
         self.assertRaises(ValueError, mat.get_refractive_index, 1 * q.MeV)
 
     def test_interpolation_few_points(self):
         energies = [0] * q.eV
         indices = [1 + 1j]
-        self.assertRaises(MaterialError, Material, 'foo', indices, energies)
+        self.assertRaises(MaterialError, Material, "foo", indices, energies)
 
 
 class TestPMASFMaterial(SyrisTest):
-
     def setUp(self):
         default_syris_init()
         self.energies = np.arange(1, 5, 1) * q.keV
@@ -71,26 +67,25 @@ class TestPMASFMaterial(SyrisTest):
             self.assertRaises(RuntimeError, make_pmasf, "asd", [0] * q.keV)
 
     def test_wrong_executable(self):
-        cfg.PMASF_FILE = 'dskjfhjsaf'
+        cfg.PMASF_FILE = "dskjfhjsaf"
         self.assertRaises(RuntimeError, make_pmasf, "PMMA", [0] * q.keV)
 
 
 class TestHenkeMaterial(SyrisTest):
-
     def test_creation(self):
         default_syris_init()
         energies = np.arange(1, 10, 1) * q.keV
-        make_henke('foo', energies, formula='H')
+        make_henke("foo", energies, formula="H")
 
     def test_out_of_range(self):
         # Minimum too small
         energies = np.arange(1, 1000, 1) * q.eV
-        self.assertRaises(ValueError, make_henke, 'foo', energies, formula='H')
+        self.assertRaises(ValueError, make_henke, "foo", energies, formula="H")
 
         # Maximum too big
         energies = np.arange(1, 1000, 1) * q.keV
-        self.assertRaises(ValueError, make_henke, 'foo', energies, formula='H')
+        self.assertRaises(ValueError, make_henke, "foo", energies, formula="H")
 
     def test_wrong_formula(self):
         energies = np.arange(1, 10, 1) * q.keV
-        self.assertRaises(MaterialError, make_henke, 'foo', energies, formula='xxx')
+        self.assertRaises(MaterialError, make_henke, "foo", energies, formula="xxx")

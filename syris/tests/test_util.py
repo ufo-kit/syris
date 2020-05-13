@@ -1,6 +1,7 @@
 import quantities as q
+import numpy as np
 from nose.tools import assert_raises
-from syris.util import *
+from syris.util import make_tuple, get_magnitude, get_gauss
 
 
 def test_make_tuple():
@@ -27,7 +28,7 @@ def test_gauss():
     sigma = 2
     mean = n // 2
     x = np.arange(n)
-    gt = np.exp(-(x - float(mean)) ** 2 / (2 * sigma ** 2))
+    gt = np.exp(-((x - float(mean)) ** 2) / (2 * sigma ** 2))
 
     g = get_gauss(x, mean, sigma, normalized=False)
     g_norm = get_gauss(n, mean, sigma, normalized=True)

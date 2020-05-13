@@ -1,7 +1,6 @@
 import itertools
 import numpy as np
 import quantities as q
-import syris
 from syris.geometry import Trajectory, X_AX, Y_AX
 from syris.bodies.mesh import Mesh, make_cube
 from syris.tests import default_syris_init, SyrisTest
@@ -9,7 +8,6 @@ from syris.util import get_magnitude
 
 
 class TestMesh(SyrisTest):
-
     def setUp(self):
         default_syris_init()
         self.triangles = make_cube()
@@ -93,7 +91,7 @@ class TestMesh(SyrisTest):
         triangles = get_magnitude(self.mesh.get_degenerate_triangles())
 
         for i in range(0, triangles.shape[1], 3):
-            vertices = triangles[:, i:i + 3]
+            vertices = triangles[:, i : i + 3]
             x = vertices[0, :]
             y = vertices[1, :]
             x_any = np.any(x - x[0])

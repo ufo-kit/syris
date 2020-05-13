@@ -1,6 +1,5 @@
 import numpy as np
 import pyopencl as cl
-import syris
 from syris import config as cfg
 from syris.gpu import util as g_util
 from .graphics_util import derivative, f, sgn, Metaball
@@ -8,35 +7,43 @@ from syris.tests import default_syris_init, SyrisTest
 
 
 class TestThickness(SyrisTest):
-
     def setUp(self):
         default_syris_init()
         self.pixel_size = 1e-3
         self.precision_places = int(np.log10(1 / self.pixel_size))
         self.prg = g_util.get_program(g_util.get_metaobjects_source())
         self.poly_deg = 4
-        self.roots_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                                   size=(self.poly_deg + 1) * cfg.PRECISION.cl_float)
+        self.roots_mem = cl.Buffer(
+            cfg.OPENCL.ctx,
+            cl.mem_flags.READ_WRITE,
+            size=(self.poly_deg + 1) * cfg.PRECISION.cl_float,
+        )
 
-    def get_thickness_addition(self, coeffs, roots, previous,
-                               last_derivative_sgn):
-        out_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE,
-                            size=self.poly_deg * cfg.PRECISION.cl_float)
-        roots_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE |
-                              cl.mem_flags.COPY_HOST_PTR,
-                              hostbuf=np.array(roots, dtype=cfg.PRECISION.np_float))
-        coeffs_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY |
-                               cl.mem_flags.COPY_HOST_PTR,
-                               hostbuf=np.array(coeffs, dtype=cfg.PRECISION.np_float))
+    def get_thickness_addition(self, coeffs, roots, previous, last_derivative_sgn):
+        out_mem = cl.Buffer(
+            cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE, size=self.poly_deg * cfg.PRECISION.cl_float
+        )
+        roots_mem = cl.Buffer(
+            cfg.OPENCL.ctx,
+            cl.mem_flags.READ_WRITE | cl.mem_flags.COPY_HOST_PTR,
+            hostbuf=np.array(roots, dtype=cfg.PRECISION.np_float),
+        )
+        coeffs_mem = cl.Buffer(
+            cfg.OPENCL.ctx,
+            cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+            hostbuf=np.array(coeffs, dtype=cfg.PRECISION.np_float),
+        )
 
-        self.prg.thickness_add_kernel(cfg.OPENCL.queue,
-                                      (1,),
-                                      None,
-                                      out_mem,
-                                      coeffs_mem,
-                                      roots_mem,
-                                      cfg.PRECISION.np_float(previous),
-                                      np.int32(last_derivative_sgn))
+        self.prg.thickness_add_kernel(
+            cfg.OPENCL.queue,
+            (1,),
+            None,
+            out_mem,
+            coeffs_mem,
+            roots_mem,
+            cfg.PRECISION.np_float(previous),
+            np.int32(last_derivative_sgn),
+        )
 
         res = np.empty(4, dtype=cfg.PRECISION.np_float)
         cl.enqueue_copy(cfg.OPENCL.queue, res, out_mem)
@@ -44,20 +51,28 @@ class TestThickness(SyrisTest):
         return res[:-1]
 
     def test_thickness(self):
-        def test(coeffs, roots, expected_thickness, expected_previous,
-                 previous=np.nan, last_derivative_sgn=-2,
-                 expected_last_derivative_sgn=None):
-            thickness_res, previous_res, last_derivative_sgn_res = \
-                self.get_thickness_addition(coeffs,
-                                            roots, previous,
-                                            last_derivative_sgn)
-            np.testing.assert_almost_equal(expected_thickness, thickness_res,
-                                           decimal=self.precision_places)
-            np.testing.assert_almost_equal(expected_previous, previous_res,
-                                           decimal=self.precision_places)
+        def test(
+            coeffs,
+            roots,
+            expected_thickness,
+            expected_previous,
+            previous=np.nan,
+            last_derivative_sgn=-2,
+            expected_last_derivative_sgn=None,
+        ):
+            thickness_res, previous_res, last_derivative_sgn_res = self.get_thickness_addition(
+                coeffs, roots, previous, last_derivative_sgn
+            )
+            np.testing.assert_almost_equal(
+                expected_thickness, thickness_res, decimal=self.precision_places
+            )
+            np.testing.assert_almost_equal(
+                expected_previous, previous_res, decimal=self.precision_places
+            )
             if expected_last_derivative_sgn is not None:
-                np.testing.assert_almost_equal(expected_last_derivative_sgn,
-                                               last_derivative_sgn_res)
+                np.testing.assert_almost_equal(
+                    expected_last_derivative_sgn, last_derivative_sgn_res
+                )
 
         mb_0 = Metaball(1.0, 2.0, 0.0)
         coeffs = mb_0.get_coeffs(True)
@@ -75,15 +90,25 @@ class TestThickness(SyrisTest):
                 test(coeffs, roots + [np.nan], i / 2 * 1.5, np.nan)
             else:
                 # Previous is created.
-                test(coeffs, roots + [np.nan], (i - 1) / 2 * 1.5, roots[i - 1],
-                     expected_last_derivative_sgn=sgn(f(derivative(coeffs),
-                                                        roots[i])))
+                test(
+                    coeffs,
+                    roots + [np.nan],
+                    (i - 1) / 2 * 1.5,
+                    roots[i - 1],
+                    expected_last_derivative_sgn=sgn(f(derivative(coeffs), roots[i])),
+                )
 
         # Previous is not nan.
         roots = [-1, 1, 1.5, np.nan, np.nan]
         previous = -3
-        test(coeffs, roots, 2, roots[1], previous=previous,
-             last_derivative_sgn=f(derivative(coeffs), previous))
+        test(
+            coeffs,
+            roots,
+            2,
+            roots[1],
+            previous=previous,
+            last_derivative_sgn=f(derivative(coeffs), previous),
+        )
 
         roots = [-1, 1, 2.5, 4, np.nan]
         previous = -3
@@ -125,14 +150,12 @@ class TestThickness(SyrisTest):
 
         # Multiple roots.
         roots = [1, 1, 1, 1, np.nan]
-        test(coeffs, roots, 0, 1,
-             expected_last_derivative_sgn=sgn(f(derivative(coeffs), 1)))
+        test(coeffs, roots, 0, 1, expected_last_derivative_sgn=sgn(f(derivative(coeffs), 1)))
 
         # Multiple roots with previous.
         previous = 1
         last_derivative_sgn = sgn(f(derivative(coeffs), previous))
-        test(coeffs, roots, 0, previous,
-             expected_last_derivative_sgn=last_derivative_sgn)
+        test(coeffs, roots, 0, previous, expected_last_derivative_sgn=last_derivative_sgn)
 
         # Left multiple roots.
         roots = [-1, -1, 1.5, 1.7, np.nan]

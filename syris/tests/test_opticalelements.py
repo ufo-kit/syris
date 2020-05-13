@@ -1,7 +1,6 @@
 import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
-import syris
 import syris.config as cfg
 from syris.bodies.simple import StaticBody
 from syris.materials import Material
@@ -11,25 +10,36 @@ from syris.tests import default_syris_init, SyrisTest
 
 
 class DummyOpticalElement(OpticalElement):
-
-    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None, queue=None,
-                  out=None, check=True, block=False):
+    def _transfer(
+        self,
+        shape,
+        pixel_size,
+        energy,
+        offset,
+        exponent=False,
+        t=None,
+        queue=None,
+        out=None,
+        check=True,
+        block=False,
+    ):
         return shape, pixel_size
 
-    def _transfer_fourier(self, shape, pixel_size, energy, t=None, queue=None,
-                          out=None, block=False):
+    def _transfer_fourier(
+        self, shape, pixel_size, energy, t=None, queue=None, out=None, block=False
+    ):
         if out is None:
             out = cl_array.zeros(queue, shape, cfg.PRECISION.np_cplx)
 
         return out
 
-class TestOpticalElement(SyrisTest):
 
+class TestOpticalElement(SyrisTest):
     def setUp(self):
         default_syris_init()
         energies = list(range(10, 20)) * q.keV
         self.energy = energies[len(energies) // 2]
-        self.material = Material('foo', np.arange(len(energies), dtype=np.complex), energies)
+        self.material = Material("foo", np.arange(len(energies), dtype=np.complex), energies)
 
     def test_2d_conversion(self):
         elem = DummyOpticalElement()
@@ -40,8 +50,11 @@ class TestOpticalElement(SyrisTest):
     def test_transfer(self):
         go = StaticBody(np.arange(4 ** 2).reshape(4, 4) * q.um, 1 * q.um, material=self.material)
         transferred = go.transfer((4, 4), 1 * q.um, self.energy).get()
-        gt = transfer(go.thickness, self.material.get_refractive_index(self.energy),
-                      energy_to_wavelength(self.energy)).get()
+        gt = transfer(
+            go.thickness,
+            self.material.get_refractive_index(self.energy),
+            energy_to_wavelength(self.energy),
+        ).get()
         np.testing.assert_almost_equal(gt, transferred)
 
     def test_transfer_fourier(self):
