@@ -1,8 +1,9 @@
+import os
 import numpy as np
 import quantities as q
 from distutils.spawn import find_executable
 from syris import config as cfg
-from syris.materials import Material, MaterialError, make_pmasf, make_henke
+from syris.materials import Material, MaterialError, make_pmasf, make_henke, make_fromfile
 from syris.tests import default_syris_init, SyrisTest
 
 
@@ -44,6 +45,14 @@ class TestMaterial(SyrisTest):
         energies = [0] * q.eV
         indices = [1 + 1j]
         self.assertRaises(MaterialError, Material, "foo", indices, energies)
+
+    def test_make_fromfile(self):
+        m_0 = Material("PMMA", self.refractive_indices, self.energies)
+        m_0.save()
+        try:
+            make_fromfile('PMMA.mat')
+        finally:
+            os.remove('PMMA.mat')
 
 
 class TestPMASFMaterial(SyrisTest):
