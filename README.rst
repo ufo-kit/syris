@@ -1,6 +1,9 @@
 Syris
 =====
 
+.. image:: https://img.shields.io/badge/Python-3.6+-blue
+    :target: https://www.python.org/downloads/release/python-360
+
 .. image:: https://travis-ci.org/ufo-kit/syris.svg?branch=master
     :target: https://travis-ci.org/ufo-kit/syris
 
