@@ -24,8 +24,7 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None,
-                block=False):
+    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None, block=False):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D.
         *offset* is the physical spatial body offset as (y, x). *queue* is an OpenCL command queue,
@@ -45,16 +44,29 @@ class Body(OpticalElement):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
-    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None,
-                  queue=None, out=None, check=True, block=False):
+    def _transfer(
+        self,
+        shape,
+        pixel_size,
+        energy,
+        offset,
+        exponent=False,
+        t=None,
+        queue=None,
+        out=None,
+        check=True,
+        block=False,
+    ):
         """Transfer function implementation based on a refractive index."""
         ri = self.material.get_refractive_index(energy)
         lam = energy_to_wavelength(energy)
-        proj = self.project(shape, pixel_size, offset=offset, t=t, queue=queue,
-                            out=out, block=block)
+        proj = self.project(
+            shape, pixel_size, offset=offset, t=t, queue=queue, out=out, block=block
+        )
 
-        return transfer(proj, ri, lam, exponent=exponent, queue=queue, out=out,
-                        check=check, block=block)
+        return transfer(
+            proj, ri, lam, exponent=exponent, queue=queue, out=out, check=check, block=block
+        )
 
 
 class MovableBody(Body):
@@ -88,8 +100,7 @@ class MovableBody(Body):
         self._cache_projection = cache_projection
         self.update_projection_cache()
 
-    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None,
-                block=False):
+    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None, block=False):
         """Project thickness at time *t* (if it is None no transformation is applied) to the image
         plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
         *pixel_size* is the point size, also either 1D or 2D. *offset* is the physical spatial body
@@ -103,36 +114,44 @@ class MovableBody(Body):
             self.move(t)
 
         if self.cache_projection:
-            if (self._p_cache['time'] is None or np.any(self._p_cache['ps'] != pixel_size) or
-                    self._p_cache['shape'] != shape or np.any(self._p_cache['offset'] != offset)):
+            if (
+                self._p_cache["time"] is None
+                or np.any(self._p_cache["ps"] != pixel_size)
+                or self._p_cache["shape"] != shape
+                or np.any(self._p_cache["offset"] != offset)
+            ):
                 moved = True
                 self.update_projection_cache(t=t, shape=shape, pixel_size=pixel_size, offset=offset)
             else:
                 # 0.99 to make sure we recompute when next_time from cached time is current t
-                moved = self.moved(min(self._p_cache['time'], t),
-                                   max(self._p_cache['time'], t), 0.99 * min(pixel_size),
-                                   bind=False)
+                moved = self.moved(
+                    min(self._p_cache["time"], t),
+                    max(self._p_cache["time"], t),
+                    0.99 * min(pixel_size),
+                    bind=False,
+                )
 
             if moved:
-                LOG.debug('{} computing projection at {}'.format(self, t))
-                self._p_cache['time'] = t
-                self._p_cache['projection'] = super(MovableBody, self).project(shape, pixel_size,
-                                                                               offset=offset,
-                                                                               t=t, queue=queue,
-                                                                               out=None,
-                                                                               block=block)
-            projection = self._p_cache['projection']
+                LOG.debug("{} computing projection at {}".format(self, t))
+                self._p_cache["time"] = t
+                self._p_cache["projection"] = super(MovableBody, self).project(
+                    shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block
+                )
+            projection = self._p_cache["projection"]
         else:
-            projection = super(MovableBody, self).project(shape, pixel_size, offset=offset,
-                                                          t=t, queue=queue, out=None, block=block)
+            projection = super(MovableBody, self).project(
+                shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block
+            )
 
         return projection
 
     def bind_trajectory(self, pixel_size):
         """Bind trajectory for *pixel_size*."""
-        if (self.trajectory.pixel_size != pixel_size or
-                self.trajectory.furthest_point != self.furthest_point):
-            fmt = 'Binding trajectory to pixel size {} and furthest point {}'
+        if (
+            self.trajectory.pixel_size != pixel_size
+            or self.trajectory.furthest_point != self.furthest_point
+        ):
+            fmt = "Binding trajectory to pixel size {} and furthest point {}"
             LOG.debug(fmt.format(pixel_size, self.furthest_point))
             self.trajectory.bind(pixel_size=pixel_size, furthest_point=self.furthest_point)
 
@@ -149,13 +168,18 @@ class MovableBody(Body):
         self._cache_projection = value
         self.update_projection_cache()
 
-    def update_projection_cache(self, t=None, shape=None, pixel_size=None, offset=None, projection=None):
-        """Update projection cache with time *t*, *shape*, *pixel_size*, *offset* and *projection*."""
-        self._p_cache = {'time': t,
-                         'shape': shape,
-                         'ps': pixel_size,
-                         'offset': offset,
-                         'projection': projection}
+    def update_projection_cache(
+        self, t=None, shape=None, pixel_size=None, offset=None, projection=None
+    ):
+        """Update projection cache with time *t*, *shape*, *pixel_size*, *offset* and
+        *projection*."""
+        self._p_cache = {
+            "time": t,
+            "shape": shape,
+            "ps": pixel_size,
+            "offset": offset,
+            "projection": projection,
+        }
 
     @property
     def furthest_point(self):
@@ -240,7 +264,7 @@ class MovableBody(Body):
         interval *t_0*, *t_1*.
         """
         if not self.trajectory.bound:
-            raise ValueError('Trajectory not bound')
+            raise ValueError("Trajectory not bound")
 
         u_0 = self.trajectory.get_parameter(t_0)
         u_1 = self.trajectory.get_parameter(t_1)
@@ -270,7 +294,7 @@ class MovableBody(Body):
 
     def _find_next_rotation_time(self, abs_time):
         if not self.trajectory.bound:
-            raise geom.TrajectoryError('Trajectory not bound')
+            raise geom.TrajectoryError("Trajectory not bound")
         orientation = self.orientation.simplified.magnitude
         t = np.copy(abs_time.simplified.magnitude) * q.s
 
@@ -284,8 +308,9 @@ class MovableBody(Body):
         vec = self.trajectory.get_direction(t).simplified.magnitude
         angle = geom.angle(orientation, vec)
 
-        if np.all(np.isclose(rot_ax, 0)) and not (np.all(np.isclose(vec, orientation)) or
-                                                  self.trajectory.stationary):
+        if np.all(np.isclose(rot_ax, 0)) and not (
+            np.all(np.isclose(vec, orientation)) or self.trajectory.stationary
+        ):
             # Orientation does not coincide with trajectory direction and trajectory is not
             # stationary.
             dt = self.get_maximum_dt(self.trajectory.pixel_size)
@@ -421,9 +446,9 @@ class CompositeBody(MovableBody):
         return self.bodies.__iter__()
 
     def __repr__(self):
-        strings = ', '.join([repr(item) for item in self.bodies[:min(3, len(self.bodies))]])
+        strings = ", ".join([repr(item) for item in self.bodies[: min(3, len(self.bodies))]])
         if len(self.bodies) > 3:
-            strings += ', ...'
+            strings += ", ..."
         return "CompositeBody({})".format(strings)
 
     def __str__(self):
@@ -513,11 +538,13 @@ class CompositeBody(MovableBody):
     def bind_trajectory(self, pixel_size):
         """Bind trajectory for *pixel_size*."""
         for body in self.all_bodies:
-            if (body.trajectory.pixel_size != pixel_size or
-                    body.trajectory.furthest_point != body.furthest_point):
+            if (
+                body.trajectory.pixel_size != pixel_size
+                or body.trajectory.furthest_point != body.furthest_point
+            ):
                 if body == self:
                     self._dt = None
-                fmt = 'Binding trajectory to pixel size {} and furthest point {}'
+                fmt = "Binding trajectory to pixel size {} and furthest point {}"
                 LOG.debug(fmt.format(pixel_size, body.furthest_point))
                 body.trajectory.bind(pixel_size=pixel_size, furthest_point=body.furthest_point)
 
@@ -532,8 +559,11 @@ class CompositeBody(MovableBody):
                 dts = []
             else:
                 dts = [MovableBody.get_maximum_dt(self, pixel_size / len(self.all_bodies))]
-            dts += [body.get_maximum_dt(pixel_size / len(self.all_bodies))
-                    for body in self if not body.trajectory.stationary]
+            dts += [
+                body.get_maximum_dt(pixel_size / len(self.all_bodies))
+                for body in self
+                if not body.trajectory.stationary
+            ]
             self._dt = np.min(dts) * q.s if dts else None
 
         return self._dt
@@ -543,6 +573,7 @@ class CompositeBody(MovableBody):
         Get next time at which the body will have traveled *pixel_size*, the starting time is *t_0*.
         *xtol* is the absolute tolerance for bisection passed to :py:func:`scipy.optimize.bisect`.
         """
+
         def func(t):
             """Objective function for time bisection. The
             maximum dt obtained from individual trajectories might not be precise enough, but is
@@ -563,8 +594,14 @@ class CompositeBody(MovableBody):
             # All bodies are stationary
             return np.inf * q.s
 
-        for current_time in np.arange(t_0.simplified.magnitude, self.time.simplified.magnitude,
-                                      self._dt.simplified.magnitude) * q.s:
+        for current_time in (
+            np.arange(
+                t_0.simplified.magnitude,
+                self.time.simplified.magnitude,
+                self._dt.simplified.magnitude,
+            )
+            * q.s
+        ):
             if self.moved(t_0, current_time, pixel_size):
                 return bisect(func, t_0, current_time, xtol=xtol) * q.s
 
@@ -575,7 +612,7 @@ class CompositeBody(MovableBody):
         *t_0*, *t_1*.
         """
         if not self.trajectory.bound:
-            raise ValueError('Trajectory not bound')
+            raise ValueError("Trajectory not bound")
         # Place the point for computing the derivative very close
         dt = (t_1 - t_0) * 1e-7
 
@@ -610,9 +647,11 @@ class CompositeBody(MovableBody):
 
         rot = []
         for i in range(len(self.primitive_bodies)):
-            rot.append(geom.get_rotation_displacement(d_0[i], d_1[i],
-                                                      self.primitive_bodies[i].
-                                                      furthest_point.simplified.magnitude))
+            rot.append(
+                geom.get_rotation_displacement(
+                    d_0[i], d_1[i], self.primitive_bodies[i].furthest_point.simplified.magnitude
+                )
+            )
         rot = np.array(rot) * q.m
 
         return np.max(trans) + np.max(rot)
@@ -626,13 +665,25 @@ class CompositeBody(MovableBody):
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
         for body in self.bodies:
-            out += body.project(shape, pixel_size, offset=offset, t=t, queue=queue, out=None,
-                                block=block)
+            out += body.project(
+                shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block
+            )
 
         return out
 
-    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None,
-                  queue=None, out=None, check=True, block=False):
+    def _transfer(
+        self,
+        shape,
+        pixel_size,
+        energy,
+        offset,
+        exponent=False,
+        t=None,
+        queue=None,
+        out=None,
+        check=True,
+        block=False,
+    ):
         """Transfer function implementation based on a refractive index."""
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_cplx)
@@ -640,6 +691,16 @@ class CompositeBody(MovableBody):
             # transmission_many adds values, make sure it start with a zeroed array
             out.fill(0)
 
-        return transfer_many(self.bodies, shape, pixel_size, energy, offset=offset,
-                             exponent=exponent, queue=queue, out=out, t=t, check=check,
-                             block=block)
+        return transfer_many(
+            self.bodies,
+            shape,
+            pixel_size,
+            energy,
+            offset=offset,
+            exponent=exponent,
+            queue=queue,
+            out=out,
+            t=t,
+            check=check,
+            block=block,
+        )

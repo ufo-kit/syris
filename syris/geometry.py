@@ -56,8 +56,7 @@ class BoundingBox(object):
         (y_0, x_0, y_1, x_1).
         """
 
-        return self.get_min(Y), self.get_min(X), \
-            self.get_max(Y), self.get_max(X)
+        return self.get_min(Y), self.get_min(X), self.get_max(Y), self.get_max(X)
 
     def get_projected_points(self, axis):
         """Get the points projection by releasing the specified *axis*."""
@@ -85,8 +84,7 @@ class BoundingBox(object):
         z_min = min(self.get_min(Z), other.get_min(Z))
         z_max = max(self.get_max(Z), other.get_max(Z))
 
-        self._points = make_points([x_min, x_max] * q.m, [y_min, y_max] * q.m,
-                                   [z_min, z_max] * q.m)
+        self._points = make_points([x_min, x_max] * q.m, [y_min, y_max] * q.m, [z_min, z_max] * q.m)
 
     def overlaps(self, other):
         """
@@ -98,20 +96,20 @@ class BoundingBox(object):
         x_interval_1 = other.get_min(X), other.get_max(X)
         y_interval_1 = other.get_min(Y), other.get_max(Y)
 
-        return overlap(x_interval_0, x_interval_1) and \
-            overlap(y_interval_0, y_interval_1)
+        return overlap(x_interval_0, x_interval_1) and overlap(y_interval_0, y_interval_1)
 
     def __repr__(self):
         return "BoundingBox(%s)" % (str(self))
 
     def __str__(self):
-        return "(x0=%g,y0=%g,z0=%g) -> (x1=%g,y1=%g,z1=%g)" % \
-            (self.get_min(X),
-             self.get_min(Y),
-             self.get_min(Z),
-             self.get_max(X),
-             self.get_max(Y),
-             self.get_max(Z))
+        return "(x0=%g,y0=%g,z0=%g) -> (x1=%g,y1=%g,z1=%g)" % (
+            self.get_min(X),
+            self.get_min(Y),
+            self.get_min(Z),
+            self.get_max(X),
+            self.get_max(Y),
+            self.get_max(Z),
+        )
 
 
 class Trajectory(object):
@@ -121,8 +119,15 @@ class Trajectory(object):
     Trajectory is a spline interpolated from a set of points.
     """
 
-    def __init__(self, control_points, pixel_size=None, furthest_point=None, time_dist=None,
-                 velocity=None, num_points=None):
+    def __init__(
+        self,
+        control_points,
+        pixel_size=None,
+        furthest_point=None,
+        time_dist=None,
+        velocity=None,
+        num_points=None,
+    ):
         """
         Construct a trajectory from *control_points* specified as [(x, y, z), ...]. Use *pixel_size*
         to interpolate such that the trajectory doesn't move more than 1 px between two time points.
@@ -169,7 +174,7 @@ class Trajectory(object):
         else:
             n = self._num_points
 
-        LOG.debug('Using {} points for interpolation'.format(n))
+        LOG.debug("Using {} points for interpolation".format(n))
 
         # Reinterpolate based on the updated number of points
         self._tck, self._u = reinterpolate(self._tck, self._u, n)
@@ -214,7 +219,7 @@ class Trajectory(object):
             self._pixel_size = pixel_size
         self._furthest_point = furthest_point
         if self._pixel_size is None:
-            raise ValueError('Pixel size must be set either here or before')
+            raise ValueError("Pixel size must be set either here or before")
         if len(self.control_points) > 1:
             self._interpolate()
 
@@ -226,8 +231,9 @@ class Trajectory(object):
     @property
     def stationary(self):
         """Return True if the trajectory is stationary."""
-        return len(self._control_points) == 1 or (self._velocity is None and
-                                                  self._time_dist is None)
+        return len(self._control_points) == 1 or (
+            self._velocity is None and self._time_dist is None
+        )
 
     @property
     def pixel_size(self):
@@ -287,7 +293,7 @@ class Trajectory(object):
             result = np.array((0, 0, 0)) if der else self._control_points[0].magnitude
         else:
             if not self.bound:
-                raise TrajectoryError('Trajectory not bound')
+                raise TrajectoryError("Trajectory not bound")
             result = interp.splev(self.get_parameter(abs_time), self._tck, der=der)
 
         return result
@@ -312,7 +318,7 @@ class Trajectory(object):
         parameter.
         """
         if not self.bound:
-            raise TrajectoryError('Trajectory not bound')
+            raise TrajectoryError("Trajectory not bound")
 
         if u is None:
             u = self._u
@@ -330,8 +336,9 @@ class Trajectory(object):
             len_mag = self.length.simplified.magnitude
             der = np.array(interp.splev(u, self._tck, der=1)) / len_mag
             initial_der = np.array(interp.splev(u_0, self._tck, der=1)) / len_mag
-            distances += get_rotation_displacement(der, initial_der,
-                                                   self._furthest_point).simplified.magnitude
+            distances += get_rotation_displacement(
+                der, initial_der, self._furthest_point
+            ).simplified.magnitude
 
         return distances
 
@@ -344,7 +351,7 @@ class Trajectory(object):
         if self.stationary:
             return None
         elif not self.bound:
-            raise TrajectoryError('Trajectory not bound')
+            raise TrajectoryError("Trajectory not bound")
         if distance is None:
             distance = self._pixel_size
 
@@ -383,7 +390,7 @@ class Trajectory(object):
         if self.stationary:
             return 1
         elif self._tck is None:
-            raise TrajectoryError('Trajectory not bound')
+            raise TrajectoryError("Trajectory not bound")
         if distance is None:
             distance = self._pixel_size
 
@@ -410,7 +417,7 @@ class Trajectory(object):
         if self.stationary:
             return np.inf * q.s
         elif not self.bound:
-            raise TrajectoryError('Trajectory not bound')
+            raise TrajectoryError("Trajectory not bound")
 
         u_0 = self.get_parameter(t_0)
         distances = self.get_distances(u_0=u_0)
@@ -482,6 +489,7 @@ class Trajectory(object):
         Get spline length on the spline parameter interval *param_start*,
         *param_end*.
         """
+
         def part(x_d, y_d, z_d):
             # for a 3D parametric curve the length is
             # sqrt((d_x/d_u)^2 + (d_y/d_u)^2 + (d_z/d_u)^2).
@@ -495,8 +503,6 @@ class Trajectory(object):
 class TrajectoryError(Exception):
 
     """Exceptions related to trajectory."""
-
-    pass
 
 
 def closest(values, min_value):
@@ -593,9 +599,8 @@ def rotate(phi, axis, shift=None):
 
 def scale(scale_vec):
     """Scale the object by scaling coefficients (kx, ky, kz) given by *sc_vec*."""
-    if (scale_vec[0] <= 0 or scale_vec[1] <= 0 or scale_vec[2] <= 0):
-        raise ValueError("All components of the scaling " +
-                         "must be greater than 0")
+    if scale_vec[0] <= 0 or scale_vec[1] <= 0 or scale_vec[2] <= 0:
+        raise ValueError("All components of the scaling " + "must be greater than 0")
     trans_matrix = np.identity(4)
 
     trans_matrix[0][0] = scale_vec[0]

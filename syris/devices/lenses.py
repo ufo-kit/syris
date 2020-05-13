@@ -6,8 +6,15 @@ class Lens(object):
 
     """Class holding lenses."""
 
-    def __init__(self, magnification, na=None, f_number=None, focal_length=None,
-                 transmission_eff=1, sigma=None):
+    def __init__(
+        self,
+        magnification,
+        na=None,
+        f_number=None,
+        focal_length=None,
+        transmission_eff=1,
+        sigma=None,
+    ):
         """Create a lens with *magnification*, numerical aperture *na*, *f_number*, *focal_length*,
         transmission efficiency *transmission_eff* and *sigma* (y, x) giving the standard deviation
         of the point spread function approximated by a Gaussian.
@@ -57,6 +64,6 @@ class Lens(object):
         magnification and :math:`d_0` is the distance between the lens
         entrance and the object plane.
         """
-        d_0 = (self.focal_length + self.focal_length / self.magnification)
+        d_0 = self.focal_length + self.focal_length / self.magnification
 
         return math.sin(math.atan(self.focal_length / (2 * self.f_number * d_0)))
