@@ -4,8 +4,9 @@ import logging
 import os
 import sys
 import time
-import urllib.request, urllib.parse, urllib.error
-import urllib.request, urllib.error, urllib.parse
+import urllib.error
+import urllib.parse
+import urllib.request
 from distutils.spawn import find_executable
 from html.parser import HTMLParser
 from subprocess import Popen, PIPE
@@ -17,13 +18,100 @@ from syris import config as cfg, physics
 
 
 LOG = logging.getLogger(__name__)
-ELEMENTS = ['ac', 'ag', 'al', 'ar', 'as', 'at', 'au', 'b', 'ba', 'be', 'bi', 'br', 'c', 'ca',
-            'cd', 'ce', 'cl', 'co', 'cr', 'cs', 'cu', 'dy', 'er', 'eu', 'f', 'fe', 'fr', 'ga',
-            'gd', 'ge', 'h', 'he', 'hf', 'hg', 'ho', 'i', 'in', 'ir', 'k', 'kr', 'la', 'li',
-            'lu', 'mg', 'mn', 'mo', 'n', 'na', 'nb', 'nd', 'ne', 'ni', 'o', 'os', 'p', 'pa',
-            'pb', 'pd', 'pm', 'po', 'pr', 'pt', 'ra', 'rb', 're', 'rh', 'rn', 'ru', 's', 'sb',
-            'sc', 'se', 'si', 'sm', 'sn', 'sr', 'ta', 'tb', 'tc', 'te', 'th', 'ti', 'tl', 'tm',
-            'u', 'v', 'w', 'xe', 'y', 'yb', 'zn', 'zr']
+ELEMENTS = [
+    "ac",
+    "ag",
+    "al",
+    "ar",
+    "as",
+    "at",
+    "au",
+    "b",
+    "ba",
+    "be",
+    "bi",
+    "br",
+    "c",
+    "ca",
+    "cd",
+    "ce",
+    "cl",
+    "co",
+    "cr",
+    "cs",
+    "cu",
+    "dy",
+    "er",
+    "eu",
+    "f",
+    "fe",
+    "fr",
+    "ga",
+    "gd",
+    "ge",
+    "h",
+    "he",
+    "hf",
+    "hg",
+    "ho",
+    "i",
+    "in",
+    "ir",
+    "k",
+    "kr",
+    "la",
+    "li",
+    "lu",
+    "mg",
+    "mn",
+    "mo",
+    "n",
+    "na",
+    "nb",
+    "nd",
+    "ne",
+    "ni",
+    "o",
+    "os",
+    "p",
+    "pa",
+    "pb",
+    "pd",
+    "pm",
+    "po",
+    "pr",
+    "pt",
+    "ra",
+    "rb",
+    "re",
+    "rh",
+    "rn",
+    "ru",
+    "s",
+    "sb",
+    "sc",
+    "se",
+    "si",
+    "sm",
+    "sn",
+    "sr",
+    "ta",
+    "tb",
+    "tc",
+    "te",
+    "th",
+    "ti",
+    "tl",
+    "tm",
+    "u",
+    "v",
+    "w",
+    "xe",
+    "y",
+    "yb",
+    "zn",
+    "zr",
+]
 
 
 class Material(object):
@@ -48,8 +136,10 @@ class Material(object):
             if self._f_2 is not None:
                 self._tckf_2 = interp.splrep(self._energies, f_2)
         else:
-            raise MaterialError('Number of energy points \'{}\' '.format(len(self.energies)) +
-                                'is too few for interpolation')
+            raise MaterialError(
+                "Number of energy points '{}' ".format(len(self.energies))
+                + "is too few for interpolation"
+            )
 
     @property
     def name(self):
@@ -81,8 +171,11 @@ class Material(object):
         minimum = np.min(energy)
         maximum = np.max(energy)
         if minimum < self._energies[0] or maximum > self._energies[-1]:
-            raise ValueError('Energy \'{}\' not within limits \'[{}, {}]\''.
-                             format(energy, self._energies[0], self._energies[-1]))
+            raise ValueError(
+                "Energy '{}' not within limits '[{}, {}]'".format(
+                    energy, self._energies[0], self._energies[-1]
+                )
+            )
         energy = energy.rescale(self._energies.units).magnitude
         value = interp.splev(energy, tck)
 
@@ -97,19 +190,19 @@ class Material(object):
 
     def get_f_1(self, energy):
         if self._f_1 is None:
-            raise MaterialError('Scattering factor f_1 not specified in material')
+            raise MaterialError("Scattering factor f_1 not specified in material")
         return self._get_interpolated(self._tckf_1, energy)
 
     def get_f_2(self, energy):
         if self._f_2 is None:
-            raise MaterialError('Scattering factor f_2 not specified in material')
+            raise MaterialError("Scattering factor f_2 not specified in material")
         return self._get_interpolated(self._tckf_2, energy)
 
     def save(self, filename=None):
         """Save this instance to a *filename*."""
         if filename is None:
-            filename = '{}.mat'.format(self.name)
-        pickle.dump(self, open(filename, 'wb'))
+            filename = "{}.mat".format(self.name)
+        pickle.dump(self, open(filename, "wb"))
 
     def __eq__(self, other):
         return isinstance(other, Material) and self.name == other.name
@@ -143,18 +236,21 @@ def make_pmasf(name, energies):
         if find_executable(executable) is None:
             raise RuntimeError("pmasf in '{}' not found".format(executable))
 
-    cmd = "%s -C %s -E %f %f -p %d -+l%s -w Ed" % \
-        (cfg.PMASF_FILE, name, energies[0].rescale(q.eV),
-         energies[-1].rescale(q.eV), len(energies),
-         os.path.dirname(executable))
+    cmd = "%s -C %s -E %f %f -p %d -+l%s -w Ed" % (
+        cfg.PMASF_FILE,
+        name,
+        energies[0].rescale(q.eV),
+        energies[-1].rescale(q.eV),
+        len(energies),
+        os.path.dirname(executable),
+    )
 
     # Execute the pmasf program and get the text results
     # via a pipe.
     pipe = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
     out, err = pipe.communicate()
     if pipe.returncode != 0:
-        raise RuntimeError("pmasf error (code: {0}, message: {1})".
-                           format(pipe.returncode, err))
+        raise RuntimeError("pmasf error (code: {0}, message: {1})".format(pipe.returncode, err))
 
     # Parse the text output to obtain the refractive indices.
     lines = out.split("\n")
@@ -180,11 +276,12 @@ def make_henke(name, energies, formula=None, density=None):
     f_1 = f_2 = None
     if element in ELEMENTS:
         # Get the scattering factors
-        response = urllib.request.urlopen('http://henke.lbl.gov/optical_constants' +
-                                   '/sf/{}.nff'.format(element))
-        data = response.read().decode('utf-8')
+        response = urllib.request.urlopen(
+            "http://henke.lbl.gov/optical_constants" + "/sf/{}.nff".format(element)
+        )
+        data = response.read().decode("utf-8")
         response.close()
-        data = np.fromstring(data[data.find('\r\n'):], sep='\t')
+        data = np.fromstring(data[data.find("\r\n") :], sep="\t")
         data = data.reshape(data.shape[0] // 3, 3)
         # Henke returns eV
         sf_energies = data[:, 0] * 1e-3
@@ -205,17 +302,17 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
     if crystal and formula:
         raise ValueError("Only one of 'formula' or 'crystal' can be specified")
     if crystal:
-        mat = '&coway=0&code={}'.format(crystal)
+        mat = "&coway=0&code={}".format(crystal)
     else:
         if not density:
             raise ValueError("'density' must be specified for formula-based lookup")
         if not formula:
             formula = name
         density = density.rescale(q.g / q.cm ** 3).magnitude
-        mat = '&coway=2&chem={}&rho={}'.format(formula, density)
+        mat = "&coway=2&chem={}&rho={}".format(formula, density)
 
-    base = 'http://x-server.gmca.aps.anl.gov/cgi/x0h_form.exe?xway=2'
-    apdx_fmt = '&wave={}&i1=1&i2=1&i3=1&df1df2=-1&modeout=1'
+    base = "http://x-server.gmca.aps.anl.gov/cgi/x0h_form.exe?xway=2"
+    apdx_fmt = "&wave={}&i1=1&i2=1&i3=1&df1df2=-1&modeout=1"
 
     indices = []
     for energy in energies:
@@ -223,9 +320,9 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
         url = base + mat + apdx
         res = urllib.request.urlopen(url)
         txt = res.read()
-        lines = txt[txt.find('delta='):].split('\n')
-        delta = float(lines[0].split('=')[1])
-        beta = - float(lines[1].split('=')[1])
+        lines = txt[txt.find("delta=") :].split("\n")
+        delta = float(lines[0].split("=")[1])
+        beta = -float(lines[1].split("=")[1])
         indices.append(cfg.PRECISION.np_cplx(float(delta) + float(beta) * 1j))
         # Don't cause a DOS
         time.sleep(0.1)
@@ -235,7 +332,7 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
 
 def make_fromfile(filename):
     """Load saved material from *filename*."""
-    return pickle.load(open(filename, 'r'))
+    return pickle.load(open(filename, "r"))
 
 
 class _HenkeQuery(object):
@@ -245,7 +342,7 @@ class _HenkeQuery(object):
     .. _The Center For X-ray Optics: http://henke.lbl.gov/optical_constants/getdb2.html
     """
 
-    _URL = 'http://henke.lbl.gov'
+    _URL = "http://henke.lbl.gov"
 
     class HenkeHTMLParser(HTMLParser):
 
@@ -256,7 +353,7 @@ class _HenkeQuery(object):
             self.link = None
 
         def handle_starttag(self, tag, attrs):
-            if attrs and attrs[0][0] == 'href':
+            if attrs and attrs[0][0] == "href":
                 self.link = attrs[0][1]
 
     def __init__(self, name, energies, formula=None, density=None):
@@ -266,9 +363,9 @@ class _HenkeQuery(object):
         if not formula:
             formula = name
         if energies[0] < 30 * q.eV:
-            raise ValueError('Minimum acceptable energy is 30 eV')
+            raise ValueError("Minimum acceptable energy is 30 eV")
         if energies[-1] > 30 * q.keV:
-            raise ValueError('Maximum acceptable energy is 30 keV')
+            raise ValueError("Maximum acceptable energy is 30 keV")
         density = -1 if density is None else density.rescale(q.g / q.cm ** 3).magnitude
 
         self.energies = energies
@@ -277,36 +374,36 @@ class _HenkeQuery(object):
 
         try:
             response = self._query_server(formula, density)
-            if b'error' in response.lower():
-                raise MaterialError('Error looking up material `{}`'.format(name))
-            parser.feed(response.decode('utf-8'))
+            if b"error" in response.lower():
+                raise MaterialError("Error looking up material `{}`".format(name))
+            parser.feed(response.decode("utf-8"))
             link = urljoin(self._URL, parser.link)
             # First two lines are description
             values = urllib.request.urlopen(link).readlines()[2:]
             energies_henke, indices = _parse_henke(values)
             self.refractive_indices = self._interpolate(energies_henke, indices)
         except urllib.error.URLError:
-            print('Cannot contact server, please check your Internet connection', file=sys.stderr)
+            print("Cannot contact server, please check your Internet connection", file=sys.stderr)
             raise
 
     def _query_server(self, formula, density):
         """Get the indices from the server."""
         data = {}
-        data['Material'] = 'Enter Formula'
-        data['Formula'] = formula
-        data['Density'] = str(density)
-        data['Scan'] = 'Energy'
-        data['Min'] = str(self.energies[0].rescale(q.eV).magnitude)
-        data['Max'] = str(self.energies[-1].rescale(q.eV).magnitude)
+        data["Material"] = "Enter Formula"
+        data["Formula"] = formula
+        data["Density"] = str(density)
+        data["Scan"] = "Energy"
+        data["Min"] = str(self.energies[0].rescale(q.eV).magnitude)
+        data["Max"] = str(self.energies[-1].rescale(q.eV).magnitude)
         # Get the maximum number of points and interpolate because the website output doesn't have
         # to be spaced like we want
-        data['Npts'] = str(500)
-        data['Output'] = 'Text File'
+        data["Npts"] = str(500)
+        data["Output"] = "Text File"
         url_values = urllib.parse.urlencode(data)
 
-        url = urljoin(self._URL, '/cgi-bin/getdb.pl')
+        url = urljoin(self._URL, "/cgi-bin/getdb.pl")
 
-        req = urllib.request.Request(url, bytes(url_values, 'utf-8'))
+        req = urllib.request.Request(url, bytes(url_values, "utf-8"))
         response = urllib.request.urlopen(req)
         result = response.read()
         response.close()
@@ -347,4 +444,3 @@ class MaterialError(Exception):
 
     """Material errors"""
 
-    pass

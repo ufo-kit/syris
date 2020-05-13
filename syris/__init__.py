@@ -7,14 +7,22 @@ from syris.gpu.util import make_opencl_defaults, init_programs, execute_profiled
 from syris import profiling as prf
 
 
-__version__ = '0.1'
+__version__ = "0.1"
 
 
 LOG = logging.getLogger(__name__)
 
 
-def init(platform_name=None, device_type=None, device_index=None, profiling=False,
-         profiling_file='profile.dat', loglevel=logging.INFO, logfile=None, double_precision=False):
+def init(
+    platform_name=None,
+    device_type=None,
+    device_index=None,
+    profiling=False,
+    profiling_file="profile.dat",
+    loglevel=logging.INFO,
+    logfile=None,
+    double_precision=False,
+):
     """Initialize syris with *device_index*."""
     cfg.init_logging(level=loglevel, logger_file=logfile)
     cfg.PRECISION = cfg.Precision(double_precision)
@@ -26,10 +34,14 @@ def init(platform_name=None, device_type=None, device_index=None, profiling=Fals
         LOG.exception(str(e))
     else:
         if not platforms:
-            LOG.warning('No OpenCL platforms found, GPU computing will not be available')
+            LOG.warning("No OpenCL platforms found, GPU computing will not be available")
         else:
-            make_opencl_defaults(platform_name=platform_name, device_type=device_type,
-                                 device_index=device_index, profiling=profiling)
+            make_opencl_defaults(
+                platform_name=platform_name,
+                device_type=device_type,
+                device_index=device_index,
+                profiling=profiling,
+            )
     if profiling:
         _wrap_opencl()
         prf.PROFILER = prf.Profiler(cfg.OPENCL.queues, profiling_file)

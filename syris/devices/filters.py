@@ -30,7 +30,7 @@ class GaussianFilter(OpticalElement):
         *center*, i.e. this is the highest transmitted intensity.
         """
         if len(energies) < 4:
-            raise ValueError('Number of energy points too low for interpolation')
+            raise ValueError("Number of energy points too low for interpolation")
         energies = energies.rescale(q.keV).magnitude
         center = center.rescale(q.keV).magnitude
         sigma = sigma.rescale(q.keV).magnitude
@@ -41,8 +41,19 @@ class GaussianFilter(OpticalElement):
         """A filter doesn't move, this function returns infinity."""
         return np.inf * q.s
 
-    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None, queue=None,
-                  out=None, check=True, block=False):
+    def _transfer(
+        self,
+        shape,
+        pixel_size,
+        energy,
+        offset,
+        exponent=False,
+        t=None,
+        queue=None,
+        out=None,
+        check=True,
+        block=False,
+    ):
         """Transfer function implementation. Only *energy* is relevant because a filter has the same
         thickness everywhere.
         """
@@ -70,15 +81,27 @@ class MaterialFilter(Filter):
 
     def get_attenuation(self, energy):
         """Get attenuation at *energy*."""
-        return (self.thickness *
-                self.material.get_attenuation_coefficient(energy)).simplified.magnitude
+        return (
+            self.thickness * self.material.get_attenuation_coefficient(energy)
+        ).simplified.magnitude
 
     def get_next_time(self, t_0, distance):
         """A filter doesn't move, this function returns infinity."""
         return np.inf * q.s
 
-    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None, queue=None,
-                  out=None, check=True, block=False):
+    def _transfer(
+        self,
+        shape,
+        pixel_size,
+        energy,
+        offset,
+        exponent=False,
+        t=None,
+        queue=None,
+        out=None,
+        check=True,
+        block=False,
+    ):
         """Transfer function implementation. Only *energy* is relevant because a filter has the same
         thickness everywhere.
         """
@@ -97,8 +120,16 @@ class Scintillator(MaterialFilter):
 
     """Scintillator emits visible light when it is irradiated by X-rays."""
 
-    def __init__(self, thickness, material, light_yields, energies, luminescence, wavelengths,
-                 optical_ref_index):
+    def __init__(
+        self,
+        thickness,
+        material,
+        light_yields,
+        energies,
+        luminescence,
+        wavelengths,
+        optical_ref_index,
+    ):
         """Create a scintillator with *light_yields* [1 / keV] at *energies*, *luminescence* are the
         portions of total emmitted photons per some portion of wavelengths [1 / nm] (they are
         normalized so that their integral is 1) with respect to visible light *wavelengths*,
@@ -111,10 +142,14 @@ class Scintillator(MaterialFilter):
         self._luminescence = luminescence / luminescence.sum() / self.d_wavelength
         self.opt_ref_index = optical_ref_index
 
-        self._ly_tck = interp.splrep(self._energies.rescale(q.keV).magnitude,
-                                     self._lights_yields.rescale(1 / q.keV).magnitude)
-        self._lum_tck = interp.splrep(self._wavelengths.rescale(q.nm).magnitude,
-                                      self._luminescence.rescale(1 / q.nm).magnitude)
+        self._ly_tck = interp.splrep(
+            self._energies.rescale(q.keV).magnitude,
+            self._lights_yields.rescale(1 / q.keV).magnitude,
+        )
+        self._lum_tck = interp.splrep(
+            self._wavelengths.rescale(q.nm).magnitude,
+            self._luminescence.rescale(1 / q.nm).magnitude,
+        )
 
     @property
     def wavelengths(self):

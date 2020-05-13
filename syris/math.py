@@ -10,6 +10,7 @@ def difference_root(x_0, tck, y_d):
     :math:`|f(x_1) - f(x_0)| = y_d`. *x_0* is the starting :math:`x_0`
     and :math:`f(x)` is defined by spline coefficients *tck*.
     """
+
     def get_root(up=1):
         y_s = interp.splev(x_0, tck) + up * y_d
         t, c, k = np.copy(tck)
@@ -24,8 +25,7 @@ def difference_root(x_0, tck, y_d):
     top = get_root()
     bottom = get_root(-1)
 
-    return top if top is not None and top < bottom or bottom \
-        is None else bottom
+    return top if top is not None and top < bottom or bottom is None else bottom
 
 
 def closest(values, min_value):
@@ -60,8 +60,7 @@ def match_range(x_points, y_points, x_target):
     y_points = y_points.simplified
     tck = interp.splrep(x_points, y_points)
 
-    return interp.splev(x_target.rescale(x_points.units), tck) * \
-        y_points.units
+    return interp.splev(x_target.rescale(x_points.units), tck) * y_points.units
 
 
 def supremum(x_0, data):
