@@ -1,4 +1,5 @@
 """Tests initialization."""
+import logging
 import pyopencl as cl
 import syris
 from unittest import TestCase
@@ -10,7 +11,8 @@ class SyrisTest(TestCase):
 
 def default_syris_init(double_precision=False, profiling=False):
     syris.init(device_type=cl.device_type.CPU, device_index=0,
-               double_precision=double_precision, profiling=profiling)
+               double_precision=double_precision, profiling=profiling,
+               loglevel=logging.CRITICAL)
 
 
 def are_images_supported():
