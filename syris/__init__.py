@@ -7,7 +7,7 @@ from syris.gpu.util import make_opencl_defaults, init_programs, execute_profiled
 from syris import profiling as prf
 
 
-__version__ = "0.2"
+__version__ = "0.3dev"
 
 
 LOG = logging.getLogger(__name__)
