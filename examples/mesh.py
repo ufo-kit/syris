@@ -1,4 +1,5 @@
 """Mesh projection and slice."""
+import imageio
 import logging
 import time
 import matplotlib.pyplot as plt
@@ -7,7 +8,6 @@ import quantities as q
 import syris
 import syris.geometry as geom
 from syris.bodies.mesh import Mesh, make_cube, read_blender_obj
-from syris.util import save_image
 from .util import get_default_parser, show
 
 
@@ -17,7 +17,7 @@ LOG = logging.getLogger(__name__)
 def main():
     """Main function."""
     args = parse_args()
-    syris.init(loglevel=logging.INFO, double_precision=args.double_precision)
+    syris.init(device_type=2, loglevel=logging.INFO, double_precision=args.double_precision)
     units = q.Quantity(1, args.units)
     triangles = make_cube().magnitude if args.input is None else read_blender_obj(args.input)
     triangles = triangles * units
@@ -57,12 +57,12 @@ def main():
     offset = (0, translate[1].simplified, -(fov / 2.).simplified) * q.m
 
     if args.projection_filename is not None:
-        save_image(args.projection_filename, proj)
+        imageio.imwrite(args.projection_filename, proj)
 
     if args.compute_slice:
         sl = mesh.compute_slices((1,) + shape, args.pixel_size, offset=offset).get()[0]
         if args.slice_filename is not None:
-            save_image(args.slice_filename, sl)
+            imageio.imwrite(args.slice_filename, sl)
         show(sl, title='Slice at y = {}'.format(args.n / 2))
 
     show(proj, title='Projection')

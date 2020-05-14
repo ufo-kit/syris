@@ -1,4 +1,5 @@
 """Laminography data set generation with mesh geometry."""
+import imageio
 import itertools
 import logging
 import os
@@ -9,7 +10,6 @@ import syris.gpu.util as gutil
 from functools import partial
 from multiprocessing import Lock, Pool
 from syris.geometry import X_AX, Y_AX, Z_AX
-from syris.util import save_image
 from .util import get_default_parser
 
 
@@ -57,7 +57,7 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
     # Compute this device portion of tomographic angles
     enumerated = list(enumerate(angles))
     num_angles = len(enumerated)
-    per_device = num_angles / num_devices
+    per_device = num_angles // num_devices
     stop = None if index == num_devices - 1 else (index + 1) * per_device
     mine = enumerated[index * per_device:stop]
 
@@ -86,7 +86,7 @@ def scan(shape, ps, axis, mesh, angles, prefix, lamino_angle=45 * q.deg, index=0
         with LOCK:
             LOG.info(log_fmt.format(index, i + 1, num_angles, duration,
                                     float(angle.magnitude), max_vals))
-        save_image(prefix.format(i), projs[best][2048-128:2048+128, :])
+        imageio.imwrite(prefix.format(i), projs[best])
         last = max_vals[best]
 
     with LOCK:
@@ -134,8 +134,8 @@ def make_ground_truth(args, shape, mesh):
                 z_stack[k] = bin_image(slices[j + k], orig_shape, average=True, queue=queue).get()
             # Sum only the slices which are present (last run might not go to the end)
             sl = np.mean(z_stack[:slices.shape[0]], axis=0)
-            index = (i + j) / args.supersampling
-            save_image(args.prefix.format(index), sl)
+            index = (i + j) // args.supersampling
+            imageio.imwrite(args.prefix.format(index), sl)
 
     return sl
 

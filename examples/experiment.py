@@ -1,10 +1,10 @@
 """Experiment example."""
+import imageio
 import os
 import time
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
-import scipy.misc
 import syris
 from syris.bodies.mesh import make_cube, Mesh
 from syris.devices.cameras import Camera, make_pco_dimax
@@ -112,7 +112,7 @@ def make_topo_tomo_flat(args, highspeed=True, scintillator=None):
     flat = get_flat(dimax.shape, energies, detector, bm, filters=filters, shot_noise=True,
                     amplifier_noise=True)
     fmt = 'min: {}, max: {}, mean: {}, middle row std: {}'
-    print(fmt.format(flat.min(), flat.max(), flat.mean(), flat[n / 2].std()))
+    print(fmt.format(flat.min(), flat.max(), flat.mean(), flat[n // 2].std()))
 
     show(flat)
     plt.show()
@@ -173,7 +173,7 @@ def make_motion(args):
 
             if args.output:
                 path = os.path.join(args.output, 'projection_{:>05}.png').format(i)
-                scipy.misc.imsave(path, image)
+                imageio.imwrite(path, image)
 
         print('Maximum intensity:', image.max())
         print('Duration: {} s'.format(time.time() - st))
@@ -184,7 +184,7 @@ def make_motion(args):
 def main():
     """Parse command line arguments and execute one of the experiments."""
     parser = get_default_parser(__doc__)
-    subparsers = parser.add_subparsers(help='sub-command help')
+    subparsers = parser.add_subparsers(help='sub-command help', dest='sub-commands', required=True)
 
     motion = subparsers.add_parser('motion', help='An experiment with motion')
     motion.add_argument('--output', type=str, help='Output directory for moving objects.')
