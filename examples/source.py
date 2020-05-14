@@ -18,8 +18,6 @@ def make_triangle(n=128):
 def main():
     syris.init()
 
-    n = 512
-    shape = (n, n)
     ps = 1 * q.um
     dE = 1 * q.keV
     energies = np.arange(5, 30, dE.magnitude) * q.keV
@@ -35,10 +33,10 @@ def main():
 
     plt.subplot(121)
     plt.imshow(flat_0)
-    f = plt.subplot(122)
+    plt.subplot(122)
     plt.imshow(flat_1)
     plt.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

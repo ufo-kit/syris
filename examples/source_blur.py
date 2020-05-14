@@ -19,13 +19,11 @@ def main():
     ps = 1 * q.um
     energy = 20 * q.keV
     tr = Trajectory([(n / 2, n / 2, 0)] * ps, pixel_size=ps)
-    sample = make_sphere(n, n / 30 * ps, pixel_size=ps, material=get_material('air_5_30_kev.mat'))
+    sample = make_sphere(n, n / 30 * ps, pixel_size=ps, material=get_material("air_5_30_kev.mat"))
 
     bm = make_topotomo(pixel_size=ps, trajectory=tr)
-    print('Source size FWHM (height x width): {}'.format(bm.size.rescale(q.um)))
+    print("Source size FWHM (height x width): {}".format(bm.size.rescale(q.um)))
 
-    u = bm.transfer(shape, ps, energy, t=0 * q.s)
-    u = sample.transfer(shape, ps, energy)
     intensity = propagate([sample], shape, [energy], d, ps).get()
     incoh = bm.apply_blur(intensity, d, ps).get()
 
@@ -33,18 +31,19 @@ def main():
     intensity = ip.crop(intensity, region).get()
     incoh = ip.crop(incoh, region).get()
 
-    show(intensity, title='Coherent')
-    show(incoh, title='Applied source blur')
+    show(intensity, title="Coherent")
+    show(incoh, title="Applied source blur")
     plt.show()
 
 
 def parse_args():
     parser = get_default_parser(__doc__)
-    parser.add_argument('--propagation-distance', type=float, default=2,
-                        help='Propagation distance [m]')
+    parser.add_argument(
+        "--propagation-distance", type=float, default=2, help="Propagation distance [m]"
+    )
 
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
