@@ -1,5 +1,4 @@
 import numpy as np
-from numpy import linalg
 import quantities as q
 from syris import geometry as geom
 import itertools
@@ -14,12 +13,17 @@ def get_base():
 def get_directions(units):
     """Create directions in 3D space and apply *units*."""
     base = np.array(list(itertools.product([0, 1], [0, 1], [0, 1])))[1:]
-    x_points, y_points, z_points = np.array(zip(*base))
-    return np.array(zip(x_points, y_points, z_points) +
-                    zip(-x_points, y_points, z_points) +
-                    zip(x_points, -y_points, z_points) +
-                    zip(x_points, y_points, -z_points) +
-                    zip(-x_points, -y_points, -z_points)) * units
+    x_points, y_points, z_points = np.array(list(zip(*base)))
+    return (
+        np.array(
+            list(zip(x_points, y_points, z_points))
+            + list(zip(-x_points, y_points, z_points))
+            + list(zip(x_points, -y_points, z_points))
+            + list(zip(x_points, y_points, -z_points))
+            + list(zip(-x_points, -y_points, -z_points))
+        )
+        * units
+    )
 
 
 def get_vec_0():
@@ -27,7 +31,6 @@ def get_vec_0():
 
 
 class TestGeometry(SyrisTest):
-
     def test_angle(self):
         a = np.zeros((3, 2)) * q.m
         a[1, 0] = 1 * q.m
@@ -43,8 +46,9 @@ class TestGeometry(SyrisTest):
         # It must work also the other way around (vector, matrix)
         np.testing.assert_almost_equal(gt, geom.angle(v, a).simplified.magnitude)
         # 2D x 2D array vector-wise
-        np.testing.assert_almost_equal([gt[1], gt[1]],
-                                       geom.angle(a, a[:, ::-1]).simplified.magnitude)
+        np.testing.assert_almost_equal(
+            [gt[1], gt[1]], geom.angle(a, a[:, ::-1]).simplified.magnitude
+        )
 
     def test_zero_angle(self):
         zero_vec = np.zeros(3) * q.m
@@ -56,8 +60,10 @@ class TestGeometry(SyrisTest):
 
     def test_orthogonal_angles(self):
         vectors = get_base()
-        pairs = np.array([(x, y) for x in vectors for y in vectors if
-                          np.array(x - y).any()]) * vectors.units
+        pairs = (
+            np.array([(x, y) for x in vectors for y in vectors if np.array(x - y).any()])
+            * vectors.units
+        )
         for vec_0, vec_1 in pairs:
             self.assertEqual(geom.angle(vec_0, vec_1), 90 * q.deg)
 
@@ -126,8 +132,7 @@ class TestGeometry(SyrisTest):
         for direction in directions:
             rot_axis = np.cross(direction, normalized) * q.dimensionless
             trans_mat = geom.rotate(geom.angle(direction, normalized), rot_axis)
-            diff = np.sum(normalized - geom.normalize(
-                          geom.transform_vector(trans_mat, direction)))
+            diff = np.sum(normalized - geom.normalize(geom.transform_vector(trans_mat, direction)))
             self.assertAlmostEqual(diff, 0)
 
     def test_overlap(self):
@@ -140,13 +145,11 @@ class TestGeometry(SyrisTest):
 
     def test_bounding_box_overlap(self):
         def test(base, ground_truth):
-            b_1 = BoundingBox(list(itertools.product(base, base, base)) *
-                              q.m)
+            b_1 = BoundingBox(list(itertools.product(base, base, base)) * q.m)
             self.assertEqual(b_0.overlaps(b_1), ground_truth)
 
         base_0 = -1, 1
-        b_0 = BoundingBox(list(itertools.product(base_0, base_0, base_0)) *
-                          q.m)
+        b_0 = BoundingBox(list(itertools.product(base_0, base_0, base_0)) * q.m)
         test((1, 2), False)
         test((-10, -5), False)
         test((0, 2), True)

@@ -1,21 +1,14 @@
+.. Syris documentation master file, created by
+   sphinx-quickstart on Thu May 14 13:12:08 2020.
+   You can adapt this file completely to your liking, but it should at least
+   contain the root `toctree` directive.
+
 Welcome to Syris's documentation!
 =================================
 
-*syris* (**sy**\ nchrotron **r**\ adiation **i**\ maging **s**\ imulation) is a
-framework for simulations of X-ray absorption and phase contrast dynamic imaging
-experiments, like time-resolved radiography, tomography or laminography. It
-includes X-ray sources, various sample shape creation possibilities, complex
-refractive index lookup options, motion model and indirect detection model
-(scintillator combined with a conventional camera). Phase contrast is simulated
-by the Angular spectrum method, which enables one to include various optical
-elements in the simulation, e.g. gratings and X-ray lenses.
-
-Compute-intensive algorithms like Fourier transforms, sample shape creation and
-free-space propagation are implemented by using OpenCL, which enables one to
-execute the code on graphic cards.
-
-There are numerous examples of how to use *syris* described below which ship
-directly with the code. Enjoy!
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
 
 
 Application Programming Interface
@@ -44,6 +37,7 @@ Usage
 .. toctree::
    :maxdepth: 2
 
+   usage/profiling
    usage/examples
 
 

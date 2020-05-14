@@ -1,12 +1,18 @@
 Syris
 =====
 
+.. image:: https://img.shields.io/badge/Python-3.6+-blue
+    :target: https://www.python.org/downloads/release/python-360
+
 .. image:: https://travis-ci.org/ufo-kit/syris.svg?branch=master
     :target: https://travis-ci.org/ufo-kit/syris
 
 .. image:: https://readthedocs.org/projects/syris/badge/?version=latest
     :target: http://syris.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
+
+.. image:: https://codecov.io/gh/ufo-kit/syris/branch/master/graph/badge.svg
+  :target: https://codecov.io/gh/ufo-kit/syris
 
 *Syris* (**sy**\ nchrotron **r**\ adiation **i**\ maging **s**\ imulation) is a
 framework for simulations of X-ray absorption and phase contrast dynamic imaging
@@ -55,6 +61,15 @@ A simple white beam propagation example looks like this:
     plt.show()
 
 For more detailed information please see the `reference <https://syris.readthedocs.io/en/latest>`_.
+
+
+Examples
+********
+
+Are stored in the **examples** directory. Make sure you install their
+dependencies by ``pip install -r requirements-examples.txt`` and then you can
+run them from the top-level directory of syris repository by e.g. ``python -m
+examples.simple``.
 
 
 Citation

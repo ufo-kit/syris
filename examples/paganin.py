@@ -13,7 +13,7 @@ from syris.bodies.simple import make_sphere
 from syris.gpu.util import get_array
 from syris.imageprocessing import decimate, fft_2, ifft_2
 from syris.physics import propagate, compute_propagator, energy_to_wavelength
-from util import get_default_parser, get_material, show
+from .util import get_default_parser, get_material, show
 
 
 def get_propagator_psf(n, d, ps, energy):
@@ -34,14 +34,14 @@ def compute_tie_kernel(n, pixel_size, distance, material, energy):
     delta = ri.real
     beta = ri.imag
     mju = material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
-    fmt = '                            mju: {}'
-    print fmt.format(mju)
-    fmt = '                          delta: {}'
-    print fmt.format(delta)
-    fmt = '                           beta: {}'
-    print fmt.format(beta)
-    fmt = '    Regularization rate for UFO: {}'
-    print fmt.format(np.log10(delta / beta))
+    fmt = "                            mju: {}"
+    print(fmt.format(mju))
+    fmt = "                          delta: {}"
+    print(fmt.format(delta))
+    fmt = "                           beta: {}"
+    print(fmt.format(beta))
+    fmt = "    Regularization rate for UFO: {}"
+    print(fmt.format(np.log10(delta / beta)))
 
     return mju / (distance * ri.real * (f ** 2 + g ** 2) + mju)
     # Alternative forms
@@ -61,19 +61,19 @@ def main():
     n_camera = 256
     n = n_camera * args.supersampling
     shape = (n, n)
-    material = get_material('pmma_5_30_kev.mat')
+    material = get_material("pmma_5_30_kev.mat")
     energy = 15 * q.keV
     ps = 1 * q.um
     ps_hd = ps / args.supersampling
-    radius = n / 4. * ps_hd
+    radius = n / 4.0 * ps_hd
 
-    fmt = '                     Wavelength: {}'
-    print fmt.format(energy_to_wavelength(energy))
-    fmt = 'Pixel size used for propagation: {}'
-    print fmt.format(ps_hd.rescale(q.um))
-    print '                  Field of view: {}'.format(n * ps_hd.rescale(q.um))
-    fmt = '                Sphere diameter: {}'
-    print fmt.format(2 * radius)
+    fmt = "                     Wavelength: {}"
+    print(fmt.format(energy_to_wavelength(energy)))
+    fmt = "Pixel size used for propagation: {}"
+    print(fmt.format(ps_hd.rescale(q.um)))
+    print("                  Field of view: {}".format(n * ps_hd.rescale(q.um)))
+    fmt = "                Sphere diameter: {}"
+    print(fmt.format(2 * radius))
 
     sample = make_sphere(n, radius, pixel_size=ps_hd, material=material)
     projection = sample.project((n, n), ps_hd).get() * 1e6
@@ -87,24 +87,27 @@ def main():
     f_ld = fft_2(ld)
     f_ld *= get_array(kernel.astype(cfg.PRECISION.np_float))
     retrieved = ifft_2(f_ld).get().real
-    retrieved = - 1 / mju * np.log(retrieved) * 1e6
+    retrieved = -1 / mju * np.log(retrieved) * 1e6
 
-    show(hd, title='High resolution')
-    show(ld, title='Low resolution (detector)')
-    show(retrieved, title='Retrieved [um]')
-    show(projection, title='Projection [um]')
-    show(projection - retrieved, title='Projection - retrieved')
+    show(hd, title="High resolution")
+    show(ld, title="Low resolution (detector)")
+    show(retrieved, title="Retrieved [um]")
+    show(projection, title="Projection [um]")
+    show(projection - retrieved, title="Projection - retrieved")
     plt.show()
 
 
 def parse_args():
     parser = get_default_parser(__doc__)
-    parser.add_argument('--supersampling', type=int, default=8,
-                        help='Supersampling used to prevent propagation artefacts')
+    parser.add_argument(
+        "--supersampling",
+        type=int,
+        default=8,
+        help="Supersampling used to prevent propagation artefacts",
+    )
 
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

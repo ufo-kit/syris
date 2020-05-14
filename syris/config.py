@@ -39,12 +39,13 @@ class Precision(object):
             self.np_float = np.float32
             self.np_cplx = np.complex64
         self.numpy_to_opencl = {self.np_float: self.cl_float, self.np_cplx: self.cl_cplx}
-        self.opencl_to_numpy = dict(zip(self.numpy_to_opencl.values(),
-                                        self.numpy_to_opencl.keys()))
+        self.opencl_to_numpy = dict(
+            list(zip(list(self.numpy_to_opencl.values()), list(self.numpy_to_opencl.keys())))
+        )
 
-        dtype_base = 'double' if double else 'float'
+        dtype_base = "double" if double else "float"
         for i in [2, 3, 4, 8, 16]:
-            setattr(self, 'vfloat' + str(i), getattr(cl_array.vec, dtype_base + str(i)))
+            setattr(self, "vfloat" + str(i), getattr(cl_array.vec, dtype_base + str(i)))
 
 
 class OpenCL(object):
@@ -57,10 +58,7 @@ class OpenCL(object):
         self.devices = []
         # Default command queue
         self.queue = None
-        self.programs = {'improc': None,
-                         'physics': None,
-                         'geometry': None,
-                         'mesh': None}
+        self.programs = {"improc": None, "physics": None, "geometry": None, "mesh": None}
         # {command queue: {shape: plan}} dictionary
         self.fft_plans = {}
 
@@ -68,7 +66,7 @@ class OpenCL(object):
 def init_logging(level=logging.DEBUG, logger_file=None):
     """Initialize logging with output to *logger_file*."""
     LOG.setLevel(level)
-    fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     logging.basicConfig(format=fmt)
 
     if logger_file:

@@ -37,9 +37,7 @@ class StaticBody(Body):
         start = [int(num) for num in start]
 
         cy, cx = (max(0, start[0]), max(0, start[1]))
-        crop_region = (cy, cx,
-                       min(end[0], orig_shape[0]) - cy,
-                       min(end[1], orig_shape[1]) - cx)
+        crop_region = (cy, cx, min(end[0], orig_shape[0]) - cy, min(end[1], orig_shape[1]) - cx)
 
         py, px = (abs(min(0, start[0])), abs(min(0, start[1])))
         pad_region = (py, px, end[0] - start[0], end[1] - start[1])
@@ -55,8 +53,9 @@ class StaticBody(Body):
         return proj
 
 
-def make_grid(n, period, width=1 * q.m, thickness=1 * q.m, pixel_size=1 * q.m, material=None,
-              queue=None):
+def make_grid(
+    n, period, width=1 * q.m, thickness=1 * q.m, pixel_size=1 * q.m, material=None, queue=None
+):
     """Make a rectangluar grid with shape (*n*, *n*), the bars are spaced *period* and are *width*
     in diameter. *thickness* is the projected thickness and *pixel_size*, *material* and *queue*,
     which is an OpenCL command queue, are used to create :class:`.StaticBody`.
@@ -67,7 +66,7 @@ def make_grid(n, period, width=1 * q.m, thickness=1 * q.m, pixel_size=1 * q.m, m
 
     image = np.zeros((n, n), dtype=cfg.PRECISION.np_float)
 
-    for i in range(-width / 2, width / 2):
+    for i in range(-width // 2, width // 2):
         if i < 0:
             i = period + i
         image[i::period, :] = 1
@@ -82,9 +81,9 @@ def make_sphere(n, radius, pixel_size=1 * q.m, material=None, queue=None):
     an OpenCL command queue, are used to create :class:`.StaticBody`.
     """
     image = np.zeros((n, n), dtype=cfg.PRECISION.np_float)
-    y, x = np.mgrid[-n / 2:n / 2, -n / 2:n / 2]
-    x = (x + .5) * pixel_size.simplified.magnitude
-    y = (y + .5) * pixel_size.simplified.magnitude
+    y, x = np.mgrid[-n // 2 : n // 2, -n // 2 : n // 2]
+    x = (x + 0.5) * pixel_size.simplified.magnitude
+    y = (y + 0.5) * pixel_size.simplified.magnitude
     radius = radius.simplified.magnitude
     valid = np.where(x ** 2 + y ** 2 < radius ** 2)
     image[valid] = 2 * np.sqrt(radius ** 2 - x[valid] ** 2 - y[valid] ** 2)

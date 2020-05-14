@@ -7,13 +7,12 @@ import math
 
 
 class TestMath(SyrisTest):
-
     def test_match_range(self):
         n = 6
         n_1 = 1000
-        x_0 = np.linspace(-n / 2, n / 2, n) * q.m
+        x_0 = np.linspace(-n // 2, n // 2, n) * q.m
         y_0 = x_0 ** 2
-        x_1 = np.linspace(-n / 2, n / 2, n_1) * q.mm
+        x_1 = np.linspace(-n // 2, n // 2, n_1) * q.mm
         y_1 = smath.match_range(x_0, y_0, x_1)
         y_1_def = x_1 ** 2
 
@@ -37,14 +36,17 @@ class TestMath(SyrisTest):
 
         # f ascending
         x_0 = np.pi / 4
-        self.assertAlmostEqual(smath.difference_root(x_0, tck, y_d),
-                               math.asin(y_d + math.sin(x_0)), places=places)
+        self.assertAlmostEqual(
+            smath.difference_root(x_0, tck, y_d), math.asin(y_d + math.sin(x_0)), places=places
+        )
 
         # f descending
         x_0 = 3 * np.pi / 4
-        self.assertAlmostEqual(smath.difference_root(x_0, tck, y_d),
-                               np.pi - math.asin(math.sin(x_0) - y_d),
-                               places=places)
+        self.assertAlmostEqual(
+            smath.difference_root(x_0, tck, y_d),
+            np.pi - math.asin(math.sin(x_0) - y_d),
+            places=places,
+        )
 
 
 def test_supremum():
