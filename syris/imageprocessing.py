@@ -1,5 +1,4 @@
 """Module for GPU-based image processing."""
-import glob
 import itertools
 import logging
 import numpy as np
@@ -11,7 +10,7 @@ from reikna.fft import FFT
 from syris import config as cfg
 from syris.gpu import util as g_util
 from syris.math import fwnm_to_sigma
-from syris.util import get_magnitude, make_tuple, next_power_of_two, read_image, save_image
+from syris.util import get_magnitude, make_tuple, next_power_of_two
 
 
 LOG = logging.getLogger(__name__)
@@ -555,19 +554,6 @@ def make_tiles(
         return (
             item for item in g_util.qmap(func, iterable, queues=queues, args=args, kwargs=kwargs)
         )
-
-
-def save_tiles(prefix, tiles):
-    """Save *tiles* to linearly indexed files formed by *prefix* and the tile number."""
-    for i, tile in enumerate(tiles):
-        save_image(prefix.format(i), tile)
-
-
-def read_tiles(prefix):
-    """Read tiles from disk using the glob module for pattern expansion. Returns a generator."""
-    names = sorted(glob.glob(prefix))
-
-    return (read_image(name) for name in names)
 
 
 def merge_tiles(tiles, num_tiles=None, outlier=(0, 0)):
