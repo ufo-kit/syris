@@ -3,11 +3,11 @@ same time move along y-axis. The total vertical displacement between rotation st
 cube edge. This leads to an "incomplete" data set with increasingly more missing data in the
 sinogram space from top to bottom. There is exactly one complete sinogram, the middle one.
 """
+import imageio
 import os
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
-import tifffile
 import syris
 import syris.geometry as geom
 from syris.bodies.base import CompositeBody
@@ -22,7 +22,7 @@ def make_cube_body(n, ps, cube_edge, phase_shift=None):
     # Rotation around the vertical axis
     points = make_circle(axis='y', overall_angle=np.pi * q.rad,
                          phase_shift=phase_shift).magnitude
-    points = points * fov / 4 + [n / 2, 0, 0] * ps
+    points = points * fov / 4 + [n // 2, 0, 0] * ps
     trajectory = geom.Trajectory(points, pixel_size=ps, velocity=ps / q.s)
     # *orientation* aligns the object with the trajectory derivative
     mesh = Mesh(triangles, trajectory, orientation=geom.Z_AX)
@@ -40,7 +40,7 @@ def main():
     cube_edge = n / 4 * ps
     fmt = os.path.join(args.output, 'projection_{:04}.tif')
 
-    x = np.linspace(n / 4 + n / 8, 3 * n / 4 + n / 8, num=10)
+    x = np.linspace(n // 4 + n // 8, 3 * n // 4 + n // 8, num=10)
     y = z = np.zeros(x.shape)
     cube_0 = make_cube_body(n, ps, cube_edge)
     cube_1 = make_cube_body(n, ps, cube_edge, phase_shift=np.pi * q.rad)
@@ -65,7 +65,7 @@ def main():
         t = total_time / num_projections * i
         composite.move(t)
         projection = composite.project(shape, ps).get()
-        tifffile.imsave(fmt.format(i), projection)
+        imageio.imwrite(fmt.format(i), projection)
 
     show(projection)
     plt.show()

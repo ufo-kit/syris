@@ -104,7 +104,7 @@ def run(n, m, complexity, prg, verbose=False):
 
 def main():
     args = parse_args()
-    syris.init()
+    syris.init(profiling=True)
     prg = cl.Program(cfg.OPENCL.ctx, get_kernel()).build()
 
     if len(args.k) == 1:

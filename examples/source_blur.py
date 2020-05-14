@@ -29,7 +29,7 @@ def main():
     intensity = propagate([sample], shape, [energy], d, ps).get()
     incoh = bm.apply_blur(intensity, d, ps).get()
 
-    region = (n / 4, n / 4, n / 2, n / 2)
+    region = (n // 4, n // 4, n // 2, n // 2)
     intensity = ip.crop(intensity, region).get()
     incoh = ip.crop(incoh, region).get()
 

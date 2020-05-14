@@ -1,3 +1,4 @@
+import imageio
 import logging
 import re
 from matplotlib import pyplot as plt
@@ -8,7 +9,7 @@ import syris
 from syris import config as cfg
 from syris.bodies.isosurfaces import MetaBall, MetaBalls, project_metaballs_naive
 from syris.geometry import Trajectory
-from syris.util import make_tuple, save_image
+from syris.util import make_tuple
 from .util import get_default_parser, show
 
 
@@ -33,14 +34,14 @@ def load_params(file_name):
     return params
 
 
-def create_metaballs(params):
+def create_metaballs(params, pixel_size):
     x, y, z, r = list(zip(*params))
 
-    objects = ""
+    objects = b""
     metaballs = []
     for i in range(len(params)):
         c_points = [(x[i], y[i], z[i])] * q.um
-        trajectory = Trajectory(c_points)
+        trajectory = Trajectory(c_points, pixel_size=pixel_size)
         metaball = MetaBall(trajectory, r[i] * q.um)
         metaball.move(0 * q.s)
         metaballs.append(metaball)
@@ -66,7 +67,7 @@ def create_metaballs_random(n, pixel_size, num, min_radius, max_radius):
         r = np.random.uniform(min_radius, max_radius)
         params.append([x, y, z, r])
 
-    return create_metaballs(params)
+    return create_metaballs(params, pixel_size)
 
 
 def get_z_range(metaballs):
@@ -158,12 +159,12 @@ def main():
     elif args.method == 'file':
         # 1e6 because packing converts to meters
         values = np.fromfile(args.input, dtype=np.float32) * 1e6
-        metaballs, objects_all = create_metaballs(values.reshape(len(values) / 4, 4))
+        metaballs, objects_all = create_metaballs(values.reshape(len(values) / 4, 4), pixel_size)
     else:
         distance = args.distance or args.n / 4
         positions = [(args.n / 2 - distance, args.n / 2, 0, args.n / 6),
                      (args.n / 2 + distance, args.n / 2, 0, args.n / 6)]
-        metaballs, objects_all = create_metaballs(positions)
+        metaballs, objects_all = create_metaballs(positions, pixel_size)
 
     if args.output:
         with open(args.output, mode='wb') as out_file:
@@ -181,7 +182,7 @@ def main():
         thickness = project_metaballs_naive(metaballs, shape, make_tuple(pixel_size)).get()
 
     if args.output_thickness:
-        save_image(args.output_thickness, thickness)
+        imageio.imwrite(args.output_thickness, thickness)
 
     show(thickness)
     plt.show()

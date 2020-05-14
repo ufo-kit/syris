@@ -1,4 +1,5 @@
 """Example showing variable convolution."""
+import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
@@ -7,7 +8,6 @@ import syris.config as cfg
 import syris.gpu.util as gutil
 import syris.imageprocessing as ip
 from syris.bodies.simple import make_grid
-from syris.util import save_image
 from .util import get_default_parser, show
 
 
@@ -40,7 +40,7 @@ def main():
     image = ip.crop(image, (m - 1, m - 1, crop_n, crop_n)).get()
 
     if args.output:
-        save_image(args.output, result)
+        imageio.imwrite(args.output, result)
 
     show(image, title='Original Image')
     show(2 * radii, title='Blurring Disk Diameters')

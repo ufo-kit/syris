@@ -171,7 +171,7 @@ def make_complex_trajectory_sequence(args):
 
 def main():
     parser = get_default_parser(__doc__)
-    subparsers = parser.add_subparsers(help='sub-command help')
+    subparsers = parser.add_subparsers(help='sub-command help', dest='sub-commands', required=True)
     manual = subparsers.add_parser('manual', help='Manual positioning via simple transformations')
     trajectory = subparsers.add_parser('trajectory', help='Automatic positioning via trajectories')
     subtrajectories = subparsers.add_parser('subtrajectories', help='Automatic positioning with '
