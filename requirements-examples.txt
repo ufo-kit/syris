@@ -1,6 +1,2 @@
-scipy
 imageio
-numpy
 matplotlib
-quantities
-pyopencl
