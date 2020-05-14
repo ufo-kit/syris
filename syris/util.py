@@ -1,15 +1,5 @@
 """Utility functions."""
 import numpy as np
-import scipy.misc
-
-
-TIF_32 = True
-
-
-try:
-    import tifffile
-except ImportError:
-    TIF_32 = False
 
 
 def make_tuple(value, num_dims=2):
@@ -46,24 +36,6 @@ def get_magnitude(value):
 def next_power_of_two(n):
     """Get next power of two for number *n*."""
     return 2 ** int(np.ceil(np.log2(n)))
-
-
-def save_image(filename, image):
-    """Save *image* to *filename*."""
-    if (filename.endswith("tif") or filename.endswith(".tiff")) and TIF_32:
-        tifffile.imsave(filename, image.astype(np.float32))
-    else:
-        scipy.misc.imsave(filename, image)
-
-
-def read_image(filename):
-    """Load image from *filename*."""
-    if (filename.endswith("tif") or filename.endswith(".tiff")) and TIF_32:
-        image = tifffile.imread(filename)
-    else:
-        image = scipy.misc.imread(filename, image)
-
-    return image
 
 
 def get_gauss(x, center, sigma, normalized=False):
