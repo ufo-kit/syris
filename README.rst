@@ -63,6 +63,15 @@ A simple white beam propagation example looks like this:
 For more detailed information please see the `reference <https://syris.readthedocs.io/en/latest>`_.
 
 
+Examples
+********
+
+Are stored in the **examples** directory. Make sure you install their
+dependencies by ``pip install -r requirements-examples.txt`` and then you can
+run them from the top-level directory of syris repository by e.g. ``python -m
+examples.simple``.
+
+
 Citation
 --------
 
