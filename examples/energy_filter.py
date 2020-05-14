@@ -27,11 +27,12 @@ def main():
     fwhm = args.energy_resolution * energy_center
     sigma = smath.fwnm_to_sigma(fwhm, n=2)
     # Make sure we resolve the curve nicely
-    energies = np.arange(max(1 * q.keV, energy_center - 2 * fwhm),
-                         energy_center + 2 * fwhm,
-                         fwhm / 25) * q.keV
+    energies = (
+        np.arange(max(1 * q.keV, energy_center - 2 * fwhm), energy_center + 2 * fwhm, fwhm / 25)
+        * q.keV
+    )
     dE = energies[1] - energies[0]
-    print('Energy from, to, step, number:', energies[0], energies[-1], dE, len(energies))
+    print("Energy from, to, step, number:", energies[0], energies[-1], dE, len(energies))
 
     bm = make_topotomo(dE=dE, pixel_size=ps, trajectory=tr)
     spectrum_energies = np.arange(1, 50, 1) * q.keV
@@ -43,38 +44,45 @@ def main():
 
     intensity = propagate([bm, fltr], shape, energies, 0 * q.m, ps).get()
 
-    show(intensity, title='Intensity for energy range {} - {}'.format(energies[0], energies[-1]))
+    show(intensity, title="Intensity for energy range {} - {}".format(energies[0], energies[-1]))
 
     plt.figure()
     plt.plot(spectrum_energies.magnitude, native_spectrum)
-    plt.title('Source Spectrum')
-    plt.xlabel('Energy [keV]')
-    plt.ylabel('Intensity')
+    plt.title("Source Spectrum")
+    plt.xlabel("Energy [keV]")
+    plt.ylabel("Intensity")
 
     plt.figure()
     plt.plot(energies.magnitude, gauss)
-    plt.title('Gaussian Filter')
-    plt.xlabel('Energy [keV]')
-    plt.ylabel('Transmitted intensity')
+    plt.title("Gaussian Filter")
+    plt.xlabel("Energy [keV]")
+    plt.ylabel("Transmitted intensity")
 
     plt.figure()
     plt.plot(energies.magnitude, filtered_spectrum)
-    plt.title('Filtered Spectrum')
-    plt.xlabel('Energy [keV]')
-    plt.ylabel('Intensity')
+    plt.title("Filtered Spectrum")
+    plt.xlabel("Energy [keV]")
+    plt.ylabel("Intensity")
     plt.show()
 
 
 def parse_args():
     parser = get_default_parser(__doc__)
-    parser.add_argument('--energy-center', type=float, default=10,
-                        help='Energy at which the filter is centered [keV]')
-    parser.add_argument('--energy-resolution', type=float, default=1e-2,
-                        help='Energy resolution (FWHM of the Gaussian filter) [dE/E]')
+    parser.add_argument(
+        "--energy-center",
+        type=float,
+        default=10,
+        help="Energy at which the filter is centered [keV]",
+    )
+    parser.add_argument(
+        "--energy-resolution",
+        type=float,
+        default=1e-2,
+        help="Energy resolution (FWHM of the Gaussian filter) [dE/E]",
+    )
 
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

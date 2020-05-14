@@ -11,7 +11,7 @@ from .util import show
 def compute_fourier_propagator(n, lam, z, ps, fresnel=True):
     try:
         ps[0]
-    except:
+    except Exception:
         ps = (ps.magnitude, ps.magnitude) * ps.units
 
     lam = lam.rescale(q.m).magnitude
@@ -25,8 +25,9 @@ def compute_fourier_propagator(n, lam, z, ps, fresnel=True):
     g /= ps[0]
 
     if fresnel:
-        result = np.exp(1j * 2 * np.pi / lam * z) * \
-            np.exp(-1j * np.pi * lam * z * (f ** 2 + g ** 2))
+        result = np.exp(1j * 2 * np.pi / lam * z) * np.exp(
+            -1j * np.pi * lam * z * (f ** 2 + g ** 2)
+        )
     else:
         result = np.exp(1j * 2 * np.pi / lam * z * np.sqrt(1 - (f * lam) ** 2 - (g * lam) ** 2))
 
@@ -44,25 +45,26 @@ def main():
     ca = (lam / 2 / ps).simplified.magnitude
     tga = np.tan(np.arccos(ca))
     distance = (tga * n * ps / 2).simplified
-    print('Propagation distance:', distance)
+    print("Propagation distance:", distance)
 
-    propagator = compute_propagator(n, distance, lam, ps, apply_phase_factor=True,
-                                    mollified=False).get()
+    propagator = compute_propagator(
+        n, distance, lam, ps, apply_phase_factor=True, mollified=False
+    ).get()
     full_propagator = compute_propagator(n, distance, lam, ps, fresnel=False, mollified=False).get()
     np_propagator = compute_fourier_propagator(n, lam, distance, ps)
     np_full_propagator = compute_fourier_propagator(n, lam, distance, ps, fresnel=False)
     diff = propagator - np_propagator
     full_diff = full_propagator - np_full_propagator
 
-    show(np.fft.fftshift(propagator.real), 'Syris Fresnel Propagator (Real Part)')
-    show(np.fft.fftshift(np_propagator.real), 'Numpy Fresnel propagator (Real Part)')
-    show(np.fft.fftshift(diff.real), 'Fresnel Syris - Fresnel Numpy (Real Part)')
+    show(np.fft.fftshift(propagator.real), "Syris Fresnel Propagator (Real Part)")
+    show(np.fft.fftshift(np_propagator.real), "Numpy Fresnel propagator (Real Part)")
+    show(np.fft.fftshift(diff.real), "Fresnel Syris - Fresnel Numpy (Real Part)")
 
-    show(np.fft.fftshift(full_propagator.real), 'Syris Full Propagator (Real Part)')
-    show(np.fft.fftshift(np_full_propagator.real), 'Numpy Full propagator (Real Part)')
-    show(np.fft.fftshift(full_diff.real), 'Full Syris - Full Numpy (Real Part)')
+    show(np.fft.fftshift(full_propagator.real), "Syris Full Propagator (Real Part)")
+    show(np.fft.fftshift(np_full_propagator.real), "Numpy Full propagator (Real Part)")
+    show(np.fft.fftshift(full_diff.real), "Full Syris - Full Numpy (Real Part)")
     plt.show()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

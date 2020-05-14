@@ -40,7 +40,7 @@ from .trajectory import make_circle
 
 def _make_metaballs(args):
     metaballs = []
-    radius = args.n / 16.
+    radius = args.n / 16.0
     shift = 3 * radius
     for i in range(-1, 2):
         dx = i * 3 * radius
@@ -58,7 +58,7 @@ def _make_metaballs(args):
 
 def make_manual_sequence(args):
     metaballs = _make_metaballs(args)
-    traj = Trajectory([(args.n / 2., args.n / 2., 0)] * args.ps, pixel_size=args.ps)
+    traj = Trajectory([(args.n / 2.0, args.n / 2.0, 0)] * args.ps, pixel_size=args.ps)
     composite = CompositeBody(traj, bodies=metaballs)
     # Move the sub-bodies relative to the composite body and also move the composite body to the
     # center of the image.
@@ -66,7 +66,7 @@ def make_manual_sequence(args):
 
     im = None
     d_angle = 10 * q.deg
-    fmt = 'Projection at rotation {:>9}'
+    fmt = "Projection at rotation {:>9}"
     # Rotate around 360 deg
     for i in range(int((360 * q.deg / d_angle).magnitude) + 1):
         p = composite.project(args.shape, args.ps).get()
@@ -92,7 +92,7 @@ def make_trajectory_sequence(args):
 
     im = None
     d_angle = 10 * q.deg
-    fmt = 'Projection at rotation {:>9}'
+    fmt = "Projection at rotation {:>9}"
     # Rotate around 360 deg
     for i, t in enumerate(np.linspace(0, traj.time.simplified.magnitude, 37) * q.s):
         # Reset transformation matrices
@@ -151,7 +151,7 @@ def make_complex_trajectory_sequence(args):
         times = np.linspace(0, 1, 100)
     else:
         if args.t < 0 or args.t > 1:
-            raise ValueError('--t must be in the range [0, 1]')
+            raise ValueError("--t must be in the range [0, 1]")
         times = [args.t]
 
     im = None
@@ -161,7 +161,7 @@ def make_complex_trajectory_sequence(args):
         composite.move(t)
         p = composite.project(args.shape, args.ps).get()
         if im is None:
-            im = show(p, title='Projection')
+            im = show(p, title="Projection")
         else:
             im.set_data(p)
             plt.draw()
@@ -171,17 +171,21 @@ def make_complex_trajectory_sequence(args):
 
 def main():
     parser = get_default_parser(__doc__)
-    subparsers = parser.add_subparsers(help='sub-command help', dest='sub-commands', required=True)
-    manual = subparsers.add_parser('manual', help='Manual positioning via simple transformations')
-    trajectory = subparsers.add_parser('trajectory', help='Automatic positioning via trajectories')
-    subtrajectories = subparsers.add_parser('subtrajectories', help='Automatic positioning with '
-                                            'local sub-body trajectories')
+    subparsers = parser.add_subparsers(help="sub-command help", dest="sub-commands", required=True)
+    manual = subparsers.add_parser("manual", help="Manual positioning via simple transformations")
+    trajectory = subparsers.add_parser("trajectory", help="Automatic positioning via trajectories")
+    subtrajectories = subparsers.add_parser(
+        "subtrajectories", help="Automatic positioning with " "local sub-body trajectories"
+    )
     manual.set_defaults(_func=make_manual_sequence)
     trajectory.set_defaults(_func=make_trajectory_sequence)
 
-    subtrajectories.add_argument('--t', type=float,
-                                 help='Time at which to compute the projection normalized to '
-                                 '[0, 1], if not specified, complete sequence is shown')
+    subtrajectories.add_argument(
+        "--t",
+        type=float,
+        help="Time at which to compute the projection normalized to "
+        "[0, 1], if not specified, complete sequence is shown",
+    )
     subtrajectories.set_defaults(_func=make_complex_trajectory_sequence)
 
     args = parser.parse_args()
@@ -195,5 +199,5 @@ def main():
     args._func(args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -26,27 +26,30 @@ def make_power_2(n=128):
     return list(zip(x, y, z)) * q.mm
 
 
-def make_circle(n=128, axis='z', overall_angle=None, phase_shift=None):
+def make_circle(n=128, axis="z", overall_angle=None, phase_shift=None):
     """Axis specifies the axis of rotation, which can be 'x', 'y' or 'z'."""
     if overall_angle is None:
         overall_angle = 2 * np.pi * q.rad
     if phase_shift is None:
         phase_shift = 0 * q.rad
-    t = np.linspace(phase_shift.rescale(q.rad).magnitude,
-                    (phase_shift + overall_angle).rescale(q.rad).magnitude, n)
+    t = np.linspace(
+        phase_shift.rescale(q.rad).magnitude,
+        (phase_shift + overall_angle).rescale(q.rad).magnitude,
+        n,
+    )
     a = np.cos(t)
     b = np.sin(t)
     c = np.zeros(n)
 
-    if axis == 'z':
+    if axis == "z":
         x = a
         y = b
         z = c
-    elif axis == 'y':
+    elif axis == "y":
         x = a
         z = b
         y = c
-    elif axis == 'x':
+    elif axis == "x":
         y = a
         z = b
         x = c
@@ -83,20 +86,22 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
         times.append(t.simplified.magnitude)
 
     times = times * q.s
-    points = np.array(list(zip(*[obj.trajectory.get_point(tt).rescale(q.um).magnitude for tt in times])))
+    points = np.array(
+        list(zip(*[obj.trajectory.get_point(tt).rescale(q.um).magnitude for tt in times]))
+    )
     dt = np.gradient(times)
 
     plt.figure()
     plt.plot(get_ds(points))
-    plt.title('ds')
+    plt.title("ds")
 
     plt.figure()
     plt.plot(dt)
-    plt.title('dt')
+    plt.title("dt")
 
     plt.figure()
     plt.plot(get_ds(points) / dt * 1e-3)
-    plt.title('Speed [mm / s]')
+    plt.title("Speed [mm / s]")
     plt.ylim(0, 2)
 
     if do_plot:
@@ -104,12 +109,12 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
         max_all = np.max(d_points, axis=0)
         plt.figure()
         plt.plot(max_all)
-        plt.title('Max shift, should be < {}'.format(ps))
+        plt.title("Max shift, should be < {}".format(ps))
 
         max_dx = max(d_points[0])
         max_dy = max(d_points[1])
         max_dz = max(d_points[2])
-        print('Maxima: {}, {}, {}'.format(max_dx, max_dy, max_dz))
+        print("Maxima: {}, {}, {}".format(max_dx, max_dy, max_dz))
 
     return times, points
 
@@ -146,11 +151,11 @@ def main():
     mb.bind_trajectory(ps)
 
     tr = mb.trajectory
-    print('Length: {}, time: {}'.format(tr.length.rescale(q.mm), tr.time))
+    print("Length: {}, time: {}".format(tr.length.rescale(q.mm), tr.time))
 
     plt.figure()
     plt.plot(tr.points[0].rescale(q.um), tr.points[1].rescale(q.um))
-    plt.title('Trajectory')
+    plt.title("Trajectory")
     times, points = get_diffs(mb, ps)
 
     if args.output is not None:
@@ -159,7 +164,7 @@ def main():
         for i, t in enumerate(times):
             mb.clear_transformation()
             proj = mb.project((n, n), ps, t=t).get()
-            scipy.misc.imsave(os.path.join(args.output, 'projection_{:>04}.tif'.format(i)), proj)
+            scipy.misc.imsave(os.path.join(args.output, "projection_{:>04}.tif".format(i)), proj)
 
     plt.show()
 
@@ -167,10 +172,10 @@ def main():
 def parse_args():
     """Parse command line arguments."""
     parser = get_default_parser(__doc__)
-    parser.add_argument('--output', type=str, help='Output directory for moving objects.')
+    parser.add_argument("--output", type=str, help="Output directory for moving objects.")
 
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
