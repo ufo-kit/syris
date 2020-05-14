@@ -3,11 +3,10 @@ import logging
 import pkg_resources
 import numpy as np
 import quantities as q
-from pyopencl import array as cl_array
 import scipy.interpolate as interp
 import syris.gpu.util as gutil
 from syris import config as cfg
-from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2, decimate, bin_image
+from syris.imageprocessing import bin_image, decimate
 from syris.math import fwnm_to_sigma
 
 
@@ -26,9 +25,20 @@ class Camera(object):
 
     """Base class representing a camera."""
 
-    def __init__(self, pixel_size, gain, dark_current, amplifier_sigma, bits_per_pixel,
-                 shape, quantum_efficiencies=None, wavelengths=None, exp_time=1 * q.s, fps=1 / q.s,
-                 dtype=np.ushort):
+    def __init__(
+        self,
+        pixel_size,
+        gain,
+        dark_current,
+        amplifier_sigma,
+        bits_per_pixel,
+        shape,
+        quantum_efficiencies=None,
+        wavelengths=None,
+        exp_time=1 * q.s,
+        fps=1 / q.s,
+        dtype=np.ushort,
+    ):
         """Create a camera with *pixel_size*, *gain* specifying :math:`\frac{counts}{e^-}`,
         *dark_current* as mean number of electrons present without incident light, *amplifier_sigma*
         is the sigma of the normally distributed electron noise given by camera electronics,
@@ -52,8 +62,9 @@ class Camera(object):
         self._psf = None
 
         if self._quantum_efficiencies is not None and self._wavelengths is not None:
-            self._qe_tck = interp.splrep(self._wavelengths.rescale(q.nm).magnitude,
-                                         self._quantum_efficiencies)
+            self._qe_tck = interp.splrep(
+                self._wavelengths.rescale(q.nm).magnitude, self._quantum_efficiencies
+            )
         if not is_fps_feasible(fps, exp_time):
             fps = 1 / exp_time.simplified
         self._exp_time = exp_time
@@ -70,7 +81,7 @@ class Camera(object):
     @exp_time.setter
     def exp_time(self, exp_time):
         if not is_fps_feasible(self.fps, exp_time):
-            fmt = 'Exposure time {} not possible for FPS {}, setting FPS to {}'
+            fmt = "Exposure time {} not possible for FPS {}, setting FPS to {}"
             LOG.debug(fmt.format(exp_time, self.fps, 1 / exp_time.simplified))
             self._fps = 1 / exp_time.simplified
         self._exp_time = exp_time.simplified
@@ -82,7 +93,7 @@ class Camera(object):
     @fps.setter
     def fps(self, fps):
         if not is_fps_feasible(fps, self.exp_time):
-            fmt = 'FPS {} not possible for exposure time {}, setting exposure time to {}'
+            fmt = "FPS {} not possible for exposure time {}, setting exposure time to {}"
             LOG.debug(fmt.format(fps, self.exp_time, 1 / fps.simplified))
             self._exp_time = 1 / fps.simplified
         self._fps = fps.simplified
@@ -144,10 +155,12 @@ class Camera(object):
 
 def make_pco_dimax():
     """Make a pco.dimax camera."""
-    lam, qe = np.load(pkg_resources.resource_filename(__name__,
-                                                      'data/dimax_quantum_efficiencies.npy'))
+    lam, qe = np.load(
+        pkg_resources.resource_filename(__name__, "data/dimax_quantum_efficiencies.npy")
+    )
     lam = lam * q.m
 
     # Use a power of two padded value so that it's easier to use with FFT
-    return Camera(11 * q.um, 0.1, 530., 23., 12, (2048, 2048),
-                  quantum_efficiencies=qe, wavelengths=lam)
+    return Camera(
+        11 * q.um, 0.1, 530.0, 23.0, 12, (2048, 2048), quantum_efficiencies=qe, wavelengths=lam
+    )

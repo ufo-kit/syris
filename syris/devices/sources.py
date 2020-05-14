@@ -28,7 +28,7 @@ LOG = logging.getLogger(__name__)
 
 
 class XRaySource(OpticalElement):
-    def __init__(self, sample_distance, size, trajectory, phase_profile='plane'):
+    def __init__(self, sample_distance, size, trajectory, phase_profile="plane"):
         self.sample_distance = sample_distance.simplified
         self.size = size.simplified
         self.trajectory = trajectory
@@ -40,7 +40,7 @@ class XRaySource(OpticalElement):
 
     @phase_profile.setter
     def phase_profile(self, phase_profile):
-        if phase_profile not in ['plane', 'parabola', 'sphere']:
+        if phase_profile not in ["plane", "parabola", "sphere"]:
             raise XRaySourceError("Unknown phase profile: '{}'".format(phase_profile))
         self._phase_profile = phase_profile
 
@@ -48,8 +48,20 @@ class XRaySource(OpticalElement):
         """Get the next time when the source will have moved more than *distance*."""
         return self.trajectory.get_next_time(t_0)
 
-    def _transfer_real(self, shape, center, pixel_size, energy, exponent, compute_phase,
-                       is_parabola, out, queue, block, flux=1):
+    def _transfer_real(
+        self,
+        shape,
+        center,
+        pixel_size,
+        energy,
+        exponent,
+        compute_phase,
+        is_parabola,
+        out,
+        queue,
+        block,
+        flux=1,
+    ):
         """Compte the actual wavefield. *center*, *pixel_size*, *sample_distance* and *wavelength*
         are all unitless values which can be passed directly to OpenCL kernels.
         """
@@ -57,26 +69,39 @@ class XRaySource(OpticalElement):
         cl_ps = gutil.make_vfloat2(*pixel_size.simplified.magnitude[::-1])
         z_sample = self.sample_distance.simplified.magnitude
         lam = energy_to_wavelength(energy).simplified.magnitude
-        kernel = cfg.OPENCL.programs['physics'].make_flat_from_scalar
+        kernel = cfg.OPENCL.programs["physics"].make_flat_from_scalar
 
-        ev = kernel(queue,
-                    shape[::-1],
-                    None,
-                    out.data,
-                    cfg.PRECISION.np_float(flux),
-                    cl_center,
-                    cl_ps,
-                    cfg.PRECISION.np_float(z_sample),
-                    cfg.PRECISION.np_float(lam),
-                    np.int32(exponent),
-                    np.int32(compute_phase),
-                    np.int32(is_parabola))
+        ev = kernel(
+            queue,
+            shape[::-1],
+            None,
+            out.data,
+            cfg.PRECISION.np_float(flux),
+            cl_center,
+            cl_ps,
+            cfg.PRECISION.np_float(z_sample),
+            cfg.PRECISION.np_float(lam),
+            np.int32(exponent),
+            np.int32(compute_phase),
+            np.int32(is_parabola),
+        )
 
         if block:
             ev.wait()
 
-    def _transfer(self, shape, pixel_size, energy, offset, exponent=False, t=None, queue=None,
-                  out=None, check=True, block=False):
+    def _transfer(
+        self,
+        shape,
+        pixel_size,
+        energy,
+        offset,
+        exponent=False,
+        t=None,
+        queue=None,
+        out=None,
+        check=True,
+        block=False,
+    ):
         """Compute the flat field wavefield. Returned *out* array is different from the input
         one.
         """
@@ -93,16 +118,17 @@ class XRaySource(OpticalElement):
         x += offset[1].simplified.magnitude
         y += offset[0].simplified.magnitude
         center = (x, y, z)
-        phase = self.phase_profile != 'plane'
-        parabola = self.phase_profile == 'parabola'
+        phase = self.phase_profile != "plane"
+        parabola = self.phase_profile == "parabola"
         compute_exponent = exponent or check and phase
 
-        self._transfer_real(shape, center, ps, energy, compute_exponent,
-                            phase, parabola, out, queue, block)
+        self._transfer_real(
+            shape, center, ps, energy, compute_exponent, phase, parabola, out, queue, block
+        )
 
         if compute_exponent:
             if check and phase and not is_wavefield_sampling_ok(out, queue=queue):
-                LOG.error('Insufficient beam phase sampling')
+                LOG.error("Insufficient beam phase sampling")
             if not exponent:
                 out = clmath.exp(out, queue=queue)
 
@@ -112,8 +138,9 @@ class XRaySource(OpticalElement):
         """Apply source blur based on van Cittert-Zernike theorem at *distance*."""
         fwhm = (distance * self.size / self.sample_distance).simplified
         sigma = smath.fwnm_to_sigma(fwhm, n=2)
-        psf = ip.get_gauss_2d(intensity.shape, sigma, pixel_size=pixel_size, fourier=True,
-                              queue=queue, block=block)
+        psf = ip.get_gauss_2d(
+            intensity.shape, sigma, pixel_size=pixel_size, fourier=True, queue=queue, block=block
+        )
 
         return ip.ifft_2(ip.fft_2(intensity) * psf).real
 
@@ -122,9 +149,10 @@ class XRaySource(OpticalElement):
 
 
 class FixedSpectrumSource(XRaySource):
-    def __init__(self, energies, flux, sample_distance, size, trajectory, phase_profile='plane'):
-        super(FixedSpectrumSource, self).__init__(sample_distance, size, trajectory,
-                                                  phase_profile=phase_profile)
+    def __init__(self, energies, flux, sample_distance, size, trajectory, phase_profile="plane"):
+        super(FixedSpectrumSource, self).__init__(
+            sample_distance, size, trajectory, phase_profile=phase_profile
+        )
         self._energies = energies.rescale(q.keV).magnitude
         self._flux = flux.rescale(1 / q.s).magnitude
         self._tck = interp.splrep(self._energies, self._flux)
@@ -132,13 +160,34 @@ class FixedSpectrumSource(XRaySource):
     def get_flux(self, photon_energy, vertical_angle, pixel_size):
         return interp.splev(photon_energy.rescale(q.keV).magnitude, self._tck) / q.s
 
-    def _transfer_real(self, shape, center, pixel_size, energy, exponent, compute_phase,
-                       is_parabola, out, queue, block, flux=1):
+    def _transfer_real(
+        self,
+        shape,
+        center,
+        pixel_size,
+        energy,
+        exponent,
+        compute_phase,
+        is_parabola,
+        out,
+        queue,
+        block,
+        flux=1,
+    ):
         flux = self.get_flux(energy, 0 * q.rad, pixel_size).magnitude
-        super(FixedSpectrumSource, self)._transfer_real(shape, center, pixel_size,
-                                                        energy, exponent, compute_phase,
-                                                        is_parabola, out, queue, block,
-                                                        flux=flux)
+        super(FixedSpectrumSource, self)._transfer_real(
+            shape,
+            center,
+            pixel_size,
+            energy,
+            exponent,
+            compute_phase,
+            is_parabola,
+            out,
+            queue,
+            block,
+            flux=flux,
+        )
 
 
 class BendingMagnet(XRaySource):
@@ -147,8 +196,19 @@ class BendingMagnet(XRaySource):
 
     _SR_CONST = 3 * fine_structure_constant.simplified / (4 * np.pi ** 2)
 
-    def __init__(self, electron_energy, el_current, magnetic_field, sample_distance, dE, size,
-                 pixel_size, trajectory, profile_approx=True, phase_profile='plane'):
+    def __init__(
+        self,
+        electron_energy,
+        el_current,
+        magnetic_field,
+        sample_distance,
+        dE,
+        size,
+        pixel_size,
+        trajectory,
+        profile_approx=True,
+        phase_profile="plane",
+    ):
         """The parameters are *electron_energy*, electric *el_current*, *magnetic_field*, place it
         into *sample_distance* (distance between the source and a sample), take into account energy
         spacing *dE* which sets the amount of photons obtained for an energy to be:
@@ -166,8 +226,9 @@ class BendingMagnet(XRaySource):
         is the parabolic approximation of the real spherical profile.
         """
 
-        super(BendingMagnet, self).__init__(sample_distance, size, trajectory,
-                                            phase_profile=phase_profile)
+        super(BendingMagnet, self).__init__(
+            sample_distance, size, trajectory, phase_profile=phase_profile
+        )
         self.electron_energy = electron_energy.simplified
         self.el_current = el_current.simplified
         self.magnetic_field = magnetic_field
@@ -187,8 +248,12 @@ class BendingMagnet(XRaySource):
 
                 \epsilon_c [keV] = 0.665 E^2 [GeV] B[T]
         """
-        return 0.665 * self.electron_energy.rescale(q.GeV).magnitude ** 2 * \
-            self.magnetic_field.rescale(q.T).magnitude * q.keV
+        return (
+            0.665
+            * self.electron_energy.rescale(q.GeV).magnitude ** 2
+            * self.magnetic_field.rescale(q.T).magnitude
+            * q.keV
+        )
 
     def _get_full_profile(self, energy, angles, pixel_size):
         """Get the vertical profile based on energies integration.  If there are two energies e_0
@@ -196,12 +261,14 @@ class BendingMagnet(XRaySource):
         from e_0 - d_e, e_0 + d_e, where d_e = e_1 - e_0. *angles* are the vertical angles for which
         the flux is computed, *pixel_size* is the vertical pixel size.
         """
+
         def _get_flux_wrapper(photon_energy, vertical_angle):
             """Get rid of quantities, because scipy.romberg
             cannot work with them.
             """
-            flux = self.get_flux(photon_energy * q.keV, vertical_angle * q.rad,
-                                 pixel_size).magnitude
+            flux = self.get_flux(
+                photon_energy * q.keV, vertical_angle * q.rad, pixel_size
+            ).magnitude
             # Conversion is 1e3 * dE / E, 1e3 for the 0.1 % BW. Integration takes care of the dE so
             # we need to correct by 1e3 / E
             return flux * 1e3 / photon_energy
@@ -222,8 +289,19 @@ class BendingMagnet(XRaySource):
         """Get the next time when the source will have moved more than *distance*."""
         return self.trajectory.get_next_time(t_0)
 
-    def _transfer_real(self, shape, center, pixel_size, energy, exponent, compute_phase,
-                       is_parabola, out, queue, block):
+    def _transfer_real(
+        self,
+        shape,
+        center,
+        pixel_size,
+        energy,
+        exponent,
+        compute_phase,
+        is_parabola,
+        out,
+        queue,
+        block,
+    ):
         """Compute the flat field wavefield. Returned *out* array is different from the input
         one.
         """
@@ -231,25 +309,28 @@ class BendingMagnet(XRaySource):
         cl_ps = gutil.make_vfloat2(*pixel_size.simplified.magnitude[::-1])
         fov = np.arange(0, shape[0]) * pixel_size[0] - center[1] * q.m
         angles = np.arctan((fov / self.sample_distance).simplified)
-        profile = self._create_vertical_profile(energy, angles,
-                                                pixel_size[0]).rescale(1 / q.s).magnitude
+        profile = (
+            self._create_vertical_profile(energy, angles, pixel_size[0]).rescale(1 / q.s).magnitude
+        )
         profile = cl_array.to_device(queue, profile.astype(cfg.PRECISION.np_float))
         z_sample = self.sample_distance.simplified.magnitude
         lam = energy_to_wavelength(energy).simplified.magnitude
-        kernel = cfg.OPENCL.programs['physics'].make_flat_from_vertical_profile
+        kernel = cfg.OPENCL.programs["physics"].make_flat_from_vertical_profile
 
-        ev = kernel(queue,
-                    shape[::-1],
-                    None,
-                    out.data,
-                    profile.data,
-                    cl_center,
-                    cl_ps,
-                    cfg.PRECISION.np_float(z_sample),
-                    cfg.PRECISION.np_float(lam),
-                    np.int32(exponent),
-                    np.int32(compute_phase),
-                    np.int32(is_parabola))
+        ev = kernel(
+            queue,
+            shape[::-1],
+            None,
+            out.data,
+            profile.data,
+            cl_center,
+            cl_ps,
+            cfg.PRECISION.np_float(z_sample),
+            cfg.PRECISION.np_float(lam),
+            np.int32(exponent),
+            np.int32(compute_phase),
+            np.int32(is_parabola),
+        )
 
         if block:
             ev.wait()
@@ -279,37 +360,66 @@ class BendingMagnet(XRaySource):
         angle_step = np.arctan(pixel_size.simplified / self.sample_distance.simplified)
 
         # 1e-3 for 0.1 % BW
-        return Quantity(BendingMagnet._SR_CONST * gama ** 2 *
-                        self.el_current / q.elementary_charge *
-                        norm_energy ** 2 *
-                        (1.0 + gama_psi ** 2) ** 2 *
-                        (special.kv(2.0 / 3, xi) ** 2 + gama_psi ** 2 /
-                         (1.0 + gama_psi ** 2) * special.kv(1.0 / 3, xi) ** 2) *
-                        angle_step.rescale(q.rad) ** 2 * 1e-3).simplified
+        return Quantity(
+            BendingMagnet._SR_CONST
+            * gama ** 2
+            * self.el_current
+            / q.elementary_charge
+            * norm_energy ** 2
+            * (1.0 + gama_psi ** 2) ** 2
+            * (
+                special.kv(2.0 / 3, xi) ** 2
+                + gama_psi ** 2 / (1.0 + gama_psi ** 2) * special.kv(1.0 / 3, xi) ** 2
+            )
+            * angle_step.rescale(q.rad) ** 2
+            * 1e-3
+        ).simplified
 
 
 class Wiggler(BendingMagnet):
 
     """Wiggler source."""
 
-    def __init__(self, electron_energy, el_current, magnetic_field, sample_distance, dE, size,
-                 pixel_size, trajectory, num_periods, profile_approx=True, phase_profile='plane'):
+    def __init__(
+        self,
+        electron_energy,
+        el_current,
+        magnetic_field,
+        sample_distance,
+        dE,
+        size,
+        pixel_size,
+        trajectory,
+        num_periods,
+        profile_approx=True,
+        phase_profile="plane",
+    ):
         """All parameters are the same as by :class:`.BendingMagnet` and *num_periods* is the number
         of wiggler periods.
         """
-        super(Wiggler, self).__init__(electron_energy, el_current, magnetic_field,
-                                      sample_distance, dE, size, pixel_size, trajectory,
-                                      profile_approx=True, phase_profile='plane')
+        super(Wiggler, self).__init__(
+            electron_energy,
+            el_current,
+            magnetic_field,
+            sample_distance,
+            dE,
+            size,
+            pixel_size,
+            trajectory,
+            profile_approx=True,
+            phase_profile="plane",
+        )
         self.num_periods = num_periods
 
     def get_flux(self, photon_energy, vertical_angle, pixel_size):
-        return super(Wiggler, self).get_flux(photon_energy, vertical_angle, pixel_size) * \
-            self.num_periods
+        return (
+            super(Wiggler, self).get_flux(photon_energy, vertical_angle, pixel_size)
+            * self.num_periods
+        )
 
 
 class XRaySourceError(Exception):
     """X-ray source related exceptions."""
-    pass
 
 
 def make_topotomo(dE=None, trajectory=None, pixel_size=None, ring_current=200 * q.mA):
@@ -326,5 +436,13 @@ def make_topotomo(dE=None, trajectory=None, pixel_size=None, ring_current=200 * 
     if not dE:
         dE = 1 * q.keV
 
-    return BendingMagnet(2.5 * q.GeV, ring_current, 1.5 * q.T, 30 * q.m, dE,
-                         (142, 503) * q.um, pixel_size, trajectory)
+    return BendingMagnet(
+        2.5 * q.GeV,
+        ring_current,
+        1.5 * q.T,
+        30 * q.m,
+        dE,
+        (142, 503) * q.um,
+        pixel_size,
+        trajectory,
+    )

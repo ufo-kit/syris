@@ -2,7 +2,6 @@
 import itertools
 import re
 import numpy as np
-import pyopencl as cl
 import pyopencl.array as cl_array
 import quantities as q
 import syris.config as cfg
@@ -28,16 +27,25 @@ class Mesh(MovableBody):
     arbitrary point.
     """
 
-    def __init__(self, triangles, trajectory, material=None, orientation=geom.Y_AX, iterations=1,
-                 center='bbox'):
+    def __init__(
+        self,
+        triangles,
+        trajectory,
+        material=None,
+        orientation=geom.Y_AX,
+        iterations=1,
+        center="bbox",
+    ):
         """Constructor."""
         # Use homogeneous coordinates for easy matrix multiplication, i.e. the 4-th element is 1
-        self._current = np.insert(triangles.rescale(q.um).magnitude, 3, np.ones(triangles.shape[1]), axis=0)
+        self._current = np.insert(
+            triangles.rescale(q.um).magnitude, 3, np.ones(triangles.shape[1]), axis=0
+        )
         if center is None:
             point = (0, 0, 0) * q.um
-        elif center == 'gravity':
+        elif center == "gravity":
             point = self.center_of_gravity
-        elif center == 'bbox':
+        elif center == "bbox":
             point = self.center_of_bbox
         else:
             # Arbitrary point
@@ -65,14 +73,16 @@ class Mesh(MovableBody):
     @property
     def num_triangles(self):
         """Number of triangles in the mesh."""
-        return self._current.shape[1] / 3
+        return self._current.shape[1] // 3
 
     @property
     def extrema(self):
         """Mesh extrema as ((x_min, x_max), (y_min, y_max), (z_min, z_max))."""
-        return ((self._compute(min, 0), self._compute(max, 0)),
-                (self._compute(min, 1), self._compute(max, 1)),
-                (self._compute(min, 2), self._compute(max, 2))) * q.um
+        return (
+            (self._compute(min, 0), self._compute(max, 0)),
+            (self._compute(min, 1), self._compute(max, 1)),
+            (self._compute(min, 2), self._compute(max, 2)),
+        ) * q.um
 
     @property
     def center_of_gravity(self):
@@ -84,8 +94,9 @@ class Mesh(MovableBody):
     @property
     def center_of_bbox(self):
         """The bounding box center."""
+
         def get_middle(ends):
-            return (ends[0] + ends[1]) / 2.
+            return (ends[0] + ends[1]) / 2.0
 
         return np.array([get_middle(ends) for ends in self.extrema.magnitude]) * q.um
 
@@ -94,16 +105,24 @@ class Mesh(MovableBody):
         """Smallest and greatest difference between all mesh points in all three dimensions. Returns
         ((min(dx), max(dx)), (min(dy), max(dy)), (min(dz), max(dz))).
         """
-        func = lambda ar: np.abs(ar[1:] - ar[:-1])
-        min_nonzero = lambda ar: min(ar[np.where(ar != 0)])
-        max_nonzero = lambda ar: max(ar[np.where(ar != 0)])
+        def min_nonzero(ar):
+            return min(ar[np.where(ar != 0)])
+
+        def max_nonzero(ar):
+            return max(ar[np.where(ar != 0)])
+
+        def func(ar):
+            return np.abs(ar[1:] - ar[:-1])
+
         x_diff = self._compute(func, 0)
         y_diff = self._compute(func, 1)
         z_diff = self._compute(func, 2)
 
-        return ((min_nonzero(x_diff), max_nonzero(x_diff)),
-                (min_nonzero(y_diff), max_nonzero(y_diff)),
-                (min_nonzero(z_diff), max_nonzero(z_diff))) * q.um
+        return (
+            (min_nonzero(x_diff), max_nonzero(x_diff)),
+            (min_nonzero(y_diff), max_nonzero(y_diff)),
+            (min_nonzero(z_diff), max_nonzero(z_diff)),
+        ) * q.um
 
     @property
     def vectors(self):
@@ -207,7 +226,6 @@ class Mesh(MovableBody):
         return vertices.transpose().flatten().astype(cfg.PRECISION.np_float)
 
     def _make_inputs(self, queue, pixel_size):
-        mf = cl.mem_flags
         v_1 = cl_array.to_device(queue, self._make_vertices(0, pixel_size[1]))
         v_2 = cl_array.to_device(queue, self._make_vertices(1, pixel_size[0]))
         v_3 = cl_array.to_device(queue, self._make_vertices(2, pixel_size[1]))
@@ -221,6 +239,7 @@ class Mesh(MovableBody):
 
     def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
         """Projection implementation."""
+
         def get_crop(index, fov):
             minimum = max(self.extrema[index][0], fov[index][0])
             maximum = min(self.extrema[index][1], fov[index][1])
@@ -236,13 +255,21 @@ class Mesh(MovableBody):
 
         psm = pixel_size.simplified.magnitude
         fov = offset + shape * pixel_size
-        fov = np.concatenate((offset.simplified.magnitude[::-1],
-                              fov.simplified.magnitude[::-1])).reshape(2, 2).transpose() * q.m
+        fov = (
+            np.concatenate((offset.simplified.magnitude[::-1], fov.simplified.magnitude[::-1]))
+            .reshape(2, 2)
+            .transpose()
+            * q.m
+        )
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
 
-        if (self.extrema[0][0] < fov[0][1] and self.extrema[0][1] > fov[0][0] and
-            self.extrema[1][0] < fov[1][1] and self.extrema[1][1] > fov[1][0]):
+        if (
+            self.extrema[0][0] < fov[0][1]
+            and self.extrema[0][1] > fov[0][0]
+            and self.extrema[1][0] < fov[1][1]
+            and self.extrema[1][1] > fov[1][0]
+        ):
             # Object inside FOV
             x_min, x_max = get_crop(0, fov)
             y_min, y_max = get_crop(1, fov)
@@ -260,21 +287,23 @@ class Mesh(MovableBody):
             min_z = self.extrema[2][0].simplified.magnitude / psm[1]
             offset = gutil.make_vfloat2(*(offset / pixel_size).simplified.magnitude[::-1])
 
-            ev = cfg.OPENCL.programs['mesh'].compute_thickness(queue,
-                                                               (width, height),
-                                                               None,
-                                                               v_1.data,
-                                                               v_2.data,
-                                                               v_3.data,
-                                                               out.data,
-                                                               np.int32(self.num_triangles),
-                                                               np.int32(shape[1]),
-                                                               compute_offset,
-                                                               offset,
-                                                               cfg.PRECISION.np_float(psm[1]),
-                                                               cfg.PRECISION.np_float(max_dx),
-                                                               cfg.PRECISION.np_float(min_z),
-                                                               np.int32(self.iterations))
+            ev = cfg.OPENCL.programs["mesh"].compute_thickness(
+                queue,
+                (width, height),
+                None,
+                v_1.data,
+                v_2.data,
+                v_3.data,
+                out.data,
+                np.int32(self.num_triangles),
+                np.int32(shape[1]),
+                compute_offset,
+                offset,
+                cfg.PRECISION.np_float(psm[1]),
+                cfg.PRECISION.np_float(max_dx),
+                cfg.PRECISION.np_float(min_z),
+                np.int32(self.iterations),
+            )
             if block:
                 ev.wait()
 
@@ -299,34 +328,35 @@ class Mesh(MovableBody):
             offset = offset.simplified.magnitude
             offset = gutil.make_vfloat3(offset[0] / psm[1], offset[1] / psm[0], offset[2] / psm[1])
 
-        cfg.OPENCL.programs['mesh'].compute_slices(queue,
-                                                   (shape[2], shape[0]),
-                                                   None,
-                                                   v_1.data,
-                                                   v_2.data,
-                                                   v_3.data,
-                                                   out.data,
-                                                   np.int32(shape[1]),
-                                                   np.int32(self.num_triangles),
-                                                   offset,
-                                                   cfg.PRECISION.np_float(max_dx))
-
+        cfg.OPENCL.programs["mesh"].compute_slices(
+            queue,
+            (shape[2], shape[0]),
+            None,
+            v_1.data,
+            v_2.data,
+            v_3.data,
+            out.data,
+            np.int32(shape[1]),
+            np.int32(self.num_triangles),
+            offset,
+            cfg.PRECISION.np_float(max_dx),
+        )
 
         return out
 
 
 def _extract_object(txt):
     """Extract an object from string *txt*."""
-    face_start = txt.index('s ')
-    if 'v' not in txt[face_start:]:
+    face_start = txt.index("s ")
+    if "v" not in txt[face_start:]:
         obj_end = None
     else:
-        obj_end = face_start + txt[face_start:].index('v')
+        obj_end = face_start + txt[face_start:].index("v")
     subtxt = txt[:obj_end]
 
-    pattern = r'{} (?P<x>.*) (?P<y>.*) (?P<z>.*)'
-    v_pattern = re.compile(pattern.format('v'))
-    f_pattern = re.compile(pattern.format('f'))
+    pattern = r"{} (?P<x>.*) (?P<y>.*) (?P<z>.*)"
+    v_pattern = re.compile(pattern.format("v"))
+    f_pattern = re.compile(pattern.format("f"))
     vertices = np.array(re.findall(v_pattern, subtxt)).astype(np.float32)
     faces = np.array(re.findall(f_pattern, subtxt)).astype(np.int32).flatten() - 1
 
@@ -337,7 +367,7 @@ def _extract_object(txt):
 
 def read_blender_obj(filename, objects=None):
     """Read blender wavefront *filename*, extract only *objects* which are object indices."""
-    remainder = open(filename, 'r').read()
+    remainder = open(filename, "r").read()
     triangles = None
     face_start = 0
     i = 0
@@ -359,7 +389,7 @@ def make_cube():
     """Create a cube triangle mesh from -1 to 1 m in all dimensions."""
     seed = (-1, 1)
     points = list(itertools.product(seed, seed, seed))
-    points = np.array(zip(*points)).reshape(3, 8)
+    points = np.array(list(zip(*points))).reshape(3, 8)
     indices = [0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7]
     triangles = points[:, indices]
     for i in range(1, 3):

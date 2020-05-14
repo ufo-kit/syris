@@ -29,8 +29,7 @@ def np_roots(coeffs, interval):
 def filter_np_roots(roots, interval):
     result = []
     for root in roots:
-        if root.real > interval[0] and root.real <= interval[1] and \
-                root.imag == 0:
+        if root.real > interval[0] and root.real <= interval[1] and root.imag == 0:
             result.append(root.real)
         else:
             result.append(np.nan)
@@ -49,12 +48,11 @@ def derivative(coeffs):
 
 
 def f(coeffs, x):
-    return np.sum(coeffs * np.array([x ** (len(coeffs) - i - 1)
-                                     for i in range(len(coeffs))]))
+    return np.sum(coeffs * np.array([x ** (len(coeffs) - i - 1) for i in range(len(coeffs))]))
 
 
 def sgn(val):
-    return 0 if val == 0 else 1 if val > 0 else - 1
+    return 0 if val == 0 else 1 if val > 0 else -1
 
 
 def get_linear_points(direction, start=(0, 0, 0), num=4):
@@ -68,7 +66,6 @@ def get_linear_points(direction, start=(0, 0, 0), num=4):
 
 
 class Metaball(object):
-
     def __init__(self, r, R, c):
         self.r = r
         self.R = R
@@ -91,10 +88,12 @@ class Metaball(object):
     def get_coeffs(self, final=False):
         abs_val = 1 if final else 0
 
-        return np.array([self.coeff,
-                         - 4 * self.coeff * self.c,
-                         self.coeff * (- 2 * self.R ** 2 + 6 * self.c ** 2),
-                         self.coeff *
-                       (4 * self.R ** 2 * self.c - 4 * self.c ** 3),
-            self.coeff * (self.R ** 4 - 2 * self.R ** 2 * self.c ** 2 +
-                          self.c ** 4) - abs_val])
+        return np.array(
+            [
+                self.coeff,
+                -4 * self.coeff * self.c,
+                self.coeff * (-2 * self.R ** 2 + 6 * self.c ** 2),
+                self.coeff * (4 * self.R ** 2 * self.c - 4 * self.c ** 3),
+                self.coeff * (self.R ** 4 - 2 * self.R ** 2 * self.c ** 2 + self.c ** 4) - abs_val,
+            ]
+        )

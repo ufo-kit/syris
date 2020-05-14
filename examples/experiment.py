@@ -1,10 +1,10 @@
 """Experiment example."""
+import imageio
 import os
 import time
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
-import scipy.misc
 import syris
 from syris.bodies.mesh import make_cube, Mesh
 from syris.devices.cameras import Camera, make_pco_dimax
@@ -16,12 +16,20 @@ from syris.geometry import Trajectory
 from syris.gpu.util import get_host
 from syris.experiments import Experiment
 from syris.math import fwnm_to_sigma
-from trajectory import create_sample, make_circle
-from util import get_default_parser, get_material, show
+from .trajectory import create_sample, make_circle
+from .util import get_default_parser, get_material, show
 
 
-def get_flat(shape, energies, detector, source, filters=(), shot_noise=False,
-             amplifier_noise=False, psf=False):
+def get_flat(
+    shape,
+    energies,
+    detector,
+    source,
+    filters=(),
+    shot_noise=False,
+    amplifier_noise=False,
+    psf=False,
+):
     image = np.zeros(shape)
 
     for e in energies:
@@ -32,8 +40,9 @@ def get_flat(shape, energies, detector, source, filters=(), shot_noise=False,
         det = detector.convert(flat, e)
         image += det * detector.camera.exp_time.simplified.magnitude
 
-    return detector.camera.get_image(image, shot_noise=shot_noise,
-                                     amplifier_noise=amplifier_noise, psf=psf)
+    return detector.camera.get_image(
+        image, shot_noise=shot_noise, amplifier_noise=amplifier_noise, psf=psf
+    )
 
 
 def make_devices(n, energies, camera=None, highspeed=True, scintillator=None):
@@ -45,36 +54,49 @@ def make_devices(n, energies, camera=None, highspeed=True, scintillator=None):
 
     if not camera:
         vis_wavelengths = np.arange(500, 700) * q.nm
-        camera = Camera(11 * q.um, .1, 500, 23, 32, shape, exp_time=1 * q.ms, fps=1000 / q.s,
-                        quantum_efficiencies=0.5 * np.ones(len(vis_wavelengths)),
-                        wavelengths=vis_wavelengths, dtype=np.float32)
+        camera = Camera(
+            11 * q.um,
+            0.1,
+            500,
+            23,
+            32,
+            shape,
+            exp_time=1 * q.ms,
+            fps=1000 / q.s,
+            quantum_efficiencies=0.5 * np.ones(len(vis_wavelengths)),
+            wavelengths=vis_wavelengths,
+            dtype=np.float32,
+        )
     else:
         vis_wavelengths = camera.wavelengths.rescale(q.nm)
 
     x = vis_wavelengths.rescale(q.nm).magnitude
-    dx = x[1] - x[0]
-    if scintillator == 'lso' or not (scintillator or highspeed):
+    if scintillator == "lso" or not (scintillator or highspeed):
         sigma = fwnm_to_sigma(50)
-        emission = np.exp(-(x - 545) ** 2 / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
-        lso = get_material('lso_5_30_kev.mat')
-        scintillator = Scintillator(13 * q.um,
-                                    lso,
-                                    36 * np.ones(len(energies)) / q.keV,
-                                    energies,
-                                    emission / q.nm,
-                                    vis_wavelengths,
-                                    1.82)
-    elif scintillator == 'luag' or (not scintillator and highspeed):
+        emission = np.exp(-((x - 545) ** 2) / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
+        lso = get_material("lso_5_30_kev.mat")
+        scintillator = Scintillator(
+            13 * q.um,
+            lso,
+            36 * np.ones(len(energies)) / q.keV,
+            energies,
+            emission / q.nm,
+            vis_wavelengths,
+            1.82,
+        )
+    elif scintillator == "luag" or (not scintillator and highspeed):
         sigma = fwnm_to_sigma(50)
-        emission = np.exp(-(x - 450) ** 2 / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
-        luag = get_material('luag.mat')
-        scintillator = Scintillator(50 * q.um,
-                                    luag,
-                                    14 * np.ones(len(energies)) / q.keV,
-                                    energies,
-                                    emission / q.nm,
-                                    vis_wavelengths,
-                                    1.84)
+        emission = np.exp(-((x - 450) ** 2) / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
+        luag = get_material("luag.mat")
+        scintillator = Scintillator(
+            50 * q.um,
+            luag,
+            14 * np.ones(len(energies)) / q.keV,
+            energies,
+            emission / q.nm,
+            vis_wavelengths,
+            1.84,
+        )
 
     if highspeed:
         # High speed setup
@@ -91,16 +113,17 @@ def make_devices(n, energies, camera=None, highspeed=True, scintillator=None):
 
 
 def make_topo_tomo_flat(args, highspeed=True, scintillator=None):
-    syris.init(device_index=0, loglevel='INFO')
+    syris.init(device_index=0, loglevel="INFO")
     dimax = make_pco_dimax()
     n = dimax.shape[0]
     energies = np.arange(5, 30) * q.keV
 
-    bm, detector = make_devices(n, energies, camera=dimax, highspeed=highspeed,
-                                scintillator=scintillator)
+    bm, detector = make_devices(
+        n, energies, camera=dimax, highspeed=highspeed, scintillator=scintillator
+    )
 
     # Customize the setup for the 2013_03_07-08 experiment
-    air = MaterialFilter(1 * q.m, get_material('air_5_30_kev.mat'))
+    air = MaterialFilter(1 * q.m, get_material("air_5_30_kev.mat"))
     filters = [air]
     dimax.bpp = 32
     dimax.dtype = np.float32
@@ -109,10 +132,11 @@ def make_topo_tomo_flat(args, highspeed=True, scintillator=None):
     bm.el_current = 130 * q.mA
 
     # Compte the flat field
-    flat = get_flat(dimax.shape, energies, detector, bm, filters=filters, shot_noise=True,
-                    amplifier_noise=True)
-    fmt = 'min: {}, max: {}, mean: {}, middle row std: {}'
-    print fmt.format(flat.min(), flat.max(), flat.mean(), flat[n / 2].std())
+    flat = get_flat(
+        dimax.shape, energies, detector, bm, filters=filters, shot_noise=True, amplifier_noise=True
+    )
+    fmt = "min: {}, max: {}, mean: {}, middle row std: {}"
+    print(fmt.format(flat.min(), flat.max(), flat.mean(), flat[n // 2].std()))
 
     show(flat)
     plt.show()
@@ -128,14 +152,14 @@ def make_motion(args):
     bm, detector = make_devices(n, energies)
     mb = create_sample(n, detector.pixel_size, velocity=20 * q.mm / q.s)
     mb_2 = create_sample(n, detector.pixel_size, velocity=10 * q.mm / q.s)
-    mb.material = get_material('pmma_5_30_kev.mat')
+    mb.material = get_material("pmma_5_30_kev.mat")
     mb_2.material = mb.material
 
     cube = make_cube() / q.m * 30 * detector.pixel_size + 0.1 * detector.pixel_size
     fov = detector.pixel_size * n
     circle = make_circle().magnitude * fov / 30000 + fov / 2
     tr = Trajectory(circle, velocity=10 * q.um / q.s)
-    glass = get_material('glass.mat')
+    glass = get_material("glass.mat")
     mesh = Mesh(cube, tr, material=glass)
     ex = Experiment([bm, mb, mb_2, mesh], bm, detector, 0 * q.m, energies)
 
@@ -144,7 +168,7 @@ def make_motion(args):
             sample.trajectory.bind(detector.pixel_size)
 
     if args.show_flat:
-        show(get_flat(shape, energies, detector, bm), title='Counts')
+        show(get_flat(shape, energies, detector, bm), title="Counts")
         plt.show()
 
     if args.conduct:
@@ -172,11 +196,11 @@ def make_motion(args):
                     plt.draw()
 
             if args.output:
-                path = os.path.join(args.output, 'projection_{:>05}.png').format(i)
-                scipy.misc.imsave(path, image)
+                path = os.path.join(args.output, "projection_{:>05}.png").format(i)
+                imageio.imwrite(path, image)
 
-        print 'Maximum intensity:', image.max()
-        print 'Duration: {} s'.format(time.time() - st)
+        print("Maximum intensity:", image.max())
+        print("Duration: {} s".format(time.time() - st))
 
     plt.show()
 
@@ -184,22 +208,22 @@ def make_motion(args):
 def main():
     """Parse command line arguments and execute one of the experiments."""
     parser = get_default_parser(__doc__)
-    subparsers = parser.add_subparsers(help='sub-command help')
+    subparsers = parser.add_subparsers(help="sub-command help", dest="sub-commands", required=True)
 
-    motion = subparsers.add_parser('motion', help='An experiment with motion')
-    motion.add_argument('--output', type=str, help='Output directory for moving objects.')
-    motion.add_argument('--show', action='store_true', help='Show images as they are produced')
-    motion.add_argument('--show-flat', action='store_true', help='Show a flat field image')
-    motion.add_argument('--conduct', action='store_true', help='Conduct the experiment')
-    motion.add_argument('--num-images', type=int, help='Number of images to produce')
+    motion = subparsers.add_parser("motion", help="An experiment with motion")
+    motion.add_argument("--output", type=str, help="Output directory for moving objects.")
+    motion.add_argument("--show", action="store_true", help="Show images as they are produced")
+    motion.add_argument("--show-flat", action="store_true", help="Show a flat field image")
+    motion.add_argument("--conduct", action="store_true", help="Conduct the experiment")
+    motion.add_argument("--num-images", type=int, help="Number of images to produce")
     motion.set_defaults(_func=make_motion)
 
-    flat = subparsers.add_parser('flat', help='Quantitatively correct flat field computation')
+    flat = subparsers.add_parser("flat", help="Quantitatively correct flat field computation")
     flat.set_defaults(_func=make_topo_tomo_flat)
 
     args = parser.parse_args()
     args._func(args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

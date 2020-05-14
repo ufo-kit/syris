@@ -1,61 +1,60 @@
 """Module for GPU-based image processing."""
-import glob
 import itertools
 import logging
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
 from pyopencl.array import vec
-from pyfft.cl import Plan
+from reikna.cluda import ocl_api
+from reikna.fft import FFT
 from syris import config as cfg
 from syris.gpu import util as g_util
 from syris.math import fwnm_to_sigma
-from syris.util import get_magnitude, make_tuple, next_power_of_two, read_image, save_image
+from syris.util import get_magnitude, make_tuple, next_power_of_two
 
 
 LOG = logging.getLogger(__name__)
 
 
-def fft_2(data, plan=None, queue=None, block=True):
-    """2D FFT executed on *data* by a *plan*. If *plan* is None, it is created either for *queue* if
-    given, otherwise for the default opencl queue. *block* specifies if the execution will wait
-    until the scheduled FFT kernels finish. The transformation is done in-place if *data* is a
-    pyopencl Array class and has complex data type, otherwise the data is converted first.
+def fft_2(data, queue=None, block=True):
+    """2D FFT executed on *data*. *block* specifies if the execution will wait until the scheduled
+    FFT kernels finish. The transformation is done in-place if *data* is a pyopencl Array class and
+    has complex data type, otherwise the data is converted first.
     """
-    return _fft_2(data, inverse=False, plan=plan, queue=queue, block=block)
+    return _fft_2(data, inverse=False, queue=queue, block=block)
 
 
-def ifft_2(data, plan=None, queue=None, block=True):
-    """2D inverse FFT executed on *data* by a *plan*. If *plan* is None, it is created either for
-    *queue* if given, otherwise for the default opencl queue. *block* specifies if the execution
-    will wait until the scheduled FFT kernels finish. The transformation is done in-place if *data*
-    is a pyopencl Array class and has complex data type, otherwise the data is converted first.
-    """
-    return _fft_2(data, inverse=True, plan=plan, queue=queue, block=block)
+def ifft_2(data, queue=None, block=True):
+    """2D inverse FFT executed on *data*. *block* specifies if the execution will wait until the
+    scheduled FFT kernels finish. The transformation is done in-place if *data* is a pyopencl Array
+    class and has complex data type, otherwise the data is converted first.  """
+    return _fft_2(data, inverse=True, queue=queue, block=block)
 
 
-def _fft_2(data, inverse=False, plan=None, queue=None, block=True):
+def _fft_2(data, inverse=False, queue=None, block=True):
     """Execute FFT on *data*, which is first converted to a pyopencl array and retyped to
     complex.
     """
+    if not queue:
+        queue = cfg.OPENCL.queue
+    thread = ocl_api().Thread(queue)
     data = g_util.get_array(data, queue=queue)
     if data.dtype != cfg.PRECISION.np_cplx:
         data = data.astype(cfg.PRECISION.np_cplx)
 
-    if not plan:
-        if not queue:
-            queue = cfg.OPENCL.queue
-        if queue not in cfg.OPENCL.fft_plans:
-            cfg.OPENCL.fft_plans[queue] = {}
-        if data.shape not in cfg.OPENCL.fft_plans[queue]:
-            LOG.debug('Creating FFT Plan for {} and shape {}'.format(queue, data.shape))
-            cfg.OPENCL.fft_plans[queue][data.shape] = Plan(data.shape,
-                                                           dtype=cfg.PRECISION.np_cplx,
-                                                           queue=queue)
-        plan = cfg.OPENCL.fft_plans[queue][data.shape]
+    if queue not in cfg.OPENCL.fft_plans:
+        cfg.OPENCL.fft_plans[queue] = {}
+    if data.shape not in cfg.OPENCL.fft_plans[queue]:
+        LOG.debug("Creating FFT Plan for {} and shape {}".format(queue, data.shape))
+        _fft = FFT(data, axes=(0, 1))
+        cfg.OPENCL.fft_plans[queue][data.shape] = _fft.compile(thread, fast_math=False)
+    plan = cfg.OPENCL.fft_plans[queue][data.shape]
 
-    LOG.debug('fft_2, shape: %s, inverse: %s', data.shape, inverse)
-    plan.execute(data.data, inverse=inverse, wait_for_finish=block)
+    LOG.debug("fft_2, shape: %s, inverse: %s", data.shape, inverse)
+    # plan.execute(data.data, inverse=inverse, wait_for_finish=block)
+    plan(data, data, inverse=inverse)
+    if block:
+        thread.synchronize()
 
     return data
 
@@ -68,29 +67,36 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None, block=Fa
     shape = make_tuple(shape)
     pixel_size = get_magnitude(make_tuple(pixel_size))
     sigma = get_magnitude(make_tuple(sigma))
-    LOG.debug('get_gauss_2d, shape: %s, sigma: %s, pixel size: %s, fourier: %s',
-              shape, sigma, pixel_size, fourier)
+    LOG.debug(
+        "get_gauss_2d, shape: %s, sigma: %s, pixel size: %s, fourier: %s",
+        shape,
+        sigma,
+        pixel_size,
+        fourier,
+    )
 
     if queue is None:
         queue = cfg.OPENCL.queue
     out = cl.array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
 
     if fourier:
-        ev = cfg.OPENCL.programs['improc'].gauss_2d_f(queue,
-                                                      shape[::-1],
-                                                      None,
-                                                      out.data,
-                                                      g_util.make_vfloat2(sigma[1], sigma[0]),
-                                                      g_util.make_vfloat2(pixel_size[1],
-                                                      pixel_size[0]))
+        ev = cfg.OPENCL.programs["improc"].gauss_2d_f(
+            queue,
+            shape[::-1],
+            None,
+            out.data,
+            g_util.make_vfloat2(sigma[1], sigma[0]),
+            g_util.make_vfloat2(pixel_size[1], pixel_size[0]),
+        )
     else:
-        ev = cfg.OPENCL.programs['improc'].gauss_2d(queue,
-                                                    shape[::-1],
-                                                    None,
-                                                    out.data,
-                                                    g_util.make_vfloat2(sigma[1], sigma[0]),
-                                                    g_util.make_vfloat2(pixel_size[1],
-                                                    pixel_size[0]))
+        ev = cfg.OPENCL.programs["improc"].gauss_2d(
+            queue,
+            shape[::-1],
+            None,
+            out.data,
+            g_util.make_vfloat2(sigma[1], sigma[0]),
+            g_util.make_vfloat2(pixel_size[1], pixel_size[0]),
+        )
     if block:
         ev.wait()
 
@@ -106,8 +112,8 @@ def pad(image, region=None, out=None, value=0, queue=None, block=False):
     """
     if region is None:
         shape = tuple([next_power_of_two(n) for n in image.shape])
-        y_0 = (shape[0] - image.shape[0]) / 2
-        x_0 = (shape[1] - image.shape[1]) / 2
+        y_0 = (shape[0] - image.shape[0]) // 2
+        x_0 = (shape[1] - image.shape[1]) // 2
         region = (y_0, x_0) + shape
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -120,8 +126,13 @@ def pad(image, region=None, out=None, value=0, queue=None, block=False):
     src_origin = (0, 0, 0)
     dst_origin = (n_bytes * x_0, y_0, 0)
     region = (n_bytes * image.shape[1], image.shape[0], 1)
-    LOG.debug('pad, shape: %s, src_origin: %s, dst_origin: %s, region: %s', image.shape,
-              src_origin, dst_origin, region)
+    LOG.debug(
+        "pad, shape: %s, src_origin: %s, dst_origin: %s, region: %s",
+        image.shape,
+        src_origin,
+        dst_origin,
+        region,
+    )
 
     _copy_rect(image, out, src_origin, dst_origin, region, queue, block=block)
 
@@ -144,16 +155,20 @@ def crop(image, region, out=None, queue=None, block=False):
     src_origin = (n_bytes * x_0, y_0, 0)
     dst_origin = (0, 0, 0)
     region = (n_bytes * width, height, 1)
-    LOG.debug('crop, shape: %s, src_origin: %s, dst_origin: %s, region: %s', image.shape,
-              src_origin, dst_origin, region)
+    LOG.debug(
+        "crop, shape: %s, src_origin: %s, dst_origin: %s, region: %s",
+        image.shape,
+        src_origin,
+        dst_origin,
+        region,
+    )
 
     _copy_rect(image, out, src_origin, dst_origin, region, queue, block=block)
 
     return out
 
 
-def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue=None,
-              block=False):
+def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue=None, block=False):
     """Bin an *image*. The resulting buffer has shape *summed_shape* (y, x). *Offset* (y, x) is the
     offset to the original *image*. *summed_shape* has to be a divisor of the original shape minus
     the *offset*. If *average* is True, the summed pixel is normalized by the region area.  *out* is
@@ -166,22 +181,31 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
         out = cl.array.Array(queue, summed_shape, dtype=cfg.PRECISION.np_float)
     image = g_util.get_array(image, queue=queue)
     orig_shape = (image.shape[0] - offset[0], image.shape[1] - offset[1])
-    region = (orig_shape[0] / summed_shape[0], orig_shape[1] / summed_shape[1])
+    region = (orig_shape[0] // summed_shape[0], orig_shape[1] // summed_shape[1])
     if orig_shape[0] % summed_shape[0] or orig_shape[1] % summed_shape[1]:
-        raise RuntimeError('Final shape {} must be a divisor '.format(summed_shape) +
-                           'of the original shape {}'.format(image.shape))
-    LOG.debug('bin_image, shape: %s, summed_shape: %s, offset: %s, average: %s', image.shape,
-              summed_shape, offset, average)
+        raise RuntimeError(
+            "Final shape {} must be a divisor ".format(summed_shape)
+            + "of the original shape {}".format(image.shape)
+        )
+    LOG.debug(
+        "bin_image, shape: %s, summed_shape: %s, offset: %s, average: %s",
+        image.shape,
+        summed_shape,
+        offset,
+        average,
+    )
 
-    ev = cfg.OPENCL.programs['improc'].sum(queue,
-                                           (summed_shape[::-1]),
-                                           None,
-                                           out.data,
-                                           image.data,
-                                           vec.make_int2(*region[::-1]),
-                                           np.int32(image.shape[1]),
-                                           vec.make_int2(*offset[::-1]),
-                                           np.int32(average))
+    ev = cfg.OPENCL.programs["improc"].sum(
+        queue,
+        (summed_shape[::-1]),
+        None,
+        out.data,
+        image.data,
+        vec.make_int2(*region[::-1]),
+        np.int32(image.shape[1]),
+        vec.make_int2(*offset[::-1]),
+        np.int32(average),
+    )
     if block:
         ev.wait()
 
@@ -205,8 +229,13 @@ def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
     if sigma is None:
         sigma = tuple([fwnm_to_sigma(float(image.shape[i]) / shape[i], n=2) for i in range(2)])
 
-    LOG.debug('decimate, shape: %s, final_shape: %s, sigma: %s, average: %s', image.shape, shape,
-              sigma, average)
+    LOG.debug(
+        "decimate, shape: %s, final_shape: %s, sigma: %s, average: %s",
+        image.shape,
+        shape,
+        sigma,
+        average,
+    )
 
     fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue, block=block)
     image = image.astype(cfg.PRECISION.np_cplx)
@@ -236,11 +265,11 @@ def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
     Use OpenCL *queue* and *out* pyopencl Array. If *block* is True, wait for the copy to finish.
     """
     if cfg.PRECISION.cl_float == 8:
-        raise TypeError('Double precision mode not supported')
+        raise TypeError("Double precision mode not supported")
     shape = make_tuple(shape)
     # OpenCL order
     factor = float(shape[1]) / image.shape[1], float(shape[0]) / image.shape[0]
-    LOG.debug('rescale, shape: %s, final_shape: %s, factor: %s', image.shape, shape, factor)
+    LOG.debug("rescale, shape: %s, final_shape: %s, factor: %s", image.shape, shape, factor)
 
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -248,16 +277,14 @@ def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
         out = cl.array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
 
     if not sampler:
-        sampler = cl.Sampler(cfg.OPENCL.ctx, False, cl.addressing_mode.CLAMP_TO_EDGE, cl.filter_mode.LINEAR)
+        sampler = cl.Sampler(
+            cfg.OPENCL.ctx, False, cl.addressing_mode.CLAMP_TO_EDGE, cl.filter_mode.LINEAR
+        )
     image = g_util.get_image(image)
 
-    ev = cfg.OPENCL.programs['improc'].rescale(queue,
-                                               shape[::-1],
-                                               None,
-                                               image,
-                                               out.data,
-                                               sampler,
-                                               g_util.make_vfloat2(*factor))
+    ev = cfg.OPENCL.programs["improc"].rescale(
+        queue, shape[::-1], None, image, out.data, sampler, g_util.make_vfloat2(*factor)
+    )
     if block:
         ev.wait()
 
@@ -271,19 +298,18 @@ def compute_intensity(wavefield, queue=None, out=None, block=False):
         out = cl.array.Array(queue, wavefield.shape, dtype=cfg.PRECISION.np_float)
     wavefield = g_util.get_array(wavefield, queue=queue)
 
-    ev = cfg.OPENCL.programs['improc'].compute_intensity(queue,
-                                                         wavefield.shape[::-1],
-                                                         None,
-                                                         wavefield.data,
-                                                         out.data)
+    ev = cfg.OPENCL.programs["improc"].compute_intensity(
+        queue, wavefield.shape[::-1], None, wavefield.data, out.data
+    )
     if block:
         ev.wait()
 
     return out
 
 
-def varconvolve(kernel_name, shape, kernel_args, local_size=None, program=None, queue=None,
-                block=False):
+def varconvolve(
+    kernel_name, shape, kernel_args, local_size=None, program=None, queue=None, block=False
+):
     """Variable convolution with OpenCL kernel function *kernel_name*, gloal size *shape* (y, x),
     kernel arguments *kernel_args*, work group size *local_size* (can be None, i.e. OpenCL will
     determine it automatically), OpenCL *program* (can be None in which case the default syris
@@ -297,10 +323,10 @@ def varconvolve(kernel_name, shape, kernel_args, local_size=None, program=None, 
 
     """
     if not program:
-        program = cfg.OPENCL.programs['varconv']
+        program = cfg.OPENCL.programs["varconv"]
     if queue is None:
         queue = cfg.OPENCL.queue
-    LOG.debug('varconvolve, shape: %s, kernel: %s', shape, kernel_name)
+    LOG.debug("varconvolve, shape: %s, kernel: %s", shape, kernel_name)
 
     ev = getattr(program, kernel_name)(queue, shape[::-1], local_size, *kernel_args)
 
@@ -310,8 +336,9 @@ def varconvolve(kernel_name, shape, kernel_args, local_size=None, program=None, 
     return ev
 
 
-def _varconvolve_2d_parametrized(image, parameters, kernel_name, sampler=None, queue=None,
-                                 out=None, block=False):
+def _varconvolve_2d_parametrized(
+    image, parameters, kernel_name, sampler=None, queue=None, out=None, block=False
+):
     """Variable convolution of *image* with *parameters*, use OpoenCL kernel *kernel_name*,
     *sampler*, *queue*, *out* and wait if *block* is True. Return *out*.
     """
@@ -320,16 +347,20 @@ def _varconvolve_2d_parametrized(image, parameters, kernel_name, sampler=None, q
     if out is None:
         out = cl.array.Array(queue, image.shape, dtype=cfg.PRECISION.np_float)
     if sampler is None:
-        sampler = cl.Sampler(queue.context, False, cl.addressing_mode.CLAMP_TO_EDGE,
-                             cl.filter_mode.NEAREST)
+        sampler = cl.Sampler(
+            queue.context, False, cl.addressing_mode.CLAMP_TO_EDGE, cl.filter_mode.NEAREST
+        )
     if not isinstance(parameters, cl_array.Array):
         params_host = np.empty(parameters[0].shape, dtype=cfg.PRECISION.vfloat2)
-        params_host['y'] = g_util.get_host(parameters[0])
-        params_host['x'] = g_util.get_host(parameters[1])
+        params_host["y"] = g_util.get_host(parameters[0])
+        params_host["x"] = g_util.get_host(parameters[1])
         parameters = cl_array.to_device(queue, params_host)
     if parameters.shape != image.shape:
-        raise ValueError("Parameters shape '{}' differs from image shape '{}'".
-                         format(parameters.shape, image.shape))
+        raise ValueError(
+            "Parameters shape '{}' differs from image shape '{}'".format(
+                parameters.shape, image.shape
+            )
+        )
     image = g_util.get_image(image, queue=queue)
     args = (image, out.data, sampler, cl_array.vec.make_int2(0, 0), parameters.data)
 
@@ -338,8 +369,9 @@ def _varconvolve_2d_parametrized(image, parameters, kernel_name, sampler=None, q
     return out
 
 
-def varconvolve_gauss(image, sigmas, normalized=True, sampler=None, queue=None,
-                      out=None, block=False):
+def varconvolve_gauss(
+    image, sigmas, normalized=True, sampler=None, queue=None, out=None, block=False
+):
     """Variable convolution of input *image* with a Gaussian with y and x sigmas. *sigmas* specify
     the convolution kernel y and x sigmas for every output point. They are specified as two 2D
     arrays and can be either a tuple of two 2D arrays or a pyopencl.array.Array instance with
@@ -349,15 +381,17 @@ def varconvolve_gauss(image, sigmas, normalized=True, sampler=None, queue=None,
     Convolution window is always odd-shaped and the middle pixel is set to 0. This means that if the
     *sigmas* are smaller numbers than 1, the convolution returns the original image.
     """
-    kernel_name = 'varconvolve_gauss'
+    kernel_name = "varconvolve_gauss"
     if normalized:
-        kernel_name += '_normalized'
-    return _varconvolve_2d_parametrized(image, sigmas, kernel_name, sampler=sampler,
-                                        queue=queue, out=out, block=block)
+        kernel_name += "_normalized"
+    return _varconvolve_2d_parametrized(
+        image, sigmas, kernel_name, sampler=sampler, queue=queue, out=out, block=block
+    )
 
 
-def varconvolve_disk(image, radii, normalized=True, smooth=True, sampler=None, queue=None,
-                     out=None, block=False):
+def varconvolve_disk(
+    image, radii, normalized=True, smooth=True, sampler=None, queue=None, out=None, block=False
+):
     """Variable convolution of input *image* with an elliptical disk with y and x radii. *radii*
     specify the convolution kernel disk y and x radius for every output point. They are specified as
     two 2D arrays and can be either a tuple of two 2D arrays or a pyopencl.array.Array instance with
@@ -371,13 +405,14 @@ def varconvolve_disk(image, radii, normalized=True, smooth=True, sampler=None, q
     pixels, e.g. if the radius is 1.5, then pixels [-1, 0, 1] will be selected, i.e. the disk
     diameter is 3 pixels.
     """
-    kernel_name = 'varconvolve_disk'
+    kernel_name = "varconvolve_disk"
     if smooth:
-        kernel_name += '_smooth'
+        kernel_name += "_smooth"
     if normalized:
-        kernel_name += '_normalized'
-    return _varconvolve_2d_parametrized(image, radii, kernel_name, sampler=sampler,
-                                        queue=queue, out=out, block=block)
+        kernel_name += "_normalized"
+    return _varconvolve_2d_parametrized(
+        image, radii, kernel_name, sampler=sampler, queue=queue, out=out, block=block
+    )
 
 
 def _check_tiling(shape, tiles_count):
@@ -392,8 +427,7 @@ class Tiler(object):
 
     """Class for breaking images into smaller tiles."""
 
-    def __init__(self, shape, tiles_count, outlier=True, supersampling=1,
-                 cplx=False):
+    def __init__(self, shape, tiles_count, outlier=True, supersampling=1, cplx=False):
         """
         Create image tiler for a region of *shape* (y, x) to tiles with (y, x)
         *tiles_count*. If *outlier* is True we want to include outlier regions
@@ -408,20 +442,19 @@ class Tiler(object):
         self.tiles_count = tiles_count
         self._outlier_coeff = 2 if outlier else 1
         self.supersampling = supersampling
-        self.shape = (shape[0] * self.supersampling,
-                      shape[1] * self.supersampling)
+        self.shape = (shape[0] * self.supersampling, shape[1] * self.supersampling)
 
         ar_type = cfg.PRECISION.np_cplx if cplx else cfg.PRECISION.np_float
 
-        self._overall = np.empty((self.shape[0] / self.supersampling,
-                                  self.shape[1] / self.supersampling),
-                                 dtype=ar_type)
+        self._overall = np.empty(
+            (self.shape[0] // self.supersampling, self.shape[1] // self.supersampling),
+            dtype=ar_type,
+        )
 
     @property
     def result_tile_shape(self):
         """Result tile shape without outlier and supersampling."""
-        return tuple([dim / self.supersampling / self._outlier_coeff
-                      for dim in self.tile_shape])
+        return tuple([dim // self.supersampling // self._outlier_coeff for dim in self.tile_shape])
 
     @property
     def outlier(self):
@@ -436,35 +469,38 @@ class Tiler(object):
         """Get the supersampled tile shape based on tile counts
         *tile_counts* as (y, x) and *shape* (y, x).
         """
-        return self._outlier_coeff * self.shape[0] / self.tiles_count[0], \
-            self._outlier_coeff * self.shape[1] / self.tiles_count[1]
+        return (
+            self._outlier_coeff * self.shape[0] // self.tiles_count[0],
+            self._outlier_coeff * self.shape[1] // self.tiles_count[1],
+        )
 
     @property
     def tile_indices(self):
         """Get the supersampled tile indices which are starting points
         of a given tile in (y, x) fashion.
         """
-        y_ind = np.array([i * self.tile_shape[0] / self._outlier_coeff
-                          for i in range(self.tiles_count[0])])
-        x_ind = np.array([i * self.tile_shape[1] / self._outlier_coeff
-                          for i in range(self.tiles_count[1])])
+        y_ind = np.array(
+            [i * self.tile_shape[0] // self._outlier_coeff for i in range(self.tiles_count[0])]
+        )
+        x_ind = np.array(
+            [i * self.tile_shape[1] // self._outlier_coeff for i in range(self.tiles_count[1])]
+        )
 
         if self.outlier:
             # If the tile starts at x and has a shape n, then with outlier
             # treatment it starts at x - n / 2 and ends in x + n / 2, thus
             # has shape 2 * n
-            y_ind = y_ind - self.tile_shape[0] / 4
-            x_ind = x_ind - self.tile_shape[1] / 4
+            y_ind = y_ind - self.tile_shape[0] // 4
+            x_ind = x_ind - self.tile_shape[1] // 4
 
-        return np.array(list(itertools.product(y_ind, x_ind))).\
-            reshape(self.tiles_count + (2,))
+        return np.array(list(itertools.product(y_ind, x_ind))).reshape(self.tiles_count + (2,))
 
     def average(self, tile, out=None):
         """Average :class:`pyopencl.array.Array` *tile* based on supersampling and outlier specified
         for the tiler. If *out* is not None, it will be used for returning the sum.
         """
         summed_shape = self.result_tile_shape
-        offset = [(self._outlier_coeff - 1) * dim / 4 for dim in self.tile_shape]
+        offset = [(self._outlier_coeff - 1) * dim // 4 for dim in self.tile_shape]
 
         return bin_image(tile, summed_shape, offset, average=True, out=out)
 
@@ -475,10 +511,10 @@ class Tiler(object):
         # Get rid of supersampling and outlier.
         tile_shape = self.result_tile_shape
 
-        self._overall[indices[0] * tile_shape[0]:
-                      tile_shape[0] * (indices[0] + 1),
-                      indices[1] * tile_shape[1]:
-                      tile_shape[1] * (indices[1] + 1)] = tile
+        self._overall[
+            indices[0] * tile_shape[0] : tile_shape[0] * (indices[0] + 1),
+            indices[1] * tile_shape[1] : tile_shape[1] * (indices[1] + 1),
+        ] = tile
 
 
 def make_tile_offsets(shape, tile_shape, outlier=(0, 0)):
@@ -488,14 +524,15 @@ def make_tile_offsets(shape, tile_shape, outlier=(0, 0)):
     be cropped to (m / 2, n - n / 2) before it can be placed into the resulting image. This is
     convenient for convolution outlier treatment.
     """
-    y_starts = np.arange(0, shape[0], tile_shape[0] - outlier[0]) - outlier[0] / 2
-    x_starts = np.arange(0, shape[1], tile_shape[1] - outlier[1]) - outlier[1] / 2
+    y_starts = np.arange(0, shape[0], tile_shape[0] - outlier[0]) - outlier[0] // 2
+    x_starts = np.arange(0, shape[1], tile_shape[1] - outlier[1]) - outlier[1] // 2
 
     return list(itertools.product(y_starts, x_starts))
 
 
-def make_tiles(func, shape, tile_shape, iterable=None, outlier=(0, 0), queues=None,
-               args=(), kwargs=None):
+def make_tiles(
+    func, shape, tile_shape, iterable=None, outlier=(0, 0), queues=None, args=(), kwargs=None
+):
     """Make tiles using *func* which can either have signature func(item, *args, **kwargs) or
     func(item, queue, *args, **kwargs), where queue is the OpenCL command queue. In the latter case,
     multiple command queues are mapped to different computation items. *shape* (y, x) is the final
@@ -514,21 +551,9 @@ def make_tiles(func, shape, tile_shape, iterable=None, outlier=(0, 0), queues=No
         return (func(item, *args, **kwargs) for item in iterable)
     else:
         # Use multiple comand queues
-        return (item for item in g_util.qmap(func, iterable, queues=queues, args=args,
-                                             kwargs=kwargs))
-
-
-def save_tiles(prefix, tiles):
-    """Save *tiles* to linearly indexed files formed by *prefix* and the tile number."""
-    for i, tile in enumerate(tiles):
-        save_image(prefix.format(i), tile)
-
-
-def read_tiles(prefix):
-    """Read tiles from disk using the glob module for pattern expansion. Returns a generator."""
-    names = sorted(glob.glob(prefix))
-
-    return (read_image(name) for name in names)
+        return (
+            item for item in g_util.qmap(func, iterable, queues=queues, args=args, kwargs=kwargs)
+        )
 
 
 def merge_tiles(tiles, num_tiles=None, outlier=(0, 0)):
@@ -543,10 +568,14 @@ def merge_tiles(tiles, num_tiles=None, outlier=(0, 0)):
 
     for j in range(n):
         for i in range(m):
-            tile = g_util.get_host(tiles[j * m + i])[outlier[0] / 2:tile_shape[0] - outlier[0] / 2,
-                                                     outlier[1] / 2:tile_shape[1] - outlier[1] / 2]
-            result[j * crop_shape[0]:(j + 1) * crop_shape[0],
-                   i * crop_shape[1]:(i + 1) * crop_shape[1]] = tile
+            tile = g_util.get_host(tiles[j * m + i])[
+                outlier[0] // 2 : tile_shape[0] - outlier[0] // 2,
+                outlier[1] // 2 : tile_shape[1] - outlier[1] // 2,
+            ]
+            result[
+                j * crop_shape[0] : (j + 1) * crop_shape[0],
+                i * crop_shape[1] : (i + 1) * crop_shape[1],
+            ] = tile
 
     return result
 
@@ -556,8 +585,10 @@ def get_num_tiles(tiles, num_tiles=None):
     if num_tiles is None:
         num_tiles = int(np.sqrt(len(tiles)))
         if num_tiles ** 2 != len(tiles):
-            raise ValueError('There must be equal number of tiles in both dimensions if '
-                             'num_tiles is not specified')
+            raise ValueError(
+                "There must be equal number of tiles in both dimensions if "
+                "num_tiles is not specified"
+            )
         num_tiles = (num_tiles, num_tiles)
 
     return num_tiles
@@ -572,7 +603,15 @@ def _copy_rect(src, dst, src_origin, dst_origin, region, queue, block=False):
     src_pitches = (n_bytes * src.shape[1], n_bytes * src.shape[1] * src.shape[0])
     dst_pitches = (n_bytes * dst.shape[1], n_bytes * dst.shape[1] * dst.shape[0])
 
-    ev = cl.enqueue_copy_buffer_rect(queue, src.data, dst.data, src_origin, dst_origin, region,
-                                     src_pitches, dst_pitches)
+    ev = cl.enqueue_copy(
+        queue,
+        dst.data,
+        src.data,
+        src_origin=src_origin,
+        dst_origin=dst_origin,
+        region=region,
+        src_pitches=src_pitches,
+        dst_pitches=dst_pitches,
+    )
     if block:
         ev.wait()

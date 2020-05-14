@@ -22,7 +22,7 @@ class Detector(object):
         if wavelengths is None:
             wavelengths = self.camera.wavelengths
         if len(wavelengths) < 2:
-            raise ValueError('Wavelengths must contain at least two values')
+            raise ValueError("Wavelengths must contain at least two values")
         d_lam = wavelengths[1] - wavelengths[0]
         luminescence = self.scintillator.get_luminescence(wavelengths) * d_lam
         qe = self.camera.get_quantum_efficiency(wavelengths)

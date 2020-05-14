@@ -1,24 +1,22 @@
 import numpy as np
 import quantities as q
-import syris
-from pyopencl import clmath
 from syris.devices.sources import BendingMagnet, Wiggler, XRaySourceError
 from syris.geometry import Trajectory
 from syris.physics import energy_to_wavelength
-from syris.tests import SyrisTest, opencl, slow
+from syris.tests import default_syris_init, SyrisTest
 
 
 def make_phase(n, ps, d, energy, phase_profile):
-    y, x = np.mgrid[-n / 2:n / 2, -n / 2:n / 2] * ps
+    y, x = np.mgrid[-n // 2 : n // 2, -n // 2 : n // 2] * ps
     x = x.simplified.magnitude
     y = y.simplified.magnitude
     d = d.simplified.magnitude
     lam = energy_to_wavelength(energy).simplified.magnitude
     k = 2 * np.pi / lam
 
-    if phase_profile == 'parabola':
+    if phase_profile == "parabola":
         r = (x ** 2 + y ** 2) / (2 * d)
-    elif phase_profile == 'sphere':
+    elif phase_profile == "sphere":
         r = np.sqrt(x ** 2 + y ** 2 + d ** 2)
     else:
         raise ValueError("Unknown phase profile '{}'".format(phase_profile))
@@ -27,25 +25,37 @@ def make_phase(n, ps, d, energy, phase_profile):
 
 
 class TestSources(SyrisTest):
-
     def setUp(self):
         # Double precision needed for spherical phase profile
-        syris.init(double_precision=True, device_index=0)
+        default_syris_init(double_precision=True)
         self.dE = 0.1 * q.keV
         self.energies = np.arange(14.8, 15, self.dE.magnitude) * q.keV
         self.trajectory = Trajectory([(0, 0, 0)] * q.m)
         self.ps = 10 * q.um
 
-        self.source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
-                                    self.dE, np.array([0.2, 0.8]) * q.mm, self.ps,
-                                    self.trajectory)
+        self.source = BendingMagnet(
+            2.5 * q.GeV,
+            150 * q.mA,
+            1.5 * q.T,
+            30 * q.m,
+            self.dE,
+            np.array([0.2, 0.8]) * q.mm,
+            self.ps,
+            self.trajectory,
+        )
 
-    @opencl
-    @slow
     def test_bending_magnet_approx(self):
-        source_2 = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
-                                 self.dE, np.array([0.2, 0.8]) * q.mm, self.ps,
-                                 self.trajectory, profile_approx=False)
+        source_2 = BendingMagnet(
+            2.5 * q.GeV,
+            150 * q.mA,
+            1.5 * q.T,
+            30 * q.m,
+            self.dE,
+            np.array([0.2, 0.8]) * q.mm,
+            self.ps,
+            self.trajectory,
+            profile_approx=False,
+        )
 
         for e in self.energies:
             u_0 = self.source.transfer((16, 16), self.ps, e, t=0 * q.s).get().real
@@ -55,7 +65,6 @@ class TestSources(SyrisTest):
             # Allow 0.1 % difference
             np.testing.assert_allclose(perc, 1, rtol=1e-3)
 
-    @opencl
     def test_transfer(self):
         shape = 10
         # No trajectory
@@ -67,10 +76,22 @@ class TestSources(SyrisTest):
         n = 16
         x = z = np.zeros(n)
         y = np.linspace(0, 1, n) * q.mm
-        tr = Trajectory(zip(x, y, z) * q.mm, pixel_size=10 * q.um, furthest_point=0*q.m,
-                        velocity=1 * q.mm / q.s)
-        source = BendingMagnet(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m,
-                               self.dE, np.array([0.2, 0.8]) * q.mm, self.ps, trajectory=tr)
+        tr = Trajectory(
+            list(zip(x, y, z)) * q.mm,
+            pixel_size=10 * q.um,
+            furthest_point=0 * q.m,
+            velocity=1 * q.mm / q.s,
+        )
+        source = BendingMagnet(
+            2.5 * q.GeV,
+            150 * q.mA,
+            1.5 * q.T,
+            30 * q.m,
+            self.dE,
+            np.array([0.2, 0.8]) * q.mm,
+            self.ps,
+            trajectory=tr,
+        )
         im_0 = source.transfer(shape, self.ps, self.energies[0], t=0 * q.s).get()
         im_1 = source.transfer(shape, self.ps, self.energies[0], t=tr.time / 2).get()
 
@@ -84,39 +105,47 @@ class TestSources(SyrisTest):
 
     def test_set_phase_profile(self):
         with self.assertRaises(XRaySourceError):
-            self.source.phase_profile = 'foo'
+            self.source.phase_profile = "foo"
 
-        self.source.phase_profile = 'plane'
-        self.source.phase_profile = 'parabola'
-        self.source.phase_profile = 'sphere'
+        self.source.phase_profile = "plane"
+        self.source.phase_profile = "parabola"
+        self.source.phase_profile = "sphere"
 
-    @opencl
     def test_phase_profile(self):
         n = 64
         shape = (n, n)
         ps = 1 * q.um
         energy = 10 * q.keV
-        offset = (n / 2, n / 2) * ps
+        offset = (n // 2, n // 2) * ps
 
         def test_one_phase_profile(phase_profile):
             self.source.phase_profile = phase_profile
             phase = np.angle(self.source.transfer(shape, ps, energy, offset=offset).get())
-            gt = np.angle(make_phase(n, ps, self.source.sample_distance, energy,
-                          phase_profile=phase_profile))
+            gt = np.angle(
+                make_phase(n, ps, self.source.sample_distance, energy, phase_profile=phase_profile)
+            )
             np.testing.assert_almost_equal(phase, gt)
 
         # Plane wave
-        self.source.phase_profile = 'plane'
+        self.source.phase_profile = "plane"
         u = self.source.transfer(shape, ps, energy).get()
         np.testing.assert_almost_equal(np.angle(u), 0)
 
-        test_one_phase_profile('parabola')
-        test_one_phase_profile('sphere')
+        test_one_phase_profile("parabola")
+        test_one_phase_profile("sphere")
 
-    @opencl
     def test_wiggler(self):
-        wiggler = Wiggler(2.5 * q.GeV, 150 * q.mA, 1.5 * q.T, 30 * q.m, self.dE,
-                          np.array([0.2, 0.8]) * q.mm, self.ps, self.trajectory, 4)
+        wiggler = Wiggler(
+            2.5 * q.GeV,
+            150 * q.mA,
+            1.5 * q.T,
+            30 * q.m,
+            self.dE,
+            np.array([0.2, 0.8]) * q.mm,
+            self.ps,
+            self.trajectory,
+            4,
+        )
         energy = 10 * q.keV
 
         w_flux = wiggler.get_flux(energy, 0 * q.mrad, self.ps)
