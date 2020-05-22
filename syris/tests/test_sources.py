@@ -1,9 +1,12 @@
 import numpy as np
 import quantities as q
-from syris.devices.sources import BendingMagnet, Wiggler, XRaySourceError
+import unittest
+from syris.devices.sources import BendingMagnet, FixedSpectrumSource, Wiggler, XRaySourceError
 from syris.geometry import Trajectory
+import syris.imageprocessing as ip
 from syris.physics import energy_to_wavelength
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import are_images_supported, default_syris_init, SyrisTest
+from syris.tests.util import get_gauss_2d
 
 
 def make_phase(n, ps, d, energy, phase_profile):
@@ -156,3 +159,67 @@ class TestSources(SyrisTest):
         w_u = np.abs(wiggler.transfer(shape, self.ps, energy).get()) ** 2
         u = np.abs(self.source.transfer(shape, self.ps, energy).get()) ** 2
         np.testing.assert_almost_equal(w_u / u, 4)
+
+
+class TestFixedSource(SyrisTest):
+    def setUp(self):
+        # Double precision needed for spherical phase profile
+        default_syris_init()
+        self.ps = 1 * q.um
+        self.n = 128
+        self.size = (100, 100) * q.um
+        self.sample_dist = 30 * q.m
+        self.dE = 1 * q.keV
+        self.energies = np.arange(1, 39, self.dE.magnitude) * q.keV
+        self.trajectory = Trajectory([(self.n / 2, self.n / 2, 0)] * self.ps)
+
+    def test_init(self):
+        # Wrong number of flux points
+        flux = np.arange(len(self.energies) - 1) / q.s
+        with self.assertRaises(XRaySourceError):
+            FixedSpectrumSource(self.energies, flux, self.sample_dist, self.size, self.trajectory)
+
+        # No pixel size for 3D flux
+        flux = np.mgrid[: len(self.energies), : self.n, : self.n] / q.s
+        with self.assertRaises(XRaySourceError):
+            FixedSpectrumSource(self.energies, flux, self.sample_dist, self.size, self.trajectory)
+
+    def test_get_flux(self):
+        flux = np.arange(len(self.energies)) / q.s + 10 / q.s
+        source = FixedSpectrumSource(
+            self.energies, flux, self.sample_dist, self.size, self.trajectory
+        )
+        # Out of bounds values
+        self.assertAlmostEqual(source.get_flux(self.energies[0] - self.dE, None, None), flux[0])
+        self.assertAlmostEqual(source.get_flux(self.energies[-1] + self.dE, None, None), flux[-1])
+
+        # Linear interpolation
+        self.assertAlmostEqual(
+            source.get_flux(1.2 * q.keV, None, None), 0.8 * flux[0] + 0.2 * flux[1]
+        )
+
+    @unittest.skipIf(not are_images_supported(), "Images not supported")
+    def test_transfer(self):
+        def compare_sampling(gauss, factor):
+            shape = (int(factor * self.n),) * 2
+            im = ip.compute_intensity(
+                source.transfer(shape, self.ps / factor, self.energies[0], check=False)
+            ).get()
+            self.assertAlmostEqual(im.sum(), gauss.sum(), places=3)
+            hd = ip.rescale(gauss, shape).get() / factor ** 2
+            np.testing.assert_almost_equal(im, hd, decimal=5)
+
+        gauss = np.fft.fftshift(get_gauss_2d((self.n, self.n), self.n / 10.0))
+        flux = np.tile(gauss, [len(self.energies), 1, 1]) / q.s
+        source = FixedSpectrumSource(
+            self.energies, flux, self.sample_dist, self.size, self.trajectory, pixel_size=self.ps
+        )
+
+        # Same sampling
+        compare_sampling(gauss, 1)
+
+        # Upsampling
+        compare_sampling(gauss, 2)
+
+        # Downsampling
+        compare_sampling(gauss, 0.5)
