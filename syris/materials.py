@@ -267,7 +267,7 @@ def make_pmasf(name, energies):
 
 
 def make_henke(name, energies, formula=None, density=None):
-    """Use the http://henke.lbl.gov database to lookup a material *name* for *energies*, use the
+    """Use the https://henke.lbl.gov database to lookup a material *name* for *energies*, use the
     specified chemical *formula* and *density*.
     """
     indices = _HenkeQuery(name, energies, formula=formula, density=density).refractive_indices
@@ -277,7 +277,7 @@ def make_henke(name, energies, formula=None, density=None):
     if element in ELEMENTS:
         # Get the scattering factors
         response = urllib.request.urlopen(
-            "http://henke.lbl.gov/optical_constants" + "/sf/{}.nff".format(element)
+            "https://henke.lbl.gov/optical_constants" + "/sf/{}.nff".format(element)
         )
         data = response.read().decode("utf-8")
         response.close()
@@ -296,7 +296,7 @@ def make_henke(name, energies, formula=None, density=None):
 
 
 def make_stepanov(name, energies, density=None, formula=None, crystal=None):
-    """Use the http://x-server.gmca.aps.anl.gov database to lookup a material *name* for
+    """Use the https://x-server.gmca.aps.anl.gov database to lookup a material *name* for
     *energies*, use the specified chemical *formula* and *density*.
     """
     if crystal and formula:
@@ -340,10 +340,10 @@ class _HenkeQuery(object):
 
     """Class for obtaining refractive indices obtained from `The Center For X-ray Optics`_.
 
-    .. _The Center For X-ray Optics: http://henke.lbl.gov/optical_constants/getdb2.html
+    .. _The Center For X-ray Optics: https://henke.lbl.gov/optical_constants/getdb2.html
     """
 
-    _URL = "http://henke.lbl.gov"
+    _URL = "https://henke.lbl.gov"
 
     class HenkeHTMLParser(HTMLParser):
 
