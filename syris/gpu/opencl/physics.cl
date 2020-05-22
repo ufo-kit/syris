@@ -183,6 +183,35 @@ __kernel void make_flat_from_vertical_profile(__global vcomplex *output,
 }
 
 /*
+ * Make flat field wavefield out of a 2D profile of intensities.
+ */
+__kernel void make_flat_from_2D_profile(__global vcomplex *output,
+                                        read_only image2d_t input,
+                                        const sampler_t sampler,
+                                        const vfloat3 center,
+                                        const vfloat2 pixel_size,
+                                        const vfloat2 input_pixel_size,
+                                        const vfloat z,
+                                        const vfloat lambda,
+                                        const int exponent,
+                                        const int phase,
+                                        const int parabola) {
+    int ix = get_global_id(0);
+    int iy = get_global_id(1);
+    float input_width = (float) get_image_width (input);
+    float input_height = (float) get_image_height (input);
+    float2 factor = (float2) (pixel_size.x / input_pixel_size.x,
+                              pixel_size.y / input_pixel_size.y);
+    float x = (ix * pixel_size.x - center.x) / input_pixel_size.x + input_width / 2.0f + 0.5f * factor.x;
+    float y = (iy * pixel_size.y - center.y) / input_pixel_size.y + input_height / 2.0f + 0.5f * factor.y;
+
+    vfloat flux = read_imagef (input, sampler, (float2) (x, y)).x * factor.x * factor.y;
+
+    make_flat_field (output, ix, iy, flux, &center, &pixel_size, z, lambda,
+                     exponent, phase, parabola);
+}
+
+/*
  * Check the sampling of a transfer function
  */
 __kernel void check_transmission_function(__global vfloat *exponent,
