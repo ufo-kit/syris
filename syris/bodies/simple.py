@@ -80,10 +80,11 @@ def make_sphere(n, radius, pixel_size=1 * q.m, material=None, queue=None):
     2 + 0.5, which means between two adjacent pixels. *pixel_size*, *material* and *queue*, which is
     an OpenCL command queue, are used to create :class:`.StaticBody`.
     """
+    pixel_size = make_tuple(pixel_size, num_dims=2)
     image = np.zeros((n, n), dtype=cfg.PRECISION.np_float)
     y, x = np.mgrid[-n // 2 : n // 2, -n // 2 : n // 2]
-    x = (x + 0.5) * pixel_size.simplified.magnitude
-    y = (y + 0.5) * pixel_size.simplified.magnitude
+    x = (x + 0.5) * pixel_size[1].simplified.magnitude
+    y = (y + 0.5) * pixel_size[0].simplified.magnitude
     radius = radius.simplified.magnitude
     valid = np.where(x ** 2 + y ** 2 < radius ** 2)
     image[valid] = 2 * np.sqrt(radius ** 2 - x[valid] ** 2 - y[valid] ** 2)
