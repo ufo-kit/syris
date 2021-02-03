@@ -3,8 +3,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
 import syris
+import syris.imageprocessing as ip
 from syris.geometry import Trajectory
-from syris.devices.sources import BendingMagnet
+from syris.devices.sources import BendingMagnet, FixedSpectrumSource
+from .util import get_default_parser, show
 
 
 def make_triangle(n=128):
@@ -15,7 +17,7 @@ def make_triangle(n=128):
     return list(zip(z, y, z)) * q.mm
 
 
-def main():
+def run_bending_magnet():
     syris.init()
 
     ps = 1 * q.um
@@ -36,6 +38,41 @@ def main():
     plt.subplot(122)
     plt.imshow(flat_1)
     plt.show()
+
+
+def run_fixed():
+    syris.init()
+    n = 512
+    ps = 1 * q.um
+    energies = np.arange(5, 30) * q.keV
+    y, x = np.mgrid[-n // 2 : n // 2, -n // 2 : n // 2]
+    flux = np.exp(-(x ** 2 + y ** 2) / (100 ** 2)) / q.s
+    weights = np.arange(1, len(energies) + 1)[:, np.newaxis, np.newaxis]
+    flux = weights * flux
+    traj = Trajectory([(n / 2, n / 2, 0)] * ps)
+    source = FixedSpectrumSource(energies, flux, 30 * q.m, (100, 500) * q.um, traj, pixel_size=ps)
+
+    im = ip.compute_intensity(source.transfer((n, n), ps, 5 * q.keV)).get()
+    show(im, title="Original sampling")
+    im = ip.compute_intensity(source.transfer((2 * n,) * 2, ps / 2, 5 * q.keV)).get()
+    show(im, title="2x supersampled")
+    plt.show()
+
+
+def main():
+    parser = get_default_parser(__doc__)
+    subparsers = parser.add_subparsers(help="sub-command help", dest="sub-commands", required=True)
+
+    bm = subparsers.add_parser("bm", help="BendingMagnet example")
+    bm.set_defaults(_func=run_bending_magnet)
+
+    fixed = subparsers.add_parser(
+        "fixed", help="FixedSpectrumSource example with Gaussian intensity profile"
+    )
+    fixed.set_defaults(_func=run_fixed)
+
+    args = parser.parse_args()
+    args._func()
 
 
 if __name__ == "__main__":
