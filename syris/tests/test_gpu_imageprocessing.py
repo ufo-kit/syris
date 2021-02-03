@@ -6,9 +6,9 @@ from syris.gpu import util as gpu_util
 from syris import config as cfg
 from syris import imageprocessing as ip
 from syris.math import fwnm_to_sigma
-from syris.util import get_magnitude, make_tuple
 import itertools
 from syris.tests import are_images_supported, default_syris_init, SyrisTest
+from syris.tests.util import get_gauss_2d
 
 
 def bin_cpu(image, shape):
@@ -19,29 +19,6 @@ def bin_cpu(image, shape):
     for k in range(1, factor[1]):
         im[:, :: factor[1]] += im[:, k :: factor[1]]
     return im[:: factor[0], :: factor[1]]
-
-
-def get_gauss_2d(shape, sigma, pixel_size=None, fourier=False):
-    shape = make_tuple(shape)
-    sigma = get_magnitude(make_tuple(sigma))
-    if pixel_size is None:
-        pixel_size = (1, 1)
-    else:
-        pixel_size = get_magnitude(make_tuple(pixel_size))
-
-    if fourier:
-        i = np.fft.fftfreq(shape[1]) / pixel_size[1]
-        j = np.fft.fftfreq(shape[0]) / pixel_size[0]
-        i, j = np.meshgrid(i, j)
-
-        return np.exp(-2 * np.pi ** 2 * ((i * sigma[1]) ** 2 + (j * sigma[0]) ** 2))
-    else:
-        x = (np.arange(shape[1]) - shape[1] // 2) * pixel_size[1]
-        y = (np.arange(shape[0]) - shape[0] // 2) * pixel_size[0]
-        x, y = np.meshgrid(x, y)
-        gauss = np.exp(-(x ** 2) / (2.0 * sigma[1] ** 2) - y ** 2 / (2.0 * sigma[0] ** 2))
-
-        return np.fft.ifftshift(gauss)
 
 
 def rescale_scipy(image, factor):

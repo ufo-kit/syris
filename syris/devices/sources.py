@@ -8,12 +8,12 @@ import logging
 import numpy as np
 import quantities as q
 import quantities.constants.electron as qe
+import pyopencl as cl
 import pyopencl.array as cl_array
 from pyopencl import clmath
 from quantities.quantity import Quantity
 from quantities.constants import fine_structure_constant
 from scipy import integrate, special
-from scipy import interpolate as interp
 import syris.config as cfg
 import syris.imageprocessing as ip
 import syris.math as smath
@@ -149,16 +149,46 @@ class XRaySource(OpticalElement):
 
 
 class FixedSpectrumSource(XRaySource):
-    def __init__(self, energies, flux, sample_distance, size, trajectory, phase_profile="plane"):
+    def __init__(
+        self,
+        energies,
+        flux,
+        sample_distance,
+        size,
+        trajectory,
+        pixel_size=None,
+        phase_profile="plane",
+    ):
+        """Source with a pre-computed *flux* at given *energies*. *flux* can be a 1D array, in which
+        case there is no spatial distribution of intensities, or it can be a 3D array, in which case
+        every 2D image *flux[i]* represents spatial intensity distribution for *energies[i]*.
+        """
         super(FixedSpectrumSource, self).__init__(
             sample_distance, size, trajectory, phase_profile=phase_profile
         )
-        self._energies = energies.rescale(q.keV).magnitude
-        self._flux = flux.rescale(1 / q.s).magnitude
-        self._tck = interp.splrep(self._energies, self._flux)
+        if len(flux) != len(energies):
+            raise XRaySourceError("Flux must have the same length as energies")
+        if flux.ndim == 3 and pixel_size is None:
+            raise XRaySourceError("pixel_size must be specified for 3D flux input")
+        self._pixel_size = make_tuple(pixel_size, num_dims=2)
+        self._energies = energies
+        self._flux = flux
 
     def get_flux(self, photon_energy, vertical_angle, pixel_size):
-        return interp.splev(photon_energy.rescale(q.keV).magnitude, self._tck) / q.s
+        """Get linearly interpolated flux at *photon_energy*."""
+        if photon_energy <= self._energies[0]:
+            flux = self._flux[0]
+        elif photon_energy >= self._energies[-1]:
+            flux = self._flux[-1]
+        else:
+            i_0 = np.where(self._energies < photon_energy)[0][-1]
+            i_1 = np.where(self._energies >= photon_energy)[0][0]
+            d_e = (self._energies[i_1] - self._energies[i_0]).simplified.magnitude
+            w_0 = (photon_energy - self._energies[i_0]).simplified.magnitude
+            w_1 = (self._energies[i_1] - photon_energy).simplified.magnitude
+            flux = (self._flux[i_0] * w_1 + self._flux[i_1] * w_0) / d_e
+
+        return flux
 
     def _transfer_real(
         self,
@@ -174,20 +204,41 @@ class FixedSpectrumSource(XRaySource):
         block,
         flux=1,
     ):
-        flux = self.get_flux(energy, 0 * q.rad, pixel_size).magnitude
-        super(FixedSpectrumSource, self)._transfer_real(
-            shape,
-            center,
-            pixel_size,
-            energy,
-            exponent,
-            compute_phase,
-            is_parabola,
-            out,
-            queue,
-            block,
-            flux=flux,
+        flux = (
+            self.get_flux(energy, None, pixel_size)
+            .rescale(1 / q.s)
+            .magnitude.astype(cfg.PRECISION.np_float)
         )
+        cl_image = gutil.get_image(flux, queue=queue)
+
+        sampler = cl.Sampler(cfg.OPENCL.ctx, False, cl.addressing_mode.CLAMP, cl.filter_mode.LINEAR)
+
+        cl_center = gutil.make_vfloat3(*center)
+        cl_ps = gutil.make_vfloat2(*pixel_size.simplified.magnitude[::-1])
+        cl_input_ps = gutil.make_vfloat2(*self._pixel_size.simplified.magnitude[::-1])
+        z_sample = self.sample_distance.simplified.magnitude
+        lam = energy_to_wavelength(energy).simplified.magnitude
+        kernel = cfg.OPENCL.programs["physics"].make_flat_from_2D_profile
+
+        ev = kernel(
+            queue,
+            shape[::-1],
+            None,
+            out.data,
+            cl_image,
+            sampler,
+            cl_center,
+            cl_ps,
+            cl_input_ps,
+            cfg.PRECISION.np_float(z_sample),
+            cfg.PRECISION.np_float(lam),
+            np.int32(exponent),
+            np.int32(compute_phase),
+            np.int32(is_parabola),
+        )
+
+        if block:
+            ev.wait()
 
 
 class BendingMagnet(XRaySource):
