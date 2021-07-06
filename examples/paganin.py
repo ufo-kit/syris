@@ -3,6 +3,7 @@
 [1] Paganin, David, et al. "Simultaneous phase and amplitude extraction from a single defocused
 image of a homogeneous object." Journal of microscopy 206.1 (2002): 33-40.
 """
+import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
@@ -89,6 +90,13 @@ def main():
     retrieved = ifft_2(f_ld).get().real
     retrieved = -1 / mju * np.log(retrieved) * 1e6
 
+    if args.output_thickness:
+        imageio.imwrite(args.output_thickness, projection)
+    if args.output_projection:
+        imageio.imwrite(args.output_projection, ld)
+    if args.output_retrieved:
+        imageio.imwrite(args.output_retrieved, retrieved)
+
     show(hd, title="High resolution")
     show(ld, title="Low resolution (detector)")
     show(retrieved, title="Retrieved [um]")
@@ -105,6 +113,12 @@ def parse_args():
         default=8,
         help="Supersampling used to prevent propagation artefacts",
     )
+    parser.add_argument("--output-projection", type=str,
+                        help="Output file name for X-ray projection")
+    parser.add_argument("--output-thickness", type=str,
+                        help="Output file name for projected thickness [um]")
+    parser.add_argument("--output-retrieved", type=str,
+                        help="Output file name for the retrieved projected thickness [um]")
 
     return parser.parse_args()
 
