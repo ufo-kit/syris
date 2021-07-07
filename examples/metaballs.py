@@ -57,15 +57,24 @@ def get_vfloat_mem_host(mem, size):
     return res
 
 
-def create_metaballs_random(n, pixel_size, num, min_radius, max_radius):
+def create_metaballs_random(n, pixel_size, num, min_radius, max_radius, distance_from_center=None):
     params = []
+    center = n / 2
+    center_distance = None
 
-    for j in range(num):
-        x = np.random.uniform(0, n)
-        y = np.random.uniform(0, n)
-        z = np.random.uniform(-2 * max_radius, 2 * max_radius)
+    while len(params) < num:
         r = np.random.uniform(min_radius, max_radius)
-        params.append([x, y, z, r])
+        if distance_from_center is not None:
+            x = np.random.uniform(center - distance_from_center, center + distance_from_center)
+            y = np.random.uniform(center - distance_from_center, center + distance_from_center)
+            z = np.random.uniform(center - distance_from_center, center + distance_from_center)
+            center_distance = np.sqrt((x - center) ** 2 + (y - center) ** 2 + (z - center) ** 2)
+        else:
+            x = np.random.uniform(0, n)
+            y = np.random.uniform(0, n)
+            z = np.random.uniform(-2 * max_radius, 2 * max_radius)
+        if distance_from_center is None or center_distance < distance_from_center:
+            params.append([x, y, z, r])
 
     return create_metaballs(params, pixel_size)
 
@@ -135,6 +144,10 @@ def parse_args():
     )
     parser.add_argument("--num", type=int, default=50, help="Number of random metaballs")
     parser.add_argument(
+        "--distance-from-center", type=float,
+        help="Maximum allowed distance of the metaballs from image center"
+    )
+    parser.add_argument(
         "--distance", type=float, help="Distance of the two fixed metaballs in pixels"
     )
     parser.add_argument(
@@ -167,7 +180,8 @@ def main():
     if args.method == "random":
         # Random metaballs creation
         metaballs, objects_all = create_metaballs_random(
-            args.n, pixel_size, args.num, args.min_radius, args.max_radius
+            args.n, pixel_size, args.num, args.min_radius, args.max_radius,
+            distance_from_center=args.distance_from_center,
         )
     elif args.method == "file":
         # 1e6 because packing converts to meters
