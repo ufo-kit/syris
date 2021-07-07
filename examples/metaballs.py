@@ -186,7 +186,7 @@ def main():
     elif args.method == "file":
         # 1e6 because packing converts to meters
         values = np.fromfile(args.input, dtype=np.float32) * 1e6
-        metaballs, objects_all = create_metaballs(values.reshape(len(values) / 4, 4), pixel_size)
+        metaballs, objects_all = create_metaballs(values.reshape(len(values) // 4, 4), pixel_size)
     else:
         distance = args.distance or args.n / 4
         positions = [
