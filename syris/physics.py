@@ -383,3 +383,12 @@ def compute_propagation_sampling(wavelength, distance, fov, fresnel=True):
     n = int(np.ceil((fov / ps).simplified.magnitude))
 
     return n, ps
+
+
+def compute_propagation_distance_limit(n, wavelength, pixel_size):
+    """Compute the propagation distance which just fits the sampling theorem for *n* pixels,
+    *wavelength* and *pixel_size*.
+    """
+    alpha = np.arccos((wavelength / (2 * pixel_size)).simplified.magnitude)
+
+    return (np.tan(alpha) * n * pixel_size / 2).simplified
