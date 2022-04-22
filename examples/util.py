@@ -19,7 +19,7 @@ def show(image, title=""):
     image = plt.imshow(image)
     plt.title(title)
     plt.colorbar()
-    plt.show(False)
+    plt.show(block=False)
 
     return image
 
