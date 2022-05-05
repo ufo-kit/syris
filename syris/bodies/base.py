@@ -497,8 +497,12 @@ class CompositeBody(MovableBody):
                 local_shift += shift
             body.rotate(angle, vec, shift=local_shift)
 
-    def move(self, abs_time):
-        """Move to a position of the body in time *abs_time*."""
+    def move(self, abs_time, clear=True):
+        """Move to a position of the body in time *abs_time*. If *clear* is true clear the
+        transformation matrix first.
+        """
+        if clear:
+            self.clear_transformation()
         # Move the whole body.
         abs_time = abs_time.simplified
         p_0 = self.trajectory.get_point(abs_time).simplified
