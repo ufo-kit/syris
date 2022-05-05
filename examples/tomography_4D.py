@@ -62,7 +62,7 @@ def main():
 
     for i in range(num_projections):
         t = total_time / num_projections * i
-        composite.move(t)
+        composite.move(t, clear=True)
         projection = composite.project(shape, ps).get()
         imageio.imwrite(fmt.format(i), projection)
 
