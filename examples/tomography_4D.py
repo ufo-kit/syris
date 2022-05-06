@@ -6,6 +6,7 @@ sinogram space from top to bottom. There is exactly one complete sinogram, the m
 import imageio
 import os
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import numpy as np
 import quantities as q
 import syris
@@ -60,20 +61,54 @@ def main():
     print("   vertical motion time:", traj_y.time)
     print("        simulation time:", total_time)
 
+    if args.create_animation:
+        projections = np.zeros((num_projections, n, n))
+
     for i in range(num_projections):
         t = total_time / num_projections * i
         composite.move(t, clear=True)
-        projection = composite.project(shape, ps).get()
+        projection = composite.project(shape, ps).get().astype("float32")
         imageio.imwrite(fmt.format(i), projection)
+        if args.create_animation:
+            projections[i] = projection
 
     show(projection)
     plt.show()
+    if args.create_animation:
+        # Animate Projections
+        writergif = animation.PillowWriter(fps=20)
+        projection_animation = animate_volume(projections, title="Projection: ", axis=0)
+        f = args.output + "projections.gif"
+        projection_animation.save(f, writer=writergif)
+        plt.close("all")
+
+        # Animate Sinogram
+        sinogram_animation = animate_volume(projections, title="Sinogram: ", axis=1)
+        f = args.output + "sinogram.gif"
+        sinogram_animation.save(f, writer=writergif)
+
+
+def animate_volume(volume, title="Projection: ", axis=0):
+    fig = plt.figure()
+    ax = plt.gca()
+    ax.set_title("")
+    im_1 = plt.imshow(np.take(volume, 0, axis=axis),
+                      vmin=np.min(volume), vmax=np.max(volume), cmap="Greys")
+    plt.colorbar()
+
+    def update(i):
+        im_1.set_data(np.take(volume, i, axis=axis))
+        ax.set_title(title + str(i))
+        return im_1,
+
+    return animation.FuncAnimation(fig, update, blit=True, repeat=True, frames=volume.shape[axis])
 
 
 def parse_args():
     parser = get_default_parser(__doc__)
     parser.add_argument("--output", type=str, help="Output directory for projections.")
-
+    parser.add_argument("--create_animation", action='store_true',
+                        help="Creates an animations of the projections and sinograms.")
     return parser.parse_args()
 
 
