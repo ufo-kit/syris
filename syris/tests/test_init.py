@@ -1,6 +1,6 @@
 import logging
 import pyopencl as cl
-import pyopencl.array as cl_array
+import pyopencl.cltypes as cltypes
 import syris
 import syris.physics
 import syris.profiling
@@ -13,7 +13,7 @@ def test_init():
     assert cfg.OPENCL.ctx is not None
     assert cfg.PRECISION.cl_float == 8
     assert syris.profiling.PROFILER is not None
-    assert cfg.PRECISION.vfloat2 == cl_array.vec.double2
+    assert cfg.PRECISION.vfloat2 == cltypes.double2
 
 
 def test_no_opencl_init():
@@ -22,4 +22,4 @@ def test_no_opencl_init():
     syris.init(profiling=False, loglevel=logging.DEBUG, double_precision=True)
     assert logging.DEBUG == syris.physics.LOG.getEffectiveLevel()
     assert cfg.PRECISION.cl_float == 8
-    assert cfg.PRECISION.vfloat2 == cl_array.vec.double2
+    assert cfg.PRECISION.vfloat2 == cltypes.double2

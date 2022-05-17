@@ -6,7 +6,7 @@ here and caching policy for data as well.
 import logging
 import numpy as np
 import pyopencl as cl
-import pyopencl.array as cl_array
+import pyopencl.cltypes as cltypes
 
 
 LOG = logging.getLogger()
@@ -45,7 +45,7 @@ class Precision(object):
 
         dtype_base = "double" if double else "float"
         for i in [2, 3, 4, 8, 16]:
-            setattr(self, "vfloat" + str(i), getattr(cl_array.vec, dtype_base + str(i)))
+            setattr(self, "vfloat" + str(i), getattr(cltypes, dtype_base + str(i)))
 
 
 class OpenCL(object):

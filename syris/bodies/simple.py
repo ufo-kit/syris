@@ -30,8 +30,8 @@ class StaticBody(Body):
         orig_shape = self.thickness.shape
         orig_region = (0, 0) + orig_shape
         end = ((offset + shape * pixel_size) / self.pixel_size).simplified.magnitude
-        end = np.round(end).astype(np.int)
-        start = np.round((offset / self.pixel_size).simplified.magnitude).astype(np.int)
+        end = np.round(end).astype(int)
+        start = np.round((offset / self.pixel_size).simplified.magnitude).astype(int)
         # numpy integers are not understood by pyopencl's rectangle copy
         end = [int(num) for num in end]
         start = [int(num) for num in start]
