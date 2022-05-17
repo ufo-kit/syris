@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
-from pyopencl.array import vec
+import pyopencl.cltypes as cltypes
 from reikna.cluda import ocl_api
 from reikna.fft import FFT
 from syris import config as cfg
@@ -201,9 +201,9 @@ def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue
         None,
         out.data,
         image.data,
-        vec.make_int2(*region[::-1]),
+        cltypes.make_int2(*region[::-1]),
         np.int32(image.shape[1]),
-        vec.make_int2(*offset[::-1]),
+        cltypes.make_int2(*offset[::-1]),
         np.int32(average),
     )
     if block:
@@ -362,7 +362,7 @@ def _varconvolve_2d_parametrized(
             )
         )
     image = g_util.get_image(image, queue=queue)
-    args = (image, out.data, sampler, cl_array.vec.make_int2(0, 0), parameters.data)
+    args = (image, out.data, sampler, cltypes.make_int2(0, 0), parameters.data)
 
     varconvolve(kernel_name, image.shape[::-1], args, queue=queue, block=block)
 

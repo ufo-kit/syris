@@ -3,6 +3,7 @@ import itertools
 import re
 import numpy as np
 import pyopencl.array as cl_array
+import pyopencl.cltypes as cltypes
 import quantities as q
 import syris.config as cfg
 import syris.geometry as geom
@@ -182,7 +183,7 @@ class Mesh(MovableBody):
         representatives = np.argmax(x, axis=1) + factor
         # Get indices which sort the triangles
         base = 3 * np.argsort(self._current[0, representatives])
-        indices = np.empty(3 * len(base), dtype=np.int)
+        indices = np.empty(3 * len(base), dtype=int)
         indices[::3] = base
         indices[1::3] = base + 1
         indices[2::3] = base + 2
@@ -207,7 +208,7 @@ class Mesh(MovableBody):
         indices = np.where(diff < eps)[0]
 
         # Stretch to vertex indices
-        t_indices = np.empty(3 * len(indices), dtype=np.int)
+        t_indices = np.empty(3 * len(indices), dtype=int)
         for i in range(3):
             t_indices[i::3] = 3 * indices + i
         close = self._current[:-1, t_indices]
@@ -279,7 +280,7 @@ class Mesh(MovableBody):
             y_max_px = get_px_value(y_max, np.ceil, pixel_size[0])
             width = min(x_max_px - x_min_px, shape[1])
             height = min(y_max_px - y_min_px, shape[0])
-            compute_offset = cl_array.vec.make_int2(x_min_px, y_min_px)
+            compute_offset = cltypes.make_int2(x_min_px, y_min_px)
             v_1, v_2, v_3 = self._make_inputs(queue, pixel_size)
             max_dx = self.max_triangle_x_diff.simplified.magnitude / psm[1]
             # Use the same pixel size as for the x-axis, which will work for objects "not too far"
