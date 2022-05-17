@@ -1,7 +1,15 @@
 import quantities as q
 import numpy as np
-from nose.tools import assert_raises
 from syris.util import make_tuple, get_magnitude, get_gauss
+
+
+def assert_raises(exc_class, func, *args, **kwargs):
+    try:
+        func(*args, **kwargs)
+    except exc_class:
+        pass
+    else:
+        raise RuntimeError(f'{exc_class.__name__} not raised')
 
 
 def test_make_tuple():
