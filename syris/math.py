@@ -13,9 +13,9 @@ def difference_root(x_0, tck, y_d):
 
     def get_root(up=1):
         y_s = interp.splev(x_0, tck) + up * y_d
-        t, c, k = np.copy(tck)
+        t, c, k = tck
         # Adjust spline coefficients to be able to find f(x) = 0.
-        c -= y_s
+        c = c - y_s
 
         return closest(interp.sproot((t, c, k)), x_0)
 
