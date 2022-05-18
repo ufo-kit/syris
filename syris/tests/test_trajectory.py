@@ -66,24 +66,24 @@ class TestTrajectory(SyrisTest):
         )
 
     def test_init(self):
-        def test_stationary(traj):
+        def _test_stationary(traj):
             self.assertEqual(traj.length, 0 * q.m)
             self.assertEqual(traj.time, 0 * q.s)
 
         # Stationary trajectory.
         traj = Trajectory([(0, 0, 0)] * q.m)
-        test_stationary(traj)
+        _test_stationary(traj)
 
         times = np.linspace(0, 2 * np.pi, self.n)
         dist = np.sin(times)
 
         # Length is zero but velocities given.
         traj = Trajectory([(0, 0, 0)] * q.m, list(zip(times, dist)))
-        test_stationary(traj)
+        _test_stationary(traj)
 
         # Length is non-zero but no velocities given.
         traj = Trajectory(self.control_points)
-        test_stationary(traj)
+        _test_stationary(traj)
 
         # Constant velocity.
         velocity = 10 * q.m / q.s

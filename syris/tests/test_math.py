@@ -36,6 +36,7 @@ class TestMath(SyrisTest):
 
         # f ascending
         x_0 = np.pi / 4
+        smath.difference_root(x_0, tck, y_d)
         self.assertAlmostEqual(
             smath.difference_root(x_0, tck, y_d), math.asin(y_d + math.sin(x_0)), places=places
         )
@@ -48,26 +49,24 @@ class TestMath(SyrisTest):
             places=places,
         )
 
+    def test_supremum(self):
+        # Normal flow
+        data = np.array([1, 0, 3, 2])
+        self.assertEqual(smath.supremum(1, data), 2)
 
-def test_supremum():
-    # Normal flow
-    data = np.array([1, 0, 3, 2])
-    assert smath.supremum(1, data) == 2
+        # Doesn't exist
+        self.assertEqual(smath.supremum(3, data), None)
 
-    # Doesn't exist
-    assert smath.supremum(3, data) is None
+        # Empty data
+        self.assertEqual(smath.supremum(1, np.array([])), None)
 
-    # Empty data
-    assert smath.supremum(1, np.array([])) is None
+    def test_infimum(self):
+        # Normal flow
+        data = np.array([1, 0, 3, 2])
+        self.assertEqual(smath.infimum(2, data), 1)
 
+        # Doesn't exist
+        self.assertEqual(smath.infimum(0, data), None)
 
-def test_infimum():
-    # Normal flow
-    data = np.array([1, 0, 3, 2])
-    assert smath.infimum(2, data) == 1
-
-    # Doesn't exist
-    assert smath.infimum(0, data) is None
-
-    # Empty data
-    assert smath.infimum(1, np.array([])) is None
+        # Empty data
+        self.assertEqual(smath.infimum(1, np.array([])), None)
