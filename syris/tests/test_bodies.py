@@ -1,6 +1,7 @@
 import numpy as np
 import quantities as q
 import syris.config as cfg
+import unittest
 from syris import geometry as geom
 from syris.geometry import Trajectory
 from syris.bodies.base import CompositeBody
@@ -8,7 +9,7 @@ from syris.bodies.isosurfaces import MetaBall
 from syris.bodies.mesh import make_cube, Mesh
 from syris.bodies.simple import StaticBody
 from syris.imageprocessing import crop, pad, rescale
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import are_images_supported, default_syris_init, SyrisTest
 import itertools
 from syris.tests.graphics_util import get_linear_points
 
@@ -28,6 +29,7 @@ class TestBodies(SyrisTest):
         self.metaball_2 = MetaBall(Trajectory(get_linear_points(geom.Z)), 2 * q.mm)
         self.composite = CompositeBody(traj, bodies=[self.metaball, self.metaball_2])
 
+    @unittest.skipIf(not are_images_supported(), "Images not supported")
     def test_simple(self):
         n = 8
         ps = 1 * q.um
