@@ -121,7 +121,7 @@ class TestSources(SyrisTest):
         energy = 10 * q.keV
         offset = (n // 2, n // 2) * ps
 
-        def test_one_phase_profile(phase_profile):
+        def _test_one_phase_profile(phase_profile):
             self.source.phase_profile = phase_profile
             phase = np.angle(self.source.transfer(shape, ps, energy, offset=offset).get())
             gt = np.angle(
@@ -134,8 +134,8 @@ class TestSources(SyrisTest):
         u = self.source.transfer(shape, ps, energy).get()
         np.testing.assert_almost_equal(np.angle(u), 0)
 
-        test_one_phase_profile("parabola")
-        test_one_phase_profile("sphere")
+        _test_one_phase_profile("parabola")
+        _test_one_phase_profile("sphere")
 
     def test_wiggler(self):
         wiggler = Wiggler(

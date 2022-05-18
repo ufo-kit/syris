@@ -1,6 +1,7 @@
 import numpy as np
 import quantities as q
 import syris.config as cfg
+import unittest
 from syris import geometry as geom
 from syris.geometry import Trajectory
 from syris.bodies.base import CompositeBody
@@ -8,66 +9,13 @@ from syris.bodies.isosurfaces import MetaBall
 from syris.bodies.mesh import make_cube, Mesh
 from syris.bodies.simple import StaticBody
 from syris.imageprocessing import crop, pad, rescale
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import are_images_supported, default_syris_init, SyrisTest
 import itertools
 from syris.tests.graphics_util import get_linear_points
 
 
 def get_control_points():
     return np.array([(0, 0, 0), (1, 0, 0), (1, 1, 0), (0, 0, 1), (1, 1, 1)]) * q.mm
-
-
-def test_simple():
-    default_syris_init()
-    n = 8
-    ps = 1 * q.um
-    thickness = np.arange(n ** 2).reshape(n, n).astype(cfg.PRECISION.np_float) * q.m
-    go = StaticBody(thickness, ps)
-
-    # Same
-    projection = go.project((n, n), ps).get()
-    np.testing.assert_almost_equal(thickness.magnitude, projection)
-
-    # Cropped upsampled
-    shape = (n, n)
-    gt = rescale(thickness.magnitude, shape).get()
-    projection = go.project(shape, ps / 2).get()
-    gt = rescale(crop(thickness.magnitude, (0, 0, n // 2, n // 2)), shape).get()
-    np.testing.assert_almost_equal(gt, projection)
-
-    # Cropped downsampled
-    shape = (n // 4, n // 4)
-    gt = rescale(thickness.magnitude, shape).get()
-    projection = go.project(shape, 2 * ps).get()
-    gt = rescale(crop(thickness.magnitude, (0, 0, n // 2, n // 2)), shape).get()
-    np.testing.assert_almost_equal(gt, projection)
-
-    # Padded upsampled
-    shape = (4 * n, 4 * n)
-    projection = go.project(shape, ps / 2, offset=(-n // 2, -n // 2) * ps).get()
-    gt = rescale(pad(thickness.magnitude, (n // 2, n // 2, 2 * n, 2 * n)), shape).get()
-    np.testing.assert_almost_equal(gt, projection)
-
-    # Padded downsampled
-    shape = (n, n)
-    projection = go.project(shape, 2 * ps, offset=(-n // 2, -n // 2) * ps).get()
-    gt = rescale(pad(thickness.magnitude, (4, 4, 2 * n, 2 * n)), shape).get()
-    np.testing.assert_almost_equal(gt, projection)
-
-    # Crop and pad and upsample
-    def crop_pad_rescale(ss):
-        shape = (n, n)
-        target_ps = ps / ss
-        offset = (2, -2) * q.um
-        shape = (int(n // 2 * ss), int(ss * 3 * n // 2))
-        projection = go.project(shape, target_ps, offset=offset).get()
-        gt = rescale(
-            pad(thickness[n // 4 : 3 * n // 4, :], (0, n // 4, n // 2, 3 * n // 2)), shape
-        ).get()
-        np.testing.assert_almost_equal(gt, projection)
-
-    crop_pad_rescale(2)
-    crop_pad_rescale(0.5)
 
 
 class TestBodies(SyrisTest):
@@ -80,6 +28,58 @@ class TestBodies(SyrisTest):
         self.metaball = MetaBall(traj, 1 * q.mm)
         self.metaball_2 = MetaBall(Trajectory(get_linear_points(geom.Z)), 2 * q.mm)
         self.composite = CompositeBody(traj, bodies=[self.metaball, self.metaball_2])
+
+    @unittest.skipIf(not are_images_supported(), "Images not supported")
+    def test_simple(self):
+        n = 8
+        ps = 1 * q.um
+        thickness = np.arange(n ** 2).reshape(n, n).astype(cfg.PRECISION.np_float) * q.m
+        go = StaticBody(thickness, ps)
+
+        # Same
+        projection = go.project((n, n), ps).get()
+        np.testing.assert_almost_equal(thickness.magnitude, projection)
+
+        # Cropped upsampled
+        shape = (n, n)
+        gt = rescale(thickness.magnitude, shape).get()
+        projection = go.project(shape, ps / 2).get()
+        gt = rescale(crop(thickness.magnitude, (0, 0, n // 2, n // 2)), shape).get()
+        np.testing.assert_almost_equal(gt, projection)
+
+        # Cropped downsampled
+        shape = (n // 4, n // 4)
+        gt = rescale(thickness.magnitude, shape).get()
+        projection = go.project(shape, 2 * ps).get()
+        gt = rescale(crop(thickness.magnitude, (0, 0, n // 2, n // 2)), shape).get()
+        np.testing.assert_almost_equal(gt, projection)
+
+        # Padded upsampled
+        shape = (4 * n, 4 * n)
+        projection = go.project(shape, ps / 2, offset=(-n // 2, -n // 2) * ps).get()
+        gt = rescale(pad(thickness.magnitude, (n // 2, n // 2, 2 * n, 2 * n)), shape).get()
+        np.testing.assert_almost_equal(gt, projection)
+
+        # Padded downsampled
+        shape = (n, n)
+        projection = go.project(shape, 2 * ps, offset=(-n // 2, -n // 2) * ps).get()
+        gt = rescale(pad(thickness.magnitude, (4, 4, 2 * n, 2 * n)), shape).get()
+        np.testing.assert_almost_equal(gt, projection)
+
+        # Crop and pad and upsample
+        def crop_pad_rescale(ss):
+            shape = (n, n)
+            target_ps = ps / ss
+            offset = (2, -2) * q.um
+            shape = (int(n // 2 * ss), int(ss * 3 * n // 2))
+            projection = go.project(shape, target_ps, offset=offset).get()
+            gt = rescale(
+                pad(thickness[n // 4 : 3 * n // 4, :], (0, n // 4, n // 2, 3 * n // 2)), shape
+            ).get()
+            np.testing.assert_almost_equal(gt, projection)
+
+        crop_pad_rescale(2)
+        crop_pad_rescale(0.5)
 
     def _get_moved_bounding_box(self, body, angle):
         body.translate((1, 0, 0) * q.mm)

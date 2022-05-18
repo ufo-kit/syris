@@ -39,7 +39,7 @@ class TestOpticalElement(SyrisTest):
         default_syris_init()
         energies = list(range(10, 20)) * q.keV
         self.energy = energies[len(energies) // 2]
-        self.material = Material("foo", np.arange(len(energies), dtype=np.complex), energies)
+        self.material = Material("foo", np.arange(len(energies), dtype=complex), energies)
 
     def test_2d_conversion(self):
         elem = DummyOpticalElement()

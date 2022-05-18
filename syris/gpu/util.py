@@ -9,9 +9,9 @@ import sys
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
+import pyopencl.cltypes as cltypes
 import quantities as q
 from multiprocessing.pool import ThreadPool
-from pyopencl.array import vec
 from syris import profiling as prf
 from syris import config as cfg
 import logging
@@ -456,9 +456,9 @@ def _make_vfloat_functions():
     def _wrapper(i):
         def make_vfloat(*args):
             if cfg.PRECISION.is_single():
-                return getattr(vec, "make_float%d" % (i))(*args)
+                return getattr(cltypes, "make_float%d" % (i))(*args)
             else:
-                return getattr(vec, "make_double%d" % (i))(*args)
+                return getattr(cltypes, "make_double%d" % (i))(*args)
 
         make_vfloat.__name__ = "make_vfloat%d" % (i)
         return make_vfloat

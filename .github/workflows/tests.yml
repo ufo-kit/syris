@@ -1,0 +1,43 @@
+name: syris tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10']
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v3
+    - name: Display Ubuntu version
+      run: lsb_release -d
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Display python version
+      run: python --version
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -qq python3-pyopencl
+        python -m pip install --upgrade pip
+        pip install flake8 pytest coverage
+        pip install -r requirements.txt
+    - name: Run tests with coverage
+      run: |
+        coverage run -m --source=syris unittest discover -v
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == 3.8
+      uses: codecov/codecov-action@v2
+      with:
+        fail_ci_if_error: true
+        verbose: true

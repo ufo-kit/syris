@@ -202,7 +202,8 @@ class Material(object):
         """Save this instance to a *filename*."""
         if filename is None:
             filename = "{}.mat".format(self.name)
-        pickle.dump(self, open(filename, "wb"))
+        with open(filename, 'wb') as f:
+            pickle.dump(self, f)
 
     def __eq__(self, other):
         return isinstance(other, Material) and self.name == other.name
@@ -333,7 +334,8 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
 
 def make_fromfile(filename):
     """Load saved material from *filename*."""
-    return pickle.load(open(filename, "rb"))
+    with open(filename, "rb") as f:
+        return pickle.load(f)
 
 
 class _HenkeQuery(object):
@@ -434,9 +436,9 @@ def _parse_henke(response):
     """
     split = [line.split() for line in response]
     energies, delta, beta = list(zip(*split))
-    delta = np.array(delta).astype(np.float)
-    beta = np.array(beta).astype(np.float)
-    energies = np.array(energies).astype(np.float)
+    delta = np.array(delta).astype(float)
+    beta = np.array(beta).astype(float)
+    energies = np.array(energies).astype(float)
 
     return energies, (delta + beta * 1j).astype(cfg.PRECISION.np_cplx)
 

@@ -99,7 +99,7 @@ class TestPhysics(SyrisTest):
         wavefield = physics.transfer(thickness, refractive_index, wavelength).get()
 
         exponent = -2 * np.pi * thickness.simplified / wavelength.simplified
-        truth = np.exp(exponent * np.complex(refractive_index.imag, refractive_index.real))
+        truth = np.exp(exponent * complex(refractive_index.imag, refractive_index.real))
         np.testing.assert_almost_equal(truth, wavefield)
 
         # Exponent
@@ -115,7 +115,7 @@ class TestPhysics(SyrisTest):
         lam = physics.energy_to_wavelength(energy)
         # Delta causes phase shift between two adjacent pixels by Pi / 16
         delta = (lam / (32 * ps)).simplified.magnitude
-        ri = np.ones_like(energies.magnitude, dtype=np.complex) * delta + 0j
+        ri = np.ones_like(energies.magnitude, dtype=complex) * delta + 0j
         material = Material("dummy", ri, energies)
         wedge = np.tile(np.arange(n), [n, 1]) * ps
         wedge = StaticBody(wedge, ps, material=material)
@@ -151,7 +151,7 @@ class TestPhysics(SyrisTest):
         lam = physics.energy_to_wavelength(energy)
         # Delta causes phase shift between two adjacent pixels by 2 Pi
         delta = (lam / ps).simplified.magnitude
-        ri = np.ones_like(energies.magnitude, dtype=np.complex) * delta + 0j
+        ri = np.ones_like(energies.magnitude, dtype=complex) * delta + 0j
         material = Material("dummy", ri, energies)
 
         # Single object
