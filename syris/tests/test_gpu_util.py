@@ -99,7 +99,7 @@ class TestGPUUtil(SyrisTest):
             self.assertRaises(TypeError, gu.get_image, None)
 
             # Complex Image
-            data = np.ones((4, 4), dtype=np.complex)
+            data = np.ones((4, 4), dtype=complex)
             self.assertRaises(TypeError, gu.get_image, data)
 
     def test_get_duration(self):

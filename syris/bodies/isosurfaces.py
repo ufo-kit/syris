@@ -6,6 +6,7 @@ import logging
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
+import pyopencl.cltypes as cltypes
 import quantities as q
 import syris.gpu.util as g_util
 import syris.geometry as geom
@@ -185,8 +186,8 @@ def project_metaballs(metaballs, shape, pixel_size, offset=None, queue=None, out
         right_mem,
         np.int32(len(metaballs)),
         offset,
-        cl_array.vec.make_int2(0, 0),
-        cl_array.vec.make_int4(0, 0, m, n),
+        cltypes.make_int2(0, 0),
+        cltypes.make_int4(0, 0, m, n),
         g_util.make_vfloat2(ps[1], ps[0]),
         np.int32(True),
     )

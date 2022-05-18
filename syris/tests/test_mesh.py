@@ -22,7 +22,7 @@ class TestMesh(SyrisTest):
         self.assertAlmostEqual(get_magnitude(self.mesh.furthest_point), np.sqrt(3))
 
     def test_bounding_box(self):
-        bbox_points = get_magnitude(self.mesh.bounding_box.points).astype(np.int).tolist()
+        bbox_points = get_magnitude(self.mesh.bounding_box.points).astype(int).tolist()
         seed = (-1, 1)
         for point in itertools.product(seed, seed, seed):
             self.assertTrue(list(point) in bbox_points)
