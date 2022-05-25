@@ -4,6 +4,9 @@ Syris
 .. image:: https://img.shields.io/badge/Python-3.6+-blue
     :target: https://www.python.org/downloads/release/python-360
 
+.. image:: https://badge.fury.io/py/syris.png
+    :target: http://badge.fury.io/py/syris
+
 .. image:: https://github.com/ufo-kit/syris/actions/workflows/tests.yml/badge.svg?branch=master
     :target: https://github.com/ufo-kit/syris/actions
 
