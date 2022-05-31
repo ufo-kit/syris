@@ -331,13 +331,11 @@ def ref_index_to_attenuation_coeff(ref_index, lam):
 
 
 def compute_collection(num_aperture, opt_ref_index):
-    """Get the collection efficiency of the scintillator combined with
-    a lens. The efficiency is given by :math:`\eta = \\frac{1}{2}
-    \\left( \\frac{N\!A}{n} \\right)^2`, where :math:`N\!A` is the numerical
-    aperture *num_aperture* of the lens, :math:`n` is the optical refractive
-    index *opt_ref_index* given by the :class:`.Scintillator`.
-    """
-    return 0.5 * (num_aperture / opt_ref_index) ** 2
+    """Get the collection efficiency of the scintillator combined with a lens. The efficiency is
+    given by :math:`\eta = \\frac{1 - \\sqrt(1 - \\left( \\frac{N\!A}{n} \\right)^2)}{2}`, where
+    :math:`N\!A` is the numerical aperture *num_aperture* of the lens, :math:`n` is the optical
+    refractive index *opt_ref_index* given by the :class:`.Scintillator`.  """
+    return (1 - np.sqrt(1 - (num_aperture / opt_ref_index) ** 2)) / 2
 
 
 def compute_diffraction_angle(diameter, propagation_distance):
