@@ -6,7 +6,6 @@ import syris
 from syris.physics import propagate
 from syris.bodies.simple import make_sphere
 from syris.materials import make_henke
-from .util import show
 
 
 def main():
@@ -20,7 +19,7 @@ def main():
     sample = make_sphere(n, n / 4 * pixel_size, pixel_size, material=material)
     image = propagate([sample], (n, n), energies, distance, pixel_size).get()
 
-    show(image)
+    plt.imshow(image)
     plt.show()
 
 
