@@ -41,6 +41,7 @@ setup(
         'scipy>=0.11.0',
         # Examples
         'imageio',
-        'matplotlib'
+        'matplotlib',
+        'tqdm'
     ]
 )
