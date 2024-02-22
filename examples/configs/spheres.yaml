@@ -1,0 +1,35 @@
+n: 512
+verbose: False
+inner_cylinder_radius:  # Maximum lateral distance from the center (any part of any sphere will not reach beyond this, applicable to `create' and `xray' commands) [px]
+
+run:
+  - create
+  - project
+  - xray
+
+create:
+  output_directory:
+  n_spheres: 1000  # Number of spheres
+  r_min: 2  # Minimum sphere radius [px]
+  r_max: 12  # Maximum sphere radius [px]
+  rho_min: 0.5  # Minimum relative density (0, 1]
+  rho_max: 1.0  # Maximum relative density (0, 1]
+
+project:
+  spheres_filename:  # File with spheres from `create' sub-command
+  supersampling: 8  # Supersampling amount
+  num_projections:  # Number of projections
+
+xray:
+  projections_fmt:  # Projections file name format from `project' sub-command compatible with glob.glob()
+  output_suffix:  # Output directory will be projections-[OUTPUT-SUFFIX]
+  spots_filename:  # File name with spots for corruption
+  propagation_distance: 0  # Propagation distance [cm]
+  outer_cylinder_radius:  # Outer cylinder radius [px]
+  max_absorbed_photons: 10000  # Maximum number of flat-field photons absorbed in the scintillator
+  noise: False  # Whether to simulate noise
+  num_darks: 100
+  num_flats: 100
+  source:
+    num_periods: 1  # Source moves along a sine vertically, this specifies number of periods it makes
+    max_shift: 0.25  # How far does the source center go vertically as a fraction of the field of view
