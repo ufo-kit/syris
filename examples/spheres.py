@@ -28,6 +28,10 @@ import quantities as q
 import syris
 import tqdm
 from syris.bodies.simple import StaticBody
+from syris.devices.sources import make_topotomo
+from syris.devices.cameras import Camera
+from syris.geometry import Trajectory
+from syris.gpu.util import get_host
 from syris.imageprocessing import decimate
 from syris.math import fwnm_to_sigma
 from syris.physics import propagate, energy_to_wavelength
@@ -217,6 +221,22 @@ def project_spheres(
         )
 
 
+def get_camera_image(image, camera, xray_gain, with_noise=False):
+    """Convert an X-ray *image* to a visible light image."""
+    # X-ray -> visible light
+    if with_noise:
+        image = np.random.poisson(image)
+    image = image * xray_gain
+
+    # Visible light -> electrons -> counts
+    return camera.get_image(
+        image,
+        shot_noise=with_noise,
+        amplifier_noise=with_noise,
+        psf=True,
+    )
+
+
 def create_xray_projections(
     n=None,
     propagation_distance=None,
@@ -225,6 +245,9 @@ def create_xray_projections(
     outer_cylinder_radius=None,
     projections_fmt=None,
     spots_filename=None,
+    max_absorbed_photons=None,
+    with_noise=False,
+    output_suffix=None,
 ):
     syris.init()
     projection_filenames = sorted(glob.glob(projections_fmt))
@@ -237,11 +260,11 @@ def create_xray_projections(
     propagation_distance = propagation_distance * q.cm
     ps = 1 * q.um
     ps_hd = ps / supersampling
-    water_material = get_material("water.mat")
-    ri = water_material.get_refractive_index(energy)
-    pmma_material = get_material("pmma_5_30_kev.mat")
+    material = get_material("synth-delta-1e-6-beta-1e-8.mat")
+    ri = material.get_refractive_index(energy)
     max_intensity = 4000
-    incident_intensity = 1000
+    max_absorbed_photons = max_absorbed_photons
+    xray_gain = 20  # number of emitted visible light photons / one X-ray photon
 
     fmt = "Wavelength: {}"
     print(fmt.format(lam))
@@ -249,8 +272,7 @@ def create_xray_projections(
     print(fmt.format(ps_hd.rescale(q.um)))
     print("Field of view: {}".format(n * ps.rescale(q.um)))
     print("Supersampling: {}".format(supersampling))
-    print(f"Pmma mu at {energy}: {pmma_material.get_attenuation_coefficient(energy)}")
-    print(f"Water mu at {energy}: {water_material.get_attenuation_coefficient(energy)}")
+    print(f"Material mu at {energy}: {material.get_attenuation_coefficient(energy)}")
     print(f"Regularization rate for water in UFO: {np.log10(ri.real / ri.imag)}")
     n_kernel_half = int(np.ceil((lam * propagation_distance / (2 * ps ** 2)).simplified.magnitude))
     print("Propagator half-size in pixels:", n_kernel_half)
@@ -261,16 +283,65 @@ def create_xray_projections(
     inner_cylinder = make_cylinder_profile(n_hd, inner_cylinder_radius * supersampling)
     outer_cylinder = make_cylinder_profile(n_hd, outer_cylinder_radius * supersampling)
     capillary_thickness = (outer_cylinder - inner_cylinder) * ps_hd
-    capillary = StaticBody(capillary_thickness, ps_hd, material=pmma_material)
+    capillary = StaticBody(capillary_thickness, ps_hd, material=material)
     num_projections = len(projection_filenames)
     print(f"Number of projections: {num_projections}")
 
     output_directory = os.path.dirname(os.path.dirname(projection_filenames[0]))
     projs_dir = os.path.join(output_directory, "projections")
+    if output_suffix:
+        projs_dir += "-" + output_suffix
     os.makedirs(projs_dir, exist_ok=True)
 
-    # Flat field and scintillator spots
-    flat = incident_intensity * np.ones((n, n), dtype=np.float32)
+    # Devices
+    vis_wavelengths = np.arange(500, 700) * q.nm
+    camera = Camera(
+        11 * q.um,
+        0.1,
+        500,
+        20,
+        32,
+        (n, n),
+        exp_time=1 * q.ms,
+        fps=1000 / q.s,
+        quantum_efficiencies=0.5 * np.ones(len(vis_wavelengths)),
+        wavelengths=vis_wavelengths,
+        dtype=np.float32,
+    )
+    # Use fake pixel size to make the bending magnet fall off faster to ~10 % of the instensity at
+    # the top and bottom wrt the middle
+    source_ps = 20 * q.um
+    source_traj = Trajectory([(n / 2, n / 2, 0)] * source_ps)
+    source = make_topotomo(trajectory=source_traj)
+
+    # Flat and dark
+    flat = np.abs(get_host(source.transfer((n, n), source_ps, energy))) ** 2
+    flat = flat / flat.max() * max_absorbed_photons
+
+    imageio.volwrite(
+        os.path.join(output_directory, "flat.tif"),
+        [
+            get_camera_image(
+                flat,
+                camera,
+                xray_gain,
+                with_noise=with_noise
+            )[y_cutoff:-y_cutoff] for i in range(100)
+        ]
+    )
+    imageio.volwrite(
+        os.path.join(output_directory, "dark.tif"),
+        [
+            get_camera_image(
+                np.zeros_like(flat),
+                camera,
+                xray_gain,
+                with_noise=with_noise
+            )[y_cutoff:-y_cutoff] for i in range(100)
+        ]
+    )
+
+    # Scintillator spots
     if spots_filename:
         spots = imageio.imread(spots_filename) if spots_filename else None
         spots[spots > 0] *= max_intensity
@@ -278,22 +349,21 @@ def create_xray_projections(
         # In case there were some tiny values, they could end up below 1
         spots = np.clip(spots, 1, np.inf)
         flat = np.clip(flat * spots, 0, max_intensity)
-    imageio.imwrite(os.path.join(output_directory, "flat.tif"), flat[y_cutoff:-y_cutoff])
-    imageio.imwrite(os.path.join(output_directory, "dark.tif"), 0 * flat[y_cutoff:-y_cutoff])
 
     # Projections
     for i, filename in tqdm.tqdm(enumerate(projection_filenames)):
         spheres = imageio.imread(filename)
         projection = spheres * ps_hd
-        sample = StaticBody(projection, ps_hd, material=water_material)
+        sample = StaticBody(projection, ps_hd, material=material)
         # Propagation with a monochromatic plane incident wave
         hd = propagate([capillary, sample], shape, [energy], propagation_distance, ps_hd).get()
-        ld = incident_intensity * decimate(
+        ld = flat * decimate(
             hd,
             (n, n),
             sigma=fwnm_to_sigma(supersampling, n=2),
             average=True
         ).get()
+        ld = get_camera_image(ld, camera, xray_gain, with_noise=with_noise)
         if spots_filename:
             ld = np.clip(ld * spots, 0, max_intensity)
         imageio.imwrite(
@@ -381,6 +451,22 @@ def main():
         "--spots-filename",
         type=str,
         help="File name with spots for corruption"
+    )
+    xray.add_argument(
+        "--max-absorbed-photons",
+        type=int,
+        default=10000,
+        help="Maximum number of flat-field photons absorbed in the scintillator"
+    )
+    xray.add_argument(
+        "--with-noise",
+        action="store_true",
+        help="Simulate noise or not"
+    )
+    xray.add_argument(
+        "--output-suffix",
+        type=str,
+        help="Output directory will be projections-[output-suffix]"
     )
     xray.set_defaults(_func=create_xray_projections)
 
