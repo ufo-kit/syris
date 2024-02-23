@@ -238,6 +238,7 @@ def get_low_resolution_image(
     supersampling,
     camera,
     xray_gain,
+    max_intensity,
     noise=False,
     spots_image=None
 ):
@@ -246,12 +247,11 @@ def get_low_resolution_image(
         hd_image,
         (n, n),
         sigma=fwnm_to_sigma(supersampling, n=2),
-        average=True
+        average=False
     ).get()
     image = get_camera_image(image, camera, xray_gain, noise=noise)
     if spots_image is not None:
-        image_max = image.max()
-        image = np.clip(image + spots_image * image_max, 0, image_max)
+        image = np.clip(image + spots_image * max_intensity, 0, max_intensity)
 
     return image
 
@@ -347,10 +347,12 @@ def create_xray_projections(common):
     )
 
     # Scintillator spots
+    spots_image = None
     if args.spots_filename:
         spots_image = imageio.imread(args.spots_filename) if args.spots_filename else None
 
     flats_done = False
+    max_flat = None
     # Projections
     for i, filename in tqdm.tqdm(enumerate(projection_filenames)):
         # Flat field
@@ -360,13 +362,17 @@ def create_xray_projections(common):
             energy,
             t=i / num_projections * source_traj.time if args.source.drift else 0 * q.s
         )) ** 2
-        flat_hd /= cl_array.max(flat_hd) / args.max_absorbed_photons
+        flat_hd = flat_hd / cl_array.max(flat_hd) * args.max_absorbed_photons / supersampling ** 2
+        if max_flat is None:
+            max_flat = cl_array.max(flat_hd).get() * xray_gain * camera.gain * supersampling ** 2
+            print("Max flat value:", max_flat)
         if not flats_done:
             flat_ld = get_low_resolution_image(
                 flat_hd,
                 supersampling,
                 camera,
                 xray_gain,
+                max_flat * 1.2,
                 noise=args.noise,
                 spots_image=spots_image
             )
@@ -390,6 +396,7 @@ def create_xray_projections(common):
             supersampling,
             camera,
             xray_gain,
+            max_flat * 1.2,
             noise=args.noise,
             spots_image=spots_image
         )
