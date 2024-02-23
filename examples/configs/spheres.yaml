@@ -31,5 +31,6 @@ xray:
   num_darks: 100
   num_flats: 100
   source:
+    drift: False
     num_periods: 1  # Source moves along a sine vertically, this specifies number of periods it makes
     max_shift: 0.25  # How far does the source center go vertically as a fraction of the field of view
