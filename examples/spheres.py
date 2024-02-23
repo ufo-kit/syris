@@ -233,12 +233,35 @@ def get_camera_image(image, camera, xray_gain, noise=False):
     )
 
 
+def get_low_resolution_image(
+    hd_image,
+    supersampling,
+    camera,
+    xray_gain,
+    noise=False,
+    spots_image=None
+):
+    n = hd_image.shape[1] // supersampling
+    image = decimate(
+        hd_image,
+        (n, n),
+        sigma=fwnm_to_sigma(supersampling, n=2),
+        average=True
+    ).get()
+    image = get_camera_image(image, camera, xray_gain, noise=noise)
+    if spots_image is not None:
+        image_max = image.max()
+        image = np.clip(image + spots_image * image_max, 0, image_max)
+
+    return image
+
+
 def create_xray_projections(common):
     args = common.xray
     syris.init()
     projection_filenames = sorted(glob.glob(args.projections_fmt))
     n_hd = imageio.imread(projection_filenames[0]).shape[0]
-    supersampling = n_hd / common.n
+    supersampling = n_hd // common.n
     # Compute grid
     shape = (n_hd, n_hd)
     energy = 15 * q.keV
@@ -248,7 +271,6 @@ def create_xray_projections(common):
     ps_hd = ps / supersampling
     material = get_material("synth-delta-1e-6-beta-1e-8.mat")
     ri = material.get_refractive_index(energy)
-    max_intensity = 4000
     xray_gain = 20  # number of emitted visible light photons / one X-ray photon
 
     fmt = "Wavelength: {}"
@@ -326,12 +348,7 @@ def create_xray_projections(common):
 
     # Scintillator spots
     if args.spots_filename:
-        spots = imageio.imread(args.spots_filename) if args.spots_filename else None
-        spots[spots > 0] *= max_intensity
-        spots[spots == 0] = 1
-        # In case there were some tiny values, they could end up below 1
-        spots = np.clip(spots, 1, np.inf)
-        flat = np.clip(flat * spots, 0, max_intensity)
+        spots_image = imageio.imread(args.spots_filename) if args.spots_filename else None
 
     flats_done = False
     # Projections
@@ -341,17 +358,18 @@ def create_xray_projections(common):
             (n_hd, n_hd),
             source_ps / supersampling,
             energy,
-            t=i / num_projections * source_traj.time
+            t=i / num_projections * source_traj.time if args.source.drift else 0 * q.s
         )) ** 2
         flat_hd /= cl_array.max(flat_hd) / args.max_absorbed_photons
-        flat_ld = decimate(
-            flat_hd,
-            (common.n, common.n),
-            sigma=fwnm_to_sigma(supersampling, n=2),
-            average=True
-        ).get()
-        flat_ld = get_camera_image(flat_ld, camera, xray_gain, noise=args.noise)
         if not flats_done:
+            flat_ld = get_low_resolution_image(
+                flat_hd,
+                supersampling,
+                camera,
+                xray_gain,
+                noise=args.noise,
+                spots_image=spots_image
+            )
             if i < num_flats:
                 flats.append(flat_ld[y_cutoff:-y_cutoff])
             else:
@@ -367,18 +385,17 @@ def create_xray_projections(common):
         sample = StaticBody(projection, ps_hd, material=material)
         # Propagation with a monochromatic plane incident wave
         hd = propagate([capillary, sample], shape, [energy], propagation_distance, ps_hd)
-        ld = decimate(
+        proj = get_low_resolution_image(
             flat_hd * hd,
-            (common.n, common.n),
-            sigma=fwnm_to_sigma(supersampling, n=2),
-            average=True
-        ).get()
-        ld = get_camera_image(ld, camera, xray_gain, noise=args.noise)
-        if args.spots_filename:
-            ld = np.clip(ld * spots, 0, max_intensity)
+            supersampling,
+            camera,
+            xray_gain,
+            noise=args.noise,
+            spots_image=spots_image
+        )
         imageio.imwrite(
             os.path.join(projs_dir, "projection-{:>05}.tif".format(i)),
-            ld.astype(np.float32)[y_cutoff:-y_cutoff]
+            proj.astype(np.float32)[y_cutoff:-y_cutoff]
         )
 
 
