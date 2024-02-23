@@ -332,7 +332,6 @@ def create_xray_projections(common):
     flat = np.abs(get_host(source.transfer((common.n, common.n), source_ps, energy))) ** 2
     flat = flat / flat.max() * args.max_absorbed_photons
     flats = []
-    num_flats = 100
 
     imageio.volwrite(
         os.path.join(output_directory, f"darks{args.output_suffix}.tif"),
@@ -342,7 +341,7 @@ def create_xray_projections(common):
                 camera,
                 xray_gain,
                 noise=args.noise
-            )[y_cutoff:-y_cutoff] for i in range(10)
+            )[y_cutoff:-y_cutoff] for i in range(args.num_darks)
         ]
     )
 
@@ -376,7 +375,7 @@ def create_xray_projections(common):
                 noise=args.noise,
                 spots_image=spots_image
             )
-            if i < num_flats:
+            if i < args.num_flats:
                 flats.append(flat_ld[y_cutoff:-y_cutoff])
             else:
                 imageio.volwrite(
