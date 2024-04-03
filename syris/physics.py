@@ -24,7 +24,7 @@ import quantities as q
 import quantities.constants.quantum as cq
 from pyopencl import clmath
 from syris.gpu import util as g_util
-from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2
+from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2, get_butterworth
 from syris.math import fwnm_to_sigma
 from syris import config as cfg
 from syris.util import make_tuple
@@ -104,6 +104,8 @@ def compute_propagator(
     region=None,
     apply_phase_factor=False,
     mollified=True,
+    mollifier="gauss",
+    fourier=True,
     queue=None,
     block=False,
 ):
@@ -112,14 +114,21 @@ def compute_propagator(
     the full propagator (don't approximate the square root). *region* is the diameter of the the
     wavefront area which is capable of interference. If *apply_phase_factor* is True, apply the
     phase factor defined by Fresnel approximation. If *mollified* is True the aliased frequencies
-    are suppressed. If command *queue* is specified, execute the kernel on it. If *block* is True,
-    wait for the kernel to finish.
+    are suppressed. If *fourier* is True, compute the propagator in the frequency space, otherwise
+    compute the Fourier transform of a real-space propagator, which gives better results for very
+    narrow real-space propagators (edge-enhancement regime) with no or low supersampling.
+    *mollifier* can be "gauss" or "butterworth". If command *queue* is specified, execute the kernel
+    on it. If *block* is True, wait for the kernel to finish.
     """
+    if mollifier not in ("gauss", "butterworth"):
+        raise ValueError("Mollifier can be either 'gauss' or 'butterworth'")
     if size % 2:
         raise ValueError("Only even sizes are supported")
     if queue is None:
         queue = cfg.OPENCL.queue
     pixel_size = make_tuple(pixel_size)
+    if mollified and mollifier == "butterworth" and pixel_size[0] != pixel_size[1]:
+        raise RuntimeError("Butterworth requires identical pixel sizes")
 
     def check_cutoff(ps):
         # Check the sampling
@@ -154,6 +163,7 @@ def compute_propagator(
         g_util.make_vfloat2(*pixel_size[::-1].simplified),
         g_util.make_vcomplex(phase_factor),
         np.int32(fresnel),
+        np.int32(fourier),
     )
     if block:
         ev.wait()
@@ -161,17 +171,37 @@ def compute_propagator(
     if mollified:
 
         def compute_sigma_component(ps):
-            fwtm = compute_aliasing_limit(size, lam, ps, distance, fov=size * ps, fourier=True)
+            cutoff = compute_aliasing_limit(size, lam, ps, distance, fourier=fourier)
             if region is not None:
-                fwtm_region = compute_aliasing_limit(size, lam, ps, distance, region, fourier=True)
-                fwtm = min(fwtm_region, fwtm)
-            sigma = fwnm_to_sigma(fwtm, n=10)
+                cutoff_region = compute_aliasing_limit(
+                    size,
+                    lam,
+                    ps,
+                    distance,
+                    fov=region,
+                    fourier=fourier
+                )
+                cutoff = min(cutoff_region, cutoff)
 
-            return sigma
+            if mollifier == "gauss":
+                cutoff = fwnm_to_sigma(cutoff, n=10)
 
-        sigma = (compute_sigma_component(pixel_size[0]), compute_sigma_component(pixel_size[1]))
-        mollifier = get_gauss_2d(size, sigma, fourier=False, queue=queue, block=block)
+            return cutoff
+
+        cutoff = (
+            compute_sigma_component(pixel_size[0]),
+            compute_sigma_component(pixel_size[1])
+        )
+        if mollifier == "gauss":
+            mollifier = get_gauss_2d(size, cutoff, fourier=False, queue=queue, block=block)
+        else:
+            mollifier = get_butterworth(size, cutoff[1] // 2, order=5, queue=queue, block=block)
         out = out * mollifier
+
+        if not fourier:
+            # Energy conservation, do this numerically to make sure that after mollification it's
+            # still on point
+            out /= cl_array.sum(out)
 
     return out
 
