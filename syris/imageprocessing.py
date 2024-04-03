@@ -120,6 +120,36 @@ def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None, block=Fa
     return out
 
 
+def get_butterworth(n, cutoff, order=5, queue=None, block=False):
+    """Get the Butterworth filter (version without the square root). *n* is the number of pixels in
+    one dimension, *cutoff* is the cutoff pixel number (can be float), *order* is the filter order.
+    Use command *queue* if specified. If *block* is True, wait for the kernel to finish.
+    """
+    LOG.debug(
+        "get_butterworth, n: %d, cutoff: %d, order %d",
+        n,
+        cutoff,
+        order,
+    )
+
+    if queue is None:
+        queue = cfg.OPENCL.queue
+    out = cl.array.Array(queue, (n, n), dtype=cfg.PRECISION.np_float)
+
+    ev = cfg.OPENCL.programs["improc"].butterworth(
+        queue,
+        (n, n),
+        None,
+        out.data,
+        cfg.PRECISION.np_float(cutoff),
+        np.int32(order)
+    )
+    if block:
+        ev.wait()
+
+    return out
+
+
 def pad(image, region=None, out=None, value=0, queue=None, block=False):
     """Pad a 2D *image*. *region* is the region to pad as (y_0, x_0, height, width). If not
     specified, the next power of two dimensions are used and the image is centered in the padded

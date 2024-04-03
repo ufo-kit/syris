@@ -74,6 +74,21 @@ __kernel void gauss_2d_f(__global vfloat *out, const vfloat2 sigma, const vfloat
 }
 
 /*
+ * Butterworth filter
+ */
+__kernel void butterworth(__global vfloat *out, const vfloat cutoff, const int order) {
+    int ix = get_global_id(0);
+    int iy = get_global_id(1);
+    int width = get_global_size(0);
+    int height = get_global_size(1);
+    int x = (ix >= width >> 1) ? ix - width : ix;
+    int y = (iy >= height >> 1) ? iy - height : iy;
+    vfloat dist = sqrt ((vfloat) x * x + y * y);
+
+    out[iy * width + ix] = 1.0 / (1.0 + pown (dist / cutoff, 2 * order));
+}
+
+/*
  * Sum image over a given region.
  */
 __kernel void sum(__global vfloat *out,
