@@ -24,6 +24,7 @@ import numpy as np
 import quantities as q
 import syris
 import syris.geometry as geom
+import tqdm
 from syris.bodies.mesh import Mesh, make_cube, read_blender_obj
 from .util import get_default_parser, show
 
@@ -66,18 +67,19 @@ def main():
     LOG.info("Translation: {}".format(translate.rescale(q.um)))
 
     mesh.translate(translate)
-    mesh.rotate(args.y_rotate, geom.Y_AX)
     mesh.rotate(args.x_rotate, geom.X_AX)
+
     fmt = "n: {}, pixel size: {}, FOV: {}"
     LOG.info(fmt.format(args.n, args.pixel_size.rescale(q.um), fov.rescale(q.um)))
-
     st = time.time()
-    proj = mesh.project(shape, args.pixel_size, t=None).get()
+    for i in tqdm.tqdm(range(args.num_y_rotations)):
+        proj = mesh.project(shape, args.pixel_size, t=None).get()
+        if args.projection_filename is not None:
+            imageio.imwrite(args.projection_filename + f"_{i:>05}.tif", proj)
+        mesh.rotate(args.y_rotate, geom.Y_AX)
+
     LOG.info("Duration: {} s".format(time.time() - st))
     offset = (0, translate[1].simplified, -(fov / 2.0).simplified) * q.m
-
-    if args.projection_filename is not None:
-        imageio.imwrite(args.projection_filename, proj)
 
     if args.compute_slice:
         sl = mesh.compute_slices((1,) + shape, args.pixel_size, offset=offset).get()[0]
@@ -105,9 +107,19 @@ def parse_args():
     parser.add_argument("--x-rotate", type=float, default=0.0, help="Rotation around x axis [deg]")
     parser.add_argument("--y-rotate", type=float, default=0.0, help="Rotation around y axis [deg]")
     parser.add_argument(
+        "--num-y-rotations",
+        type=int,
+        default=1,
+        help="How many times rotate around y axis (tomography simulation)"
+    )
+    parser.add_argument(
         "--margin", type=float, default=1.0, help="Margin in factor of the full FOV"
     )
-    parser.add_argument("--projection-filename", type=str, help="Save projection to this filename")
+    parser.add_argument(
+        "--projection-filename",
+        type=str,
+        help="Save projection to this filename prefix (.tif is appended)"
+    )
     parser.add_argument("--compute-slice", action="store_true", help="Compute also one slice")
     parser.add_argument("--slice-filename", type=str, help="Save slice to this filename")
     parser.add_argument("--double-precision", action="store_true", help="Use double precision")
