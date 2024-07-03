@@ -159,6 +159,7 @@ class Camera(object):
         if amplifier_noise and self.amplifier_sigma > 0:
             # Add electronics noise
             electrons = np.random.normal(electrons, self.amplifier_sigma)
+            electrons[electrons < 0] = 0
 
         counts = self.gain * electrons
 
