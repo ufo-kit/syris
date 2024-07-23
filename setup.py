@@ -34,7 +34,6 @@ setup(
     description="X-ray imaging simulation",
     long_description=open('README.rst').read(),
     install_requires=[
-        'hydra',
         'numpy>=1.6.1',
         'quantities>=0.10.1',
         'pyopencl>=2012.1',
