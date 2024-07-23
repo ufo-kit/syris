@@ -1,4 +1,5 @@
-hydra
+hydra-core
+omegaconf
 imageio
 matplotlib
 tqdm

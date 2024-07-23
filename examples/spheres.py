@@ -20,7 +20,7 @@ Creation of spheres in a capillary, their projection and X-ray simulation.
 """
 import functools
 import glob
-import hydra
+import sys
 import imageio
 import multiprocessing
 import numpy as np
@@ -29,7 +29,6 @@ import os
 import quantities as q
 import syris
 import tqdm
-from omegaconf import OmegaConf
 from syris.bodies.simple import StaticBody
 from syris.devices.sources import make_topotomo
 from syris.devices.cameras import Camera
@@ -40,6 +39,14 @@ from syris.math import fwnm_to_sigma
 from syris.physics import propagate, energy_to_wavelength
 from multiprocessing.pool import Pool
 from .util import get_material
+
+
+try:
+    import hydra
+    from omegaconf import OmegaConf
+except ImportError:
+    print("You have to install hydra and omegaconf to use this example", file=sys.stderr)
+    sys.exit(1)
 
 
 def project_sphere(xc, yc, radius):
