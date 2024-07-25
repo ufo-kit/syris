@@ -405,7 +405,7 @@ def create_xray_projections(common):
             hd_acc += hd
         if (i + 1) % args.num_projections_per_image == 0:
             proj = get_low_resolution_image(
-                flat_hd * hd_acc,
+                flat_hd * hd_acc / args.num_projections_per_image,
                 supersampling,
                 camera,
                 xray_gain,
