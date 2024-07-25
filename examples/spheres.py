@@ -414,7 +414,10 @@ def create_xray_projections(common):
                 spots_image=spots_image
             )
             imageio.imwrite(
-                os.path.join(projs_dir, "projection-{:>05}.tif".format(i)),
+                os.path.join(
+                    projs_dir,
+                    "projection-{:>05}.tif".format(i // args.num_projections_per_image)
+                ),
                 proj.astype(np.float32)[y_cutoff:-y_cutoff]
             )
             hd_acc = None
