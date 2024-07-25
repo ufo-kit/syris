@@ -357,6 +357,7 @@ def create_xray_projections(common):
     if args.spots_filename:
         spots_image = imageio.imread(args.spots_filename) if args.spots_filename else None
 
+    hd_acc = None
     flats_done = False
     max_flat = None
     # Projections
@@ -393,23 +394,30 @@ def create_xray_projections(common):
 
         # Sample
         spheres = imageio.imread(filename)
-        projection = spheres * ps_hd
+        projection = spheres * q.m
         sample = StaticBody(projection, ps_hd, material=material)
+        samples = [sample, capillary] if args.use_capillary else [sample]
         # Propagation with a monochromatic plane incident wave
-        hd = propagate([capillary, sample], shape, [energy], propagation_distance, ps_hd)
-        proj = get_low_resolution_image(
-            flat_hd * hd,
-            supersampling,
-            camera,
-            xray_gain,
-            max_flat * 1.2,
-            noise=args.noise,
-            spots_image=spots_image
-        )
-        imageio.imwrite(
-            os.path.join(projs_dir, "projection-{:>05}.tif".format(i)),
-            proj.astype(np.float32)[y_cutoff:-y_cutoff]
-        )
+        hd = propagate(samples, shape, [energy], propagation_distance, ps_hd)
+        if hd_acc is None:
+            hd_acc = hd
+        else:
+            hd_acc += hd
+        if (i + 1) % args.num_projections_per_image == 0:
+            proj = get_low_resolution_image(
+                flat_hd * hd_acc,
+                supersampling,
+                camera,
+                xray_gain,
+                max_flat * 1.2,
+                noise=args.noise,
+                spots_image=spots_image
+            )
+            imageio.imwrite(
+                os.path.join(projs_dir, "projection-{:>05}.tif".format(i)),
+                proj.astype(np.float32)[y_cutoff:-y_cutoff]
+            )
+            hd_acc = None
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="spheres")

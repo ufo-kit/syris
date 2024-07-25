@@ -30,6 +30,8 @@ xray:
   noise: False  # Whether to simulate noise
   num_darks: 100
   num_flats: 100
+  num_projections_per_image: 1 # Superimpose this many projections in one (motion blur)
+  use_capillary: True # Project also capillary
   source:
     drift: False
     num_periods: 1  # Source moves along a sine vertically, this specifies number of periods it makes
