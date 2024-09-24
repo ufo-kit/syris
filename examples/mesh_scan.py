@@ -40,7 +40,7 @@ def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=
     if axis == "z":
         lamino_angle = lamino_angle + 90 * q.deg
         tomo_angle = -tomo_angle
-    axis = Y_AX if axis == "y" else Z_AX
+    axis = X_AX if axis == "y" else Z_AX
     mesh.clear_transformation()
     mesh.translate(center)
     mesh.rotate(lamino_angle, X_AX)
@@ -55,7 +55,7 @@ def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=
     if ss > 1:
         projection = bin_image(projection, orig_shape, average=True)
 
-    return projection.get()
+    return projection.get().T
 
 
 def read_mesh(filename, iterations=1, mesh_pixel_size=None):
@@ -64,9 +64,13 @@ def read_mesh(filename, iterations=1, mesh_pixel_size=None):
 
     path, ext = os.path.splitext(filename)
     if ext == ".obj":
-        tri = read_blender_obj(filename)
+        tmp = read_blender_obj(filename)
     else:
-        tri = np.load(filename)
+        tmp = np.load(filename)
+
+    tri = np.copy(tmp)
+    tri[0, :] = tmp[1, :]
+    tri[1, :] = tmp[0, :]
 
     if mesh_pixel_size:
         tri = tri * mesh_pixel_size * q.nm
@@ -104,7 +108,7 @@ def scan(
         mesh_filenames = sorted(glob.glob(mesh_filename))
 
     # Move to the middle of the FOV
-    point = (shape[1] * psm / 2, 0, 0) * q.m
+    point = (0, shape[1] * psm / 2, 0) * q.m
     if index == 0:
         LOG.info("Mesh shift: {}".format(point.rescale(q.um)))
         LOG.info("Mesh shift in pixels: {}".format((point / ps).simplified.magnitude))
@@ -353,7 +357,7 @@ def main():
         image_directory = "projections"
         file_prefix = image_directory[:-1]
 
-    file_prefix += "_{:>04}.tif"
+    file_prefix += "_{:>06}.tif"
 
     devices = list(range(args.num_devices))
     pool = Pool(processes=args.num_devices)

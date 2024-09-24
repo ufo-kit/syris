@@ -266,7 +266,7 @@ def get_low_resolution_image(
 def create_xray_projections(common):
     args = common.xray
     syris.init()
-    projection_filenames = sorted(glob.glob(args.projections_fmt))
+    projection_filenames = sorted(glob.glob(args.projections_fmt))[::args.every_nth_projection]
     n_hd = imageio.imread(projection_filenames[0]).shape[0]
     supersampling = n_hd // common.n
     # Compute grid
