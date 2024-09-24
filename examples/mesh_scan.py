@@ -18,6 +18,7 @@
 """Laminography data set generation with mesh geometry."""
 import imageio
 import itertools
+import glob
 import logging
 import os
 import time
@@ -39,7 +40,7 @@ def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=
     if axis == "z":
         lamino_angle = lamino_angle + 90 * q.deg
         tomo_angle = -tomo_angle
-    axis = Y_AX if axis == "y" else Z_AX
+    axis = X_AX if axis == "y" else Z_AX
     mesh.clear_transformation()
     mesh.translate(center)
     mesh.rotate(lamino_angle, X_AX)
@@ -54,14 +55,37 @@ def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=
     if ss > 1:
         projection = bin_image(projection, orig_shape, average=True)
 
-    return projection.get()
+    return projection.get().T
+
+
+def read_mesh(filename, iterations=1, mesh_pixel_size=None):
+    from syris.bodies.mesh import Mesh, read_blender_obj
+    from syris.geometry import Trajectory
+
+    path, ext = os.path.splitext(filename)
+    if ext == ".obj":
+        tmp = read_blender_obj(filename)
+    else:
+        tmp = np.load(filename)
+
+    tri = np.copy(tmp)
+    tri[0, :] = tmp[1, :]
+    tri[1, :] = tmp[0, :]
+
+    if mesh_pixel_size:
+        tri = tri * mesh_pixel_size * q.nm
+    else:
+        tri = tri * q.um
+    tr = Trajectory([(0, 0, 0)] * q.um)
+
+    return Mesh(tri, tr, center=None, iterations=iterations)
 
 
 def scan(
     shape,
     ps,
     axis,
-    mesh,
+    mesh_filename,
     angles,
     prefix,
     lamino_angle=45 * q.deg,
@@ -69,15 +93,22 @@ def scan(
     num_devices=1,
     shift_coeff=1e4,
     ss=1,
+    mesh_pixel_size=None,
+    num_meshes=1,
+    supersampling_projection=1,
 ):
     """Make a scan of tomographic angles. *shift_coeff* is the coefficient multiplied by pixel size
     which shifts the triangles to get rid of faulty pixels.
     """
     psm = ps.simplified.magnitude
     log_fmt = "{}: {:>04}/{:>04} in {:6.2f} s, angle: {:>6.2f} deg, maxima: {}"
+    if os.path.isfile(mesh_filename):
+        mesh_filenames = [mesh_filename]
+    else:
+        mesh_filenames = sorted(glob.glob(mesh_filename))
 
     # Move to the middle of the FOV
-    point = (shape[1] * psm / 2, shape[0] * psm / 2, 0) * q.m
+    point = (0, shape[1] * psm / 2, 0) * q.m
     if index == 0:
         LOG.info("Mesh shift: {}".format(point.rescale(q.um)))
         LOG.info("Mesh shift in pixels: {}".format((point / ps).simplified.magnitude))
@@ -94,7 +125,17 @@ def scan(
     checked_indices = []
     # Projections which exceed the allowed metric difference even after more iterations
     bad_indices = []
+    i_mesh = None
     for i, angle in mine:
+        if i * num_meshes // num_angles != i_mesh:
+            i_mesh = i * num_meshes // num_angles
+            mesh = read_mesh(
+                mesh_filenames[i_mesh],
+                iterations=supersampling_projection,
+                mesh_pixel_size=mesh_pixel_size,
+            )
+            with LOCK:
+                LOG.info("i: %d, reading mesh %d", i, i_mesh)
         st = time.time()
         projs = [make_projection(shape, ps, axis, mesh, point, lamino_angle, angle, ss=ss)]
         max_vals = [projs[-1].max()]
@@ -174,21 +215,14 @@ def make_ground_truth(args, shape, mesh):
 
 def process(args, device_index):
     import syris
-    from syris.geometry import Trajectory
-    from syris.bodies.mesh import Mesh, read_blender_obj
 
     syris.init(
         device_index=device_index, logfile=args.logfile, double_precision=args.double_precision
     )
-    path, ext = os.path.splitext(args.input)
-    if ext == ".obj":
-        tri = read_blender_obj(args.input)
-    else:
-        tri = np.load(args.input)
-    tri = tri * q.um
-
-    tr = Trajectory([(0, 0, 0)] * q.um)
-    mesh = Mesh(tri, tr, center=None, iterations=args.supersampling_projection)
+    mesh = read_mesh(
+        args.input if os.path.isfile(args.input) else sorted(glob.glob(args.input))[0],
+        iterations=args.supersampling_projection
+    )
 
     if args.n:
         n = args.n
@@ -219,19 +253,26 @@ def process(args, device_index):
             shape,
             args.pixel_size,
             args.rotation_axis,
-            mesh,
+            args.input,
             angles,
             args.prefix,
             lamino_angle=args.lamino_angle,
             index=device_index,
             num_devices=args.num_devices,
             ss=args.supersampling,
+            num_meshes=args.num_meshes,
+            supersampling_projection=args.supersampling_projection,
+            mesh_pixel_size=args.mesh_pixel_size,
         )
 
 
 def parse_args():
     parser = get_default_parser(__doc__)
-    parser.add_argument("input", type=str, help="Blender .obj input file name")
+    parser.add_argument(
+        "input",
+        type=str,
+        help="Input file name or file names prefix"
+    )
     parser.add_argument("--n", type=int, help="Number of pixels")
     parser.add_argument(
         "--supersampling-projection",
@@ -254,6 +295,9 @@ def parse_args():
         "--pixel-size", type=float, default=[750.0], nargs="+", help="Pixel size in nm"
     )
     parser.add_argument(
+        "--mesh-pixel-size", type=float, help="Physical mesh pixel size in nm"
+    )
+    parser.add_argument(
         "--rotation-angle", type=float, default=180, help="Total rotation angle in degrees"
     )
     parser.add_argument(
@@ -269,6 +313,9 @@ def parse_args():
     )
     parser.add_argument(
         "--num-devices", type=int, default=1, help="Number of compute devices to use"
+    )
+    parser.add_argument(
+        "--num-meshes", type=int, default=1, help="Number of meshes / rotation angle"
     )
     parser.add_argument(
         "--supersampling",
@@ -294,6 +341,10 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    if os.path.isfile(args.input) and args.num_meshes > 1:
+        raise ValueError("--num-meshes > 1 can be used only if more meshes are specified")
+
     combinations = list(
         itertools.product(
             args.lamino_angle, args.pixel_size, args.rotation_axis, args.supersampling
@@ -306,7 +357,7 @@ def main():
         image_directory = "projections"
         file_prefix = image_directory[:-1]
 
-    file_prefix += "_{:>04}.tif"
+    file_prefix += "_{:>06}.tif"
 
     devices = list(range(args.num_devices))
     pool = Pool(processes=args.num_devices)
