@@ -49,6 +49,7 @@ class Mesh(MovableBody):
         self,
         triangles,
         trajectory,
+        normals=None,
         material=None,
         orientation=geom.Y_AX,
         iterations=1,
@@ -74,6 +75,8 @@ class Mesh(MovableBody):
         self._triangles = np.copy(self._current)
         self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
         self.iterations = iterations
+        self._normals = np.insert(normals, 3, np.ones(normals.shape[1]), axis=0)
+        self._current_normals = self._normals.copy()
         super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
     @property
@@ -212,6 +215,7 @@ class Mesh(MovableBody):
 
         # Sort the triangles among each other
         self._current = self._current[:, indices]
+        self._current_normals = self._current_normals[:, indices]
 
     def get_degenerate_triangles(self, eps=1e-3 * q.deg):
         """Get triangles which are close to be parallel with the ray in z-direction based on the
@@ -254,6 +258,8 @@ class Mesh(MovableBody):
         """Apply transformation *matrix* and return the resulting triangles."""
         matrix = self.get_rescaled_transform_matrix(q.um)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
+        matrix[:-1, -1] = 0
+        self._current_normals = np.dot(matrix.astype(self._normals.dtype), self._normals)
 
     def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
         """Projection implementation."""
@@ -304,6 +310,9 @@ class Mesh(MovableBody):
             # from the imaging plane
             min_z = self.extrema[2][0].simplified.magnitude / psm[1]
             offset = gutil.make_vfloat2(*(offset / pixel_size).simplified.magnitude[::-1])
+            # Onlyz z coordinate is important
+            normals = self._current_normals[2, ::3].astype(cfg.PRECISION.np_float)
+            normals = cl_array.to_device(queue, normals)
 
             ev = cfg.OPENCL.programs["mesh"].compute_thickness(
                 queue,
@@ -312,6 +321,7 @@ class Mesh(MovableBody):
                 v_1.data,
                 v_2.data,
                 v_3.data,
+                normals.data,
                 out.data,
                 np.int32(self.num_triangles),
                 np.int32(shape[1]),
@@ -401,6 +411,55 @@ def read_blender_obj(filename, objects=None):
         i += 1
 
     return triangles
+
+
+def _extract_object_with_normals(txt):
+    """Extract an object from string *txt*."""
+    face_start = txt.index("s ")
+    if "v" not in txt[face_start:]:
+        obj_end = None
+    else:
+        obj_end = face_start + txt[face_start:].index("v")
+    subtxt = txt[:obj_end]
+
+    pattern = r"{} (?P<x>.*) (?P<y>.*) (?P<z>.*)"
+    v_pattern = re.compile(pattern.format("v"))
+    n_pattern = re.compile(pattern.format("vn"))
+    f_pattern = r"f (?P<fx>[0-9]+)//(?P<nx>[0-9]+) (?P<fy>[0-9]+)//(?P<ny>[0-9]+) (?P<fz>[0-9]+)//(?P<nz>[0-9]+)"
+    vertices = np.array(re.findall(v_pattern, subtxt)).astype(np.float32)
+    normals = np.array(re.findall(n_pattern, subtxt)).astype(np.float32)
+    fn = np.array(re.findall(f_pattern, subtxt)).astype(np.int32).flatten() - 1
+    faces = fn[::2]
+    normal_indices = fn[1::2]
+
+    remainder = txt[obj_end:] if obj_end else None
+
+    return remainder, vertices, faces, normals, normal_indices
+
+
+def read_blender_obj_with_normals(filename, objects=None):
+    """Read blender wavefront *filename*, extract only *objects* which are object indices."""
+    remainder = open(filename, "r").read()
+    triangles = None
+    normals = None
+    face_start = 0
+    normals_start = 0
+    i = 0
+
+    while remainder:
+        remainder, v, f, vn, normal_indices = _extract_object_with_normals(remainder)
+        if objects is None or i in objects:
+            if triangles is None:
+                triangles = v[f - face_start].transpose()
+                normals = vn[normal_indices - normals_start].transpose()
+            else:
+                triangles = np.concatenate((triangles, v[f - face_start].transpose()), axis=1)
+                normals = np.concatenate((normals, vn[normal_indices - normals_start].transpose()), axis=1)
+        face_start += len(v)
+        normals_start += len(vn)
+        i += 1
+
+    return triangles, normals
 
 
 def make_cube():

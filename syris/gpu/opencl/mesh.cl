@@ -92,11 +92,13 @@ int find_leftmost (const global vfloat3 *v_1,
 int compute_intersections (const global vfloat3 *v_1,
                            const global vfloat3 *v_2,
                            const global vfloat3 *v_3,
+                           const global vfloat *nz,
                            const int num_triangles,
                            vfloat3 *O,
                            vfloat3 *D,
                            vfloat max_dx,
-                           vfloat *intersections)
+                           vfloat *intersections,
+                           vfloat *normals)
 {
     int i, num_intersections = 0;
     vfloat current;
@@ -122,6 +124,7 @@ int compute_intersections (const global vfloat3 *v_1,
             current = compute_intersection_point (&v_1[i], &v_2[i], &v_3[i], O, D); 
             if (current > -1) {
                 intersections[num_intersections] = current;
+                normals[num_intersections] = nz[i];
                 num_intersections++;
                 if (num_intersections == MAX_INTERSECTIONS) {
                     break;
@@ -131,29 +134,70 @@ int compute_intersections (const global vfloat3 *v_1,
         i++;
     }
 
-    vf_sort (intersections, num_intersections);
+    vf_sort_2 (intersections, normals, num_intersections);
 
     return num_intersections;
 }
 
-vfloat project_thickness (vfloat *intersections, int num_intersections)
+vfloat project_thickness (vfloat *intersections, vfloat *normals, int num_intersections)
 {
     int i, j;
     vfloat result = 0.0;
+    int inout;
+    int skipped = 0;
+
+    if (num_intersections < 1) {
+        return 0.0f;
+    }
+
+    inout = sign(normals[0]);
+    if (inout > 0) {
+        /* positive = object exit, this cannot happen */
+        return NAN;
+    }
 
     i = 0;
+    while (i < num_intersections && normals[i] == 0.0f) {
+        i++;
+    }
+
     while (i < num_intersections) {
         j = i + 1;
-        while (j < num_intersections && fabs (intersections[j] - intersections[i]) < EPSILON) {
+        skipped = 0;
+        while (j < num_intersections && (fabs (intersections[j] - intersections[i]) < EPSILON)) {
             j++;
         }
         if (i < num_intersections && j < num_intersections) {
-            result += fabs (intersections[j] - intersections[i]);
+            while (j < num_intersections && normals[j] == 0.0f) {
+                j++;
+                skipped = 1;
+            }
+            inout += sign(normals[j]);
+            if (!skipped) {
+                result += fabs (intersections[j] - intersections[i]);
+            } else {
+                if (inout > 0) {
+                    inout--;
+                } else {
+                    inout++;
+                }
+            }
         }
-        i = j + 1;
+        if (inout) {
+            i = j;
+        } else {
+            i = j + 1;
+            inout = i < num_intersections ? sign(normals[i]) : 0;
+        }
+        while (j < num_intersections && normals[j] == 0.0f) {
+            j++;
+            skipped = 1;
+        }
+
     }
 
     return result;
+    // return num_intersections > 3 ? intersections[3] : 0.0f;
 }
 
 
@@ -201,6 +245,7 @@ void fill_slice (vfloat *intersections,
 kernel void compute_thickness (const global vfloat3 *v_1,
                                const global vfloat3 *v_2,
                                const global vfloat3 *v_3,
+                               const global vfloat *nz,
                                global vfloat *output,
                                const int num_triangles,
                                const int image_width,
@@ -219,55 +264,63 @@ kernel void compute_thickness (const global vfloat3 *v_1,
     vfloat y_0 = idy + offset.y + 0.5 + mesh_offset.y;
     vfloat3 O, D = (vfloat3)(0, 0, 1);
     vfloat intersections[MAX_INTERSECTIONS];
+    vfloat normals[MAX_INTERSECTIONS];
     O.z = min_z - 1;
 
     for (i = 0; i < supersampling; i++) {
         for (j = 0; j < supersampling; j++) {
             O.x = (2. * i - supersampling + 1) / (2 * supersampling) + x_0;
             O.y = (2. * j - supersampling + 1) / (2 * supersampling) + y_0;
-            num_intersections = compute_intersections (v_1, v_2, v_3, num_triangles, &O, &D,
-                                                       max_dx, intersections);
+            num_intersections = compute_intersections (v_1, v_2, v_3, nz, num_triangles, &O, &D,
+                                                       max_dx, intersections, normals);
             if (num_intersections == MAX_INTERSECTIONS) {
                 output[(idy + offset.y) * image_width + idx + offset.x] = NAN;
                 return;
             }
-            results[i * supersampling + j] = project_thickness (intersections, num_intersections);
+
+            results[i * supersampling + j] = project_thickness (intersections, normals, num_intersections);
+
+            if (isnan (results[i * supersampling + j])) {
+                output[(idy + offset.y) * image_width + idx + offset.x] = NAN;
+                return;
+            }
         }
     }
 
     vf_sort (results, supersampling * supersampling);
+    // output[(idy + offset.y) * image_width + idx + offset.x] = results[supersampling * supersampling / 2];
     output[(idy + offset.y) * image_width + idx + offset.x] = scale * results[supersampling * supersampling / 2];
 }
 
-kernel void compute_slices (const global vfloat3 *v_1,
-                         const global vfloat3 *v_2,
-                         const global vfloat3 *v_3,
-                         global uchar *output,
-                         const int depth,
-                         const int num_triangles,
-                         const vfloat3 offset,
-                         const vfloat max_dx)
-{
-    int idx = get_global_id (0);
-    int idy = get_global_id (1);
-    int width = get_global_size (0);
-    int z, num_intersections;
-    vfloat intersections[MAX_INTERSECTIONS];
-    vfloat3 O;
-    vfloat3 D = (vfloat3)(0, 0, 1);
-    O.x = idx + 0.5 + offset.x;
-    O.y = idy + 0.5 + offset.y;
-    O.z = offset.z;
-
-    num_intersections = compute_intersections (v_1, v_2, v_3, num_triangles, &O, &D,
-                                               max_dx, intersections);
-    if (num_intersections == MAX_INTERSECTIONS) {
-        for (z = 0; z < depth; z++) {
-            output[width * depth * idy + z * width + idx] = NAN;
-        }
-    } else {
-        /* Make epsilon one pixel */
-        num_intersections = remove_duplicates (intersections, num_intersections, EPSILON);
-        fill_slice (intersections, output, num_intersections, idx, idy, width, depth);
-    }
-}
+// kernel void compute_slices (const global vfloat3 *v_1,
+//                          const global vfloat3 *v_2,
+//                          const global vfloat3 *v_3,
+//                          global uchar *output,
+//                          const int depth,
+//                          const int num_triangles,
+//                          const vfloat3 offset,
+//                          const vfloat max_dx)
+// {
+//     int idx = get_global_id (0);
+//     int idy = get_global_id (1);
+//     int width = get_global_size (0);
+//     int z, num_intersections;
+//     vfloat intersections[MAX_INTERSECTIONS];
+//     vfloat3 O;
+//     vfloat3 D = (vfloat3)(0, 0, 1);
+//     O.x = idx + 0.5 + offset.x;
+//     O.y = idy + 0.5 + offset.y;
+//     O.z = offset.z;
+//
+//     num_intersections = compute_intersections (v_1, v_2, v_3, num_triangles, &O, &D,
+//                                                max_dx, intersections);
+//     if (num_intersections == MAX_INTERSECTIONS) {
+//         for (z = 0; z < depth; z++) {
+//             output[width * depth * idy + z * width + idx] = NAN;
+//         }
+//     } else {
+//         /* Make epsilon one pixel */
+//         num_intersections = remove_duplicates (intersections, num_intersections, EPSILON);
+//         fill_slice (intersections, output, num_intersections, idx, idy, width, depth);
+//     }
+// }

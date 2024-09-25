@@ -72,6 +72,56 @@ void vf_sort(vfloat *array, int size) {
     }
 }
 
+void vf_swap_2(vfloat *array, vfloat *other, int i, int j) {
+	vfloat tmp;
+
+	tmp = array[i];
+	array[i] = array[j];
+	array[j] = tmp;
+
+	tmp = other[i];
+	other[i] = other[j];
+	other[j] = tmp;
+}
+
+void vf_sift_down_2(vfloat *heap, vfloat *other, int start, int end) {
+    int root = start;
+    int child;
+
+    while (root*2 + 1 <= end) {
+        child = root*2 + 1;
+        if (child + 1 <= end && (heap[child] < heap[child + 1] ||
+        								isnan(heap[child + 1]))) {
+            child++;
+        }
+        if (child <= end && (heap[root] < heap[child] || isnan(heap[child]))) {
+        	vf_swap_2(heap, other, root, child);
+            root = child;
+        } else {
+            return;
+        }
+    }
+}
+
+void vf_heapify_2(vfloat *array, vfloat *other, int size) {
+	int start = (size - 2) / 2;
+
+	while (start >= 0) {
+		vf_sift_down_2(array, other, start, size - 1);
+		start--;
+	}
+}
+
+void vf_sort_2(vfloat *array, vfloat *other, int size) {
+	vf_heapify_2(array, other, size);
+    int end = size - 1;
+
+    while (end > 0) {
+    	vf_swap_2(array, other, 0, end);
+        vf_sift_down_2(array, other, 0, end - 1);
+        end--;
+    }
+}
 
 __kernel void sort_kernel(__global vfloat *array) {
 	vfloat ar[10];
