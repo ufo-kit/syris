@@ -242,6 +242,64 @@ void fill_slice (vfloat *intersections,
     }
 }
 
+
+/**
+ * spheres = (x, y, z, radius)
+ */
+kernel void project_spheres (constant vfloat4 *spheres,
+                             const int num_spheres,
+                             global vfloat *output)
+{
+    int idx = get_global_id (0);
+    int idy = get_global_id (1);
+    int width = get_global_size (0);
+    vfloat x = (vfloat) idx;
+    vfloat y = (vfloat) idy;
+    vfloat z;
+    vfloat intersections[MAX_INTERSECTIONS];
+    vfloat normals[MAX_INTERSECTIONS];
+    vfloat results[16];
+    int num_intersections = 0;
+    const int supersampling = 2;
+    int i, j;
+
+    for (i = 0; i < supersampling; i++) {
+        for (j = 0; j < supersampling; j++) {
+            num_intersections = 0;
+            for (int k = 0; k < num_spheres; k++) {
+                x = ((vfloat) idx) - spheres[k].x + (2. * i - supersampling + 1) / (2 * supersampling);
+                y = ((vfloat) idy) - spheres[k].y + (2. * j - supersampling + 1) / (2 * supersampling);
+                /* z^2 = r^2 - x^2 - y^2 */
+                z = spheres[k].w * spheres[k].w - x * x - y * y;
+                if (z >= 0.0f) {
+                    z = sqrt (z);
+                    intersections[num_intersections] = spheres[k].z - z;
+                    intersections[num_intersections + 1] = spheres[k].z + z;
+                    normals[num_intersections] = -1.0f;
+                    normals[num_intersections + 1] = 1.0f;
+                    num_intersections += 2;
+                }
+                if (num_intersections >= MAX_INTERSECTIONS) {
+                    output[idy * width + idx] = NAN;
+                    return;
+                }
+            }
+            vf_sort_2 (intersections, normals, num_intersections);
+            // output[idy * width + idx] = intersections[9];
+            results[i * supersampling + j] = project_thickness (intersections, normals, num_intersections);
+            for (int l = 0; l < num_intersections; l++) {
+                intersections[l] = 0.0f;
+                normals[l] = 0.0f;
+            }
+        }
+    }
+
+    vf_sort (results, supersampling * supersampling);
+    // output[(idy + offset.y) * image_width + idx + offset.x] = results[supersampling * supersampling / 2];
+    output[idy * width + idx] = results[supersampling * supersampling / 2];
+}
+
+
 kernel void compute_thickness (const global vfloat3 *v_1,
                                const global vfloat3 *v_2,
                                const global vfloat3 *v_3,

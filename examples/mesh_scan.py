@@ -58,6 +58,69 @@ def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=
     return projection.get().T
 
 
+def make_projection_spheres(shape, ps, spheres, center, tomo_angle, ss=1):
+    import pyopencl.array as cl_array
+    import syris.config as cfg
+    from syris.imageprocessing import bin_image
+    from syris.geometry import rotate
+
+    queue = cfg.OPENCL.queue
+
+    matrix = rotate(tomo_angle, Y_AX)
+    spheres = (spheres / ps * ss).simplified.magnitude
+    center = (center / ps * ss).simplified.magnitude
+    spheres = np.dot(matrix, spheres.T).T.copy()
+    spheres += center
+    spheres = spheres.flatten()
+
+
+    orig_shape = shape
+    shape = tuple([n * ss for n in orig_shape])
+    ps = ps / ss
+    spheres = cl_array.to_device(queue, spheres.astype(cfg.PRECISION.np_float))
+    projection = cl_array.zeros(queue, orig_shape, dtype=cfg.PRECISION.np_float)
+
+    # t=None for trajectory override
+    ev = cfg.OPENCL.programs["mesh"].project_spheres(
+        queue,
+        orig_shape[::-1],
+        None,
+        spheres.data,
+        np.int32(spheres.shape[0] // 4),
+        projection.data,
+    )
+    ev.wait()
+
+    if ss > 1:
+        projection = bin_image(projection, orig_shape, average=True)
+
+    return projection.get() * ps.simplified.magnitude
+
+
+def read_spheres(filename, radius, mesh_pixel_size=None):
+    import re
+
+    with open(filename) as f:
+        txt = f.read()
+
+    positions = []
+    objects = txt.split("o Sphere")
+    pattern = r"v (?P<x>.*) (?P<y>.*) (?P<z>.*)"
+    for j in range(1, len(objects)):
+        vertices = np.array(re.findall(pattern, objects[j])).astype(np.float32)
+        position = (np.max(vertices, axis=0) + np.min(vertices, axis=0)) / 2
+        positions.append(position)
+
+    positions = np.insert(positions, 3, radius, axis=1)
+
+    if mesh_pixel_size:
+        positions = positions * mesh_pixel_size * q.nm
+    else:
+        positions = positions * q.um
+
+    return positions
+
+
 def read_mesh(filename, iterations=1, mesh_pixel_size=None):
     from syris.bodies.mesh import Mesh, read_blender_obj
     from syris.geometry import Trajectory
@@ -94,6 +157,8 @@ def scan(
     shift_coeff=1e4,
     ss=1,
     mesh_pixel_size=None,
+    sphere_radius=None,
+    y_offset=0,
     num_meshes=1,
     supersampling_projection=1,
 ):
@@ -108,7 +173,9 @@ def scan(
         mesh_filenames = sorted(glob.glob(mesh_filename))
 
     # Move to the middle of the FOV
-    point = (0, shape[1] * psm / 2, 0) * q.m
+    # point = (0, shape[1] * psm / 2, 0) * q.m
+    point = (shape[1] * psm / 2, y_offset * 1e-9, 0, 0) * q.m
+
     if index == 0:
         LOG.info("Mesh shift: {}".format(point.rescale(q.um)))
         LOG.info("Mesh shift in pixels: {}".format((point / ps).simplified.magnitude))
@@ -129,15 +196,21 @@ def scan(
     for i, angle in mine:
         if i * num_meshes // num_angles != i_mesh:
             i_mesh = i * num_meshes // num_angles
-            mesh = read_mesh(
+            spheres = read_spheres(
                 mesh_filenames[i_mesh],
-                iterations=supersampling_projection,
-                mesh_pixel_size=mesh_pixel_size,
+                sphere_radius,
+                mesh_pixel_size=mesh_pixel_size
             )
+            # mesh = read_mesh(
+            #     mesh_filenames[i_mesh],
+            #     iterations=supersampling_projection,
+            #     mesh_pixel_size=mesh_pixel_size,
+            # )
             with LOCK:
                 LOG.info("i: %d, reading mesh %d", i, i_mesh)
         st = time.time()
-        projs = [make_projection(shape, ps, axis, mesh, point, lamino_angle, angle, ss=ss)]
+        # projs = [make_projection(shape, ps, axis, mesh, point, lamino_angle, angle, ss=ss)]
+        projs = [make_projection_spheres(shape, ps, spheres, point, angle, ss=ss)]
         max_vals = [projs[-1].max()]
         best = 0
         if last is not None and max_vals[0] > 2 * last or np.isnan(max_vals[0]):
@@ -146,8 +219,11 @@ def scan(
             for shift in [-psm / shift_coeff, psm / shift_coeff]:
                 shifted_point = point + (shift, 0, 0) * q.m
                 projs.append(
-                    make_projection(
-                        shape, ps, axis, mesh, shifted_point, lamino_angle, angle, ss=ss
+                    # make_projection(
+                    #     shape, ps, axis, mesh, shifted_point, lamino_angle, angle, ss=ss
+                    # )
+                    make_projection_spheres(
+                        shape, ps, spheres, shifted_point, angle, ss=ss
                     )
                 )
                 max_vals.append(projs[-1].max())
@@ -219,36 +295,41 @@ def process(args, device_index):
     syris.init(
         device_index=device_index, logfile=args.logfile, double_precision=args.double_precision
     )
-    mesh = read_mesh(
-        args.input if os.path.isfile(args.input) else sorted(glob.glob(args.input))[0],
-        iterations=args.supersampling_projection
-    )
-
-    if args.n:
-        n = args.n
-        fov = n * args.pixel_size
-    else:
-        fov = max([ends[1] - ends[0] for ends in mesh.extrema[:-1]]) * 1.1
-        n = int(np.ceil((fov / args.pixel_size).simplified.magnitude))
+    # mesh = read_mesh(
+    #     args.input if os.path.isfile(args.input) else sorted(glob.glob(args.input))[0],
+    #     iterations=args.supersampling_projection
+    # )
+    #
+    # if args.n:
+    #     n = args.n
+    #     fov = n * args.pixel_size
+    # else:
+    #     fov = max([ends[1] - ends[0] for ends in mesh.extrema[:-1]]) * 1.1
+    #     n = int(np.ceil((fov / args.pixel_size).simplified.magnitude))
+    # shape = (n, n)
+    #
+    # if args.make_gt:
+    #     LOG.info("--- Args info ---")
+    #     log_attributes(args)
+    #
+    #     return make_ground_truth(args, shape, mesh)
+    # else:
+    #     num_projs = int(np.pi * n) if args.num_projections is None else args.num_projections
+    #     angles = np.linspace(0, args.rotation_angle, num_projs, endpoint=False) * q.deg
+    #     if device_index == 0:
+    #         LOG.info("n: {}, ps: {}, FOV: {}".format(n, args.pixel_size, fov))
+    #         LOG.info("Total rotation angle: {} deg".format(args.rotation_angle))
+    #         LOG.info("Number of projections: {}".format(num_projs))
+    #         LOG.info("--- Mesh info ---")
+    #         log_attributes(mesh)
+    #         LOG.info("--- Args info ---")
+    #         log_attributes(args)
+    n = args.n
     shape = (n, n)
+    num_projs = int(np.pi * n) if args.num_projections is None else args.num_projections
+    angles = np.linspace(0, args.rotation_angle, num_projs, endpoint=False) * q.deg
 
-    if args.make_gt:
-        LOG.info("--- Args info ---")
-        log_attributes(args)
-
-        return make_ground_truth(args, shape, mesh)
-    else:
-        num_projs = int(np.pi * n) if args.num_projections is None else args.num_projections
-        angles = np.linspace(0, args.rotation_angle, num_projs, endpoint=False) * q.deg
-        if device_index == 0:
-            LOG.info("n: {}, ps: {}, FOV: {}".format(n, args.pixel_size, fov))
-            LOG.info("Total rotation angle: {} deg".format(args.rotation_angle))
-            LOG.info("Number of projections: {}".format(num_projs))
-            LOG.info("--- Mesh info ---")
-            log_attributes(mesh)
-            LOG.info("--- Args info ---")
-            log_attributes(args)
-
+    if not args.make_gt:
         return scan(
             shape,
             args.pixel_size,
@@ -263,6 +344,8 @@ def process(args, device_index):
             num_meshes=args.num_meshes,
             supersampling_projection=args.supersampling_projection,
             mesh_pixel_size=args.mesh_pixel_size,
+            sphere_radius=args.sphere_radius,
+            y_offset=args.y_offset,
         )
 
 
@@ -296,6 +379,12 @@ def parse_args():
     )
     parser.add_argument(
         "--mesh-pixel-size", type=float, help="Physical mesh pixel size in nm"
+    )
+    parser.add_argument(
+        "--sphere-radius", type=float, help="Unitless sphere radius (as in the obj file)"
+    )
+    parser.add_argument(
+        "--y-offset", type=float, help="y offset in nm"
     )
     parser.add_argument(
         "--rotation-angle", type=float, default=180, help="Total rotation angle in degrees"
