@@ -64,6 +64,9 @@ def make_projection_spheres(shape, ps, spheres, center, tomo_angle, ss=1):
     from syris.imageprocessing import bin_image
     from syris.geometry import rotate
 
+    if len(spheres) == 0:
+        return np.zeros((shape[0] // ss, shape[1] // ss), dtype=cfg.PRECISION.np_float)
+
     queue = cfg.OPENCL.queue
 
     matrix = rotate(tomo_angle, Y_AX)
@@ -97,7 +100,7 @@ def make_projection_spheres(shape, ps, spheres, center, tomo_angle, ss=1):
     return projection.get() * ps.simplified.magnitude
 
 
-def read_spheres(filename, radius, mesh_pixel_size=None):
+def read_spheres(filename, radius=None, mesh_pixel_size=None):
     import re
 
     with open(filename) as f:
@@ -108,10 +111,18 @@ def read_spheres(filename, radius, mesh_pixel_size=None):
     pattern = r"v (?P<x>.*) (?P<y>.*) (?P<z>.*)"
     for j in range(1, len(objects)):
         vertices = np.array(re.findall(pattern, objects[j])).astype(np.float32)
-        position = (np.max(vertices, axis=0) + np.min(vertices, axis=0)) / 2
+        mn = np.min(vertices, axis=0)
+        mx = np.max(vertices, axis=0)
+        if radius is None:
+            position = np.concatenate(((mn + mx) / 2, [np.mean(mx - mn) / 2]))
+        else:
+            position = (np.max(vertices, axis=0) + np.min(vertices, axis=0)) / 2
         positions.append(position)
 
-    positions = np.insert(positions, 3, radius, axis=1)
+    if radius is not None:
+        positions = np.insert(positions, 3, radius, axis=1)
+
+    positions = np.array(positions)
 
     if mesh_pixel_size:
         positions = positions * mesh_pixel_size * q.nm
@@ -198,7 +209,7 @@ def scan(
             i_mesh = i * num_meshes // num_angles
             spheres = read_spheres(
                 mesh_filenames[i_mesh],
-                sphere_radius,
+                radius=sphere_radius,
                 mesh_pixel_size=mesh_pixel_size
             )
             # mesh = read_mesh(
@@ -217,7 +228,7 @@ def scan(
             # Check for faulty pixels
             checked_indices.append(i)
             for shift in [-psm / shift_coeff, psm / shift_coeff]:
-                shifted_point = point + (shift, 0, 0) * q.m
+                shifted_point = point + (shift, 0, 0, 0) * q.m
                 projs.append(
                     # make_projection(
                     #     shape, ps, axis, mesh, shifted_point, lamino_angle, angle, ss=ss
