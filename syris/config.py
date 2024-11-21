@@ -24,11 +24,11 @@ import logging
 import numpy as np
 import pyopencl as cl
 import pyopencl.cltypes as cltypes
+import cupy as cp
 
 
 LOG = logging.getLogger()
 MAX_META_BODIES = 30
-
 
 class Precision(object):
 
@@ -50,14 +50,37 @@ class Precision(object):
             self.cl_cplx = 16
             self.np_float = np.float64
             self.np_cplx = np.complex128
+            self.cp_float = cp.float64
         else:
             self.cl_float = 4
             self.cl_cplx = 8
             self.np_float = np.float32
             self.np_cplx = np.complex64
+            self.cp_float = cp.float32
         self.numpy_to_opencl = {self.np_float: self.cl_float, self.np_cplx: self.cl_cplx}
         self.opencl_to_numpy = dict(
             list(zip(list(self.numpy_to_opencl.values()), list(self.numpy_to_opencl.keys())))
+        )
+
+        self.float4 = np.dtype(
+            {
+                'names': ['x', 'y', 'z', 'w'],
+                'formats': [self.np_float] * 4,
+            }
+        )
+
+        self.float2 = np.dtype(
+            {
+                'names': ['x', 'y'],
+                'formats': [self.np_float] * 2,
+            }
+        )
+
+        self.uint2 = np.dtype(
+            {
+                'names': ['x', 'y'],
+                'formats': [np.uint32] * 2,
+            }
         )
 
         dtype_base = "double" if double else "float"
@@ -79,6 +102,65 @@ class OpenCL(object):
         # {command queue: {shape: plan}} dictionary
         self.fft_plans = {}
 
+class CudaPipeline:
+    """
+    Manage and run CUDA kernels using CuPy.
+    """
+    def __init__(self, headers : list, options : list = None):
+        self.modules = {}
+        self.kernels = {}
+        self.opts = ["-I " + h + " " for h in headers]
+        if options is not None:
+            self.opts += options
+    
+    def readModuleFromFiles(self, 
+        moduleName : str,
+        fileNames : list, 
+        options : list = None,
+        name_expressions : list = None,
+        backend : str = "nvcc",
+        jitify : bool = False):
+        if moduleName in self.modules:
+            raise Exception("Module already loaded")
+    
+        if options is None:
+            selected_options = self.opts
+        else:
+            selected_options = options + self.opts
+        
+        selected_options += ['-D__CUDA_NO_HALF_CONVERSIONS__']
+        
+        selected_options = tuple(selected_options,)
+        print (selected_options)
+
+        # Prepend
+        code = r"""
+        #include <cub/cub.cuh>
+        #include <thrust/sort.h>
+        #include <thrust/device_vector.h>
+        #include <thrust/execution_policy.h>
+        """
+        for fileName in fileNames:
+            with open(fileName, "r") as f:
+                source = f.read()
+                code += source + "\n"
+
+        self.modules[moduleName] = cp.RawModule(
+            code=code,
+            options=selected_options,
+            jitify=jitify,
+            name_expressions=name_expressions,
+            backend=backend)
+
+    def getKernelFromModule(self, moduleName : str, kernelName : str) -> cp.RawKernel:
+        if moduleName not in self.modules:
+            raise Exception("Module not found")
+        
+        if kernelName not in self.kernels:
+            self.kernels[kernelName] = self.modules[moduleName].get_function(kernelName)
+        
+        return self.kernels[kernelName]
+
 
 def init_logging(level=logging.DEBUG, logger_file=None):
     """Initialize logging with output to *logger_file*."""
@@ -95,6 +177,8 @@ def init_logging(level=logging.DEBUG, logger_file=None):
 
 PRECISION = None
 OPENCL = None
+CUDA_PIPELINE = None
+CUDA_KERNELS = None
 
 # Refractive index calculation program path.
 PMASF_FILE = "pmasf"

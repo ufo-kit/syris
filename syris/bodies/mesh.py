@@ -26,7 +26,10 @@ import syris.config as cfg
 import syris.geometry as geom
 import syris.gpu.util as gutil
 from syris.bodies.base import MovableBody
+from syris.devices.cameras import Camera
 from syris.util import get_magnitude, make_tuple
+import cupy as cp
+import pyvista as pv
 
 
 class Mesh(MovableBody):
@@ -35,12 +38,12 @@ class Mesh(MovableBody):
     shape (3, N), where N / 3 is the number of triangles. One polygon is formed by three consecutive
     triangles, e.g. when::
 
-        triangles = [[Ax, Bx, Cx]
-                     [Ay, By, Cy]
-                     [Az, Bz, Cz]]
+        triangles =[[A0, A1, A2],
+                    [B0, B1, B2],
+                    [C0, C1, C2],
+                    ...]
 
-    then A, B, C are one triangle's points. *iterations* are the number of iterations within one
-    pixel which try to find an intersection. *center* determines the center of the local
+    then A, B, C are one triangle's points. *center* determines the center of the local
     coordinates, it can be one of None, 'bbox', 'gravity' or a (x, y, z) tuple specifying an
     arbitrary point.
     """
@@ -51,16 +54,15 @@ class Mesh(MovableBody):
         trajectory,
         material=None,
         orientation=geom.Y_AX,
-        iterations=1,
+        unit=q.m,
         center="bbox",
+        normals=None,
+        bounds=None,
+        iterations=1
     ):
         """Constructor."""
-        # Use homogeneous coordinates for easy matrix multiplication, i.e. the 4-th element is 1
-        self._current = np.insert(
-            triangles.rescale(q.um).magnitude, 3, np.ones(triangles.shape[1]), axis=0
-        )
         if center is None:
-            point = (0, 0, 0) * q.um
+            point = (0, 0, 0) * unit
         elif center == "gravity":
             point = self.center_of_gravity
         elif center == "bbox":
@@ -68,18 +70,39 @@ class Mesh(MovableBody):
         else:
             # Arbitrary point
             point = center
-        point = np.insert(point.rescale(q.um).magnitude, 3, 0)[:, np.newaxis]
-        self._current -= point
 
-        self._triangles = np.copy(self._current)
+        self._unit = unit
+        point = np.insert(point.rescale(self._unit).magnitude, 3, 0)[:, np.newaxis]
+
+        self._triangles = triangles
         self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
-        self.iterations = iterations
+        self._iterations = iterations
+
+        if normals is None:
+            # TODO: make projection function that works without normals
+            pass
+        else:
+            self._normals = normals
+
+        if bounds is None:
+            # TODO: Compute bounds (xmin, xmax, ymin, ymax, zmin, zmax)
+            pass
+        else:
+            self._bounds = bounds
+
+        self._current = np.copy(self._triangles)
+
+        self._tree = None
+
+        # Build the tree
+        self._build_tree()
+
         super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
     @property
     def furthest_point(self):
         """Furthest point from the center."""
-        return self._furthest_point * q.um
+        return self._furthest_point * self._unit
 
     @property
     def bounding_box(self):
@@ -100,14 +123,14 @@ class Mesh(MovableBody):
             (self._compute(min, 0), self._compute(max, 0)),
             (self._compute(min, 1), self._compute(max, 1)),
             (self._compute(min, 2), self._compute(max, 2)),
-        ) * q.um
+        ) * self._unit
 
     @property
     def center_of_gravity(self):
         """Get body's center of gravity as (x, y, z)."""
         center = (self._compute(np.mean, 0), self._compute(np.mean, 1), self._compute(np.mean, 2))
 
-        return np.array(center) * q.um
+        return np.array(center) * self._unit
 
     @property
     def center_of_bbox(self):
@@ -116,7 +139,7 @@ class Mesh(MovableBody):
         def get_middle(ends):
             return (ends[0] + ends[1]) / 2.0
 
-        return np.array([get_middle(ends) for ends in self.extrema.magnitude]) * q.um
+        return np.array([get_middle(ends) for ends in self.extrema.magnitude]) * self._unit
 
     @property
     def diff(self):
@@ -140,7 +163,7 @@ class Mesh(MovableBody):
             (min_nonzero(x_diff), max_nonzero(x_diff)),
             (min_nonzero(y_diff), max_nonzero(y_diff)),
             (min_nonzero(z_diff), max_nonzero(z_diff)),
-        ) * q.um
+        ) * self._unit
 
     @property
     def vectors(self):
@@ -153,7 +176,7 @@ class Mesh(MovableBody):
         v_0 = (b - a).transpose()
         v_1 = (c - a).transpose()
 
-        return v_0 * q.um, v_1 * q.um
+        return v_0 * self._unit, v_1 * self._unit
 
     @property
     def areas(self):
@@ -161,14 +184,14 @@ class Mesh(MovableBody):
         v_0, v_1 = self.vectors
         cross = np.cross(v_0, v_1)
 
-        return np.sqrt(np.sum(cross * cross, axis=1)) / 2 * q.um ** 2
+        return np.sqrt(np.sum(cross * cross, axis=1)) / 2 * self._unit ** 2
 
     @property
     def normals(self):
         """Triangle normals."""
         v_0, v_1 = self.vectors
 
-        return np.cross(v_0, v_1) * q.um
+        return np.cross(v_0, v_1) * self._unit
 
     @property
     def max_triangle_x_diff(self):
@@ -180,12 +203,12 @@ class Mesh(MovableBody):
         d_1 = np.max(np.abs(x_1 - x_2))
         d_2 = np.max(np.abs(x_2 - x_1))
 
-        return max(d_0, d_1, d_2) * q.um
+        return max(d_0, d_1, d_2) * self._unit
 
     @property
     def triangles(self):
         """Return current triangle mesh."""
-        return self._current[:-1, :] * q.um
+        return self._current[:-1, :] * self._unit
 
     def sort(self):
         """Sort triangles based on the greatest x-coordinate in an ascending order. Also sort
@@ -218,7 +241,7 @@ class Mesh(MovableBody):
         current transformation matrix. *eps* is the tolerance for the angle between a triangle and
         the ray to be still considered parallel.
         """
-        ray = np.array([0, 0, 1]) * q.um
+        ray = np.array([0, 0, 1]) * self._unit
         dot = np.sqrt(np.sum(self.normals ** 2, axis=1))
         theta = np.arccos(np.dot(self.normals, ray) / dot)
         diff = np.abs(theta - np.pi / 2 * q.rad)
@@ -230,7 +253,7 @@ class Mesh(MovableBody):
             t_indices[i::3] = 3 * indices + i
         close = self._current[:-1, t_indices]
 
-        return close * q.um
+        return close * self._unit
 
     def _compute(self, func, axis):
         """General function for computations with triangles."""
@@ -239,7 +262,7 @@ class Mesh(MovableBody):
     def _make_vertices(self, index, pixel_size):
         """Make a flat array of vertices belong to *triangles* at *index*."""
         # Convert to meters
-        vertices = self._current[:, index::3] / pixel_size.rescale(q.um).magnitude
+        vertices = self._current[:, index::3] / pixel_size.rescale(self._unit).magnitude
 
         return vertices.transpose().flatten().astype(cfg.PRECISION.np_float)
 
@@ -252,80 +275,205 @@ class Mesh(MovableBody):
 
     def transform(self):
         """Apply transformation *matrix* and return the resulting triangles."""
-        matrix = self.get_rescaled_transform_matrix(q.um)
+        matrix = self.get_rescaled_transform_matrix(self._unit)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+    # def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+    #     """Projection implementation."""
+
+    #     def get_crop(index, fov):
+    #         minimum = max(self.extrema[index][0], fov[index][0])
+    #         maximum = min(self.extrema[index][1], fov[index][1])
+
+    #         return minimum - offset[::-1][index], maximum - offset[::-1][index]
+
+    #     def get_px_value(value, round_func, ps):
+    #         return int(round_func(get_magnitude(value / ps)))
+
+    #     # Move to the desired location, apply the T matrix and resort the triangles
+    #     self.transform()
+    #     self.sort()
+
+    #     psm = pixel_size.simplified.magnitude
+    #     fov = offset + shape * pixel_size
+    #     fov = (
+    #         np.concatenate((offset.simplified.magnitude[::-1], fov.simplified.magnitude[::-1]))
+    #         .reshape(2, 2)
+    #         .transpose()
+    #         * q.m
+    #     )
+    #     if out is None:
+    #         out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
+
+    #     if (
+    #         self.extrema[0][0] < fov[0][1]
+    #         and self.extrema[0][1] > fov[0][0]
+    #         and self.extrema[1][0] < fov[1][1]
+    #         and self.extrema[1][1] > fov[1][0]
+    #     ):
+    #         # Object inside FOV
+    #         x_min, x_max = get_crop(0, fov)
+    #         y_min, y_max = get_crop(1, fov)
+    #         x_min_px = get_px_value(x_min, np.floor, pixel_size[1])
+    #         x_max_px = get_px_value(x_max, np.ceil, pixel_size[1])
+    #         y_min_px = get_px_value(y_min, np.floor, pixel_size[0])
+    #         y_max_px = get_px_value(y_max, np.ceil, pixel_size[0])
+    #         width = min(x_max_px - x_min_px, shape[1])
+    #         height = min(y_max_px - y_min_px, shape[0])
+    #         compute_offset = cltypes.make_int2(x_min_px, y_min_px)
+    #         v_1, v_2, v_3 = self._make_inputs(queue, pixel_size)
+    #         max_dx = self.max_triangle_x_diff.simplified.magnitude / psm[1]
+    #         # Use the same pixel size as for the x-axis, which will work for objects "not too far"
+    #         # from the imaging plane
+    #         min_z = self.extrema[2][0].simplified.magnitude / psm[1]
+    #         offset = gutil.make_vfloat2(*(offset / pixel_size).simplified.magnitude[::-1])
+
+    #         ev = cfg.OPENCL.programs["mesh"].compute_thickness(
+    #             queue,
+    #             (width, height),
+    #             None,
+    #             v_1.data,
+    #             v_2.data,
+    #             v_3.data,
+    #             out.data,
+    #             np.int32(self.num_triangles),
+    #             np.int32(shape[1]),
+    #             compute_offset,
+    #             offset,
+    #             cfg.PRECISION.np_float(psm[1]),
+    #             cfg.PRECISION.np_float(max_dx),
+    #             cfg.PRECISION.np_float(min_z),
+    #             np.int32(self.iterations),
+    #         )
+    #         if block:
+    #             ev.wait()
+
+    #     return out
+
+    def _build_tree (self):
+        dtype = cfg.PRECISION.np_float
+        cp_dtype = cfg.PRECISION.cp_float
+        float4 = cfg.PRECISION.float4  
+
+        vertices = self._triangles.rescale(q.m).magnitude
+        bounds = self._bounds.rescale(q.m).magnitude
+        normals = self._normals.rescale(q.m).magnitude
+
+        nb_vertices = len(vertices)
+        nb_keys = nb_vertices // 3
+        sceneMin = np.array([bounds[0], bounds[2], bounds[4], 0], dtype=dtype)
+        sceneMax = np.array([bounds[1], bounds[3], bounds[5], 0], dtype=dtype)
+        vertices = np.hstack((vertices, np.zeros((nb_vertices, 1))))
+        vertices = cp.array(vertices, dtype=cp_dtype)
+        normals = np.hstack((normals, np.zeros((len(normals), 1))))
+        normals = cp.array(normals, dtype=cp_dtype)
+        keys = cp.zeros(nb_keys, dtype=cp.uint32)
+        rope = cp.ones(2 * nb_keys, dtype=cp.int32) * -1
+        left = cp.ones(2 * nb_keys, dtype=cp.int32) * -1
+        entered = cp.ones(2 * nb_keys, dtype=cp.int32) * -1
+        bbMin = cp.zeros((2 * nb_keys, 4), dtype=cp_dtype)
+        bbMax = cp.zeros((2 * nb_keys, 4), dtype=cp_dtype)
+
+        # Project the triangle centroids
+        args = (nb_keys, vertices, keys, bbMin, bbMax, sceneMin.view(float4), sceneMax.view(float4))
+        block_size = (256, 1, 1)
+        grid_size = ((nb_keys + block_size[0] - 1) // block_size[0], 1, 1)
+        # timer.start()
+        cfg.CUDA_KERNELS["project_keys"](grid_size, block_size, args)
+        cp.cuda.Stream.null.synchronize()
+        # timer.stop()
+        # project_t = timer.elapsedTime()
+        # timer.reset()
+
+        # Sort the keys
+        # timer.start()
+        sorted_keys = cp.argsort(keys)
+        # timer.stop()
+        # sort_t = timer.elapsedTime()
+        # timer.reset()
+
+        keys = keys[sorted_keys]
+        permutation = sorted_keys
+
+        # Grow the tree
+        args = (nb_keys, keys, permutation, rope, left, entered, bbMin, bbMax)
+        block_size = (256, 1, 1)
+        grid_size = ((nb_keys + block_size[0] - 1) // block_size[0], 1, 1)
+        # timer.start()
+        cfg.CUDA_KERNELS["build_tree"](grid_size, block_size, args)
+        cp.cuda.Stream.null.synchronize()
+        # timer.stop()
+        # grow_t = timer.elapsedTime()
+        # timer.reset()
+
+        # print ("Projecting triangle centroids: ", project_t, "ms")
+        # print ("Growing the tree: ", grow_t, "ms")
+
+        tree = {
+            "keys": keys,
+            "rope": rope,
+            "left": left,
+            "indices": permutation,
+            "bbMin": bbMin,
+            "bbMax": bbMax,
+            "vertices": vertices,
+            "normals": normals
+        }
+        # t = project_t, sort_t, grow_t,
+
+        self._tree = tree
+        
+
+    def _project(self, camera, parallel=False):
         """Projection implementation."""
+        cp_dtype = cfg.PRECISION.cp_float
+        float4 = cfg.PRECISION.float4
+        float2 = cfg.PRECISION.float2
+        uint2 = cfg.PRECISION.uint2
 
-        def get_crop(index, fov):
-            minimum = max(self.extrema[index][0], fov[index][0])
-            maximum = min(self.extrema[index][1], fov[index][1])
+        U, V, W = camera.viewport_basis_vectors
+        nb_keys = len(self._triangles) // 3
+        image = cp.zeros(camera.shape[0] * camera.shape[1], dtype=cp_dtype)
+        
+        block_size = (16, 16, 1)
+        grid_size = ((camera.shape[0] + block_size[0] - 1) // block_size[0], (camera.shape[1] + block_size[1] - 1) // block_size[1], 1)
+        # timer.start()
 
-            return minimum - offset[::-1][index], maximum - offset[::-1][index]
-
-        def get_px_value(value, round_func, ps):
-            return int(round_func(get_magnitude(value / ps)))
-
-        # Move to the desired location, apply the T matrix and resort the triangles
-        self.transform()
-        self.sort()
-
-        psm = pixel_size.simplified.magnitude
-        fov = offset + shape * pixel_size
-        fov = (
-            np.concatenate((offset.simplified.magnitude[::-1], fov.simplified.magnitude[::-1]))
-            .reshape(2, 2)
-            .transpose()
-            * q.m
-        )
-        if out is None:
-            out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
-
-        if (
-            self.extrema[0][0] < fov[0][1]
-            and self.extrema[0][1] > fov[0][0]
-            and self.extrema[1][0] < fov[1][1]
-            and self.extrema[1][1] > fov[1][0]
-        ):
-            # Object inside FOV
-            x_min, x_max = get_crop(0, fov)
-            y_min, y_max = get_crop(1, fov)
-            x_min_px = get_px_value(x_min, np.floor, pixel_size[1])
-            x_max_px = get_px_value(x_max, np.ceil, pixel_size[1])
-            y_min_px = get_px_value(y_min, np.floor, pixel_size[0])
-            y_max_px = get_px_value(y_max, np.ceil, pixel_size[0])
-            width = min(x_max_px - x_min_px, shape[1])
-            height = min(y_max_px - y_min_px, shape[0])
-            compute_offset = cltypes.make_int2(x_min_px, y_min_px)
-            v_1, v_2, v_3 = self._make_inputs(queue, pixel_size)
-            max_dx = self.max_triangle_x_diff.simplified.magnitude / psm[1]
-            # Use the same pixel size as for the x-axis, which will work for objects "not too far"
-            # from the imaging plane
-            min_z = self.extrema[2][0].simplified.magnitude / psm[1]
-            offset = gutil.make_vfloat2(*(offset / pixel_size).simplified.magnitude[::-1])
-
-            ev = cfg.OPENCL.programs["mesh"].compute_thickness(
-                queue,
-                (width, height),
-                None,
-                v_1.data,
-                v_2.data,
-                v_3.data,
-                out.data,
-                np.int32(self.num_triangles),
-                np.int32(shape[1]),
-                compute_offset,
-                offset,
-                cfg.PRECISION.np_float(psm[1]),
-                cfg.PRECISION.np_float(max_dx),
-                cfg.PRECISION.np_float(min_z),
-                np.int32(self.iterations),
+        if parallel:
+            print ("Projecting parallel")
+            print (camera.p00_center)
+            args = (
+                nb_keys, image, camera.shape.view(uint2),
+                U.view(float4), V.view(float4), W.view(float4),
+                camera.p00_center.view(float4), camera.pixel_size.view(float2),
+                self._tree["rope"], self._tree["left"], self._tree["indices"],
+                self._tree["bbMin"], self._tree["bbMax"],
+                self._tree["vertices"].view(float4), self._tree["normals"].view(float4)
             )
-            if block:
-                ev.wait()
+            cfg.CUDA_KERNELS["project_parallel"](grid_size, block_size, args)
+        else:
+            print ("Projecting perspective")
+            args = (
+                nb_keys, image, camera.shape.view(uint2),
+                U.view(float4), V.view(float4), W.view(float4),
+                camera.p00_center.view(float4), camera.ray_origin.view(float4), camera.pixel_size.view(float2),
+                self._tree["rope"], self._tree["left"], self._tree["indices"],
+                self._tree["bbMin"], self._tree["bbMax"],
+                self._tree["vertices"].view(float4), self._tree["normals"].view(float4)
+            )
+            cfg.CUDA_KERNELS["project_perspective"](grid_size, block_size, args)
 
-        return out
+        cp.cuda.Stream.null.synchronize()
+        # timer.stop()
+        # projectPlaneRays_t = timer.elapsedTime()
+        # timer.reset()
+        image = image.get().reshape(camera.shape)
+
+        # t = projectPlaneRays_t
+
+        return image
+
+
 
     def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
         """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for
@@ -362,7 +510,78 @@ class Mesh(MovableBody):
 
         return out
 
+class MeshReaderDelegate(object):
+    def __init__(self):
+        self.dimensions = 3
+        self.polydata = None
+        self.bounds = None # The bounding box
+        self.size = None # length of the bounding box
+        self.vertices = None # Contiguous points for all triangles
+        self.normals = None # Face normals
+        self.triangles = None # The triangles are stored as a 1D array
 
+class PyvistaReader(MeshReaderDelegate):
+    def __init__(self, filename: str, unit: q.Quantity = q.m):
+        super().__init__()
+        self._filename = filename
+        self._unit = unit
+        self._load_mesh()
+
+    def _load_mesh(self):
+        mesh = pv.read(self._filename)
+        self.polydata = mesh
+
+        # Ensure the normals are calculated
+        if mesh.cell_normals is None:
+            mesh = mesh.compute_normals(cell_normals=True, point_normals=False, inplace=False)
+
+        triangles = mesh.faces.reshape(-1, 4)[:, 1:]
+        points = mesh.points
+        triangle_vertices = points[triangles]
+        triangle_vertices = triangle_vertices.flatten().reshape(-1, 3)
+
+        self.vertices = np.array(triangle_vertices).astype(np.float32) * self._unit
+        self.triangles = triangles
+        self.normals = np.array(mesh.cell_normals).astype(np.float32) * self._unit
+        self.bounds = np.array(mesh.bounds).astype(np.float32) * self._unit
+
+    @property
+    def filename(self):
+        return self._filename
+
+    @filename.setter
+    def filename(self, value):
+        self._filename = value
+        self._load_mesh()
+
+    @property
+    def unit(self):
+        return self._unit
+
+    @unit.setter
+    def unit(self, value):
+        self._unit = value
+        self.vertices = self.vertices.rescale(value)
+        self.normals = self.normals.rescale(value)
+        self.bounds = self.bounds.rescale(value)
+
+    @property
+    def scene(self):
+        return [self.vertices, self.normals, self.bounds]
+
+    def visualize(self, plotter=None):
+        if plotter is None:
+            plotter = pv.Plotter(window_size=[800, 1024])
+        plotter.add_mesh(self.polydata)
+        plotter.show()
+
+class MeshReader():
+    def __init__(self, meshReader: MeshReaderDelegate):
+        self._delegate = meshReader
+    
+    def __getattr__(self, name):
+        return getattr(self._delegate, name)
+    
 def _extract_object(txt):
     """Extract an object from string *txt*."""
     face_start = txt.index("s ")

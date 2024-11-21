@@ -41,7 +41,7 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None, block=False):
+    def project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False, camera=None, parallel=True):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D.
         *offset* is the physical spatial body offset as (y, x). *queue* is an OpenCL command queue,
@@ -55,9 +55,9 @@ class Body(OpticalElement):
         if queue is None:
             queue = cfg.OPENCL.queue
 
-        return self._project(shape, pixel_size, offset, t=t, queue=queue, out=None, block=block)
+        return self._project(camera, parallel=parallel)
 
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False, camera=None, parallel=True):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
@@ -75,15 +75,15 @@ class Body(OpticalElement):
         block=False,
     ):
         """Transfer function implementation based on a refractive index."""
-        ri = self.material.get_refractive_index(energy)
-        lam = energy_to_wavelength(energy)
-        proj = self.project(
-            shape, pixel_size, offset=offset, t=t, queue=queue, out=out, block=block
-        )
+        # ri = self.material.get_refractive_index(energy)
+        # lam = energy_to_wavelength(energy)
+        # proj = self.project(
+        #     shape, pixel_size, offset=offset, t=t, queue=queue, out=out, block=block
+        # )
 
-        return transfer(
-            proj, ri, lam, exponent=exponent, queue=queue, out=out, check=check, block=block
-        )
+        # return transfer(
+        #     proj, ri, lam, exponent=exponent, queue=queue, out=out, check=check, block=block
+        # )
 
 
 class MovableBody(Body):
@@ -106,6 +106,9 @@ class MovableBody(Body):
         # Maximum body enlargement in any direction.
         self._scale_factor = np.ones(3)
 
+        self._coordinate_system = geom.CoordinateSystem(origin=self._center)
+        self._child_cs = self._coordinate_system.add_symmetric_child ("viewport")
+
         # Last position as tuple consisting of a 3D point and a vector giving
         # the body orientation.
         self._last_position = None
@@ -117,7 +120,7 @@ class MovableBody(Body):
         self._cache_projection = cache_projection
         self.update_projection_cache()
 
-    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None, block=False):
+    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None, block=False, camera=None, parallel=True):
         """Project thickness at time *t* (if it is None no transformation is applied) to the image
         plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
         *pixel_size* is the point size, also either 1D or 2D. *offset* is the physical spatial body
@@ -152,12 +155,12 @@ class MovableBody(Body):
                 LOG.debug("{} computing projection at {}".format(self, t))
                 self._p_cache["time"] = t
                 self._p_cache["projection"] = super(MovableBody, self).project(
-                    shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block
+                    shape, pixel_size, offset=offset, t=t, queue=queue, out=out, block=block, camera=camera, parallel=parallel
                 )
             projection = self._p_cache["projection"]
         else:
             projection = super(MovableBody, self).project(
-                shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block
+                shape, pixel_size, offset=offset, t=t, queue=queue, out=out, block=block, camera=camera, parallel=parallel
             )
 
         return projection
@@ -171,6 +174,10 @@ class MovableBody(Body):
             fmt = "Binding trajectory to pixel size {} and furthest point {}"
             LOG.debug(fmt.format(pixel_size, self.furthest_point))
             self.trajectory.bind(pixel_size=pixel_size, furthest_point=self.furthest_point)
+
+    @property
+    def child_cs(self):
+        return self._child_cs
 
     @property
     def cache_projection(self):
@@ -214,7 +221,8 @@ class MovableBody(Body):
     @property
     def position(self):
         """Current position."""
-        return self.transform_matrix[:3, -1] * q.m
+        # return self.transform_matrix[:3, -1] * q.m
+        return self._coordinate_system.origin
 
     @property
     def last_position(self):
@@ -258,7 +266,8 @@ class MovableBody(Body):
         """Apply transformation given by the transformation matrix
         *trans_matrix* on the current transformation matrix.
         """
-        self.transform_matrix = np.dot(trans_matrix, self.transform_matrix)
+        # self.transform_matrix = np.dot(trans_matrix, self.transform_matrix)
+        pass
 
     def get_next_time(self, t_0, pixel_size):
         """
@@ -363,14 +372,22 @@ class MovableBody(Body):
 
     def translate(self, vec):
         """Translate the body by a vector *vec*."""
-        self.transform_matrix = np.dot(self.transform_matrix, geom.translate(vec))
+        # self.transform_matrix = np.dot(self.transform_matrix, geom.translate(vec))
+        self._coordinate_system.translate(vec, inherit=True)
 
     def rotate(self, angle, axis, shift=None):
         """Rotate the body by *angle* around vector *vec*, where *shift* is the translation which
         takes place before the rotation and -*shift* takes place afterward, resulting in the
         transformation TRT^-1.
         """
-        self.transform_matrix = np.dot(self.transform_matrix, geom.rotate(angle, axis, shift=shift))
+        # self.transform_matrix = np.dot(self.transform_matrix, geom.rotate(angle, axis, shift=shift))
+        if shift is None:
+            self._coordinate_system.rotate_euler_local(axis, angle, inherit=True)
+        else:
+            self._coordinate_system.rotate_euler(shift, axis, angle, inherit=True)
+
+    def visualize(self, plotter, cmap="viridis"):
+        self._coordinate_system.visualize(plotter, cmap=cmap)
 
 
 class CompositeBody(MovableBody):
@@ -681,13 +698,13 @@ class CompositeBody(MovableBody):
         """Return True if the body moves more than *pixel_size* in time interval *t_0*, *t_1*."""
         return self.get_distance(t_0, t_1) > pixel_size
 
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False, camera=None, parallel=True):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
         for body in self.bodies:
             out += body.project(
-                shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block
+                camera, parallel=parallel
             )
 
         return out

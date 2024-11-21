@@ -25,6 +25,8 @@ import syris.gpu.util as gutil
 from syris import config as cfg
 from syris.imageprocessing import bin_image, decimate
 from syris.math import fwnm_to_sigma
+from syris.geometry import CoordinateSystem, Z_AX
+import pyvista as pv
 
 
 LOG = logging.getLogger(__name__)
@@ -37,6 +39,8 @@ def is_fps_feasible(fps, exp_time):
     """
     return exp_time <= 1.0 / fps
 
+def is_length(param):
+    return isinstance(param, q.Quantity) and param.dimensionality.simplified == q.m.dimensionality.simplified
 
 class Camera(object):
 
@@ -55,6 +59,9 @@ class Camera(object):
         exp_time=1 * q.s,
         fps=1 / q.s,
         dtype=np.ushort,
+        focal_length=None,
+        coordinate_system=None,
+        optical_axis=None,
     ):
         """Create a camera with *pixel_size*, *gain* specifying :math:`\frac{counts}{e^-}`,
         *dark_current* as mean number of electrons present without incident light, *amplifier_sigma*
@@ -66,7 +73,8 @@ class Camera(object):
         :math:`1/fps` s).  *dtype* is the sensor output data type. If the values given are
         incompatible, the frame rate is adjusted to the exposure time.
         """
-        self.pixel_size = pixel_size.simplified
+        self._shape = shape
+        self._pixel_size = pixel_size.simplified
         self.gain = gain
         self.dark_current = dark_current
         self.amplifier_sigma = amplifier_sigma
@@ -74,9 +82,18 @@ class Camera(object):
         self._quantum_efficiencies = quantum_efficiencies
         self._wavelengths = wavelengths
         self.dtype = dtype
-        self.shape = shape
+        
         self._last_input_shape = None
         self._psf = None
+
+        self._focal_length = focal_length
+        self._viewport_dimensions = pixel_size * shape
+
+        if coordinate_system is None:
+            self._viewport_cs = CoordinateSystem()
+        else:
+            self._viewport_cs = coordinate_system
+        self.update_fov()
 
         if self._quantum_efficiencies is not None and self._wavelengths is not None:
             self._qe_tck = interp.splrep(
@@ -86,6 +103,168 @@ class Camera(object):
             fps = 1 / exp_time.simplified
         self._exp_time = exp_time
         self._fps = fps
+
+        if optical_axis is None:
+            self._optical_axis = Z_AX
+        else:
+            self._optical_axis = optical_axis
+
+    def update_fov(self):
+        self._fov = 2 * np.arctan(self._viewport_dimensions / (2 * self._focal_length)) * q.rad
+
+    def update_viewport_dimensions(self):
+        self._viewport_dimensions = self._pixel_size * self._shape
+
+    # Cuda compatible properties
+    @property
+    def pixel_size(self):
+        ret = self._pixel_size.rescale(q.m).magnitude
+        if ret.size == 1:
+            ret = np.array([ret, ret])
+        return ret.astype(np.float32)
+
+    @pixel_size.setter
+    def pixel_size(self, value):
+        if not is_length(value):
+            raise ValueError("Pixel size must be a length quantity")
+        if value.size > 2:
+            raise ValueError("Pixel size must be at most a 2D array")
+        if np.any(value <= 0):
+            raise ValueError("Pixel size must be greater than 0")
+        self._pixel_size = value
+        self.update_viewport_dimensions()
+        self.update_fov()
+
+    @property
+    def shape(self):
+        ret = np.array(self._shape)
+        if ret.size == 1:
+            ret = np.array([ret, ret])
+        return ret.astype(np.uint32)
+
+    @shape.setter
+    def shape(self, value):
+        if value.shape[0] > 2:
+            raise ValueError("Resolution must be at most a 2D array")
+        if np.any(value <= 0):
+            raise ValueError("Resolution must be greater than 0")
+        self._shape = value
+        self.update_viewport_dimensions()
+        self.update_fov()
+
+    @property
+    def focal_length(self):
+        ret = self._focal_length.rescale(q.m).magnitude
+        return ret.astype(np.float32)
+
+    @focal_length.setter
+    def focal_length(self, value):
+        if not is_length(value):
+            raise ValueError("Focal length must be a length quantity")
+        if value <= 0:
+            raise ValueError("Focal length must be greater than 0")
+        self._focal_length = value
+        self.update_fov()
+
+    @property
+    def viewport_dimensions(self):
+        ret = self._viewport_dimensions.rescale(q.m).magnitude
+        return ret.astype(np.float32)
+    
+    @property
+    def viewport_cs(self):
+        return self._viewport_cs
+
+    @property
+    def viewport_origin(self):
+        res = self.viewport_cs.origin.magnitude
+        res = np.append(res, 0)
+        return res.astype(np.float32)
+
+    @property
+    def fov(self):
+        self._fov = 2 * np.arctan(self.viewport_dimensions / (2 * self.focal_length)) * q.rad
+        ret = self._fov.magnitude
+        return ret.astype(np.float32)
+
+    @property
+    def viewport_basis_vectors(self):
+        U = self.viewport_cs.u.magnitude
+        V = self.viewport_cs.v.magnitude
+        W = self.viewport_cs.w.magnitude
+        U = np.append(U, 0)
+        V = np.append(V, 0)
+        W = np.append(W, 0)
+        return U.astype(np.float32), V.astype(np.float32), -W.astype(np.float32)
+
+    @property
+    def p00_center(self):
+        U = self.viewport_cs.u
+        V = self.viewport_cs.v
+        cx = (self._viewport_dimensions[0] - self._pixel_size) / 2
+        cy = (self._viewport_dimensions[1] - self._pixel_size) / 2
+        ret = self.viewport_cs.origin + cx * U + cy * V
+        ret = ret.rescale(q.m).magnitude
+        ret = np.append(ret, 0)
+        return ret.astype(np.float32)
+
+    @property
+    def ray_origin(self):
+        ret = self.viewport_cs.origin
+        ret += self._focal_length * self.viewport_cs.w
+        ret = ret.rescale(q.m).magnitude
+        ret = np.append(ret, 0)
+        return ret.astype(np.float32)
+
+    @property
+    def viewport_center(self):
+        ret = self.viewport_cs.origin.rescale(q.m).magnitude
+        ret = np.append(ret, 0)
+        return ret.astype(np.float32)
+
+    @viewport_center.setter
+    def viewport_center(self, value):
+        if value.shape[0] != 3:
+            raise ValueError("Viewport center must be a 3D point")
+        self._viewport_cs.origin = value
+
+    def _translate_viewport(self, translation, inherit=True, label=None):
+        self._viewport_cs.translate(translation, inherit=inherit, label=label)
+
+    def translate(self, translation, inherit=True, label=None):
+        self._translate_viewport(translation, inherit=inherit, label=label)
+
+    def _rotate_viewport_euler(self, axis, angle, inherit=True, label=None):
+        self._viewport_cs.rotate_euler(axis, angle, inherit=inherit, label=label)
+
+    def rotate(self, axis, angle, target=None, inherit=True, label=None):
+        self._rotate_viewport_euler(axis, angle, inherit=inherit, label=label)
+
+    def set_viewport_cartesian_coordinates(self, x, y, z, inherit=True, label=None):
+        self._viewport_cs.set_cartesian_coordinates(x, y, z, inherit=inherit, label=label)
+
+    def set_viewport_spherical_coordinates(self, r, theta, phi, inherit=True, label=None):
+        self._viewport_cs.set_spherical_coordinates(r, theta, phi, inherit=inherit, label=label)
+        self._viewport_cs.to_opposite()
+
+    def set_coordinates(self, coords, inherit=True, system=None):
+        if system is None:
+            self.set_viewport_cartesian_coordinates(coords[0], coords[1], coords[2], inherit=inherit)
+        elif system == "cartesian":
+            self.set_viewport_cartesian_coordinates(coords[0], coords[1], coords[2], inherit=inherit)
+        elif system == "spherical":
+            self.set_viewport_spherical_coordinates(coords[0], coords[1], coords[2], inherit=inherit)
+        else:
+            raise ValueError("Invalid system, options are ['cartesian', 'spherical']")
+
+    def visualize(self, plotter=None, cmap="viridis"):
+        if plotter is None:
+            p = pv.Plotter()
+        else:
+            p = plotter
+        p.add_axes()
+        self._viewport_cs.visualize(p, cmap=cmap)
+        p.show()
 
     @property
     def wavelengths(self):
