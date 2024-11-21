@@ -36,7 +36,7 @@ LOG = logging.getLogger(__name__)
 
 def main():
     """Main function."""
-    plotter = pv.Plotter()
+    # plotter = pv.Plotter()
 
     args = parse_args()
     syris.init(loglevel=logging.INFO, double_precision=args.double_precision)
@@ -44,13 +44,13 @@ def main():
     units = q.Quantity(1, args.units)
     tr = geom.Trajectory([(0, 0, 0)] * units)
 
-    reader = MeshReader(PyvistaReader("/home/lt0649/Dev/syris/examples/monkey.obj", units.units))
+    reader = MeshReader(PyvistaReader(args.input, units.units))
     vertices, normals, bounds = reader.scene
 
     mesh = Mesh(vertices, tr, center=args.center, iterations=args.supersampling, bounds=bounds, normals=normals)
     LOG.info("Number of triangles: {}".format(mesh.num_triangles))
 
-    mesh.visualize(plotter)
+    # mesh.visualize(plotter)
 
     shape = (args.n, args.n)
     if args.pixel_size is None:
@@ -77,19 +77,18 @@ def main():
 
     mesh.translate(translate)
     # mesh.rotate(args.x_rotate, geom.X_AX)
-
     camera = Camera(
-        11 * q.um, 0.1, 530.0, 23.0, 12, (2048, 2048), focal_length=18 * q.um, coordinate_system=mesh.child_cs
+        args.pixel_size, 0.1, 530.0, 23.0, 12, (args.n, args.n), focal_length=18 * q.um, coordinate_system=mesh.child_cs
     )
-    coords = [0, 0, 3] * q.um
-    camera.translate(coords)
-    camera.visualize(plotter, cmap="plasma")
+    coords = [10 * q.m, 0 * q.deg, 0 * q.deg]
+    camera.set_coordinates(coords, system="spherical")
+    # camera.visualize(plotter, cmap="plasma")
 
     fmt = "n: {}, pixel size: {}, FOV: {}"
     LOG.info(fmt.format(args.n, args.pixel_size.rescale(q.um), fov.rescale(q.um)))
     st = time.time()
     for i in tqdm.tqdm(range(args.num_y_rotations)):
-        proj = mesh.project(shape, args.pixel_size, camera=camera, parallel=False)
+        proj = mesh.project(shape, args.pixel_size, camera=camera, parallel=True)
         if args.projection_filename is not None:
             imageio.imwrite(args.projection_filename + f"_{i:>05}.tif", proj)
         mesh.rotate(args.y_rotate, geom.Z_AX)

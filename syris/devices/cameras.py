@@ -110,6 +110,8 @@ class Camera(object):
             self._optical_axis = optical_axis
 
     def update_fov(self):
+        print (self._viewport_dimensions)
+        print (self._focal_length)
         self._fov = 2 * np.arctan(self._viewport_dimensions / (2 * self._focal_length)) * q.rad
 
     def update_viewport_dimensions(self):
@@ -189,9 +191,9 @@ class Camera(object):
 
     @property
     def viewport_basis_vectors(self):
-        U = self.viewport_cs.u.magnitude
-        V = self.viewport_cs.v.magnitude
-        W = self.viewport_cs.w.magnitude
+        U = self.viewport_cs.u
+        V = self.viewport_cs.v
+        W = self.viewport_cs.w
         U = np.append(U, 0)
         V = np.append(V, 0)
         W = np.append(W, 0)

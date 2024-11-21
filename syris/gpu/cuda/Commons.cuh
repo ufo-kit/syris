@@ -65,6 +65,36 @@ do { \
     (destination).z = __shfl((source)[2], (index)); \
 } while (0);
 
+
+__device__ float4 operator+(const float4& lhs, const float4& rhs) {
+    return make_float4(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
+}
+
+__device__ float4 operator-(const float4& lhs, const float4& rhs) {
+    return make_float4(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
+}
+
+__device__ float4 operator*(const float4& lhs, const float& rhs) {
+    return make_float4(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
+}
+
+__device__ float4 operator/(const float4& lhs, const float& rhs) {
+    return make_float4(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs);
+}
+
+__device__ float4 operator*(const float& lhs, const float4& rhs) {
+    return make_float4(lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w);
+}
+
+__device__ float4 operator/(const float& lhs, const float4& rhs) {
+    return make_float4(lhs / rhs.x, lhs / rhs.y, lhs / rhs.z, lhs / rhs.w);
+}
+
+__device__ float4 operator*(const float4& lhs, const float4& rhs) {
+    return make_float4(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w);
+}
+
+
 __device__ inline float xor_signmask(float x, int y)
 {
     return (float)(int(x) ^ y);
@@ -158,6 +188,8 @@ __device__ inline int maxDimIndex(const float4 &D)
         }
     }
 }
+
+
 
 __device__ inline float4 permuteVectorAlongMaxDim(float4 v, unsigned int shift)
 {

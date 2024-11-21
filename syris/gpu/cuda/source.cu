@@ -601,19 +601,6 @@ extern "C" __global__ void growTreeKernel (
 //     }
 // }
 
-// Setup the + operator for float4
-__device__ float4 operator+(const float4& lhs, const float4& rhs) {
-    return make_float4(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
-}
-
-__device__ float4 operator-(const float4& lhs, const float4& rhs) {
-    return make_float4(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
-}
-
-__device__ float4 operator*(const float4& lhs, const float& rhs) {
-    return make_float4(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
-}
-
 // extern "C" __global__ void projectNbCandidatesKernel (
 //     unsigned int nb_keys,
 //     float *image, uint2 N, float2 D, // image parameters
