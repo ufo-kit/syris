@@ -236,11 +236,11 @@ class Camera(object):
     def translate(self, translation, inherit=True, label=None):
         self._translate_viewport(translation, inherit=inherit, label=label)
 
-    def _rotate_viewport_euler(self, axis, angle, inherit=True, label=None):
-        self._viewport_cs.rotate_euler(axis, angle, inherit=inherit, label=label)
-
-    def rotate(self, axis, angle, target=None, inherit=True, label=None):
-        self._rotate_viewport_euler(axis, angle, inherit=inherit, label=label)
+    def rotate(self, angle, axis, pivot=None, inherit=True, label=None):
+        if pivot is not None:
+            self._viewport_cs.rotate_euler(pivot, axis, angle, inherit=inherit, label=label)
+        else:
+            self._viewport_cs.rotate_euler_local(axis, angle, inherit=inherit, label=label)
 
     def set_viewport_cartesian_coordinates(self, x, y, z, inherit=True, label=None):
         self._viewport_cs.set_cartesian_coordinates(x, y, z, inherit=inherit, label=label)

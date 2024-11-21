@@ -370,21 +370,21 @@ class MovableBody(Body):
         rot_ax, angle = self._find_next_rotation_time(abs_time)
         self.rotate(angle, rot_ax)
 
-    def translate(self, vec):
+    def translate(self, vec, inherit=False):
         """Translate the body by a vector *vec*."""
         # self.transform_matrix = np.dot(self.transform_matrix, geom.translate(vec))
-        self._coordinate_system.translate(vec, inherit=True)
+        self._coordinate_system.translate(vec, inherit=inherit)
 
-    def rotate(self, angle, axis, shift=None):
+    def rotate(self, angle, axis, shift=None, inherit=False):
         """Rotate the body by *angle* around vector *vec*, where *shift* is the translation which
         takes place before the rotation and -*shift* takes place afterward, resulting in the
         transformation TRT^-1.
         """
         # self.transform_matrix = np.dot(self.transform_matrix, geom.rotate(angle, axis, shift=shift))
         if shift is None:
-            self._coordinate_system.rotate_euler_local(axis, angle, inherit=True)
+            self._coordinate_system.rotate_euler_local(axis, angle, inherit=inherit)
         else:
-            self._coordinate_system.rotate_euler(shift, axis, angle, inherit=True)
+            self._coordinate_system.rotate_euler(shift, axis, angle, inherit=inherit)
 
     def visualize(self, plotter, cmap="viridis"):
         self._coordinate_system.visualize(plotter, cmap=cmap)

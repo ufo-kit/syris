@@ -37,7 +37,9 @@ public:
 
 private:
     float4 tail, head;
-
     float4 direction, invDirection;
+    float Sx, Sy, Sz;
+    int Kx, Ky, Kz;
+
     int sign[3];
 };

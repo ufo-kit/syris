@@ -3,10 +3,11 @@
 // #include <cuda.h>
 // #include <cuda_runtime.h>
 // #include <iostream>
-// #include <cmath>
+#include <cmath>
 
 #define MAX_COLLISIONS 256
 #define EPSILON 0.00001
+#define INF INFINITY
 
 typedef struct {
     int collisions[MAX_COLLISIONS];

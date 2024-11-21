@@ -75,13 +75,15 @@ def main():
         ) * q.m
     LOG.info("Translation: {}".format(translate.rescale(q.um)))
 
-    mesh.translate(translate)
-    # mesh.rotate(args.x_rotate, geom.X_AX)
     camera = Camera(
         args.pixel_size, 0.1, 530.0, 23.0, 12, (args.n, args.n), focal_length=18 * q.um, coordinate_system=mesh.child_cs
     )
-    coords = [10 * q.m, 0 * q.deg, 0 * q.deg]
-    camera.set_coordinates(coords, system="spherical")
+    # coords = [5 * q.m, 0* q.deg,0* q.deg]
+    # camera.set_coordinates(coords, system="spherical")
+    camera.rotate(args.x_rotate, geom.X_AX, inherit=False, pivot=[0,0,0] * q.m)
+    # camera.translate(translate)
+
+
     # camera.visualize(plotter, cmap="plasma")
 
     fmt = "n: {}, pixel size: {}, FOV: {}"
