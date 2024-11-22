@@ -30,6 +30,9 @@ from syris.devices.cameras import Camera
 from syris.util import get_magnitude, make_tuple
 import cupy as cp
 import pyvista as pv
+import os, vtk
+from vtk.util.numpy_support import vtk_to_numpy
+from itertools import islice
 
 
 class Mesh(MovableBody):
@@ -58,15 +61,12 @@ class Mesh(MovableBody):
         center="bbox",
         normals=None,
         bounds=None,
-        iterations=1
+        iterations=1,
+        coordinate_system=None,
     ):
         """Constructor."""
         if center is None:
             point = (0, 0, 0) * unit
-        elif center == "gravity":
-            point = self.center_of_gravity
-        elif center == "bbox":
-            point = self.center_of_bbox
         else:
             # Arbitrary point
             point = center
@@ -97,7 +97,7 @@ class Mesh(MovableBody):
         # Build the tree
         self._build_tree()
 
-        super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
+        super(Mesh, self).__init__(trajectory, material=material, orientation=orientation, coordinate_system=coordinate_system)
 
     @property
     def furthest_point(self):
@@ -378,19 +378,19 @@ class Mesh(MovableBody):
         args = (nb_keys, vertices, keys, bbMin, bbMax, sceneMin.view(float4), sceneMax.view(float4))
         block_size = (256, 1, 1)
         grid_size = ((nb_keys + block_size[0] - 1) // block_size[0], 1, 1)
-        # timer.start()
+        cfg.CUDA_TIMER.start()
         cfg.CUDA_KERNELS["project_keys"](grid_size, block_size, args)
         cp.cuda.Stream.null.synchronize()
-        # timer.stop()
-        # project_t = timer.elapsedTime()
-        # timer.reset()
+        cfg.CUDA_TIMER.stop()
+        project_t = cfg.CUDA_TIMER.elapsedTime()
+        cfg.CUDA_TIMER.reset()
 
         # Sort the keys
-        # timer.start()
+        cfg.CUDA_TIMER.start()
         sorted_keys = cp.argsort(keys)
-        # timer.stop()
-        # sort_t = timer.elapsedTime()
-        # timer.reset()
+        cfg.CUDA_TIMER.stop()
+        sort_t = cfg.CUDA_TIMER.elapsedTime()
+        cfg.CUDA_TIMER.reset()
 
         keys = keys[sorted_keys]
         permutation = sorted_keys
@@ -399,15 +399,14 @@ class Mesh(MovableBody):
         args = (nb_keys, keys, permutation, rope, left, entered, bbMin, bbMax)
         block_size = (256, 1, 1)
         grid_size = ((nb_keys + block_size[0] - 1) // block_size[0], 1, 1)
-        # timer.start()
+        cfg.CUDA_TIMER.start()
         cfg.CUDA_KERNELS["build_tree"](grid_size, block_size, args)
         cp.cuda.Stream.null.synchronize()
-        # timer.stop()
-        # grow_t = timer.elapsedTime()
-        # timer.reset()
+        cfg.CUDA_TIMER.stop()
+        grow_t = cfg.CUDA_TIMER.elapsedTime()
+        cfg.CUDA_TIMER.reset()
 
-        # print ("Projecting triangle centroids: ", project_t, "ms")
-        # print ("Growing the tree: ", grow_t, "ms")
+        print (f"{nb_keys}, {project_t}, {sort_t}, {grow_t}, ", end="")
 
         tree = {
             "keys": keys,
@@ -437,11 +436,9 @@ class Mesh(MovableBody):
         
         block_size = (16, 16, 1)
         grid_size = ((camera.shape[0] + block_size[0] - 1) // block_size[0], (camera.shape[1] + block_size[1] - 1) // block_size[1], 1)
-        # timer.start()
 
+        cfg.CUDA_TIMER.start()
         if parallel:
-            print ("Projecting parallel")
-            print (camera.p00_center)
             args = (
                 nb_keys, image, camera.shape.view(uint2),
                 U.view(float4), V.view(float4), W.view(float4),
@@ -452,7 +449,6 @@ class Mesh(MovableBody):
             )
             cfg.CUDA_KERNELS["project_parallel"](grid_size, block_size, args)
         else:
-            print ("Projecting perspective")
             args = (
                 nb_keys, image, camera.shape.view(uint2),
                 U.view(float4), V.view(float4), W.view(float4),
@@ -464,12 +460,12 @@ class Mesh(MovableBody):
             cfg.CUDA_KERNELS["project_perspective"](grid_size, block_size, args)
 
         cp.cuda.Stream.null.synchronize()
-        # timer.stop()
-        # projectPlaneRays_t = timer.elapsedTime()
-        # timer.reset()
+        cfg.CUDA_TIMER.stop()
+        projectPlaneRays_t = cfg.CUDA_TIMER.elapsedTime()
+        cfg.CUDA_TIMER.reset()
         image = image.get().reshape(camera.shape)
 
-        # t = projectPlaneRays_t
+        print (f"{projectPlaneRays_t}")
 
         return image
 
@@ -519,6 +515,74 @@ class MeshReaderDelegate(object):
         self.vertices = None # Contiguous points for all triangles
         self.normals = None # Face normals
         self.triangles = None # The triangles are stored as a 1D array
+
+class WavefrontAnimationReader(MeshReaderDelegate):
+    def __init__(self, folder : str, start : int, end : int, unit: q.Quantity = q.m):
+        super().__init__()
+        self.folder = folder
+        self.start = start
+        self.end = end
+
+        filenames = sorted (os.listdir(folder))
+        self.filenames = list(islice((os.path.join(folder, f) for f in filenames if f.endswith('.obj')), start, end))
+    
+        self.bounds = None
+        self.triangles = None
+        self.vertices = None
+        self.normals = None
+        self.unit = unit
+
+    @staticmethod
+    def extractContiguousTriangles (polydata):
+        points = polydata.GetPoints()
+        cells = polydata.GetPolys()
+
+        # Convert to numpy
+        points_np = vtk_to_numpy(points.GetData())
+        cells_np = vtk_to_numpy(cells.GetData())
+
+        # The first element is the number of vertices
+        # Verify the number of vertices
+        cells_np = cells_np.reshape(-1, 4)
+        if np.any(cells_np[:, 0] != 3):
+            raise Exception("Only triangles are supported")
+        cells_np = cells_np[:, 1:].flatten()
+        vertices = points_np[cells_np]
+
+        if len(vertices) != len(cells_np):
+            raise Exception("Vertices and cells do not match")
+        
+        return vertices, cells_np
+     
+
+    def read_file (self, filename):
+        self.reader = vtk.vtkOBJReader()
+        self.reader.SetFileName(filename)
+        self.reader.Update()
+
+        polydata = self.reader.GetOutput()
+
+        self.vertices, self.triangles = self.extractContiguousTriangles(polydata)
+        self.bounds = polydata.GetBounds()
+        self.normals = polydata.GetCellData().GetNormals()
+        if self.normals is None:
+            normals = vtk.vtkPolyDataNormals()
+            normals.SetInputData(polydata)
+            normals.ComputeCellNormalsOn()
+            normals.ComputePointNormalsOff()
+            normals.Update()
+            self.normals = normals.GetOutput().GetCellData().GetNormals()
+        
+        self.bounds = np.array(self.bounds).astype(np.float32) * self.unit
+        self.normals = vtk_to_numpy(self.normals).reshape(-1, 3).astype(np.float32) * self.unit
+        self.vertices = self.vertices.astype(np.float32) * self.unit
+        self.triangles = self.triangles.astype(np.uint32)
+        ret = (self.vertices, self.normals, self.bounds)
+        return ret
+    
+    def yield_next_timestep (self):
+        for filename in self.filenames:
+            yield self.read_file(filename)
 
 class PyvistaReader(MeshReaderDelegate):
     def __init__(self, filename: str, unit: q.Quantity = q.m):

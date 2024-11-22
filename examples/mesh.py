@@ -80,7 +80,7 @@ def main():
     )
     # coords = [5 * q.m, 0* q.deg,0* q.deg]
     # camera.set_coordinates(coords, system="spherical")
-    camera.rotate(args.x_rotate, geom.X_AX, inherit=False, pivot=[0,0,0] * q.m)
+    # camera.rotate(args.x_rotate, geom.X_AX, inherit=False, pivot=[0,0,0] * q.m)
     # camera.translate(translate)
 
 

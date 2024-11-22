@@ -51,7 +51,6 @@ class CudaPipeline:
             with open(fileName, "r") as f:
                 source = f.read()
                 code += source + "\n"
-
         self.modules[moduleName] = cp.RawModule(
             code=code,
             options=selected_options,

@@ -28,7 +28,7 @@ setup(
     url='http://github.com/ufo-kit/syris',
     license='LGPL',
     packages=find_packages(exclude=['*.tests']),
-    package_data={'syris': ['gpu/opencl/*.cl', 'gpu/opencl/*.in'],
+    package_data={'syris': ['gpu/opencl/*.cl', 'gpu/opencl/*.in', 'gpu/cuda/*'],
                   'syris.devices': ['data/*']},
     exclude_package_data={'': ['README.rst']},
     description="X-ray imaging simulation",

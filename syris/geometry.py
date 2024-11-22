@@ -679,6 +679,9 @@ class CoordinateSystem:
     def children(self):
         return self._children
     
+    def has_child(self, label):
+        return label in self._children
+    
     def __str__(self):
         return f"({self._origin}, {self._u}, {self._v}, {self._w})"
 

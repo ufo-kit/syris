@@ -25,6 +25,7 @@ import numpy as np
 import pyopencl as cl
 import pyopencl.cltypes as cltypes
 import cupy as cp
+from cupy.cuda import Event, Stream, get_elapsed_time
 
 
 LOG = logging.getLogger()
@@ -102,6 +103,32 @@ class OpenCL(object):
         # {command queue: {shape: plan}} dictionary
         self.fft_plans = {}
 
+class CudaTimer:
+    def __init__(self, stream : Stream):
+        self._start = Event()
+        self._stop = Event()
+        self._stream = stream
+        self._isRunning = False
+    
+    def start(self):
+        self._start.record(self._stream)
+        self._isRunning = True
+    
+    def stop(self):
+        self._stop.record(self._stream)
+        self._isRunning = False
+    
+    def elapsedTime(self) -> float:
+        assert not self._isRunning, "CudaTimer is still running"
+        self._stop.synchronize()
+        time = get_elapsed_time(self._start, self._stop) # ms
+        return time
+
+    def reset(self):
+        self._start = Event()
+        self._stop = Event()
+        self._isRunning = False
+        
 class CudaPipeline:
     """
     Manage and run CUDA kernels using CuPy.
@@ -112,7 +139,7 @@ class CudaPipeline:
         self.opts = ["-I " + h + " " for h in headers]
         if options is not None:
             self.opts += options
-    
+
     def readModuleFromFiles(self, 
         moduleName : str,
         fileNames : list, 
@@ -131,7 +158,6 @@ class CudaPipeline:
         selected_options += ['-D__CUDA_NO_HALF_CONVERSIONS__']
         
         selected_options = tuple(selected_options,)
-        print (selected_options)
 
         # Prepend
         code = r"""
@@ -179,6 +205,7 @@ PRECISION = None
 OPENCL = None
 CUDA_PIPELINE = None
 CUDA_KERNELS = None
+CUDA_TIMER = None
 
 # Refractive index calculation program path.
 PMASF_FILE = "pmasf"

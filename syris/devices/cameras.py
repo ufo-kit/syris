@@ -110,9 +110,9 @@ class Camera(object):
             self._optical_axis = optical_axis
 
     def update_fov(self):
-        print (self._viewport_dimensions)
-        print (self._focal_length)
-        self._fov = 2 * np.arctan(self._viewport_dimensions / (2 * self._focal_length)) * q.rad
+        angle = self._viewport_dimensions / (2 * self._focal_length)
+        angle = angle.simplified
+        self._fov = 2 * np.arctan(angle)
 
     def update_viewport_dimensions(self):
         self._viewport_dimensions = self._pixel_size * self._shape

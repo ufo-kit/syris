@@ -90,7 +90,7 @@ class MovableBody(Body):
 
     """Class representing a movable body."""
 
-    def __init__(self, trajectory, material=None, orientation=geom.Y_AX, cache_projection=True):
+    def __init__(self, trajectory, material=None, orientation=geom.Y_AX, cache_projection=True, coordinate_system=None):
         """Create a body with a :class:`~syris.geometry.Trajectory` and *orientation*,
         which is an (x, y, z) vector specifying body's "up" vector. If *cache_projection* is True,
         the projection is computed only if the object moves between the last projection time and the
@@ -106,8 +106,15 @@ class MovableBody(Body):
         # Maximum body enlargement in any direction.
         self._scale_factor = np.ones(3)
 
-        self._coordinate_system = geom.CoordinateSystem(origin=self._center)
-        self._child_cs = self._coordinate_system.add_symmetric_child ("viewport")
+        if coordinate_system is None:
+            self._coordinate_system = geom.CoordinateSystem(origin=self._center)
+            self._child_cs = self._coordinate_system.add_symmetric_child ("viewport")
+        else:
+            self._coordinate_system = coordinate_system
+            if self._coordinate_system.has_child("viewport"):
+                self._child_cs = self._coordinate_system.children["viewport"]
+            else:
+                self._child_cs = self._coordinate_system.add_symmetric_child ("viewport")
 
         # Last position as tuple consisting of a 3D point and a vector giving
         # the body orientation.

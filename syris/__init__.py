@@ -38,6 +38,7 @@ def init(
     import syris.config as cfg
     from syris.gpu.util import make_opencl_defaults, init_programs
     from syris import profiling as prf
+    import cupy as cp
     import pathlib
 
     LOG = logging.getLogger(__name__)
@@ -47,28 +48,25 @@ def init(
     source_files = ["Ray.cu", "source.cu"]
     source_files = [str(abs_source_path / file) for file in source_files]
     cuda_headers = (str(abs_source_path) + "/", )
-
-    print (cuda_headers)
-    print (source_files)
-
     cfg.init_logging(level=logging.INFO if loglevel is None else loglevel, logger_file=logfile)
     cfg.PRECISION = cfg.Precision(double_precision)
     cfg.OPENCL = cfg.OpenCL()
     cfg.CUDA_PIPELINE = cfg.CudaPipeline(cuda_headers)
+    cfg.CUDA_TIMER = cfg.CudaTimer (cp.cuda.Stream.null)
 
-    try:
+    try:   
         cfg.CUDA_PIPELINE.readModuleFromFiles("ray_caster", source_files, jitify=False)
     except Exception as e:
         LOG.exception(str(e))
 
-    print (cfg.CUDA_PIPELINE.modules)
+
 
     modules = cfg.CUDA_PIPELINE.modules["ray_caster"]
     cfg.CUDA_KERNELS = {
         "project_keys" : modules.get_function("projectTriangleCentroid"),
         "build_tree" : modules.get_function("growTreeKernel"),
+        "project_perspective" : modules.get_function("projectPerspectiveKernel"),
         "project_parallel" : modules.get_function("projectParallelKernel"),
-        "project_perspective" : modules.get_function("projectPerspectiveKernel")
     }
 
     platforms = []

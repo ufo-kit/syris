@@ -1,12 +1,5 @@
 #include "Ray.cuh"
 
-// Swap two integers
-__forceinline__ __device__ void swap(int &a, int &b) {
-    int tmp = a;
-    a = b;
-    b = tmp;
-}
-
 __device__ Ray::Ray(const Ray &ray) {
     this->tail = ray.tail;
     this->head = ray.head;
