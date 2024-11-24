@@ -158,6 +158,16 @@ __device__ inline float dot4(float4 a, float4 b)
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+__device__ inline float max_component(float4 a)
+{
+    return fmaxf(fmaxf(a.x, a.y), a.z);
+}
+
+__device__ inline float min_component(float4 a)
+{
+    return fminf(fminf(a.x, a.y), a.z);
+}
+
 __device__ inline float4 normalize4(float4 a)
 {
     float invLen = rsqrtf(dot4(a, a));

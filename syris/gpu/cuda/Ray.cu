@@ -89,52 +89,67 @@ __device__ void Ray::setInvDirection(float4 &invDirection) {
 /**
  * Ray-box intersection
  */
-__device__ bool Ray::intersects (float4 const &minBbox, float4 const &maxBbox, float &tmin, float &tmax) {
-    float4 bounds[2];
-    bounds[0] = minBbox;
-    bounds[1] = maxBbox;
+// __device__ bool Ray::intersects (float4 const &minBbox, float4 const &maxBbox, float &tmin, float &tmax) {
+//     float4 bounds[2];
+//     bounds[0] = minBbox;
+//     bounds[1] = maxBbox;
 
-    float tymin, tymax, tzmin, tzmax;
+//     float tymin, tymax, tzmin, tzmax;
 
-    // printf ("sign: %d %d %d\n", this->sign[0], this->sign[1], this->sign[2]);
-    float c = (bounds[this->sign[0]].x - this->tail.x);
-    float d = (bounds[1 - this->sign[0]].x - this->tail.x);
+//     // printf ("sign: %d %d %d\n", this->sign[0], this->sign[1], this->sign[2]);
+//     float c = (bounds[this->sign[0]].x - this->tail.x);
+//     float d = (bounds[1 - this->sign[0]].x - this->tail.x);
     
-    tmin = (c == 0) ? 0 : c * this->invDirection.x;
-    tmax = (d == 0) ? 0 : d * this->invDirection.x;
-    // printf ("%f %f \n", t.x, tmax);
+//     tmin = (c == 0) ? 0 : c * this->invDirection.x;
+//     tmax = (d == 0) ? 0 : d * this->invDirection.x;
+//     // printf ("%f %f \n", t.x, tmax);
 
-    tymin = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
-    tymax = (bounds[1 - this->sign[1]].y - this->tail.y) * this->invDirection.y;
+//     tymin = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
+//     tymax = (bounds[1 - this->sign[1]].y - this->tail.y) * this->invDirection.y;
 
-    if ((tmin > tymax) || (tymin > tmax))
-        return false;
+//     if ((tmin > tymax) || (tymin > tmax))
+//         return false;
 
-    if (tymin > tmin)
-        tmin = tymin;
+//     if (tymin > tmin)
+//         tmin = tymin;
 
-    if (tymax < tmax)
-        tmax = tymax;
+//     if (tymax < tmax)
+//         tmax = tymax;
 
-    tzmin = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
-    tzmax = (bounds[1 - this->sign[2]].z - this->tail.z) * this->invDirection.z;
+//     tzmin = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
+//     tzmax = (bounds[1 - this->sign[2]].z - this->tail.z) * this->invDirection.z;
 
-    if ((tmin > tzmax) || (tzmin > tmax))
-        return false;
+//     if ((tmin > tzmax) || (tzmin > tmax))
+//         return false;
 
-    if (tzmin > tmin)
-        tmin = tzmin;
+//     if (tzmin > tmin)
+//         tmin = tzmin;
 
-    if (tzmax < tmax)
-        tmax = tzmax;
+//     if (tzmax < tmax)
+//         tmax = tzmax;
 
-    return true;
+//     return true;
+// }
+
+__device__ bool Ray::intersects (float4 const &minBbox, float4 const &maxBbox, float &tmin, float &tmax) {
+    float4 t_lower = (minBbox - this->tail) * this->invDirection;
+    float4 t_upper = (maxBbox - this->tail) * this->invDirection;
+
+    float4 tmins = min4(t_lower, t_upper);
+    tmins.w = tmin;
+    float4 tmaxs = max4(t_lower, t_upper);
+    tmaxs.w = tmax;
+
+    float tboxmin = max_component(tmins);
+    float tboxmax = min_component(tmaxs);
+
+    return tboxmin <= tboxmax;
 }
 
 __device__ bool Ray::intersects (float4 const &minBbox, float4 const &maxBbox) {
-    float tmin = -1, tmax = -1;
+    float tmin = 0, tmax = INFINITY;
     // intersects only if box is in front of the ray
-    return this->intersects(minBbox, maxBbox, tmin, tmax) && (tmin >= 0.f);
+    return this->intersects(minBbox, maxBbox, tmin, tmax);
 }
 
 // // Both the ray and the triangle were transformed beforehand
@@ -266,15 +281,6 @@ __device__ bool Ray::intersects (float4 const &minBbox, float4 const &maxBbox) {
 //     return true;
 // }
 
-// __device__ bool Ray::intersects(float4 const &V1, float4 const &V2, float4 const &V3, float &t) {
-//     float tmin;
-//     float tmax;
-//     // intersects only if triangle is in front of the ray
-//     bool res = this->intersects(V1, V2, V3, tmin, tmax) && (tmin >= 0.f);
-//     t = res ? tmin : -1;
-//     return res;
-// }
-
 __device__ bool Ray::intersects(
     float4 const &V1, float4 const &V2, float4 const &V3, float &t)
 {
@@ -306,8 +312,14 @@ __device__ bool Ray::intersects(
 
     t = dot4 (e_2, Q) * inv_det;
 
-    return t >= 0;
+    return t > EPSILON;
 }
+
+// __device__ bool Ray::intersects(float4 const &V1, float4 const &V2, float4 const &V3, float &t) {
+//     float tmin;
+//     float tmax;
+//     return this->intersects(V1, V2, V3, t, tmax) && (t > -1.f);
+// }
 
 // __device__ bool Ray::intersects(float4 const &V1, float4 const &V2, float4 const &V3, float &t) {
 //     float tmin = -1, tmax = -1;
