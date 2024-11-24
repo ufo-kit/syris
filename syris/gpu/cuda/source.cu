@@ -200,26 +200,53 @@ __device__ void query (Tree &tree, Ray &ray, CandidateList &candidates) {
     while (current_node != SENTINEL);
 }
 
-__device__ float computeThickness(CollisionList &tvalues) {
-    float result = 0.0;
-    float epsilon = 1e-6;
-    int i = 0, j = 1;
-    if (tvalues.count == 0) {
-        return 0.0;
-    }
+// __device__ float computeThickness(CollisionList &tvalues) {
+//     float result = 0.0;
+//     float epsilon = 1e-6;
+//     int i = 0, j = 1;
+//     if (tvalues.count == 0) {
+//         return 0.0;
+//     }
     
-    float t1 = tvalues.collisions[i];
-    while (j < tvalues.count) {
-        float t2 = tvalues.collisions[j];
-        float d = fabsf (t2 - t1);
-        if (d > epsilon){
-            result += d;
-            t1 = t2;
-            j++;
-        }
-        j++;
-    }
+//     float t1 = tvalues.collisions[i];
+//     while (j < tvalues.count) {
+//         float t2 = tvalues.collisions[j];
+//         float d = fabsf (t2 - t1);
+//         if (d > epsilon){
+//             result += d;
+//             t1 = t2;
+//             j++;
+//         }
+//         j++;
+//     }
 
+//     return result;
+// }
+
+// __device__ float project_thickness (CollisionList &tvalues) {
+//     int i, j;
+//     float result = 0.0;
+
+//     i = 0;
+//     while (i < tvalues.count) {
+//         j = i + 1;
+//         while (j < tvalues.count && fabs (tvalues.collisions[j] - tvalues.collisions[i]) < 1e-6) {
+//             j++;
+//         }
+//         if (i < tvalues.count && j < tvalues.count) {
+//             result += fabs (tvalues.collisions[j] - tvalues.collisions[i]);
+//         }
+//         i = j + 1;
+//     }
+
+//     return result;
+// }
+
+__device__ float sumTvalues (CollisionList &tvalues) {
+    float result = 0.0;
+    for (int i = 0; i < tvalues.count; i++) {
+        result += tvalues.collisions[i];
+    }
     return result;
 }
 
@@ -241,6 +268,11 @@ __device__ float matchOuterPairs (
 
     for (int i = 0; i < tvalues.count; i++) {
         unsigned primIndex = candidates.collisions[i];
+        float dot_product = dot(ray.getDirection(), normals[primIndex]);
+        if (fabsf(dot_product) < 1e-6) {
+            continue;
+        }
+
         bool is_neg = dot(ray.getDirection(), normals[primIndex]) < 0;
         if (!is_neg && counter == 0) {
             continue;
@@ -305,8 +337,10 @@ __device__ float traceParallelRay (
     thrust::stable_sort_by_key(thrust::seq, tvalues.collisions, tvalues.collisions + tvalues.count, candidates.collisions);
 
     // compute the thickness
-    float val = matchOuterPairs (candidates, tvalues, ray, vertices, normals, tree);
-    // float val = sumTvalues(tvalues);
+    // float val = matchOuterPairs (candidates, tvalues, ray, vertices, normals, tree);
+    // float val = project_thickness(tvalues);
+    // float val = computeThickness(tvalues);
+    float val = sumTvalues(tvalues);
     return val;
 }
 
