@@ -223,24 +223,24 @@ __device__ void query (Tree &tree, Ray &ray, CandidateList &candidates) {
 //     return result;
 // }
 
-// __device__ float project_thickness (CollisionList &tvalues) {
-//     int i, j;
-//     float result = 0.0;
+__device__ float project_thickness (CollisionList &tvalues) {
+    int i, j;
+    float result = 0.0;
 
-//     i = 0;
-//     while (i < tvalues.count) {
-//         j = i + 1;
-//         while (j < tvalues.count && fabs (tvalues.collisions[j] - tvalues.collisions[i]) < 1e-6) {
-//             j++;
-//         }
-//         if (i < tvalues.count && j < tvalues.count) {
-//             result += fabs (tvalues.collisions[j] - tvalues.collisions[i]);
-//         }
-//         i = j + 1;
-//     }
+    i = 0;
+    while (i < tvalues.count) {
+        j = i + 1;
+        while (j < tvalues.count && fabs (tvalues.collisions[j] - tvalues.collisions[i]) < 1e-6) {
+            j++;
+        }
+        if (i < tvalues.count && j < tvalues.count) {
+            result += fabs (tvalues.collisions[j] - tvalues.collisions[i]);
+        }
+        i = j + 1;
+    }
 
-//     return result;
-// }
+    return result;
+}
 
 __device__ float sumTvalues (CollisionList &tvalues) {
     float result = 0.0;
@@ -337,10 +337,10 @@ __device__ float traceParallelRay (
     thrust::stable_sort_by_key(thrust::seq, tvalues.collisions, tvalues.collisions + tvalues.count, candidates.collisions);
 
     // compute the thickness
-    // float val = matchOuterPairs (candidates, tvalues, ray, vertices, normals, tree);
+    float val = matchOuterPairs (candidates, tvalues, ray, vertices, normals, tree);
     // float val = project_thickness(tvalues);
     // float val = computeThickness(tvalues);
-    float val = sumTvalues(tvalues);
+    // float val = sumTvalues(tvalues);
     return val;
 }
 
