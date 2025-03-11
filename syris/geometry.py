@@ -796,7 +796,7 @@ class CoordinateSystem:
             self._children[label].set_cartesian_coordinates(x, y, z, inherit)
             return
         
-        self._origin = np.array([x, y, z], dtype=np.float32)
+        self._origin = np.array([x, y, z], dtype=np.float32) * x.units
 
         if inherit:
             for child in self._children:
@@ -849,8 +849,7 @@ class CoordinateSystem:
                 self._children[child].scale_pointwise(s1, s2, s3, inherit)
                 self._children[child]._origin = self.get_global_coordinates(self._children[child]._origin)
     
-    def visualize(self, plotter=None, cmap='viridis'):
-        plotter = plotter
+    def visualize(self, plotter=None, cmap='viridis', inherit=True):
         if plotter is None:
             plotter = pv.Plotter()
 
@@ -864,8 +863,9 @@ class CoordinateSystem:
         plotter.add_arrows(self_origin, self_w, color=colors[2])
         plotter.add_points(self_origin, color='black')
 
-        for child in self._children:
-            self._children[child].visualize(plotter, cmap=cmap)
+        if inherit:
+            for child in self._children:
+                self._children[child].visualize(plotter, cmap=cmap)
         
         if plotter is None:
             plotter.show()

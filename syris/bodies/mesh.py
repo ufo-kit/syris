@@ -355,9 +355,9 @@ class Mesh(MovableBody):
         cp_dtype = cfg.PRECISION.cp_float
         float4 = cfg.PRECISION.float4  
 
-        vertices = self._triangles.rescale(q.m).magnitude
-        bounds = self._bounds.rescale(q.m).magnitude
-        normals = self._normals.rescale(q.m).magnitude
+        vertices = self._triangles.simplified.magnitude
+        bounds = self._bounds.simplified.magnitude
+        normals = self._normals.simplified.magnitude
 
         nb_vertices = len(vertices)
         nb_keys = nb_vertices // 3
@@ -388,6 +388,7 @@ class Mesh(MovableBody):
         # Sort the keys
         cfg.CUDA_TIMER.start()
         sorted_keys = cp.argsort(keys)
+        cp.cuda.Stream.null.synchronize()
         cfg.CUDA_TIMER.stop()
         sort_t = cfg.CUDA_TIMER.elapsedTime()
         cfg.CUDA_TIMER.reset()
@@ -406,7 +407,7 @@ class Mesh(MovableBody):
         grow_t = cfg.CUDA_TIMER.elapsedTime()
         cfg.CUDA_TIMER.reset()
 
-        print (f"{nb_keys}, {project_t}, {sort_t}, {grow_t}, ", end="")
+        # print (f"{nb_keys}, {project_t}, {sort_t}, {grow_t}, ", end="")
 
         tree = {
             "keys": keys,
@@ -465,7 +466,7 @@ class Mesh(MovableBody):
         cfg.CUDA_TIMER.reset()
         image = image.get().reshape(camera.shape)
 
-        print (f"{projectPlaneRays_t}")
+        # print (f"{projectPlaneRays_t}")
 
         return image
 

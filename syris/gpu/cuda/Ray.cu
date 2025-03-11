@@ -131,6 +131,13 @@ __device__ void Ray::setInvDirection(float4 &invDirection) {
 //     return true;
 // }
 
+
+/*
+    Slab method, see
+    Marrs, Adam, Peter Shirley, and Ingo Wald, eds. Ray Tracing Gems II: 
+    Next Generation Real-Time Rendering with DXR, Vulkan, and OptiX. 
+    Berkeley, CA: Apress, 2021. https://doi.org/10.1007/978-1-4842-7185-8.
+*/
 __device__ bool Ray::intersects (float4 const &minBbox, float4 const &maxBbox, float &tmin, float &tmax) {
     float4 t_lower = (minBbox - this->tail) * this->invDirection;
     float4 t_upper = (maxBbox - this->tail) * this->invDirection;
@@ -213,113 +220,113 @@ __device__ bool Ray::intersects (float4 const &minBbox, float4 const &maxBbox) {
 //   return (u >= -epsilon && u <= 1 + epsilon);
 // }
 
-// __device__ bool Ray::intersects(float4 const &V1, float4 const &V2, float4 const &V3, float &tmin, float &tmax) {
-//     // Calculate vertices relative to ray origin
-//     float A[3], B[3], C[3];
-//     A[0] = V1.x - this->tail.x;
-//     A[1] = V1.y - this->tail.y;
-//     A[2] = V1.z - this->tail.z;
-//     B[0] = V2.x - this->tail.x;
-//     B[1] = V2.y - this->tail.y;
-//     B[2] = V2.z - this->tail.z;
-//     C[0] = V3.x - this->tail.x;
-//     C[1] = V3.y - this->tail.y;
-//     C[2] = V3.z - this->tail.z;
+__device__ bool Ray::intersects(float4 const &V1, float4 const &V2, float4 const &V3, float &tmin, float &tmax) {
+    // Calculate vertices relative to ray origin
+    float A[3], B[3], C[3];
+    A[0] = V1.x - this->tail.x;
+    A[1] = V1.y - this->tail.y;
+    A[2] = V1.z - this->tail.z;
+    B[0] = V2.x - this->tail.x;
+    B[1] = V2.y - this->tail.y;
+    B[2] = V2.z - this->tail.z;
+    C[0] = V3.x - this->tail.x;
+    C[1] = V3.y - this->tail.y;
+    C[2] = V3.z - this->tail.z;
 
-//     // Perform shear and scale of vertices
-//     float Ax = A[this->Kx] - this->Sx * A[this->Kz];
-//     float Ay = A[this->Ky] - this->Sy * A[this->Kz];
-//     float Bx = B[this->Kx] - this->Sx * B[this->Kz];
-//     float By = B[this->Ky] - this->Sy * B[this->Kz];
-//     float Cx = C[this->Kx] - this->Sx * C[this->Kz];
-//     float Cy = C[this->Ky] - this->Sy * C[this->Kz];
+    // Perform shear and scale of vertices
+    float Ax = A[this->Kx] - this->Sx * A[this->Kz];
+    float Ay = A[this->Ky] - this->Sy * A[this->Kz];
+    float Bx = B[this->Kx] - this->Sx * B[this->Kz];
+    float By = B[this->Ky] - this->Sy * B[this->Kz];
+    float Cx = C[this->Kx] - this->Sx * C[this->Kz];
+    float Cy = C[this->Ky] - this->Sy * C[this->Kz];
 
-//     // Calculate scaled barycentric coordinates
-//     float U = Cx * By - Cy * Bx;
-//     float V = Ax * Cy - Ay * Cx;
-//     float W = Bx * Ay - By * Ax;
+    // Calculate scaled barycentric coordinates
+    float U = Cx * By - Cy * Bx;
+    float V = Ax * Cy - Ay * Cx;
+    float W = Bx * Ay - By * Ax;
 
-//     // Fall back to double precision if necessary
-//     if (U == 0.0f || V == 0.0f || W == 0.0f) {
-//         double CxBy = (double)Cx * (double)By;
-//         double CyBx = (double)Cy * (double)Bx;
-//         U = (float)(CxBy - CyBx);
-//         double AxCy = (double)Ax * (double)Cy;
-//         double AyCx = (double)Ay * (double)Cx;
-//         V = (float)(AxCy - AyCx);
-//         double BxAy = (double)Bx * (double)Ay;
-//         double ByAx = (double)By * (double)Ax;
-//         W = (float)(BxAy - ByAx);
-//     }
-
-//     if ((U < 0.0f || V < 0.0f || W < 0.0f) &&
-//         (U > 0.0f || V > 0.0f || W > 0.0f))
-//         return false;
-
-//     // Calculate determinant
-//     float det = U + V + W;
-
-//     if (det == 0.0f)
-//         return false;
-
-//     // Calculate scaled z-coordinates of vertices
-//     float Az = this->Sz * A[this->Kz];
-//     float Bz = this->Sz * B[this->Kz];
-//     float Cz = this->Sz * C[this->Kz];
-
-//     // Calculate the hit distance
-//     float T = U * Az + V * Bz + W * Cz;
-
-//     // Get Signed 0 of det
-//     int det_sign = sign_mask(det);
-//     if (xorf(T, det_sign) < 0.0f)
-//         return false;
-
-//     // Normalize U, V, W, and T
-//     float rcpDet = 1.0f / det;
-//     tmin = T * rcpDet;
-//     return true;
-// }
-
-__device__ bool Ray::intersects(
-    float4 const &V1, float4 const &V2, float4 const &V3, float &t)
-{
-    float4 e_1, e_2, P, Q, T;
-    float det, inv_det, u, v;
-
-    e_1 = sub4 (V2, V1);
-    e_2 = sub4 (V3, V1);
-    P = cross4 (this->direction, e_2);
-
-    det = dot4 (e_1, P);
-    
-    if (det == 0) {
-        return false;
+    // Fall back to double precision if necessary
+    if (U == 0.0f || V == 0.0f || W == 0.0f) {
+        double CxBy = (double)Cx * (double)By;
+        double CyBx = (double)Cy * (double)Bx;
+        U = (float)(CxBy - CyBx);
+        double AxCy = (double)Ax * (double)Cy;
+        double AyCx = (double)Ay * (double)Cx;
+        V = (float)(AxCy - AyCx);
+        double BxAy = (double)Bx * (double)Ay;
+        double ByAx = (double)By * (double)Ax;
+        W = (float)(BxAy - ByAx);
     }
 
-    inv_det = 1 / det;
-    T = sub4(this->tail, V1);
-    u = dot4(T, P) * inv_det;
-    if (u < 0 || u > 1) {
+    if ((U < 0.0f || V < 0.0f || W < 0.0f) &&
+        (U > 0.0f || V > 0.0f || W > 0.0f))
         return false;
-    }
 
-    Q = cross4 (T, e_1);
-    v = dot4 (this->direction, Q) * inv_det;
-    if (v < 0 || u + v > 1) {
+    // Calculate determinant
+    float det = U + V + W;
+
+    if (det == 0.0f)
         return false;
-    }
 
-    t = dot4 (e_2, Q) * inv_det;
+    // Calculate scaled z-coordinates of vertices
+    float Az = this->Sz * A[this->Kz];
+    float Bz = this->Sz * B[this->Kz];
+    float Cz = this->Sz * C[this->Kz];
 
-    return t > EPSILON;
+    // Calculate the hit distance
+    float T = U * Az + V * Bz + W * Cz;
+
+    // Get Signed 0 of det
+    int det_sign = sign_mask(det);
+    if (xorf(T, det_sign) < 0.0f)
+        return false;
+
+    // Normalize U, V, W, and T
+    float rcpDet = 1.0f / det;
+    tmin = T * rcpDet;
+    return true;
 }
 
-// __device__ bool Ray::intersects(float4 const &V1, float4 const &V2, float4 const &V3, float &t) {
-//     float tmin;
-//     float tmax;
-//     return this->intersects(V1, V2, V3, t, tmax) && (t > -1.f);
+// __device__ bool Ray::intersects(
+//     float4 const &V1, float4 const &V2, float4 const &V3, float &t)
+// {
+//     float4 e_1, e_2, P, Q, T;
+//     float det, inv_det, u, v;
+
+//     e_1 = sub4 (V2, V1);
+//     e_2 = sub4 (V3, V1);
+//     P = cross4 (this->direction, e_2);
+
+//     det = dot4 (e_1, P);
+    
+//     if (det == 0) {
+//         return false;
+//     }
+
+//     inv_det = 1 / det;
+//     T = sub4(this->tail, V1);
+//     u = dot4(T, P) * inv_det;
+//     if (u < 0 || u > 1) {
+//         return false;
+//     }
+
+//     Q = cross4 (T, e_1);
+//     v = dot4 (this->direction, Q) * inv_det;
+//     if (v < 0 || u + v > 1) {
+//         return false;
+//     }
+
+//     t = dot4 (e_2, Q) * inv_det;
+
+//     return t > 0;
 // }
+
+__device__ bool Ray::intersects(float4 const &V1, float4 const &V2, float4 const &V3, float &t) {
+    float tmin;
+    float tmax;
+    return this->intersects(V1, V2, V3, t, tmax) && (t >= 0.f);
+}
 
 // __device__ bool Ray::intersects(float4 const &V1, float4 const &V2, float4 const &V3, float &t) {
 //     float tmin = -1, tmax = -1;

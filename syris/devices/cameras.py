@@ -87,8 +87,9 @@ class Camera(object):
         self._psf = None
 
         self._focal_length = focal_length
-        self._viewport_dimensions = pixel_size * shape
-
+        print (shape)
+        self._viewport_dimensions = pixel_size * self._shape
+        print (self._viewport_dimensions)
         if coordinate_system is None:
             self._viewport_cs = CoordinateSystem()
         else:
@@ -120,7 +121,7 @@ class Camera(object):
     # Cuda compatible properties
     @property
     def pixel_size(self):
-        ret = self._pixel_size.rescale(q.m).magnitude
+        ret = self._pixel_size.simplified.magnitude
         if ret.size == 1:
             ret = np.array([ret, ret])
         return ret.astype(np.float32)
@@ -156,7 +157,7 @@ class Camera(object):
 
     @property
     def focal_length(self):
-        ret = self._focal_length.rescale(q.m).magnitude
+        ret = self._focal_length.simplified.magnitude
         return ret.astype(np.float32)
 
     @focal_length.setter
@@ -170,7 +171,7 @@ class Camera(object):
 
     @property
     def viewport_dimensions(self):
-        ret = self._viewport_dimensions.rescale(q.m).magnitude
+        ret = self._viewport_dimensions.simplified.magnitude
         return ret.astype(np.float32)
     
     @property
@@ -201,12 +202,12 @@ class Camera(object):
 
     @property
     def p00_center(self):
-        U = self.viewport_cs.u
-        V = self.viewport_cs.v
-        cx = (self._viewport_dimensions[0] - self._pixel_size) / 2
-        cy = (self._viewport_dimensions[1] - self._pixel_size) / 2
-        ret = self.viewport_cs.origin + cx * U + cy * V
-        ret = ret.rescale(q.m).magnitude
+        U = self._viewport_cs.u
+        V = self._viewport_cs.v
+        cx = (self._viewport_dimensions[0] - self._pixel_size)/2
+        cy = (self._viewport_dimensions[1] - self._pixel_size)/2
+        ret = self._viewport_cs.origin + cx * U + cy * V
+        ret = ret.simplified.magnitude
         ret = np.append(ret, 0)
         return ret.astype(np.float32)
 
@@ -214,13 +215,13 @@ class Camera(object):
     def ray_origin(self):
         ret = self.viewport_cs.origin
         ret += self._focal_length * self.viewport_cs.w
-        ret = ret.rescale(q.m).magnitude
+        ret = ret.simplified.magnitude
         ret = np.append(ret, 0)
         return ret.astype(np.float32)
 
     @property
     def viewport_center(self):
-        ret = self.viewport_cs.origin.rescale(q.m).magnitude
+        ret = self.viewport_cs.origin.simplified.magnitude
         ret = np.append(ret, 0)
         return ret.astype(np.float32)
 

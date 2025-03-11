@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
-"""Synchrotron Radiation Imaging Simulation (SYRIS) initialization."""
+"""Synchrotron Radiation Imaging Simulation (syris) initialization."""
 
 
 __version__ = "0.4dev"

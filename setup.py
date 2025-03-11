@@ -27,7 +27,7 @@ setup(
     author_email='tomas.farago@kit.edu',
     url='http://github.com/ufo-kit/syris',
     license='LGPL',
-    packages=find_packages(exclude=['*.tests']),
+    packages=find_packages(exclude=['*.tests'], include=['syris', 'syris.*']),
     package_data={'syris': ['gpu/opencl/*.cl', 'gpu/opencl/*.in', 'gpu/cuda/*'],
                   'syris.devices': ['data/*']},
     exclude_package_data={'': ['README.rst']},
@@ -39,6 +39,7 @@ setup(
         'pyopencl>=2012.1',
         'reikna',
         'scipy>=0.11.0',
+        'cupy',
         # Examples
         'imageio',
         'matplotlib',

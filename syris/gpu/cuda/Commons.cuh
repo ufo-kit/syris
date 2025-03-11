@@ -1,7 +1,7 @@
 #pragma once
 #include <cmath>
 
-#define MAX_COLLISIONS 256
+#define MAX_COLLISIONS 512
 #define EPSILON 0.00001
 #define INF INFINITY
 
@@ -14,26 +14,6 @@ typedef struct {
     float collisions[MAX_COLLISIONS];
     int count;
 } CollisionList;
-
-// // #include <vector_types.h>
-
-// Uncomment this to enforce warp synchronization
-#define SAFE_WARP_SYNCHRONY
-
-// Synchronize warp. This protects the code from future compiler optimization that 
-// involves instructions reordering, possibly leading to race conditions. 
-// __syncthreads() could be used instead, at a slight performance penalty
-#ifdef SAFE_WARP_SYNCHRONY
-#define WARP_SYNC \
-do { \
-    int _sync = 0; \
-    __shfl(_sync, 0); \
-} while (0)
-#else
-#define WARP_SYNC \
-do { \
-} while (0)
-#endif
 
 #define WARP_SIZE 32
 
@@ -253,8 +233,6 @@ __forceinline__  __device__ float4 cross(float4 v1, float4 v2)
 
 
 // --- Morton codes -------------------------------------------------------------------------------
-
-/// <summary> Normalizes a position using the specified bounding box. </summary>
 __forceinline__  __device__ float4 normalize(float4 point, float4 boundingBoxMin,
         float4 boundingBoxMax)
 {
@@ -265,7 +243,6 @@ __forceinline__  __device__ float4 normalize(float4 point, float4 boundingBoxMin
     return normalized;
 }
 
-/// <summary> Un-normalizes a position using the specified bounding box. </summary>
 __forceinline__  __device__ float4 denormalize(float4 normalized, float4 bboxMin,
         float4 bboxMax)
 {
@@ -276,7 +253,7 @@ __forceinline__  __device__ float4 denormalize(float4 normalized, float4 bboxMin
     return point;
 }
 
-/// <summary> Expands a 10-bit integer into 30 bits by inserting 2 zeros after each bit. </summary>
+// Expands a 10-bit integer into 30 bits by inserting 2 zeros after each bit.
 __forceinline__  __device__ unsigned int expandBits(unsigned int value)
 {
     value = (value * 0x00010001u) & 0xFF0000FFu;
@@ -285,28 +262,6 @@ __forceinline__  __device__ unsigned int expandBits(unsigned int value)
     value = (value * 0x00000005u) & 0x49249249u;
     return value;
 }
-
-/// <summary> Calculates the point morton code using 30 bits. </summary>
-///
-/// <remarks> Leonardo, 12/17/2014. </remarks>
-///
-/// <param name="point"> The point. </param>
-///
-/// <returns> The calculated morton code. </returns>
-// __forceinline__  __device__ unsigned int calculateMortonCode(float4 point)
-// {
-//     // Discretize the unit cube into a 10 bit integer
-//     uint3 discretized;
-//     discretized.x = (unsigned int)min(max(point.x * 1024.0f, 0.0f), 1023.0f);
-//     discretized.y = (unsigned int)min(max(point.y * 1024.0f, 0.0f), 1023.0f);
-//     discretized.z = (unsigned int)min(max(point.z * 1024.0f, 0.0f), 1023.0f);
-
-//     discretized.x = expandBits(discretized.x);
-//     discretized.y = expandBits(discretized.y);
-//     discretized.z = expandBits(discretized.z);
-
-//     return discretized.x * 4 + discretized.y * 2 + discretized.z;
-// }
 
 template <int N>__forceinline__  __device__ unsigned int expandBitsBy (unsigned int)
 {
@@ -367,8 +322,7 @@ __forceinline__  __device__ unsigned int calculateMortonCode(float4 point)
     return r;
 }
 
-/// <summary> Compact bits from the specified 30-bit value, using only one bit at every 3 from the
-///           original value and forming a 10-bit value. </summary>
+// Compact bits from the specified 30-bit value, using only one bit at every 3 from the original value and forming a 10-bit value
 __forceinline__  __device__ unsigned int compactBits(unsigned int value)
 {
     unsigned int compacted = value;
@@ -380,8 +334,7 @@ __forceinline__  __device__ unsigned int compactBits(unsigned int value)
     return compacted;
 }
 
-/// <summary> Decodes the 'x' coordinate from a 30-bit morton code. The returned value is a float
-///           between 0 and 1. </summary>
+// Decodes the 'x' coordinate from a 30-bit morton code. The returned value is a float between 0 and 1
 __forceinline__  __device__ float decodeMortonCodeX(unsigned int value)
 {
     unsigned int expanded = compactBits(value >> 2);
@@ -389,8 +342,7 @@ __forceinline__  __device__ float decodeMortonCodeX(unsigned int value)
     return expanded / 1024.0f;
 }
 
-/// <summary> Decodes the 'y' coordinate from a 30-bit morton code. The returned value is a float
-///           between 0 and 1. </summary>
+// Decodes the 'y' coordinate from a 30-bit morton code. The returned value is a float between 0 and 1.
 __forceinline__  __device__ float decodeMortonCodeY(unsigned int value)
 {
     unsigned int expanded = compactBits(value >> 1);
@@ -398,8 +350,7 @@ __forceinline__  __device__ float decodeMortonCodeY(unsigned int value)
     return expanded / 1024.0f;
 }
 
-/// <summary> Decodes the 'z' coordinate from a 30-bit morton code. The returned value is a float
-///           between 0 and 1. </summary>
+// Decodes the 'z' coordinate from a 30-bit morton code. The returned value is a float between 0 and 1.
 __forceinline__  __device__ float decodeMortonCodeZ(unsigned int value)
 {
     unsigned int expanded = compactBits(value);
@@ -407,7 +358,7 @@ __forceinline__  __device__ float decodeMortonCodeZ(unsigned int value)
     return expanded / 1024.0f;
 }
 
-/// <summary> Expands a 21-bit integer into 63 bits by inserting 2 zeros after each bit. </summary>
+// Expands a 21-bit integer into 63 bits by inserting 2 zeros after each bit.
 __forceinline__  __device__ unsigned long long int expandBits64(
         unsigned long long int value)
 {
@@ -422,7 +373,7 @@ __forceinline__  __device__ unsigned long long int expandBits64(
     return expanded;
 }
 
-/// <summary> Calculates the point morton code using 63 bits. </summary>
+// Calculates the point morton code using 63 bits.
 __forceinline__  __device__ unsigned long long int calculateMortonCode64(float4 point)
 {
     // Discretize the unit cube into a 10 bit integer
@@ -438,8 +389,7 @@ __forceinline__  __device__ unsigned long long int calculateMortonCode64(float4 
     return discretized[0] * 4 + discretized[1] * 2 + discretized[2];
 }
 
-/// <summary> Compact bits from the specified 63-bit value, using only one bit at every 3 from the
-///           original value and forming a 21-bit value. </summary>
+// Compact bits from the specified 63-bit value, using only one bit at every 3 from the original value and forming a 21-bit value.
 __forceinline__  __device__ unsigned long long int compactBits64(
         unsigned long long int value)
 {
@@ -455,8 +405,7 @@ __forceinline__  __device__ unsigned long long int compactBits64(
     return compacted;
 }
 
-/// <summary> Decodes the 'x' coordinate from a 63-bit morton code. The returned value is a float
-///           between 0 and 1. </summary>
+// Decodes the 'x' coordinate from a 63-bit morton code. The returned value is a float between 0 and 1.
 __forceinline__  __device__ float decodeMortonCode64X(unsigned long long int value)
 {
     unsigned long long int expanded = compactBits64(value >> 2);
@@ -464,8 +413,7 @@ __forceinline__  __device__ float decodeMortonCode64X(unsigned long long int val
     return expanded / 2097152.0f;
 }
 
-/// <summary> Decodes the 'y' coordinate from a 63-bit morton code. The returned value is a float
-///           between 0 and 1. </summary>
+// Decodes the 'y' coordinate from a 63-bit morton code. The returned value is a float between 0 and 1.
 __forceinline__  __device__ float decodeMortonCode64Y(unsigned long long int value)
 {
     unsigned long long int expanded = compactBits64(value >> 1);
@@ -473,8 +421,7 @@ __forceinline__  __device__ float decodeMortonCode64Y(unsigned long long int val
     return expanded / 2097152.0f;
 }
 
-/// <summary> Decodes the 'z' coordinate from a 63-bit morton code. The returned value is a float
-///           between 0 and 1. </summary>
+// Decodes the 'z' coordinate from a 63-bit morton code. The returned value is a float between 0 and 1.
 __forceinline__  __device__ float decodeMortonCode64Z(unsigned long long int value)
 {
     unsigned long long int expanded = compactBits64(value);
@@ -482,7 +429,7 @@ __forceinline__  __device__ float decodeMortonCode64Z(unsigned long long int val
     return expanded / 2097152.0f;
 }
 
-/// <summary> Expands the group bounding box using the specified new bounding box coordinates.
+// Expands the group bounding box using the specified new bounding box coordinates.
 __forceinline__  __device__ void expandBoundingBox(float4& groupBbMin, float4& groupBbMax, 
         const float4& newBbMin, const float4& newBbMax)
 {
