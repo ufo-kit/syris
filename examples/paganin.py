@@ -74,24 +74,28 @@ def main():
     args = parse_args()
     syris.init()
     # Propagate to 20 cm
-    d = 5 * q.cm
+    d = args.distance * q.cm / args.magnification
     # Compute grid
     n_camera = 256
     n = n_camera * args.supersampling
     shape = (n, n)
     material = get_material("pmma_5_30_kev.mat")
     energy = 15 * q.keV
-    ps = 1 * q.um
+    ps = 1 * q.um / args.magnification
     ps_hd = ps / args.supersampling
-    radius = n / 4.0 * ps_hd
+    radius = n / 6.0 * q.um / args.supersampling
+    lam = energy_to_wavelength(energy)
 
     fmt = "                     Wavelength: {}"
     print(fmt.format(energy_to_wavelength(energy)))
     fmt = "Pixel size used for propagation: {}"
     print(fmt.format(ps_hd.rescale(q.um)))
+    fmt = "           Propagation distance: {}"
+    print(fmt.format(d))
     print("                  Field of view: {}".format(n * ps_hd.rescale(q.um)))
     fmt = "                Sphere diameter: {}"
     print(fmt.format(2 * radius))
+    print(f"                  Fresnel number: {(ps ** 2 / (d * lam)).simplified.magnitude}")
 
     sample = make_sphere(n, radius, pixel_size=ps_hd, material=material)
     projection = sample.project((n, n), ps_hd).get() * 1e6
@@ -129,6 +133,18 @@ def parse_args():
         type=int,
         default=8,
         help="Supersampling used to prevent propagation artefacts",
+    )
+    parser.add_argument(
+        "--distance",
+        type=float,
+        default=5,
+        help="Propagation distance [cm]",
+    )
+    parser.add_argument(
+        "--magnification",
+        type=float,
+        default=1,
+        help="Magnification",
     )
     parser.add_argument("--output-projection", type=str,
                         help="Output file name for X-ray projection")
