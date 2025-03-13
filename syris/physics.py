@@ -403,9 +403,11 @@ def compute_aliasing_limit(n, wavelength, pixel_size, propagation_distance, fov=
     """
     if fov is None:
         fov = n * pixel_size
-    cos_al_max = wavelength.simplified.magnitude / (2 * pixel_size.simplified.magnitude)
-    diffraction_angle = compute_diffraction_angle(fov, propagation_distance)
-    ratio = cos_al_max / np.cos(np.pi / 2 - diffraction_angle)
+
+    r = np.sqrt(propagation_distance ** 2 + (fov / 2) ** 2).simplified
+    kx = (fov / (2 * r)).simplified.magnitude
+    lam_spatial = (wavelength / (kx * pixel_size)).simplified.magnitude
+    ratio = lam_spatial / 2
     if fourier:
         ratio = 1 / ratio
 
