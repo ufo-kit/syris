@@ -48,7 +48,7 @@ def main():
     )
     energy = 29 * q.keV
     ps = 0.2 * q.um  # Pixel size
-    shift = 16 * ps  # Shift by 24 pixels
+    shift = 16 * ps  # Shift by 16 pixels
 
     # Wedge gradient multiplied by delta defines the diffraction angle:
     # tan(angle) = d/dx delta T(x) = shift / d
