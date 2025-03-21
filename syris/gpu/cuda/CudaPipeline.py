@@ -13,7 +13,8 @@ def make_float4(x, y, z, w) -> cp.ndarray:
         pass
 
 class CudaPipeline:
-    def __init__(self, headers : list, options : list = None):
+    def __init__(self, headers : list, options : list = None, dtype = cp.float32):
+        self.dtype = dtype
         self.modules = {}
         self.kernels = {}
         self.opts = ["-I " + h + " " for h in headers]

@@ -25,6 +25,8 @@ import quantities as q
 import syris.config as cfg
 import syris.geometry as geom
 import syris.gpu.util as gutil
+from syris.coordinate_systems import CoordinateSystem
+from syris.transformations import Transformation
 from syris.bodies.base import MovableBody
 from syris.devices.cameras import Camera
 from syris.util import get_magnitude, make_tuple
@@ -33,6 +35,7 @@ import pyvista as pv
 import os, vtk
 from vtk.util.numpy_support import vtk_to_numpy
 from itertools import islice
+from syris.bodies.meshreader import MeshReader, PyvistaReader
 
 
 class Mesh(MovableBody):
@@ -53,42 +56,71 @@ class Mesh(MovableBody):
 
     def __init__(
         self,
-        triangles,
+        filename,
         trajectory,
-        material=None,
-        orientation=geom.Y_AX,
-        unit=q.m,
+        iterations=1,
         center="bbox",
+        unit=None,
+        scale=1,
+        material=None,
+        coordinate_system=None,
+        triangles=None,
         normals=None,
         bounds=None,
-        iterations=1,
-        coordinate_system=None,
     ):
         """Constructor."""
+        if unit is None:
+            self.unit = q.m
+        else:
+            self.unit = unit
+
+        try:
+            reader = MeshReader(PyvistaReader(filename, unit))
+        except Exception as e:
+            raise e
+        
+        self.mesh_name = filename
+
         if center is None:
             point = (0, 0, 0) * unit
-        else:
-            # Arbitrary point
+        elif center == "bbox":
+            point = reader.center
+        elif center == "gravity":
+            point = reader.center_of_mass
+        elif isinstance(center, tuple):
             point = center
+        else:
+            self._center = None
+            raise ValueError("Invalid center value")
 
-        self._unit = unit
-        point = np.insert(point.rescale(self._unit).magnitude, 3, 0)[:, np.newaxis]
+        self._center = point * unit
 
-        self._triangles = triangles
-        self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
-        self._iterations = iterations
+        print (f"Center: {self._center}")
+        
+        # Create local coordinate system
+        if coordinate_system is None:
+            self.coordinate_system = CoordinateSystem(origin=self._center)
+        else:
+            self.coordinate_system = coordinate_system
 
+        # self.coordinate_system.add_normals(normals)
+        # self.coordinate_system.add_bounds(bounds)
+
+        if triangles is None:
+            self._triangles = reader.vertices.rescale(q.m).magnitude
+        else:
+            self._triangles = triangles
         if normals is None:
-            # TODO: make projection function that works without normals
-            pass
+            self._normals = reader.normals.magnitude
         else:
             self._normals = normals
-
         if bounds is None:
-            # TODO: Compute bounds (xmin, xmax, ymin, ymax, zmin, zmax)
-            pass
+            self._bounds = reader.bounds.rescale(q.m).magnitude
         else:
             self._bounds = bounds
+            
+        self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
+        self._iterations = iterations
 
         self._current = np.copy(self._triangles)
 
@@ -96,8 +128,9 @@ class Mesh(MovableBody):
 
         # Build the tree
         self._build_tree()
+        self.coordinate_system.add_points(self._triangles, label=self.mesh_name)
 
-        super(Mesh, self).__init__(trajectory, material=material, orientation=orientation, coordinate_system=coordinate_system)
+        super(Mesh, self).__init__(trajectory, material=material)
 
     @property
     def furthest_point(self):
@@ -114,7 +147,7 @@ class Mesh(MovableBody):
     @property
     def num_triangles(self):
         """Number of triangles in the mesh."""
-        return self._current.shape[1] // 3
+        return len(self._triangles) // 3
 
     @property
     def extrema(self):
@@ -210,32 +243,6 @@ class Mesh(MovableBody):
         """Return current triangle mesh."""
         return self._current[:-1, :] * self._unit
 
-    def sort(self):
-        """Sort triangles based on the greatest x-coordinate in an ascending order. Also sort
-        vertices inside the triangles so that the greatest one is the last one, however, the
-        position of the two remaining ones is not sorted.
-        """
-        # Extract x-coordinates
-        x = self._current[0, :].reshape(self.num_triangles, 3)
-        # Get vertices with the greatest x-coordinate and scale the indices up so we can work with
-        # the original array
-        factor = np.arange(self.num_triangles) * 3
-        representatives = np.argmax(x, axis=1) + factor
-        # Get indices which sort the triangles
-        base = 3 * np.argsort(self._current[0, representatives])
-        indices = np.empty(3 * len(base), dtype=int)
-        indices[::3] = base
-        indices[1::3] = base + 1
-        indices[2::3] = base + 2
-
-        # Sort the triangles such that the largest x-coordinate is in the last vertex
-        tmp = np.copy(self._current[:, 2::3])
-        self._current[:, 2::3] = self._current[:, representatives]
-        self._current[:, representatives] = tmp
-
-        # Sort the triangles among each other
-        self._current = self._current[:, indices]
-
     def get_degenerate_triangles(self, eps=1e-3 * q.deg):
         """Get triangles which are close to be parallel with the ray in z-direction based on the
         current transformation matrix. *eps* is the tolerance for the angle between a triangle and
@@ -259,105 +266,14 @@ class Mesh(MovableBody):
         """General function for computations with triangles."""
         return func(self._current[axis, :])
 
-    def _make_vertices(self, index, pixel_size):
-        """Make a flat array of vertices belong to *triangles* at *index*."""
-        # Convert to meters
-        vertices = self._current[:, index::3] / pixel_size.rescale(self._unit).magnitude
-
-        return vertices.transpose().flatten().astype(cfg.PRECISION.np_float)
-
-    def _make_inputs(self, queue, pixel_size):
-        v_1 = cl_array.to_device(queue, self._make_vertices(0, pixel_size[1]))
-        v_2 = cl_array.to_device(queue, self._make_vertices(1, pixel_size[0]))
-        v_3 = cl_array.to_device(queue, self._make_vertices(2, pixel_size[1]))
-
-        return v_1, v_2, v_3
-
-    def transform(self):
-        """Apply transformation *matrix* and return the resulting triangles."""
-        matrix = self.get_rescaled_transform_matrix(self._unit)
-        self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
-
-    # def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
-    #     """Projection implementation."""
-
-    #     def get_crop(index, fov):
-    #         minimum = max(self.extrema[index][0], fov[index][0])
-    #         maximum = min(self.extrema[index][1], fov[index][1])
-
-    #         return minimum - offset[::-1][index], maximum - offset[::-1][index]
-
-    #     def get_px_value(value, round_func, ps):
-    #         return int(round_func(get_magnitude(value / ps)))
-
-    #     # Move to the desired location, apply the T matrix and resort the triangles
-    #     self.transform()
-    #     self.sort()
-
-    #     psm = pixel_size.simplified.magnitude
-    #     fov = offset + shape * pixel_size
-    #     fov = (
-    #         np.concatenate((offset.simplified.magnitude[::-1], fov.simplified.magnitude[::-1]))
-    #         .reshape(2, 2)
-    #         .transpose()
-    #         * q.m
-    #     )
-    #     if out is None:
-    #         out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
-
-    #     if (
-    #         self.extrema[0][0] < fov[0][1]
-    #         and self.extrema[0][1] > fov[0][0]
-    #         and self.extrema[1][0] < fov[1][1]
-    #         and self.extrema[1][1] > fov[1][0]
-    #     ):
-    #         # Object inside FOV
-    #         x_min, x_max = get_crop(0, fov)
-    #         y_min, y_max = get_crop(1, fov)
-    #         x_min_px = get_px_value(x_min, np.floor, pixel_size[1])
-    #         x_max_px = get_px_value(x_max, np.ceil, pixel_size[1])
-    #         y_min_px = get_px_value(y_min, np.floor, pixel_size[0])
-    #         y_max_px = get_px_value(y_max, np.ceil, pixel_size[0])
-    #         width = min(x_max_px - x_min_px, shape[1])
-    #         height = min(y_max_px - y_min_px, shape[0])
-    #         compute_offset = cltypes.make_int2(x_min_px, y_min_px)
-    #         v_1, v_2, v_3 = self._make_inputs(queue, pixel_size)
-    #         max_dx = self.max_triangle_x_diff.simplified.magnitude / psm[1]
-    #         # Use the same pixel size as for the x-axis, which will work for objects "not too far"
-    #         # from the imaging plane
-    #         min_z = self.extrema[2][0].simplified.magnitude / psm[1]
-    #         offset = gutil.make_vfloat2(*(offset / pixel_size).simplified.magnitude[::-1])
-
-    #         ev = cfg.OPENCL.programs["mesh"].compute_thickness(
-    #             queue,
-    #             (width, height),
-    #             None,
-    #             v_1.data,
-    #             v_2.data,
-    #             v_3.data,
-    #             out.data,
-    #             np.int32(self.num_triangles),
-    #             np.int32(shape[1]),
-    #             compute_offset,
-    #             offset,
-    #             cfg.PRECISION.np_float(psm[1]),
-    #             cfg.PRECISION.np_float(max_dx),
-    #             cfg.PRECISION.np_float(min_z),
-    #             np.int32(self.iterations),
-    #         )
-    #         if block:
-    #             ev.wait()
-
-    #     return out
-
     def _build_tree (self):
         dtype = cfg.PRECISION.np_float
         cp_dtype = cfg.PRECISION.cp_float
         float4 = cfg.PRECISION.float4  
 
-        vertices = self._triangles.simplified.magnitude
-        bounds = self._bounds.simplified.magnitude
-        normals = self._normals.simplified.magnitude
+        vertices = self._triangles
+        bounds = self._bounds
+        normals = self._normals
 
         nb_vertices = len(vertices)
         nb_keys = nb_vertices // 3
@@ -374,38 +290,24 @@ class Mesh(MovableBody):
         bbMin = cp.zeros((2 * nb_keys, 4), dtype=cp_dtype)
         bbMax = cp.zeros((2 * nb_keys, 4), dtype=cp_dtype)
 
+        cfg.CUDA_PIPELINE.synchronize()
+
         # Project the triangle centroids
         args = (nb_keys, vertices, keys, bbMin, bbMax, sceneMin.view(float4), sceneMax.view(float4))
         block_size = (256, 1, 1)
-        grid_size = ((nb_keys + block_size[0] - 1) // block_size[0], 1, 1)
-        cfg.CUDA_TIMER.start()
-        cfg.CUDA_KERNELS["project_keys"](grid_size, block_size, args)
-        cp.cuda.Stream.null.synchronize()
-        cfg.CUDA_TIMER.stop()
-        project_t = cfg.CUDA_TIMER.elapsedTime()
-        cfg.CUDA_TIMER.reset()
+        grid_size = (int(np.ceil(nb_keys / block_size[0])), 1, 1)
+        project_t, _ = cfg.CUDA_PIPELINE.launchKernel("projectTriangleCentroid", grid_size, block_size, args)
 
         # Sort the keys
-        cfg.CUDA_TIMER.start()
         sorted_keys = cp.argsort(keys)
-        cp.cuda.Stream.null.synchronize()
-        cfg.CUDA_TIMER.stop()
-        sort_t = cfg.CUDA_TIMER.elapsedTime()
-        cfg.CUDA_TIMER.reset()
-
         keys = keys[sorted_keys]
         permutation = sorted_keys
 
         # Grow the tree
         args = (nb_keys, keys, permutation, rope, left, entered, bbMin, bbMax)
         block_size = (256, 1, 1)
-        grid_size = ((nb_keys + block_size[0] - 1) // block_size[0], 1, 1)
-        cfg.CUDA_TIMER.start()
-        cfg.CUDA_KERNELS["build_tree"](grid_size, block_size, args)
-        cp.cuda.Stream.null.synchronize()
-        cfg.CUDA_TIMER.stop()
-        grow_t = cfg.CUDA_TIMER.elapsedTime()
-        cfg.CUDA_TIMER.reset()
+        grid_size = (int(np.ceil(nb_keys / block_size[0])), 1, 1)
+        grow_t, _ = cfg.CUDA_PIPELINE.launchKernel("growTreeKernel", grid_size, block_size, args)
 
         # print (f"{nb_keys}, {project_t}, {sort_t}, {grow_t}, ", end="")
 
@@ -419,12 +321,11 @@ class Mesh(MovableBody):
             "vertices": vertices,
             "normals": normals
         }
-        # t = project_t, sort_t, grow_t,
 
         self._tree = tree
         
 
-    def _project(self, camera, parallel=False):
+    def _project(self, camera, parallel=True, t=None, block=False):
         """Projection implementation."""
         cp_dtype = cfg.PRECISION.cp_float
         float4 = cfg.PRECISION.float4
@@ -435,10 +336,10 @@ class Mesh(MovableBody):
         nb_keys = len(self._triangles) // 3
         image = cp.zeros(camera.shape[0] * camera.shape[1], dtype=cp_dtype)
         
-        block_size = (16, 16, 1)
-        grid_size = ((camera.shape[0] + block_size[0] - 1) // block_size[0], (camera.shape[1] + block_size[1] - 1) // block_size[1], 1)
+        block_size = (1, 1, 1)
+        # grid_size = (1, 1, 1)
+        grid_size = (int(np.ceil(camera.shape[0] * camera.shape[1] / block_size[0])), 1, 1)
 
-        cfg.CUDA_TIMER.start()
         if parallel:
             args = (
                 nb_keys, image, camera.shape.view(uint2),
@@ -448,7 +349,9 @@ class Mesh(MovableBody):
                 self._tree["bbMin"], self._tree["bbMax"],
                 self._tree["vertices"].view(float4), self._tree["normals"].view(float4)
             )
-            cfg.CUDA_KERNELS["project_parallel"](grid_size, block_size, args)
+
+            t, _ = cfg.CUDA_PIPELINE.launchKernel("projectParallelKernel", grid_size, block_size, args)
+
         else:
             args = (
                 nb_keys, image, camera.shape.view(uint2),
@@ -458,19 +361,63 @@ class Mesh(MovableBody):
                 self._tree["bbMin"], self._tree["bbMax"],
                 self._tree["vertices"].view(float4), self._tree["normals"].view(float4)
             )
-            cfg.CUDA_KERNELS["project_perspective"](grid_size, block_size, args)
 
-        cp.cuda.Stream.null.synchronize()
-        cfg.CUDA_TIMER.stop()
-        projectPlaneRays_t = cfg.CUDA_TIMER.elapsedTime()
-        cfg.CUDA_TIMER.reset()
-        image = image.get().reshape(camera.shape)
+             
+            t, _ = cfg.CUDA_PIPELINE.launchKernel("projectParallelKernel", grid_size, block_size, args)
 
-        # print (f"{projectPlaneRays_t}")
+        # print (f"{t}")
 
-        return image
+        return image.reshape(camera.shape).get()
 
+    def visualize_bvh(self, plotter, mapto="id", cmap="Pastel1"):
+        """Visualize the bounding volume hierarchy."""
+        if self._tree is None:
+            raise ValueError("Tree is not built yet")
+        
+        import matplotlib.colors as mcolors
+        import matplotlib.pyplot as plt
+        
+        cmapper = plt.get_cmap(cmap)
 
+        vertices = self._tree["vertices"]
+        bbMin = self._tree["bbMin"]
+        bbMax = self._tree["bbMax"]
+        nb_keys = len(self._triangles) // 3
+
+        # Get the bounding boxes data
+        bbMin_np = bbMin.get()
+        bbMax_np = bbMax.get()
+
+        if mapto == "id":
+            minv, maxv = 0, nb_keys
+            values = np.arange(minv, maxv)
+        elif mapto == "depth":
+            minv, maxv = 0, np.log2(nb_keys)
+            values = np.log2(np.arange(minv, maxv))
+        elif mapto == "volume":
+            # use np to calculate the volume of each bounding box
+            diff = bbMax_np - bbMin_np
+            volumes = np.prod(diff, axis=1)
+            minv, maxv = np.min(volumes), np.max(volumes)
+            values = volumes
+        else:
+            raise ValueError("Invalid mapto value")
+        
+        # Normalize the values
+        norm = mcolors.Normalize(vmin=minv, vmax=maxv)
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        # Visualize the leaf nodes
+        for i in range(nb_keys, 2 * nb_keys):
+            idx = i - nb_keys  # Index in the volumes array
+            bounds = (
+                bbMin_np[i, 0],  # xMin
+                bbMax_np[i, 0],  # xMax
+                bbMin_np[i, 1],  # yMin
+                bbMax_np[i, 1],  # yMax
+                bbMin_np[i, 2],  # zMin
+                bbMax_np[i, 2],  # zMax
+            )
+            plotter.add_mesh(pv.Box(bounds=bounds), color=sm.to_rgba(values[idx]), opacity=0.5)
 
     def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
         """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for
@@ -507,146 +454,6 @@ class Mesh(MovableBody):
 
         return out
 
-class MeshReaderDelegate(object):
-    def __init__(self):
-        self.dimensions = 3
-        self.polydata = None
-        self.bounds = None # The bounding box
-        self.size = None # length of the bounding box
-        self.vertices = None # Contiguous points for all triangles
-        self.normals = None # Face normals
-        self.triangles = None # The triangles are stored as a 1D array
-
-class WavefrontAnimationReader(MeshReaderDelegate):
-    def __init__(self, folder : str, start : int, end : int, unit: q.Quantity = q.m):
-        super().__init__()
-        self.folder = folder
-        self.start = start
-        self.end = end
-
-        filenames = sorted (os.listdir(folder))
-        self.filenames = list(islice((os.path.join(folder, f) for f in filenames if f.endswith('.obj')), start, end))
-    
-        self.bounds = None
-        self.triangles = None
-        self.vertices = None
-        self.normals = None
-        self.unit = unit
-
-    @staticmethod
-    def extractContiguousTriangles (polydata):
-        points = polydata.GetPoints()
-        cells = polydata.GetPolys()
-
-        # Convert to numpy
-        points_np = vtk_to_numpy(points.GetData())
-        cells_np = vtk_to_numpy(cells.GetData())
-
-        # The first element is the number of vertices
-        # Verify the number of vertices
-        cells_np = cells_np.reshape(-1, 4)
-        if np.any(cells_np[:, 0] != 3):
-            raise Exception("Only triangles are supported")
-        cells_np = cells_np[:, 1:].flatten()
-        vertices = points_np[cells_np]
-
-        if len(vertices) != len(cells_np):
-            raise Exception("Vertices and cells do not match")
-        
-        return vertices, cells_np
-     
-
-    def read_file (self, filename):
-        self.reader = vtk.vtkOBJReader()
-        self.reader.SetFileName(filename)
-        self.reader.Update()
-
-        polydata = self.reader.GetOutput()
-
-        self.vertices, self.triangles = self.extractContiguousTriangles(polydata)
-        self.bounds = polydata.GetBounds()
-        self.normals = polydata.GetCellData().GetNormals()
-        if self.normals is None:
-            normals = vtk.vtkPolyDataNormals()
-            normals.SetInputData(polydata)
-            normals.ComputeCellNormalsOn()
-            normals.ComputePointNormalsOff()
-            normals.Update()
-            self.normals = normals.GetOutput().GetCellData().GetNormals()
-        
-        self.bounds = np.array(self.bounds).astype(np.float32) * self.unit
-        self.normals = vtk_to_numpy(self.normals).reshape(-1, 3).astype(np.float32) * self.unit
-        self.vertices = self.vertices.astype(np.float32) * self.unit
-        self.triangles = self.triangles.astype(np.uint32)
-        ret = (self.vertices, self.normals, self.bounds)
-        return ret
-    
-    def yield_next_timestep (self):
-        for filename in self.filenames:
-            yield self.read_file(filename)
-
-class PyvistaReader(MeshReaderDelegate):
-    def __init__(self, filename: str, unit: q.Quantity = q.m):
-        super().__init__()
-        self._filename = filename
-        self._unit = unit
-        self._load_mesh()
-
-    def _load_mesh(self):
-        mesh = pv.read(self._filename)
-        self.polydata = mesh
-
-        # Ensure the normals are calculated
-        if mesh.cell_normals is None:
-            mesh = mesh.compute_normals(cell_normals=True, point_normals=False, inplace=False)
-
-        triangles = mesh.faces.reshape(-1, 4)[:, 1:]
-        points = mesh.points
-        triangle_vertices = points[triangles]
-        triangle_vertices = triangle_vertices.flatten().reshape(-1, 3)
-
-        self.vertices = np.array(triangle_vertices).astype(np.float32) * self._unit
-        self.triangles = triangles
-        self.normals = np.array(mesh.cell_normals).astype(np.float32) * self._unit
-        self.bounds = np.array(mesh.bounds).astype(np.float32) * self._unit
-
-    @property
-    def filename(self):
-        return self._filename
-
-    @filename.setter
-    def filename(self, value):
-        self._filename = value
-        self._load_mesh()
-
-    @property
-    def unit(self):
-        return self._unit
-
-    @unit.setter
-    def unit(self, value):
-        self._unit = value
-        self.vertices = self.vertices.rescale(value)
-        self.normals = self.normals.rescale(value)
-        self.bounds = self.bounds.rescale(value)
-
-    @property
-    def scene(self):
-        return [self.vertices, self.normals, self.bounds]
-
-    def visualize(self, plotter=None):
-        if plotter is None:
-            plotter = pv.Plotter(window_size=[800, 1024])
-        plotter.add_mesh(self.polydata)
-        plotter.show()
-
-class MeshReader():
-    def __init__(self, meshReader: MeshReaderDelegate):
-        self._delegate = meshReader
-    
-    def __getattr__(self, name):
-        return getattr(self._delegate, name)
-    
 def _extract_object(txt):
     """Extract an object from string *txt*."""
     face_start = txt.index("s ")

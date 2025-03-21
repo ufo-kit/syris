@@ -22,10 +22,12 @@ import numpy as np
 import quantities as q
 import scipy.interpolate as interp
 import syris.gpu.util as gutil
+from syris.coordinate_systems import CoordinateSystem
+from syris.bodies.base import MovableBody
 from syris import config as cfg
 from syris.imageprocessing import bin_image, decimate
 from syris.math import fwnm_to_sigma
-from syris.geometry import CoordinateSystem, Z_AX
+from syris.geometry import Z_AX
 import pyvista as pv
 
 
@@ -42,12 +44,13 @@ def is_fps_feasible(fps, exp_time):
 def is_length(param):
     return isinstance(param, q.Quantity) and param.dimensionality.simplified == q.m.dimensionality.simplified
 
-class Camera(object):
+class Camera(MovableBody):
 
     """Base class representing a camera."""
 
     def __init__(
         self,
+        trajectory,
         pixel_size,
         gain,
         dark_current,
@@ -60,8 +63,8 @@ class Camera(object):
         fps=1 / q.s,
         dtype=np.ushort,
         focal_length=None,
-        coordinate_system=None,
         optical_axis=None,
+        coordinate_system=None,
     ):
         """Create a camera with *pixel_size*, *gain* specifying :math:`\frac{counts}{e^-}`,
         *dark_current* as mean number of electrons present without incident light, *amplifier_sigma*
@@ -87,13 +90,11 @@ class Camera(object):
         self._psf = None
 
         self._focal_length = focal_length
-        print (shape)
         self._viewport_dimensions = pixel_size * self._shape
-        print (self._viewport_dimensions)
-        if coordinate_system is None:
-            self._viewport_cs = CoordinateSystem()
-        else:
-            self._viewport_cs = coordinate_system
+        
+        if coordinate_system is not None:
+            self.coordinate_system = coordinate_system
+
         self.update_fov()
 
         if self._quantum_efficiencies is not None and self._wavelengths is not None:
@@ -110,7 +111,11 @@ class Camera(object):
         else:
             self._optical_axis = optical_axis
 
+        super(Camera, self).__init__(trajectory)
+
     def update_fov(self):
+        if self._focal_length is None:
+            return
         angle = self._viewport_dimensions / (2 * self._focal_length)
         angle = angle.simplified
         self._fov = 2 * np.arctan(angle)
@@ -176,7 +181,7 @@ class Camera(object):
     
     @property
     def viewport_cs(self):
-        return self._viewport_cs
+        return self.coordinate_system
 
     @property
     def viewport_origin(self):
@@ -198,16 +203,16 @@ class Camera(object):
         U = np.append(U, 0)
         V = np.append(V, 0)
         W = np.append(W, 0)
-        return U.astype(np.float32), V.astype(np.float32), -W.astype(np.float32)
+        return U.astype(np.float32), V.astype(np.float32), W.astype(np.float32)
 
     @property
     def p00_center(self):
-        U = self._viewport_cs.u
-        V = self._viewport_cs.v
+        U = self.coordinate_system.u
+        V = self.coordinate_system.v
         cx = (self._viewport_dimensions[0] - self._pixel_size)/2
         cy = (self._viewport_dimensions[1] - self._pixel_size)/2
-        ret = self._viewport_cs.origin + cx * U + cy * V
-        ret = ret.simplified.magnitude
+        ret = self.coordinate_system.origin + cx * U + cy * V
+        ret = ret.simplified.rescale(q.m).magnitude
         ret = np.append(ret, 0)
         return ret.astype(np.float32)
 
@@ -229,26 +234,26 @@ class Camera(object):
     def viewport_center(self, value):
         if value.shape[0] != 3:
             raise ValueError("Viewport center must be a 3D point")
-        self._viewport_cs.origin = value
+        self.coordinate_system.origin = value
 
     def _translate_viewport(self, translation, inherit=True, label=None):
-        self._viewport_cs.translate(translation, inherit=inherit, label=label)
+        self.coordinate_system.translate(translation, inherit=inherit, label=label)
 
     def translate(self, translation, inherit=True, label=None):
         self._translate_viewport(translation, inherit=inherit, label=label)
 
     def rotate(self, angle, axis, pivot=None, inherit=True, label=None):
         if pivot is not None:
-            self._viewport_cs.rotate_euler(pivot, axis, angle, inherit=inherit, label=label)
+            self.coordinate_system.rotate_euler(pivot, axis, angle, inherit=inherit, label=label)
         else:
-            self._viewport_cs.rotate_euler_local(axis, angle, inherit=inherit, label=label)
+            self.coordinate_system.rotate_euler_local(axis, angle, inherit=inherit, label=label)
 
     def set_viewport_cartesian_coordinates(self, x, y, z, inherit=True, label=None):
-        self._viewport_cs.set_cartesian_coordinates(x, y, z, inherit=inherit, label=label)
+        self.coordinate_system.set_cartesian_coordinates(x, y, z, inherit=inherit, label=label)
 
     def set_viewport_spherical_coordinates(self, r, theta, phi, inherit=True, label=None):
-        self._viewport_cs.set_spherical_coordinates(r, theta, phi, inherit=inherit, label=label)
-        self._viewport_cs.to_opposite()
+        self.coordinate_system.set_spherical_coordinates(r, theta, phi, inherit=inherit, label=label)
+        self.coordinate_system.to_opposite()
 
     def set_coordinates(self, coords, inherit=True, system=None):
         if system is None:
@@ -266,7 +271,7 @@ class Camera(object):
         else:
             p = plotter
         p.add_axes()
-        self._viewport_cs.visualize(p, cmap=cmap)
+        self.coordinate_system.visualize(p, cmap=cmap)
         p.show()
 
     @property
@@ -351,7 +356,6 @@ class Camera(object):
 
         # Apply quantization noise
         return counts.astype(self.dtype)
-
 
 def make_pco_dimax():
     """Make a pco.dimax camera."""

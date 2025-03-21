@@ -137,6 +137,8 @@ class CudaPipeline:
         self.modules = {}
         self.kernels = {}
         self.opts = ["-I " + h + " " for h in headers]
+        self._stream = cp.cuda.Stream()
+        self.timer = CudaTimer(self._stream)
         if options is not None:
             self.opts += options
 
@@ -186,7 +188,26 @@ class CudaPipeline:
             self.kernels[kernelName] = self.modules[moduleName].get_function(kernelName)
         
         return self.kernels[kernelName]
+    
+    def synchronize(self):
+        self._stream.synchronize()
 
+    def timeit(func):
+        def wrapper(self, *args, **kwargs):
+            self.timer.start()
+            result = func(self, *args, **kwargs)
+            self.synchronize()
+            self.timer.stop()
+            t = self.timer.elapsedTime()
+            self.timer.reset()
+            return (t, result)
+        return wrapper
+    
+    @timeit
+    def launchKernel(self, kernelName : str, *args):
+        if kernelName not in self.kernels:
+            raise Exception("Kernel not found")
+        return self.kernels[kernelName](*args)
 
 def init_logging(level=logging.DEBUG, logger_file=None):
     """Initialize logging with output to *logger_file*."""

@@ -31,16 +31,15 @@ def extractContiguousTriangles (polydata):
     
     return vertices, cells_np
 
-
 class MeshReaderDelegate(object):
     def __init__(self):
         self.dimensions = 3
         self.polydata = None
-        self.bounds = None # The bounding box
-        self.size = None # length of the bounding box
-        self.vertices = None # Contiguous points for all triangles
-        self.normals = None # Face normals
-        self.triangles = None # The triangles are stored as a 1D array
+        self.bounds = None
+        self.size = None
+        self.vertices = None
+        self.normals = None
+        self.triangles = None
 
 
 class WavefrontAnimationReader(MeshReaderDelegate):
@@ -129,6 +128,14 @@ class PyvistaReader(MeshReaderDelegate):
     @property
     def scene (self):
         return [self.vertices, self.normals, self.bounds]
+    
+    @property
+    def center (self):
+        return self.polydata.center
+    
+    @property
+    def center_of_mass (self):
+        return np.mean(self.vertices, axis=0)
     
     def visualize (self):
         plotter = pv.Plotter(window_size=[800, 1024])

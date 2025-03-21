@@ -4,32 +4,33 @@
 #define SENTINEL -1
 #define INVALID -1
 
-#define INT_MAX 2147483647
-#define INT_MIN -2147483648
-
 typedef unsigned int morton_t;
 typedef int delta_t;
 
-typedef struct {
+typedef struct
+{
     unsigned int nb_keys;
     morton_t *keys;
     unsigned int *indices;
     int *entered;
     int *rope;
     int *left;
-    float4 *bboxMin;
-    float4 *bboxMax;
+    FP_T4 *bboxMin;
+    FP_T4 *bboxMax;
 } Tree;
 
-__device__ bool isLeaf(Tree &tree, unsigned int index) {
+__device__ bool isLeaf(const Tree &tree, const unsigned int index)
+{
     return index < tree.nb_keys;
 }
 
-__device__ unsigned int toInternalRepresentation(Tree &tree, unsigned int index) {
+__device__ unsigned int toInternalRepresentation(const Tree &tree, const unsigned int index)
+{
     return index + tree.nb_keys;
 }
 
-__device__ void growBox(float4 &bbMinInput, float4 &bbMaxInput, float4 *bbMinOutput, float4 *bbMaxOutput) {
+__device__ void growBox(const FP_T4 &bbMinInput, const FP_T4 &bbMaxInput, FP_T4 *bbMinOutput, FP_T4 *bbMaxOutput)
+{
     bbMinOutput->x = fminf(bbMinInput.x, bbMinOutput->x);
     bbMinOutput->y = fminf(bbMinInput.y, bbMinOutput->y);
     bbMinOutput->z = fminf(bbMinInput.z, bbMinOutput->z);
@@ -39,82 +40,100 @@ __device__ void growBox(float4 &bbMinInput, float4 &bbMaxInput, float4 *bbMinOut
     bbMaxOutput->z = fmaxf(bbMaxInput.z, bbMaxOutput->z);
 }
 
-__device__ int delta(Tree &tree, int index) {
+__device__ int delta(const Tree &tree, const int index)
+{
+    constexpr int MAX = ::cuda::std::numeric_limits<int>::max();
+    constexpr int MIN = ::cuda::std::numeric_limits<int>::min();
 
-    if (index < 0 || index >= tree.nb_keys - 1) {
-        return INT_MAX;
+    if (index < 0 || index >= tree.nb_keys - 1)
+    {
+        return MAX;
     }
-    
+
     // TODO: augment the function if the codes are the same
     unsigned int a = tree.keys[index];
     unsigned int b = tree.keys[index + 1];
     int x = a ^ b;
-    return x + (!x) * (INT_MIN + (index ^ (index + 1))) - 1; // 
+    return x + (!x) * (MIN + (index ^ (index + 1))) - 1; //
 }
 
-__device__ void setRope(Tree &tree, unsigned int skip_index, int range_right, delta_t delta_right) {
+__device__ void setRope(Tree &tree, unsigned int skip_index, int range_right, delta_t delta_right)
+{
     int rope;
 
-    if (range_right != tree.nb_keys - 1) {
+    if (range_right != tree.nb_keys - 1)
+    {
         int r = range_right + 1;
         rope = delta_right < delta(tree, r) ? r : toInternalRepresentation(tree, r);
     }
-    else {
+    else
+    {
         rope = SENTINEL;
     }
     tree.rope[skip_index] = rope;
 }
 
-__device__ void setLeftChild (Tree &tree, unsigned int parent, unsigned int left_child) {
+__device__ void setLeftChild(Tree &tree, unsigned int parent, unsigned int left_child)
+{
     tree.left[parent] = left_child;
 }
 
-__device__ void setBBMin (Tree &tree, unsigned int parent, float4 bbMin) {
+__device__ void setBBMin(Tree &tree, unsigned int parent, FP_T4 bbMin)
+{
     tree.bboxMin[parent] = bbMin;
 }
 
-__device__ void setBBMax (Tree &tree, unsigned int parent, float4 bbMax) {
+__device__ void setBBMax(Tree &tree, unsigned int parent, FP_T4 bbMax)
+{
     tree.bboxMax[parent] = bbMax;
 }
 
-__device__ float4 getBBMin (Tree &tree, unsigned int index) {
+__device__ FP_T4 getBBMin(const Tree &tree, const unsigned int index)
+{
     return tree.bboxMin[index];
 }
 
-__device__ float4 getBBMax (Tree &tree, unsigned int index) {
+__device__ FP_T4 getBBMax(const Tree &tree, const unsigned int index)
+{
     return tree.bboxMax[index];
 }
 
-__device__ int getRope (Tree &tree, unsigned int index) {
+__device__ int getRope(const Tree &tree, const unsigned int index)
+{
     return tree.rope[index];
 }
 
-__device__ int getLeftChild (Tree &tree, unsigned int index) {
+__device__ int getLeftChild(const Tree &tree, const unsigned int index)
+{
     return tree.left[index];
 }
 
-__device__ void updateParents(Tree &tree, int i) {
+__device__ void updateParents(Tree &tree, int i)
+{
     int range_left = i;
     int range_right = i;
     delta_t delta_left = delta(tree, i - 1);
     delta_t delta_right = delta(tree, i);
 
-    float4 bbMinCurrent = getBBMin (tree, i);
-    float4 bbMaxCurrent = getBBMax (tree, i);
+    FP_T4 bbMinCurrent = getBBMin(tree, i);
+    FP_T4 bbMaxCurrent = getBBMax(tree, i);
 
     setRope(tree, i, range_right, delta_right);
 
     unsigned const root = toInternalRepresentation(tree, 0);
 
-    do {
+    do
+    {
         int left_child;
         int right_child;
-        if (delta_right < delta_left) {
+        if (delta_right < delta_left)
+        {
             const int apetrei_parent = range_right;
 
-            range_right = atomicCAS (&(tree.entered[toInternalRepresentation(tree, apetrei_parent)]), INVALID, range_left);
+            range_right = atomicCAS(&(tree.entered[toInternalRepresentation(tree, apetrei_parent)]), INVALID, range_left);
 
-            if (range_right == INVALID) {
+            if (range_right == INVALID)
+            {
                 return;
             }
             delta_right = delta(tree, range_right);
@@ -126,19 +145,22 @@ __device__ void updateParents(Tree &tree, int i) {
             // Memory sync
             __threadfence();
 
-            if (right_child != range_right) {
+            if (right_child != range_right)
+            {
                 right_child = toInternalRepresentation(tree, right_child);
             }
 
-            float4 bbMinRight = getBBMin (tree, right_child);
-            float4 bbMaxRight = getBBMax (tree, right_child);
+            FP_T4 bbMinRight = getBBMin(tree, right_child);
+            FP_T4 bbMaxRight = getBBMax(tree, right_child);
             growBox(bbMinRight, bbMaxRight, &bbMinCurrent, &bbMaxCurrent);
         }
-        else {
+        else
+        {
             int const apetrei_parent = range_left - 1;
-            range_left = atomicCAS (&(tree.entered[toInternalRepresentation(tree, apetrei_parent)]), INVALID, range_right);
+            range_left = atomicCAS(&(tree.entered[toInternalRepresentation(tree, apetrei_parent)]), INVALID, range_right);
 
-            if (range_left == INVALID){
+            if (range_left == INVALID)
+            {
                 return;
             }
 
@@ -149,13 +171,14 @@ __device__ void updateParents(Tree &tree, int i) {
 
             // Memory sync
             __threadfence();
-            
-            if (!left_is_leaf) {
+
+            if (!left_is_leaf)
+            {
                 left_child = toInternalRepresentation(tree, left_child);
             }
 
-            float4 bbMinLeft = getBBMin (tree, left_child);
-            float4 bbMaxLeft = getBBMax (tree, left_child);
+            FP_T4 bbMinLeft = getBBMin(tree, left_child);
+            FP_T4 bbMaxLeft = getBBMax(tree, left_child);
             growBox(bbMinLeft, bbMaxLeft, &bbMinCurrent, &bbMaxCurrent);
         }
 
@@ -168,73 +191,86 @@ __device__ void updateParents(Tree &tree, int i) {
         setRope(tree, karras_parent, range_right, delta_right);
 
         i = karras_parent;
-    }
-    while (i != root);
-    
+    } while (i != root);
+
     return;
 }
 
 
-__device__ void query (Tree &tree, Ray &ray, CandidateList &candidates) {
+__device__ void query(const Tree &tree, const Ray &ray, List<int> &candidates)
+{
     int current_node = toInternalRepresentation(tree, 0);
-    
-    do {
-        float4 bbMax = getBBMax (tree, current_node);
-        float4 bbMin = getBBMin (tree, current_node);
-        if (ray.intersects(bbMin, bbMax)) {
-            if (isLeaf(tree, current_node)) {
-                if (candidates.count == MAX_COLLISIONS) {
+
+    do
+    {
+        const FP_T4 bbMax = getBBMax(tree, current_node);
+        const FP_T4 bbMin = getBBMin(tree, current_node);
+        if (ray.intersects(bbMin, bbMax))
+        {
+            if (isLeaf(tree, current_node))
+            {
+                if (candidates.count == MAX_COLLISIONS)
+                {
                     return;
                 }
-                candidates.collisions[candidates.count++] = current_node;
+                candidates.values[candidates.count++] = current_node;
                 current_node = getRope(tree, current_node);
             }
-            else {
+            else
+            {
                 current_node = getLeftChild(tree, current_node);
             }
         }
-        else {
+        else
+        {
             current_node = getRope(tree, current_node);
         }
-    }
-    while (current_node != SENTINEL);
+    } while (current_node != SENTINEL);
 }
 
-// __device__ float computeThickness(CollisionList &tvalues) {
-//     float result = 0.0;
-//     float epsilon = 1e-6;
-//     int i = 0, j = 1;
-//     if (tvalues.count == 0) {
-//         return 0.0;
-//     }
-    
-//     float t1 = tvalues.collisions[i];
-//     while (j < tvalues.count) {
-//         float t2 = tvalues.collisions[j];
-//         float d = fabsf (t2 - t1);
-//         if (d > epsilon){
-//             result += d;
-//             t1 = t2;
-//             j++;
-//         }
-//         j++;
-//     }
+__device__ FP_T computeThickness(List<FP_T> &tvalues)
+{
+    FP_T result = 0.0;
+    FP_T epsilon = 1e-6;
+    int i = 0, j = 1;
+    if (tvalues.count == 0)
+    {
+        return 0.0;
+    }
 
-//     return result;
-// }
-
-__device__ float project_thickness (CollisionList &tvalues) {
-    int i, j;
-    float result = 0.0;
-
-    i = 0;
-    while (i < tvalues.count) {
-        j = i + 1;
-        while (j < tvalues.count && fabs (tvalues.collisions[j] - tvalues.collisions[i]) < 1e-6) {
+    FP_T t1 = tvalues.values[i];
+    while (j < tvalues.count)
+    {
+        FP_T t2 = tvalues.values[j];
+        FP_T d = fabsf(t2 - t1);
+        if (d > epsilon)
+        {
+            result += d;
+            t1 = t2;
             j++;
         }
-        if (i < tvalues.count && j < tvalues.count) {
-            result += fabs (tvalues.collisions[j] - tvalues.collisions[i]);
+        j++;
+    }
+
+    return result;
+}
+
+__device__ FP_T project_thickness(List<FP_T> &tvalues)
+{
+    int i, j;
+    FP_T result = 0.0;
+
+    i = 0;
+    while (i < tvalues.count)
+    {
+        j = i + 1;
+        while (j < tvalues.count && fabsf(tvalues.values[j] - tvalues.values[i]) < 1e-6)
+        {
+            j++;
+        }
+        if (i < tvalues.count && j < tvalues.count)
+        {
+            result += fabsf(tvalues.values[j] - tvalues.values[i]);
         }
         i = j + 1;
     }
@@ -242,193 +278,237 @@ __device__ float project_thickness (CollisionList &tvalues) {
     return result;
 }
 
-__device__ float sumTvalues (CollisionList &tvalues) {
-    float result = 0.0;
-    for (int i = 0; i < tvalues.count; i++) {
-        result += tvalues.collisions[i];
+__device__ FP_T sumTvalues(List<FP_T> &tvalues)
+{
+    FP_T result = 0.0;
+    for (int i = 0; i < tvalues.count; i++)
+    {
+        result += tvalues.values[i];
     }
     return result;
 }
 
-inline __device__ float dot(const float4& a, const float4& b) {
+inline __device__ FP_T dot(const FP_T4 &a, const FP_T4 &b)
+{
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-__device__ float matchOuterPairs (
-        CandidateList &candidates, CollisionList &tvalues, Ray &ray,
-        float4* __restrict__ vertices,
-        float4* __restrict__ normals,
-        Tree &tree) {
-    float thickness = 0.0, inner = 0.0;
+__device__ FP_T matchOuterPairs(
+    const List<int> &candidates, const List<FP_T> &tvalues, const Ray &ray,
+    FP_T4 *__restrict__ vertices,
+    FP_T4 *__restrict__ normals,
+    const Tree &tree)
+{
+    FP_T thickness = 0.0, inner = 0.0;
     int counter = 0;
 
-    if (tvalues.count == 1) {
-        return tvalues.collisions[0];
-    }
-
-    for (int i = 0; i < tvalues.count; i++) {
-        unsigned primIndex = candidates.collisions[i];
-        float dot_product = dot(ray.getDirection(), normals[primIndex]);
-        if (fabsf(dot_product) < 1e-6) {
+    for (int i = 0; i < tvalues.count; i++)
+    {
+        unsigned primIndex = candidates.values[i];
+        FP_T dot_product = dot(ray.getDirection(), normals[primIndex]);
+        if (is_null(dot_product))
+        {
             continue;
         }
 
         bool is_neg = dot(ray.getDirection(), normals[primIndex]) < 0;
-        if (!is_neg && counter == 0) {
+        if (!is_neg && counter == 0)
+        {
             continue;
         }
 
-        if (is_neg) {
+        if (is_neg)
+        {
             if (counter++ == 0)
-                inner = tvalues.collisions[i];
+                inner = tvalues.values[i];
         }
-        else {
-            if (--counter == 0) {
-                thickness += tvalues.collisions[i] - inner;
+        else
+        {
+            if (--counter == 0)
+            {
+                thickness += tvalues.values[i] - inner;
             }
         }
-
     }
     return thickness;
 }
 
-__device__ float traceParallelRay (
-        Ray &ray, Tree &tree, 
-        float4* __restrict__ vertices,
-        float4* __restrict__ normals) {
-    CandidateList candidates;
-    candidates.count = 0;
-    memset(candidates.collisions, 0, MAX_COLLISIONS * sizeof(int));
+struct FloatEpsilonComparator
+{
+    __device__ bool operator()(FP_T a, FP_T b) const {
+        return is_null(a - b);
+    }
+};
+__device__ FP_T traceParallelRay(
+    const Ray &ray, const Tree &tree,
+    FP_T4 *__restrict__ vertices,
+    FP_T4 *__restrict__ normals)
+{
 
-    CollisionList tvalues;
+    List<int> candidates;
+    List<FP_T> tvalues;
+    candidates.count = 0;
     tvalues.count = 0;
-    memset(tvalues.collisions, 0, MAX_COLLISIONS * sizeof(float));
 
     // This is where the acceleration structure (BVH) is actually usefull
     query(tree, ray, candidates);
 
-    if (candidates.count == 0) {
+    if (candidates.count == 0)
+    {
         return 0.0;
     }
 
     // Test the candidates for actual intersections
-    for (int i = 0; i < candidates.count; i++) {
-        int primIndex = candidates.collisions[i]*3;
-        
-        float4 V1 = vertices[primIndex];
-        float4 V2 = vertices[primIndex + 1];
-        float4 V3 = vertices[primIndex + 2];
+    for (int i = 0; i < candidates.count; i++)
+    {
+        int primIndex = candidates.values[i] * 3;
 
-        float t;
-        if (ray.intersects(V1, V2, V3, t)) {
-            candidates.collisions[tvalues.count] = candidates.collisions[i];
-            tvalues.collisions[tvalues.count++] = t;
+        const FP_T4 V1 = vertices[primIndex];
+        const FP_T4 V2 = vertices[primIndex + 1];
+        const FP_T4 V3 = vertices[primIndex + 2];
+
+        FP_T t = 0.0, tmax = INFINITY;
+        if (ray.intersects(V1, V2, V3, t, tmax))
+        {
+            candidates.values[tvalues.count] = candidates.values[i];
+            tvalues.values[tvalues.count++] = t;
         }
     }
 
-    if (tvalues.count < 2) {
+    if (tvalues.count < 2)
+    {
         return 0.0;
     }
+    // if (tvalues.count == 2) {
+    //     return fabsf(tvalues.values[1] - tvalues.values[0]);
+    // }
 
-    // printf ("Tvalues count: %d\n", tvalues.count);
-
-    // arg sort the tvalues
     int index[MAX_COLLISIONS];
-    thrust::stable_sort_by_key(thrust::seq, tvalues.collisions, tvalues.collisions + tvalues.count, candidates.collisions);
+    thrust::stable_sort_by_key(thrust::seq, tvalues.values, tvalues.values + tvalues.count, candidates.values);
 
-    // compute the thickness
-    float val = matchOuterPairs (candidates, tvalues, ray, vertices, normals, tree);
-    // float val = project_thickness(tvalues);
-    // float val = computeThickness(tvalues);
-    // float val = sumTvalues(tvalues);
-    return val;
-}
-
-__device__ float traceRay (
-        Ray &ray, Tree &tree, 
-        float4* __restrict__ vertices,
-        float4* __restrict__ normals) {
-    CandidateList candidates;
-    candidates.count = 0;
-    memset(candidates.collisions, 0, MAX_COLLISIONS * sizeof(int));
-
-    CollisionList tvalues;
-    tvalues.count = 0;
-    memset(tvalues.collisions, 0, MAX_COLLISIONS * sizeof(float));
-
-    // This is where the acceleration structure (BVH) is actually usefull
-    query(tree, ray, candidates);
-
-    if (candidates.count == 0) {
-        return 0.0;
-    }
-
-    // Test the candidates for actual intersections
-    for (int i = 0; i < candidates.count; i++) {
-        int primIndex = candidates.collisions[i]*3;
-        
-        float4 V1 = vertices[primIndex];
-        float4 V2 = vertices[primIndex + 1];
-        float4 V3 = vertices[primIndex + 2];
-
-        float t;
-        if (ray.intersects(V1, V2, V3, t)) {
-            candidates.collisions[tvalues.count] = candidates.collisions[i];
-            tvalues.collisions[tvalues.count++] = t;
+    // Remove duplicates
+    List<FP_T> new_tvalues;
+    new_tvalues.count = 1;
+    new_tvalues.values[0] = tvalues.values[0];
+    List<int> new_candidates;
+    new_candidates.count = 1;
+    new_candidates.values[0] = candidates.values[0];
+    for (int i = 1; i < tvalues.count; i++)
+    {
+        if (!is_null(tvalues.values[i] - tvalues.values[i - 1], 1e-9))
+        {
+            new_tvalues.values[new_tvalues.count] = tvalues.values[i];
+            new_candidates.values[new_candidates.count] = candidates.values[i];
+            new_tvalues.count++;
+            new_candidates.count++;
         }
     }
+    // int newCount = thrust::unique_by_key(
+    //     thrust::device,
+    //     tvalues.values,
+    //     tvalues.values + tvalues.count,
+    //     candidates.values,
+    //     FloatEpsilonComparator()
+    //   ).first - tvalues.values;
 
-    if (tvalues.count < 2) {
-        return 0.0;
-    }
-
-    // printf ("Tvalues count: %d\n", tvalues.count);
-
-    // arg sort the tvalues
-    int index[MAX_COLLISIONS];
-    thrust::stable_sort_by_key(thrust::seq, tvalues.collisions, tvalues.collisions + tvalues.count, candidates.collisions);
+    // tvalues.count = newCount;
+    // candidates.count = newCount;
 
     // compute the thickness
-    float val = matchOuterPairs (candidates, tvalues, ray, vertices, normals, tree);
-    // float val = sumTvalues(tvalues);
-    return val;
+    // return matchOuterPairs (new_candidates, new_tvalues, ray, vertices, normals, tree);
+    // FP_T val = project_thickness(new_tvalues);
+    // FP_T val = computeThickness(tvalues);
+    return new_tvalues.count;
+    // FP_T val = candidates.count;
+    // return sumTvalues(new_tvalues);
 }
 
-extern "C" __global__ void calculateBbBoxKernel (float4 *vertices, float4 *bbMin, float4 *bbMax, unsigned int nb_keys) {
+// __device__ FP_T traceRay (
+//         Ray &ray, Tree &tree,
+//         FP_T4* __restrict__ vertices,
+//         FP_T4* __restrict__ normals) {
+//     List candidates;
+//     candidates.count = 0;
+//     memset(candidates.values, 0, MAX_COLLISIONS * sizeof(int));
+
+//     List tvalues;
+//     tvalues.count = 0;
+//     memset(tvalues.values, 0, MAX_COLLISIONS * sizeof(FP_T));
+
+//     // This is where the acceleration structure (BVH) is actually usefull
+//     query(tree, ray, candidates);
+
+//     if (candidates.count == 0) {
+//         return 0.0;
+//     }
+
+//     // Test the candidates for actual intersections
+//     for (int i = 0; i < candidates.count; i++) {
+//         int primIndex = candidates.values[i]*3;
+
+//         FP_T4 V1 = vertices[primIndex];
+//         FP_T4 V2 = vertices[primIndex + 1];
+//         FP_T4 V3 = vertices[primIndex + 2];
+
+//         FP_T t;
+//         if (ray.intersects(V1, V2, V3, t)) {
+//             candidates.values[tvalues.count] = candidates.values[i];
+//             tvalues.values[tvalues.count++] = t;
+//         }
+//     }
+
+//     if (tvalues.count < 2) {
+//         return 0.0;
+//     }
+
+//     // printf ("Tvalues count: %d\n", tvalues.count);
+
+//     // arg sort the tvalues
+//     int index[MAX_COLLISIONS];
+//     thrust::stable_sort_by_key(thrust::seq, tvalues.values, tvalues.values + tvalues.count, candidates.values);
+
+//     // compute the thickness
+//     FP_T val = matchOuterPairs (candidates, tvalues, ray, vertices, normals, tree);
+//     // FP_T val = sumTvalues(tvalues);
+//     return val;
+// }
+
+extern "C" __global__ void calculateBbBoxKernel(FP_T4 *vertices, FP_T4 *bbMin, FP_T4 *bbMax, unsigned int nb_keys)
+{
     unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
 
-    while (tid < nb_keys) {
-        float4 V1 = vertices[tid * 3];
-        float4 V2 = vertices[tid * 3 + 1];
-        float4 V3 = vertices[tid * 3 + 2];
-        calculateTriangleBoundingBox (V1, V2, V3, bbMin[tid], bbMax[tid]);
+    while (tid < nb_keys)
+    {
+        FP_T4 V1 = vertices[tid * 3];
+        FP_T4 V2 = vertices[tid * 3 + 1];
+        FP_T4 V3 = vertices[tid * 3 + 2];
+        calculateTriangleBoundingBox(V1, V2, V3, bbMin[tid], bbMax[tid]);
 
         tid += blockDim.x * gridDim.x;
     }
-    
 }
 
-
 extern "C" __global__ void projectTriangleCentroid(
-    unsigned int const nb_keys, float4 const *vertices, unsigned int *keys,
-    float4 *bbMin, float4 *bbMax, float4 const scene_bbMin, float4 const scene_bbMax) {
+    unsigned int const nb_keys, FP_T4 const *vertices, unsigned int *keys,
+    FP_T4 *bbMin, FP_T4 *bbMax, FP_T4 const scene_bbMin, FP_T4 const scene_bbMax)
+{
 
     unsigned int index = threadIdx.x + blockIdx.x * blockDim.x;
 
-
-    while (index < nb_keys) {
+    while (index < nb_keys)
+    {
         // Get the triangle vertices
-        float4 V1 = vertices[index * 3];
-        float4 V2 = vertices[index * 3 + 1];
-        float4 V3 = vertices[index * 3 + 2];
+        FP_T4 V1 = vertices[index * 3];
+        FP_T4 V2 = vertices[index * 3 + 1];
+        FP_T4 V3 = vertices[index * 3 + 2];
 
         // Calculate the bounding box of the triangle
         calculateTriangleBoundingBox(V1, V2, V3, bbMin[index], bbMax[index]);
 
         // Calculate the centroid of the AABB
-        float4 centroid = getBoundingBoxCentroid(bbMin[index], bbMax[index]);
-        
-        float4 normalizedCentroid = normalize(centroid, scene_bbMin, scene_bbMax);
+        FP_T4 centroid = getBoundingBoxCentroid(bbMin[index], bbMax[index]);
+
+        FP_T4 normalizedCentroid = normalize(centroid, scene_bbMin, scene_bbMax);
 
         // Calculate the morton code of the triangle
         morton_t mortonCode = calculateMortonCode(normalizedCentroid);
@@ -440,13 +520,15 @@ extern "C" __global__ void projectTriangleCentroid(
     }
 }
 
-extern "C" __global__ void growTreeKernel (
-    unsigned int nb_keys, unsigned int *keys, unsigned int *permutation, 
+extern "C" __global__ void growTreeKernel(
+    unsigned int nb_keys, unsigned int *keys, unsigned int *permutation,
     int *rope, int *left, int *entered,
-    float4 *bboxMin, float4 *bboxMax) {
+    FP_T4 *bboxMin, FP_T4 *bboxMax)
+{
     int index = threadIdx.x + blockIdx.x * blockDim.x;
 
-    while (index < nb_keys) {
+    while (index < nb_keys)
+    {
         Tree tree;
         tree.nb_keys = nb_keys;
         tree.keys = keys;
@@ -462,27 +544,28 @@ extern "C" __global__ void growTreeKernel (
     }
 }
 
-extern "C" __global__ void projectParallelKernel (
-    unsigned nb_keys, float* image, uint2 N,
-    float4 U, float4 V, float4 W,  // projection basis and origin
-    float4 upperleft_origin, float2 ps,
-    int* rope,
-    int* left,
-    unsigned* permutation,  // BVH tree
-    float4* bboxMin,
-    float4* bboxMax,
-    float4* __restrict__ vertices,
-    float4* __restrict__ normals // ray casting
-    ) {
-   
-    int gid_x = blockIdx.x * blockDim.x + threadIdx.x;
-    int gid_y = blockIdx.y * blockDim.y + threadIdx.y;
+extern "C" __global__ void projectParallelKernel(
+    unsigned nb_keys, FP_T *image, uint2 N,
+    FP_T4 U, FP_T4 V, FP_T4 W, // projection basis and origin
+    FP_T4 upperleft_origin, float2 ps,
+    int *rope,
+    int *left,
+    unsigned *permutation, // BVH tree
+    FP_T4 *bboxMin,
+    FP_T4 *bboxMax,
+    FP_T4 *__restrict__ vertices,
+    FP_T4 *__restrict__ normals // ray casting
+)
+{
+    int gid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (N.x == 0 || N.y == 0) {
+    if (N.x == 0 || N.y == 0)
+    {
         return;
     }
 
-    if (gid_x >= N.x || gid_y >= N.y) {
+    if (gid >= N.x * N.y)
+    {
         return;
     }
 
@@ -494,66 +577,70 @@ extern "C" __global__ void projectParallelKernel (
     tree.bboxMin = bboxMin;
     tree.bboxMax = bboxMax;
 
-    float4 scaled_U = U * ps.x;
-    float4 scaled_V = V * ps.y;
+    FP_T4 scaled_U = U * ps.x;
+    FP_T4 scaled_V = V * ps.y;
 
-    for (int i = gid_x; i < N.x; i += blockDim.x * gridDim.x) {
-        for (int j = gid_y; j < N.y; j += blockDim.y * gridDim.y) {
-            // U, V are the scaled basis vectors for the image plane
-            float4 pixel_coordinates = upperleft_origin - scaled_U * i - scaled_V * j;
-            Ray ray = Ray(pixel_coordinates, W);
-            image[j * N.x + i] = traceParallelRay (ray, tree, vertices, normals);
-        }
+    for (int i = gid; i < N.x * N.y; i += blockDim.x * gridDim.x)
+    {
+        unsigned row = i / N.x;
+        unsigned col = i % N.x;
+
+        // U, V are the scaled basis vectors for the image plane
+        FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
+        Ray ray = Ray(pixel_coordinates, W);
+        image[row * N.x + col] += traceParallelRay(ray, tree, vertices, normals);
     }
 }
 
-extern "C" __global__ void projectPerspectiveKernel (
-    unsigned nb_keys, float* image, uint2 N,
-    float4 U, float4 V, float4 W,  // projection basis and origin
-    float4 upperleft_origin, float4 ray_origin, float2 ps, 
-    int* rope,
-    int* left,
-    unsigned* permutation,  // BVH tree
-    float4* bboxMin,
-    float4* bboxMax,
-    float4* __restrict__ vertices,
-    float4* __restrict__ normals // ray casting
-    ) {
-   
+extern "C" __global__ void projectPerspectiveKernel(
+    unsigned nb_keys, FP_T *image, uint2 N,
+    FP_T4 U, FP_T4 V, FP_T4 W, // projection basis and origin
+    FP_T4 upperleft_origin, FP_T4 ray_origin, float2 ps,
+    int *rope,
+    int *left,
+    unsigned *permutation, // BVH tree
+    FP_T4 *bboxMin,
+    FP_T4 *bboxMax,
+    FP_T4 *__restrict__ vertices,
+    FP_T4 *__restrict__ normals // ray casting
+)
+{
+
     int gid_x = blockIdx.x * blockDim.x + threadIdx.x;
     int gid_y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    if (N.x == 0 || N.y == 0) {
+    if (N.x == 0 || N.y == 0)
+    {
         return;
     }
 
-    if (gid_x >= N.x || gid_y >= N.y) {
+    if (gid_x >= N.x || gid_y >= N.y)
+    {
         return;
     }
 
-    Tree tree;
-    tree.nb_keys = nb_keys;
-    tree.rope = rope;
-    tree.left = left;
-    tree.indices = permutation;
-    tree.bboxMin = bboxMin;
-    tree.bboxMax = bboxMax;
+    //     Tree tree;
+    //     tree.nb_keys = nb_keys;
+    //     tree.rope = rope;
+    //     tree.left = left;
+    //     tree.indices = permutation;
+    //     tree.bboxMin = bboxMin;
+    //     tree.bboxMax = bboxMax;
 
-    float4 scaled_U = U * ps.x;
-    float4 scaled_V = V * ps.y;
-    
+    //     FP_T4 scaled_U = U * ps.x;
+    //     FP_T4 scaled_V = V * ps.y;
 
-    for (int i = gid_x; i < N.x; i += blockDim.x * gridDim.x) {
-        for (int j = gid_y; j < N.y; j += blockDim.y * gridDim.y) {
-            // U, V are the scaled basis vectors for the image plane
-            float4 pixel_coordinates = upperleft_origin - scaled_U * i - scaled_V * j;
-            float4 direction = pixel_coordinates - ray_origin;
-            Ray ray = Ray(ray_origin, direction);
-            // ray.print();
+    //     for (int i = gid_x; i < N.x; i += blockDim.x * gridDim.x) {
+    //         for (int j = gid_y; j < N.y; j += blockDim.y * gridDim.y) {
+    //             // U, V are the scaled basis vectors for the image plane
+    //             FP_T4 pixel_coordinates = upperleft_origin - scaled_U * i - scaled_V * j;
+    //             FP_T4 direction = pixel_coordinates - ray_origin;
+    //             Ray ray = Ray(ray_origin, direction);
+    //             // ray.print();
 
-            float thickness = traceRay (ray, tree, vertices, normals);
+    //             FP_T thickness = traceRay (ray, tree, vertices, normals);
 
-            image[j * N.x + i] = thickness;
-        }
-    }
+    //             image[j * N.x + i] = thickness;
+    //         }
+    //     }
 }

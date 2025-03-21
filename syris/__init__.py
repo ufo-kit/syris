@@ -54,12 +54,25 @@ def init(
     cfg.CUDA_PIPELINE = cfg.CudaPipeline(cuda_headers)
     cfg.CUDA_TIMER = cfg.CudaTimer (cp.cuda.Stream.null)
 
-    try:   
-        cfg.CUDA_PIPELINE.readModuleFromFiles("ray_caster", source_files, jitify=False)
+    module_name = "ray_caster"
+    
+    try:
+        cfg.CUDA_PIPELINE.readModuleFromFiles(module_name, source_files, jitify=False)
     except Exception as e:
         LOG.exception(str(e))
 
+    kernel_names = [
+        "projectTriangleCentroid",
+        "growTreeKernel",
+        "projectPerspectiveKernel",
+        "projectParallelKernel",
+    ]
 
+    for kernel_name in kernel_names:
+        try:
+            cfg.CUDA_PIPELINE.getKernelFromModule(module_name, kernel_name)
+        except Exception as e:
+            LOG.exception(str(e))
 
     modules = cfg.CUDA_PIPELINE.modules["ray_caster"]
     cfg.CUDA_KERNELS = {

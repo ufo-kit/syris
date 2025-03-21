@@ -22,6 +22,9 @@ import pyopencl.array as cl_array
 import quantities as q
 import syris.config as cfg
 import syris.geometry as geom
+
+from syris.coordinate_systems import CoordinateSystem
+from syris.transformations import Transformation
 from quantities.quantity import Quantity
 from scipy.optimize import bisect
 from syris.opticalelements import OpticalElement
@@ -41,23 +44,16 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False, camera=None, parallel=True):
+    def project(self, camera, t=None, block=False, parallel=True):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D.
         *offset* is the physical spatial body offset as (y, x). *queue* is an OpenCL command queue,
         *out* is the pyopencl array used for result. If *block* is True, wait for the kernel to
         finish.
         """
-        shape = make_tuple(shape, num_dims=2)
-        pixel_size = make_tuple(pixel_size, num_dims=2)
-        if offset is None:
-            offset = (0, 0) * q.m
-        if queue is None:
-            queue = cfg.OPENCL.queue
+        return self._project(camera, t=t, block=block, parallel=parallel)
 
-        return self._project(camera, parallel=parallel)
-
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False, camera=None, parallel=True):
+    def _project(self, camera, t=None, block=False, parallel=True):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
@@ -90,7 +86,7 @@ class MovableBody(Body):
 
     """Class representing a movable body."""
 
-    def __init__(self, trajectory, material=None, orientation=geom.Y_AX, cache_projection=True, coordinate_system=None):
+    def __init__(self, trajectory, material=None, orientation=None, cache_projection=True):
         """Create a body with a :class:`~syris.geometry.Trajectory` and *orientation*,
         which is an (x, y, z) vector specifying body's "up" vector. If *cache_projection* is True,
         the projection is computed only if the object moves between the last projection time and the
@@ -98,23 +94,18 @@ class MovableBody(Body):
         """
         super(MovableBody, self).__init__(material)
         self._trajectory = trajectory
-        self._orientation = geom.normalize(orientation)
-        self._center = trajectory.control_points[0].simplified
 
-        # Matrix holding transformation.
-        self.transform_matrix = np.identity(4, dtype=cfg.PRECISION.np_float)
-        # Maximum body enlargement in any direction.
-        self._scale_factor = np.ones(3)
-
-        if coordinate_system is None:
-            self._coordinate_system = geom.CoordinateSystem(origin=self._center)
-            self._child_cs = self._coordinate_system.add_symmetric_child ("viewport")
+        if orientation is None:
+            orientation = geom.Y_AX
         else:
-            self._coordinate_system = coordinate_system
-            if self._coordinate_system.has_child("viewport"):
-                self._child_cs = self._coordinate_system.children["viewport"]
-            else:
-                self._child_cs = self._coordinate_system.add_symmetric_child ("viewport")
+            orientation = geom.normalize(orientation)
+
+        if not hasattr(self, "_center"):
+            self._center = trajectory.control_points[0].simplified
+            print ("from top init", self._center)
+
+        if not hasattr(self, "coordinate_system"):
+            self.coordinate_system = CoordinateSystem(origin=self._center)
 
         # Last position as tuple consisting of a 3D point and a vector giving
         # the body orientation.
@@ -127,28 +118,32 @@ class MovableBody(Body):
         self._cache_projection = cache_projection
         self.update_projection_cache()
 
-    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None, block=False, camera=None, parallel=True):
-        """Project thickness at time *t* (if it is None no transformation is applied) to the image
-        plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
-        *pixel_size* is the point size, also either 1D or 2D. *offset* is the physical spatial body
-        offset as (y, x). *queue* is an OpenCL command queue, *out* is the pyopencl array used for
-        result. If *block* is True, wait for the kernel to finish.
+
+    def should_recompute_projection (self, camera, t=None):
         """
-        pixel_size = make_tuple(pixel_size, 2)
-        if offset is None:
-            offset = (0, 0) * q.m
+        Check if the projection should be recomputed based on the current state of the body and the
+        parameters. If the projection cache is not used, always return True. If the projection cache
+        is used, check if the body has moved between the last projection time and *t* or if the
+        parameters have changed. If the body has moved or the parameters have changed, update the
+        cache and return True, otherwise return False.
+        """
+
+        pixel_size = make_tuple(camera.pixel_size, 2)
+        shape = make_tuple(camera.shape, 2)
         if t is not None:
             self.move(t)
+
+        if not self.cache_projection:
+            return False
 
         if self.cache_projection:
             if (
                 self._p_cache["time"] is None
                 or np.any(self._p_cache["ps"] != pixel_size)
                 or self._p_cache["shape"] != shape
-                or np.any(self._p_cache["offset"] != offset)
             ):
                 moved = True
-                self.update_projection_cache(t=t, shape=shape, pixel_size=pixel_size, offset=offset)
+                self.update_projection_cache(t=t, shape=shape, pixel_size=pixel_size)
             else:
                 # 0.99 to make sure we recompute when next_time from cached time is current t
                 moved = self.moved(
@@ -161,16 +156,27 @@ class MovableBody(Body):
             if moved:
                 LOG.debug("{} computing projection at {}".format(self, t))
                 self._p_cache["time"] = t
-                self._p_cache["projection"] = super(MovableBody, self).project(
-                    shape, pixel_size, offset=offset, t=t, queue=queue, out=out, block=block, camera=camera, parallel=parallel
-                )
-            projection = self._p_cache["projection"]
+                return True
+            
+        return False
+    
+    def project (self, camera, t=None, block=False, parallel=True):
+        """
+        Project the body to the image plane of size *shape* which is either 1D and is extended to
+        (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D. *offset* is
+        the physical spatial body offset as (y, x). *t* is the time at which the projection is
+        computed. *queue* is an OpenCL command queue, *out* is the pyopencl array used for result.
+        If *block* is True, wait for the kernel to finish. If *camera* is given, the projection is
+        computed with respect to the camera's position and orientation. If *parallel* is True, the
+        projection uses parallel projection, otherwise perspective projection is used.
+        """
+        if self.should_recompute_projection(camera, t):
+            projection = super(MovableBody, self).project(camera, t=t, block=block, parallel=parallel)
+            self.update_projection_cache(projection=projection)
+            return projection
+        
         else:
-            projection = super(MovableBody, self).project(
-                shape, pixel_size, offset=offset, t=t, queue=queue, out=out, block=block, camera=camera, parallel=parallel
-            )
-
-        return projection
+            return self._p_cache["projection"]
 
     def bind_trajectory(self, pixel_size):
         """Bind trajectory for *pixel_size*."""
@@ -229,7 +235,7 @@ class MovableBody(Body):
     def position(self):
         """Current position."""
         # return self.transform_matrix[:3, -1] * q.m
-        return self._coordinate_system.origin
+        return self.coordinate_system.origin
 
     @property
     def last_position(self):
@@ -248,33 +254,11 @@ class MovableBody(Body):
     @property
     def orientation(self):
         return self._orientation
-
-    def clear_transformation(self):
-        """Clear all transformations."""
-        self.transform_matrix = np.identity(4, dtype=cfg.PRECISION.np_float)
-        self._scale_factor = np.ones(3)
-
+    
     @property
     def trajectory(self):
         return self._trajectory
 
-    def get_rescaled_transform_matrix(self, units, coeff=1):
-        """The last column of the transformation matrix holds displacement
-        information has SI units, convert those to the *units* specified,
-        apply coefficient *coeff* and return a copy of the matrix.
-        """
-        trans_mat = np.copy(self.transform_matrix)
-        for i in range(3):
-            trans_mat[i, 3] = coeff * Quantity(trans_mat[i, 3] * q.m).rescale(units)
-
-        return trans_mat
-
-    def apply_transformation(self, trans_matrix):
-        """Apply transformation given by the transformation matrix
-        *trans_matrix* on the current transformation matrix.
-        """
-        # self.transform_matrix = np.dot(trans_matrix, self.transform_matrix)
-        pass
 
     def get_next_time(self, t_0, pixel_size):
         """
@@ -377,24 +361,56 @@ class MovableBody(Body):
         rot_ax, angle = self._find_next_rotation_time(abs_time)
         self.rotate(angle, rot_ax)
 
-    def translate(self, vec, inherit=False):
-        """Translate the body by a vector *vec*."""
-        # self.transform_matrix = np.dot(self.transform_matrix, geom.translate(vec))
-        self._coordinate_system.translate(vec, inherit=inherit)
+        return self
 
-    def rotate(self, angle, axis, shift=None, inherit=False):
+    def translate(self, vec, inherit=True):
+        """Translate the body by a vector *vec*."""
+        self.coordinate_system.translate(vec, inherit=inherit)
+        return self
+
+    def rotate(self, angle, axis, inherit=True, pivot=None):
         """Rotate the body by *angle* around vector *vec*, where *shift* is the translation which
         takes place before the rotation and -*shift* takes place afterward, resulting in the
         transformation TRT^-1.
         """
-        # self.transform_matrix = np.dot(self.transform_matrix, geom.rotate(angle, axis, shift=shift))
-        if shift is None:
-            self._coordinate_system.rotate_euler_local(axis, angle, inherit=inherit)
+        if pivot is None:
+            self.coordinate_system.rotate_euler_local(angle, axis, inherit=inherit)
         else:
-            self._coordinate_system.rotate_euler(shift, axis, angle, inherit=inherit)
+            self.coordinate_system.rotate_euler(pivot, angle, axis, inherit=inherit)
 
+        return self
+
+    def scale(self, factor, inherit=True):
+        """Scale the body by a factor *factor*."""
+        self.coordinate_system.scale(factor, inherit=inherit)
+        return self
+    
+    def scale_mesh(self, *factor):
+        """Scale the mesh by a factor *factor*."""
+        trans = Transformation()
+        center = self.center.simplified.magnitude
+        trans.translation(*(-center))
+        trans.scaling(*factor)
+        trans.translation(*center)
+
+        if hasattr(self, "mesh_name"):
+            label = self.mesh_name
+        else:
+            label = next(iter(self.coordinate_system.points.keys()))
+        
+        points = self.coordinate_system.get_points(label=label)
+        self.coordinate_system.remove_points(label=label)
+        points = trans.apply(points)
+        self.coordinate_system.set_points(points, label=self.mesh_name)
+        return self
+
+    def clear_transformation(self):
+        """Clear all transformations."""
+        self.coordinate_system.clear_transformations()
+        return self
+        
     def visualize(self, plotter, cmap="viridis"):
-        self._coordinate_system.visualize(plotter, cmap=cmap)
+        self.coordinate_system.visualize(plotter=plotter, cmap=cmap)
 
 
 class CompositeBody(MovableBody):
@@ -571,12 +587,12 @@ class CompositeBody(MovableBody):
         them in a dictionary {body: transform_matrix}.
         """
         for body in self.all_bodies:
-            self._saved_matrices[body] = np.copy(body.transform_matrix)
+            self._saved_matrices[body] = np.copy(body.coordinate_system)
 
     def restore_transformation_matrices(self):
         """Restore transformation matrices of all bodies."""
         for body, matrix in self._saved_matrices.items():
-            body.transform_matrix = matrix
+            body.coordinate_system = matrix
 
         self._saved_matrices = {}
 
@@ -711,7 +727,7 @@ class CompositeBody(MovableBody):
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
         for body in self.bodies:
             out += body.project(
-                camera, parallel=parallel
+                shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block, camera=camera, parallel=parallel
             )
 
         return out

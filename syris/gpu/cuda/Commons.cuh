@@ -1,91 +1,88 @@
 #pragma once
-#include <cmath>
+#include <cuda/std/limits>
+#include <thrust/unique.h>
 
+
+#define FP_T float
+#define FP_T4 float4
+#define FP_T3 float3
+#define FP_T2 float2
 #define MAX_COLLISIONS 512
-#define EPSILON 0.00001
-#define INF INFINITY
 
-typedef struct {
-    int collisions[MAX_COLLISIONS];
+// Generic make function for FP_T4 to replace make_float4
+__forceinline__ __device__ __host__ FP_T4 make_fp_t4(FP_T x, FP_T y, FP_T z, FP_T w)
+{
+    FP_T4 result;
+    result.x = x;
+    result.y = y;
+    result.z = z;
+    result.w = w;
+    return result;
+}
+
+template <typename T>
+struct List
+{
+    T values[MAX_COLLISIONS];
     int count;
-} CandidateList;
+};
 
-typedef struct {
-    float collisions[MAX_COLLISIONS];
-    int count;
-} CollisionList;
-
-#define WARP_SIZE 32
-
-// Get the global warp index
-#define GLOBAL_WARP_INDEX static_cast<int>((threadIdx.x + blockIdx.x * blockDim.x) / WARP_SIZE)
-
-// Get the block warp index
-#define WARP_INDEX static_cast<int>(threadIdx.x / WARP_SIZE)
-
-// Get a pointer to the beginning of a warp area in an array that stores a certain number of 
-// elements for each warp
-#define WARP_ARRAY(source, elementsPerWarp) ((source) + WARP_INDEX * (elementsPerWarp))
-
-// Calculate the index of a value in an array that stores a certain number of elements for each 
-// warp
-#define WARP_ARRAY_INDEX(index, elementsPerWarp) (WARP_INDEX * (elementsPerWarp) + (index))
-
-// Index of the thread in the warp, from 0 to WARP_SIZE-1
-#define THREAD_WARP_INDEX (threadIdx.x & (WARP_SIZE - 1))
-
-// Read a vector of 3 elements using shuffle operations
-#define SHFL_float4(destination, source, index) \
-do { \
-    (destination).x = __shfl((source)[0], (index)); \
-    (destination).y = __shfl((source)[1], (index)); \
-    (destination).z = __shfl((source)[2], (index)); \
-} while (0);
-
-
-__device__ float4 operator+(const float4& lhs, const float4& rhs) {
-    return make_float4(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
+__forceinline__ __device__ bool is_null(FP_T val, FP_T epsilon = 1e-6)
+{
+    return fabs(val) < epsilon;
 }
 
-__device__ float4 operator-(const float4& lhs, const float4& rhs) {
-    return make_float4(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
+__device__ FP_T4 operator+(const FP_T4 &lhs, const FP_T4 &rhs)
+{
+    return make_fp_t4(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
 }
 
-__device__ float4 operator*(const float4& lhs, const float& rhs) {
-    return make_float4(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
+__device__ FP_T4 operator-(const FP_T4 &lhs, const FP_T4 &rhs)
+{
+    return make_fp_t4(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
 }
 
-__device__ float4 operator/(const float4& lhs, const float& rhs) {
-    return make_float4(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs);
+__device__ FP_T4 operator*(const FP_T4 &lhs, const FP_T &rhs)
+{
+    return make_fp_t4(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
 }
 
-__device__ float4 operator*(const float& lhs, const float4& rhs) {
-    return make_float4(lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w);
+__device__ FP_T4 operator/(const FP_T4 &lhs, const FP_T &rhs)
+{
+    return make_fp_t4(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs);
 }
 
-__device__ float4 operator/(const float& lhs, const float4& rhs) {
-    return make_float4(lhs / rhs.x, lhs / rhs.y, lhs / rhs.z, lhs / rhs.w);
+__device__ FP_T4 operator*(const FP_T &lhs, const FP_T4 &rhs)
+{
+    return make_fp_t4(lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w);
 }
 
-__device__ float4 operator*(const float4& lhs, const float4& rhs) {
-    return make_float4(lhs.x * rhs.x, lhs.y * rhs.y, lhs.z * rhs.z, lhs.w * rhs.w);
+__device__ FP_T4 operator/(const FP_T &lhs, const FP_T4 &rhs)
+{
+    return make_fp_t4(lhs / rhs.x, lhs / rhs.y, lhs / rhs.z, lhs / rhs.w);
+}
+
+__device__ FP_T operator*(const FP_T4 &lhs, const FP_T4 &rhs)
+{
+    return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
 }
 
 // Swap two integers
-__forceinline__ __device__ void swap(int &a, int &b) {
+__forceinline__ __device__ void swap(int &a, int &b)
+{
     int tmp = a;
     a = b;
     b = tmp;
 }
 
-__device__ inline float xor_signmask(float x, int y)
+__device__ inline FP_T xor_signmask(FP_T x, int y)
 {
-    return (float)(int(x) ^ y);
+    return (FP_T)(int(x) ^ y);
 }
 
-__device__ inline float4 sub4(float4 a, float4 b)
+__device__ inline FP_T4 sub4(FP_T4 a, FP_T4 b)
 {
-    float4 c;
+    FP_T4 c;
     c.x = a.x - b.x;
     c.y = a.y - b.y;
     c.z = a.z - b.z;
@@ -93,9 +90,9 @@ __device__ inline float4 sub4(float4 a, float4 b)
     return c;
 }
 
-__device__ inline float4 abs4(float4 a)
+__device__ inline FP_T4 abs4(FP_T4 a)
 {
-    float4 c;
+    FP_T4 c;
     c.x = fabs(a.x);
     c.y = fabs(a.y);
     c.z = fabs(a.z);
@@ -103,9 +100,9 @@ __device__ inline float4 abs4(float4 a)
     return c;
 }
 
-__device__ inline float4 min4(float4 a, float4 b)
+__device__ inline FP_T4 min4(FP_T4 a, FP_T4 b)
 {
-    float4 c;
+    FP_T4 c;
     c.x = fminf(a.x, b.x);
     c.y = fminf(a.y, b.y);
     c.z = fminf(a.z, b.z);
@@ -113,9 +110,9 @@ __device__ inline float4 min4(float4 a, float4 b)
     return c;
 }
 
-__device__ inline float4 max4(float4 a, float4 b)
+__device__ inline FP_T4 max4(FP_T4 a, FP_T4 b)
 {
-    float4 c;
+    FP_T4 c;
     c.x = fmaxf(a.x, b.x);
     c.y = fmaxf(a.y, b.y);
     c.z = fmaxf(a.z, b.z);
@@ -123,40 +120,40 @@ __device__ inline float4 max4(float4 a, float4 b)
     return c;
 }
 
-__device__ inline float4 cross4 (float4 a, float4 b) // cross product between two 3D vectors
-{ 
-    float4 c;
+__device__ inline FP_T4 cross4(FP_T4 a, FP_T4 b) // cross product between two 3D vectors
+{
+    FP_T4 c;
     c.x = a.y * b.z - a.z * b.y;
     c.y = a.z * b.x - a.x * b.z;
     c.z = a.x * b.y - a.y * b.x;
+    c.w = 0;
 
     return c;
 }
 
-__device__ inline float dot4(float4 a, float4 b)
+__device__ inline FP_T dot4(FP_T4 a, FP_T4 b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-__device__ inline float max_component(float4 a)
+__device__ inline FP_T max_component(FP_T4 a)
 {
     return fmaxf(fmaxf(a.x, a.y), a.z);
 }
 
-__device__ inline float min_component(float4 a)
+__device__ inline FP_T min_component(FP_T4 a)
 {
     return fminf(fminf(a.x, a.y), a.z);
 }
 
-__device__ inline float4 normalize4(float4 a)
+__device__ inline FP_T4 normalize4(FP_T4 a)
 {
-    float invLen = rsqrtf(dot4(a, a));
-    float norm = 1.0f / invLen;
-    return make_float4(a.x * invLen, a.y * invLen, a.z * invLen, norm);
+    FP_T invLen = rsqrtf(dot4(a, a));
+    FP_T norm = 1.0f / invLen;
+    return make_fp_t4(a.x * invLen, a.y * invLen, a.z * invLen, norm);
 }
 
-
-__device__ inline int maxDimIndex(const float4 &D)
+__device__ inline int maxDimIndex(const FP_T4 &D)
 {
     if (D.x > D.y)
     {
@@ -182,8 +179,8 @@ __device__ inline int maxDimIndex(const float4 &D)
     }
 }
 
-__forceinline__  __device__ void calculateTriangleBoundingBox(
-    float4 const &vertex1, float4 const &vertex2, float4 const &vertex3, float4 &boundingBoxMin, float4 &boundingBoxMax)
+__forceinline__ __device__ void calculateTriangleBoundingBox(
+    FP_T4 const &vertex1, FP_T4 const &vertex2, FP_T4 const &vertex3, FP_T4 &boundingBoxMin, FP_T4 &boundingBoxMax)
 {
     boundingBoxMin.x = min(vertex1.x, vertex2.x);
     boundingBoxMin.x = min(boundingBoxMin.x, vertex3.x);
@@ -201,10 +198,9 @@ __forceinline__  __device__ void calculateTriangleBoundingBox(
     boundingBoxMax.z = max(boundingBoxMax.z, vertex3.z);
 }
 
-
-__device__ inline float4 getBoundingBoxCentroid(float4 bboxMin, float4 bboxMax)
+__device__ inline FP_T4 getBoundingBoxCentroid(FP_T4 bboxMin, FP_T4 bboxMax)
 {
-    float4 centroid;
+    FP_T4 centroid;
 
     centroid.x = (bboxMin.x + bboxMax.x) / 2.0f;
     centroid.y = (bboxMin.y + bboxMax.y) / 2.0f;
@@ -213,40 +209,38 @@ __device__ inline float4 getBoundingBoxCentroid(float4 bboxMin, float4 bboxMax)
     return centroid;
 }
 
-__forceinline__  __device__ float4 subtract(float4 v1, float4 v2)
+__forceinline__ __device__ FP_T4 subtract(FP_T4 v1, FP_T4 v2)
 {
-    float4 result;
+    FP_T4 result;
     result.x = v1.x - v2.x;
     result.y = v1.y - v2.y;
     result.z = v1.z - v2.z;
     return result;
 }
 
-__forceinline__  __device__ float4 cross(float4 v1, float4 v2)
+__forceinline__ __device__ FP_T4 cross(FP_T4 const &a, FP_T4 const &b)
 {
-    float4 result;
-    result.x = v1.y * v2.z - v1.z * v2.y;
-    result.y = v1.z * v2.x - v1.x * v2.z;
-    result.z = v1.x * v2.y - v1.y * v2.x;
-    return result;
+    return make_fp_t4(a.y * b.z - a.z * b.y,
+                      a.z * b.x - a.x * b.z,
+                      a.x * b.y - a.y * b.x,
+                      0.0f);
 }
 
-
 // --- Morton codes -------------------------------------------------------------------------------
-__forceinline__  __device__ float4 normalize(float4 point, float4 boundingBoxMin,
-        float4 boundingBoxMax)
+__forceinline__ __device__ FP_T4 normalize(FP_T4 point, FP_T4 boundingBoxMin,
+                                            FP_T4 boundingBoxMax)
 {
-    float4 normalized;
+    FP_T4 normalized;
     normalized.x = (point.x - boundingBoxMin.x) / (boundingBoxMax.x - boundingBoxMin.x);
     normalized.y = (point.y - boundingBoxMin.y) / (boundingBoxMax.y - boundingBoxMin.y);
     normalized.z = (point.z - boundingBoxMin.z) / (boundingBoxMax.z - boundingBoxMin.z);
     return normalized;
 }
 
-__forceinline__  __device__ float4 denormalize(float4 normalized, float4 bboxMin,
-        float4 bboxMax)
+__forceinline__ __device__ FP_T4 denormalize(FP_T4 normalized, FP_T4 bboxMin,
+                                              FP_T4 bboxMax)
 {
-    float4 point;
+    FP_T4 point;
     point.x = bboxMin.x + (bboxMax.x - bboxMin.x) * normalized.x;
     point.y = bboxMin.y + (bboxMax.y - bboxMin.y) * normalized.y;
     point.z = bboxMin.z + (bboxMax.z - bboxMin.z) * normalized.z;
@@ -254,7 +248,7 @@ __forceinline__  __device__ float4 denormalize(float4 normalized, float4 bboxMin
 }
 
 // Expands a 10-bit integer into 30 bits by inserting 2 zeros after each bit.
-__forceinline__  __device__ unsigned int expandBits(unsigned int value)
+__forceinline__ __device__ unsigned int expandBits(unsigned int value)
 {
     value = (value * 0x00010001u) & 0xFF0000FFu;
     value = (value * 0x00000101u) & 0x0F00F00Fu;
@@ -263,20 +257,23 @@ __forceinline__  __device__ unsigned int expandBits(unsigned int value)
     return value;
 }
 
-template <int N>__forceinline__  __device__ unsigned int expandBitsBy (unsigned int)
+template <int N>
+__forceinline__ __device__ unsigned int expandBitsBy(unsigned int)
 {
     static_assert(0 <= N && N < 10,
-                "expandBitsBy can only be used with values 0-9");
+                  "expandBitsBy can only be used with values 0-9");
 
-    return 0; 
+    return 0;
 }
 
-template <>__forceinline__  __device__ unsigned int expandBitsBy<0> (unsigned int x)
+template <>
+__forceinline__ __device__ unsigned int expandBitsBy<0>(unsigned int x)
 {
     return x;
 }
 
-template <>__forceinline__  __device__ unsigned int expandBitsBy<1> (unsigned int x)
+template <>
+__forceinline__ __device__ unsigned int expandBitsBy<1>(unsigned int x)
 {
     x &= 0x0000ffffu;
     x = (x ^ (x << 8)) & 0x00ff00ffu;
@@ -286,7 +283,8 @@ template <>__forceinline__  __device__ unsigned int expandBitsBy<1> (unsigned in
     return x;
 }
 
-template <>__forceinline__  __device__ unsigned int expandBitsBy<2> (unsigned int x)
+template <>
+__forceinline__ __device__ unsigned int expandBitsBy<2>(unsigned int x)
 {
     x &= 0x000003ffu;
     x = (x ^ (x << 16)) & 0xff0000ffu;
@@ -296,7 +294,8 @@ template <>__forceinline__  __device__ unsigned int expandBitsBy<2> (unsigned in
     return x;
 }
 
-template <>__forceinline__  __device__ unsigned int expandBitsBy<3> (unsigned int x)
+template <>
+__forceinline__ __device__ unsigned int expandBitsBy<3>(unsigned int x)
 {
     x &= 0xffu;
     x = (x | x << 16) & 0xc0003fu;
@@ -306,24 +305,24 @@ template <>__forceinline__  __device__ unsigned int expandBitsBy<3> (unsigned in
     x = (x | x << 1) & 0x11111111u;
     return x;
 }
-__forceinline__  __device__ unsigned int calculateMortonCode(float4 point)
+__forceinline__ __device__ unsigned int calculateMortonCode(FP_T4 point)
 {
     // Discretize the unit cube into a 10 bit integer
     constexpr unsigned N = 1u << 10;
 
-    float p[3] = {point.x, point.y, point.z};
+    FP_T p[3] = {point.x, point.y, point.z};
 
     unsigned r = 0;
     for (int d = 0; d < 3; ++d)
     {
-        auto x = min (max (p[d] * N, 0.0f), (float)(N - 1));
+        auto x = min(max(p[d] * N, FP_T(0)), FP_T(N - 1));
         r += (expandBitsBy<2>((unsigned int)x) << (3 - d - 1));
     }
     return r;
 }
 
 // Compact bits from the specified 30-bit value, using only one bit at every 3 from the original value and forming a 10-bit value
-__forceinline__  __device__ unsigned int compactBits(unsigned int value)
+__forceinline__ __device__ unsigned int compactBits(unsigned int value)
 {
     unsigned int compacted = value;
     compacted &= 0x09249249;
@@ -335,32 +334,32 @@ __forceinline__  __device__ unsigned int compactBits(unsigned int value)
 }
 
 // Decodes the 'x' coordinate from a 30-bit morton code. The returned value is a float between 0 and 1
-__forceinline__  __device__ float decodeMortonCodeX(unsigned int value)
+__forceinline__ __device__ FP_T decodeMortonCodeX(unsigned int value)
 {
     unsigned int expanded = compactBits(value >> 2);
 
-    return expanded / 1024.0f;
+    return expanded / FP_T(1024.0);
 }
 
 // Decodes the 'y' coordinate from a 30-bit morton code. The returned value is a float between 0 and 1.
-__forceinline__  __device__ float decodeMortonCodeY(unsigned int value)
+__forceinline__ __device__ FP_T decodeMortonCodeY(unsigned int value)
 {
     unsigned int expanded = compactBits(value >> 1);
 
-    return expanded / 1024.0f;
+    return expanded / FP_T(1024.0);
 }
 
 // Decodes the 'z' coordinate from a 30-bit morton code. The returned value is a float between 0 and 1.
-__forceinline__  __device__ float decodeMortonCodeZ(unsigned int value)
+__forceinline__ __device__ FP_T decodeMortonCodeZ(unsigned int value)
 {
     unsigned int expanded = compactBits(value);
 
-    return expanded / 1024.0f;
+    return expanded / FP_T(1024.0);
 }
 
 // Expands a 21-bit integer into 63 bits by inserting 2 zeros after each bit.
-__forceinline__  __device__ unsigned long long int expandBits64(
-        unsigned long long int value)
+__forceinline__ __device__ unsigned long long int expandBits64(
+    unsigned long long int value)
 {
     unsigned long long int expanded = value;
     expanded &= 0x1fffff;
@@ -374,13 +373,13 @@ __forceinline__  __device__ unsigned long long int expandBits64(
 }
 
 // Calculates the point morton code using 63 bits.
-__forceinline__  __device__ unsigned long long int calculateMortonCode64(float4 point)
+__forceinline__ __device__ unsigned long long int calculateMortonCode64(FP_T4 point)
 {
     // Discretize the unit cube into a 10 bit integer
     unsigned long long int discretized[3];
-    discretized[0] = (unsigned long long int)min(max(point.x * 2097152.0f, 0.0f), 2097151.0f);
-    discretized[1] = (unsigned long long int)min(max(point.y * 2097152.0f, 0.0f), 2097151.0f);
-    discretized[2] = (unsigned long long int)min(max(point.z * 2097152.0f, 0.0f), 2097151.0f);
+    discretized[0] = (unsigned long long int)min(max(point.x * FP_T(2097152.0), FP_T(0.0)), FP_T(2097151.0));
+    discretized[1] = (unsigned long long int)min(max(point.y * FP_T(2097152.0), FP_T(0.0)), FP_T(2097151.0));
+    discretized[2] = (unsigned long long int)min(max(point.z * FP_T(2097152.0), FP_T(0.0)), FP_T(2097151.0));
 
     discretized[0] = expandBits64(discretized[0]);
     discretized[1] = expandBits64(discretized[1]);
@@ -390,8 +389,8 @@ __forceinline__  __device__ unsigned long long int calculateMortonCode64(float4 
 }
 
 // Compact bits from the specified 63-bit value, using only one bit at every 3 from the original value and forming a 21-bit value.
-__forceinline__  __device__ unsigned long long int compactBits64(
-        unsigned long long int value)
+__forceinline__ __device__ unsigned long long int compactBits64(
+    unsigned long long int value)
 {
     unsigned long long int compacted = value;
 
@@ -406,32 +405,32 @@ __forceinline__  __device__ unsigned long long int compactBits64(
 }
 
 // Decodes the 'x' coordinate from a 63-bit morton code. The returned value is a float between 0 and 1.
-__forceinline__  __device__ float decodeMortonCode64X(unsigned long long int value)
+__forceinline__ __device__ FP_T decodeMortonCode64X(unsigned long long int value)
 {
     unsigned long long int expanded = compactBits64(value >> 2);
 
-    return expanded / 2097152.0f;
+    return expanded / FP_T(2097152.0);
 }
 
 // Decodes the 'y' coordinate from a 63-bit morton code. The returned value is a float between 0 and 1.
-__forceinline__  __device__ float decodeMortonCode64Y(unsigned long long int value)
+__forceinline__ __device__ FP_T decodeMortonCode64Y(unsigned long long int value)
 {
     unsigned long long int expanded = compactBits64(value >> 1);
 
-    return expanded / 2097152.0f;
+    return expanded / FP_T(2097152.0);
 }
 
 // Decodes the 'z' coordinate from a 63-bit morton code. The returned value is a float between 0 and 1.
-__forceinline__  __device__ float decodeMortonCode64Z(unsigned long long int value)
+__forceinline__ __device__ FP_T decodeMortonCode64Z(unsigned long long int value)
 {
     unsigned long long int expanded = compactBits64(value);
 
-    return expanded / 2097152.0f;
+    return expanded / FP_T(2097152.0);
 }
 
 // Expands the group bounding box using the specified new bounding box coordinates.
-__forceinline__  __device__ void expandBoundingBox(float4& groupBbMin, float4& groupBbMax, 
-        const float4& newBbMin, const float4& newBbMax)
+__forceinline__ __device__ void expandBoundingBox(FP_T4 &groupBbMin, FP_T4 &groupBbMax,
+                                                  const FP_T4 &newBbMin, const FP_T4 &newBbMax)
 {
     groupBbMin.x = min(newBbMin.x, groupBbMin.x);
     groupBbMin.y = min(newBbMin.y, groupBbMin.y);
@@ -443,49 +442,49 @@ __forceinline__  __device__ void expandBoundingBox(float4& groupBbMin, float4& g
 }
 
 // Device implementations
-__device__ inline float device_int_as_float(int i)
+__device__ inline FP_T device_int_as_float(int i)
 {
     return __int_as_float(i);
 }
 
-__device__ inline int device_float_as_int(float f)
+__device__ inline int device_float_as_int(FP_T f)
 {
     return __float_as_int(f);
 }
 
-__device__ inline float device_xorf(float x, int y)
+__device__ inline FP_T device_xorf(FP_T x, int y)
 {
     return __int_as_float(__float_as_int(x) ^ y);
 }
 
-__device__ inline int device_sign_mask(float x)
+__device__ inline int device_sign_mask(FP_T x)
 {
     return __float_as_int(x) & 0x80000000;
 }
 
 // Host implementations
-inline float host_int_as_float(int i)
+inline FP_T host_int_as_float(int i)
 {
-    return *(float*)(&i);
+    return *(FP_T *)(&i);
 }
 
-inline int host_float_as_int(float f)
+inline int host_float_as_int(FP_T f)
 {
-    return *(int*)(&f);
+    return *(int *)(&f);
 }
 
-inline float host_xorf(float x, int y)
+inline FP_T host_xorf(FP_T x, int y)
 {
     return host_int_as_float(host_float_as_int(x) ^ y);
 }
 
-inline int host_sign_mask(float x)
+inline int host_sign_mask(FP_T x)
 {
     return host_float_as_int(x) & 0x80000000;
 }
 
 // Unified interface for both host and device
-__device__ inline float __iaf(int i)
+__device__ inline FP_T __iaf(int i)
 {
 #ifdef __CUDA_ARCH__
     return device_int_as_float(i);
@@ -494,7 +493,7 @@ __device__ inline float __iaf(int i)
 #endif
 }
 
-__device__ inline int __fai(float f)
+__device__ inline int __fai(FP_T f)
 {
 #ifdef __CUDA_ARCH__
     return device_float_as_int(f);
@@ -503,7 +502,7 @@ __device__ inline int __fai(float f)
 #endif
 }
 
-__device__ inline float xorf(float x, int y)
+__device__ inline FP_T xorf(FP_T x, int y)
 {
 #ifdef __CUDA_ARCH__
     return device_xorf(x, y);
@@ -512,7 +511,7 @@ __device__ inline float xorf(float x, int y)
 #endif
 }
 
-__device__ inline int sign_mask(float x)
+__device__ inline int sign_mask(FP_T x)
 {
 #ifdef __CUDA_ARCH__
     return device_sign_mask(x);
