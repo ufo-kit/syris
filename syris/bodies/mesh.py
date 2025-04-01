@@ -178,7 +178,7 @@ class Mesh(MovableBody):
         x_2 = self._current[0, 2::3]
         d_0 = np.max(np.abs(x_1 - x_0))
         d_1 = np.max(np.abs(x_1 - x_2))
-        d_2 = np.max(np.abs(x_2 - x_1))
+        d_2 = np.max(np.abs(x_2 - x_0))
 
         return max(d_0, d_1, d_2) * q.um
 

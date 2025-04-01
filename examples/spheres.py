@@ -240,33 +240,10 @@ def get_camera_image(image, camera, xray_gain, noise=False):
     )
 
 
-def get_low_resolution_image(
-    hd_image,
-    supersampling,
-    camera,
-    xray_gain,
-    max_intensity,
-    noise=False,
-    spots_image=None
-):
-    n = hd_image.shape[1] // supersampling
-    image = decimate(
-        hd_image,
-        (n, n),
-        sigma=fwnm_to_sigma(supersampling, n=2),
-        average=False
-    ).get()
-    image = get_camera_image(image, camera, xray_gain, noise=noise)
-    if spots_image is not None:
-        image = np.clip(image + spots_image * max_intensity, 0, max_intensity)
-
-    return image
-
-
 def create_xray_projections(common):
     args = common.xray
     syris.init()
-    projection_filenames = sorted(glob.glob(args.projections_fmt))
+    projection_filenames = sorted(glob.glob(args.projections_fmt))[::args.every_nth_projection]
     n_hd = imageio.imread(projection_filenames[0]).shape[0]
     supersampling = n_hd // common.n
     # Compute grid
@@ -357,8 +334,10 @@ def create_xray_projections(common):
     if args.spots_filename:
         spots_image = imageio.imread(args.spots_filename) if args.spots_filename else None
 
+    image_acc = None
     flats_done = False
     max_flat = None
+    max_intensity = None
     # Projections
     for i, filename in tqdm.tqdm(enumerate(projection_filenames)):
         # Flat field
@@ -369,21 +348,26 @@ def create_xray_projections(common):
             t=i / num_projections * source_traj.time if args.source.drift else 0 * q.s
         )) ** 2
         flat_hd = flat_hd / cl_array.max(flat_hd) * args.max_absorbed_photons / supersampling ** 2
+        flat_ld = decimate(
+            flat_hd,
+            (common.n, common.n),
+            sigma=fwnm_to_sigma(supersampling, n=2),
+            average=False
+        ).get()
         if max_flat is None:
             max_flat = cl_array.max(flat_hd).get() * xray_gain * camera.gain * supersampling ** 2
+            max_intensity = 1.2 * max_flat
             print("Max flat value:", max_flat)
         if not flats_done:
-            flat_ld = get_low_resolution_image(
-                flat_hd,
-                supersampling,
-                camera,
-                xray_gain,
-                max_flat * 1.2,
-                noise=args.noise,
-                spots_image=spots_image
-            )
+            flat_ld_save = get_camera_image(flat_ld, camera, xray_gain, noise=args.noise)
+            if spots_image is not None:
+                flat_ld_save = np.clip(
+                    flat_ld_save + spots_image * max_intensity,
+                    0,
+                    max_intensity
+                )
             if i < args.num_flats:
-                flats.append(flat_ld[y_cutoff:-y_cutoff])
+                flats.append(flat_ld_save[y_cutoff:-y_cutoff])
             else:
                 imageio.volwrite(
                     os.path.join(output_directory, f"flats{args.output_suffix}.tif"),
@@ -393,23 +377,43 @@ def create_xray_projections(common):
 
         # Sample
         spheres = imageio.imread(filename)
-        projection = spheres * ps_hd
+        projection = spheres * q.m
         sample = StaticBody(projection, ps_hd, material=material)
+        samples = [sample, capillary] if args.use_capillary else [sample]
         # Propagation with a monochromatic plane incident wave
-        hd = propagate([capillary, sample], shape, [energy], propagation_distance, ps_hd)
-        proj = get_low_resolution_image(
-            flat_hd * hd,
-            supersampling,
-            camera,
-            xray_gain,
-            max_flat * 1.2,
-            noise=args.noise,
-            spots_image=spots_image
-        )
-        imageio.imwrite(
-            os.path.join(projs_dir, "projection-{:>05}.tif".format(i)),
-            proj.astype(np.float32)[y_cutoff:-y_cutoff]
-        )
+        hd = propagate(samples, shape, [energy], propagation_distance, ps_hd)
+        image = decimate(
+            hd,
+            (common.n, common.n),
+            sigma=fwnm_to_sigma(supersampling, n=2),
+            average=True
+        ).get()
+        if image_acc is None:
+            image_acc = image
+        else:
+            image_acc += image
+        if (i + 1) % args.num_projections_per_image == 0:
+            image_acc = get_camera_image(
+                flat_ld * image_acc / args.num_projections_per_image,
+                camera,
+                xray_gain,
+                noise=args.noise
+            )
+            if spots_image is not None:
+                image_acc = np.clip(
+                    image_acc + spots_image * max_intensity,
+                    0,
+                    max_intensity
+                )
+
+            imageio.imwrite(
+                os.path.join(
+                    projs_dir,
+                    "projection-{:>05}.tif".format(i // args.num_projections_per_image)
+                ),
+                image_acc.astype(np.float32)[y_cutoff:-y_cutoff]
+            )
+            image_acc = None
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="spheres")
