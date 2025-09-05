@@ -41,7 +41,7 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None, block=False):
+    def project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D.
         *offset* is the physical spatial body offset as (y, x). *queue* is an OpenCL command queue,
@@ -52,34 +52,26 @@ class Body(OpticalElement):
         pixel_size = make_tuple(pixel_size, num_dims=2)
         if offset is None:
             offset = (0, 0) * q.m
-        if queue is None:
-            queue = cfg.OPENCL.queue
 
-        return self._project(shape, pixel_size, offset, t=t, queue=queue, out=None, block=block)
+        return self._project(shape, pixel_size, offset=offset, t=t, **kwargs)
 
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+    def _project(self, shape, pixel_size, /, *, offset=None, t=None, **kwargs):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
-    def _transfer(
-        self,
-        shape,
-        pixel_size,
-        energy,
-        offset,
-        exponent=False,
-        t=None,
-        queue=None,
-        out=None,
-        check=True,
-        block=False,
-    ):
+    def _transfer(self, shape, pixel_size, energy, offset, /, *, exponent=False, t=None, check=True, **kwargs):
         """Transfer function implementation based on a refractive index."""
         ri = self.material.get_refractive_index(energy)
         lam = energy_to_wavelength(energy)
-        proj = self.project(
-            shape, pixel_size, offset=offset, t=t, queue=queue, out=out, block=block
-        )
+
+        project_kwargs = kwargs.copy()
+        project_kwargs.pop('offset', None)
+
+        proj = self.project(shape, pixel_size, offset=offset, t=t, **project_kwargs)
+
+        queue = kwargs.get('queue', cfg.OPENCL.queue)
+        out = kwargs.get('out')
+        block = kwargs.get('block', False)
 
         return transfer(
             proj, ri, lam, exponent=exponent, queue=queue, out=out, check=check, block=block
@@ -117,34 +109,36 @@ class MovableBody(Body):
         self._cache_projection = cache_projection
         self.update_projection_cache()
 
-    def project(self, shape, pixel_size, offset=None, t=None, queue=None, out=None, block=False):
+    def project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs):
         """Project thickness at time *t* (if it is None no transformation is applied) to the image
         plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
         *pixel_size* is the point size, also either 1D or 2D. *offset* is the physical spatial body
         offset as (y, x). *queue* is an OpenCL command queue, *out* is the pyopencl array used for
         result. If *block* is True, wait for the kernel to finish.
         """
-        pixel_size = make_tuple(pixel_size, 2)
+        _pixel_size = make_tuple(pixel_size, 2) if pixel_size is not None else None
+        
         if offset is None:
             offset = (0, 0) * q.m
         if t is not None:
             self.move(t)
 
         if self.cache_projection:
-            if (
-                self._p_cache["time"] is None
-                or np.any(self._p_cache["ps"] != pixel_size)
-                or self._p_cache["shape"] != shape
-                or np.any(self._p_cache["offset"] != offset)
-            ):
+            cache_is_invalid = (
+                self._p_cache["time"] is None or
+                (_pixel_size is not None and np.any(self._p_cache["ps"] != _pixel_size)) or
+                (shape is not None and self._p_cache["shape"] != shape) or
+                np.any(self._p_cache["offset"] != offset)
+            )
+            
+            if cache_is_invalid:
                 moved = True
-                self.update_projection_cache(t=t, shape=shape, pixel_size=pixel_size, offset=offset)
+                self.update_projection_cache(t=t, shape=shape, pixel_size=_pixel_size, offset=offset)
             else:
-                # 0.99 to make sure we recompute when next_time from cached time is current t
                 moved = self.moved(
                     min(self._p_cache["time"], t),
                     max(self._p_cache["time"], t),
-                    0.99 * min(pixel_size),
+                    0.99 * min(_pixel_size),
                     bind=False,
                 )
 
@@ -152,12 +146,12 @@ class MovableBody(Body):
                 LOG.debug("{} computing projection at {}".format(self, t))
                 self._p_cache["time"] = t
                 self._p_cache["projection"] = super(MovableBody, self).project(
-                    shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block
+                    shape, pixel_size, offset=offset, t=t, **kwargs
                 )
             projection = self._p_cache["projection"]
         else:
             projection = super(MovableBody, self).project(
-                shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block
+                shape, pixel_size, offset=offset, t=t, **kwargs
             )
 
         return projection

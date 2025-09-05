@@ -28,18 +28,18 @@ class OpticalElement(object):
     """An optical element capable of producing a wavefield as a function of time."""
 
     def transfer(
-        self,
-        shape,
-        pixel_size,
-        energy,
-        exponent=False,
-        offset=None,
-        t=None,
-        queue=None,
-        out=None,
-        check=True,
-        block=False,
-    ):
+            self,
+            shape,
+            pixel_size,
+            energy,
+            offset=None,
+            /,
+            *,
+            exponent=False,
+            t=None,
+            check=True,
+            **kwargs,
+        ):
         """Transfer function of the element in real space on an image plane of size *shape*, use
         *pixel_size*, *energy*, *offset* is the physical spatial offset of the element as (y, x),
         transfer at time *t*. If *exponent* is true, compute the exponent of the transfer function
@@ -51,8 +51,6 @@ class OpticalElement(object):
         pixel_size = make_tuple(pixel_size, num_dims=2)
         if offset is None:
             offset = (0, 0) * q.m
-        if queue is None:
-            queue = cfg.OPENCL.queue
 
         return self._transfer(
             shape,
@@ -61,14 +59,12 @@ class OpticalElement(object):
             offset,
             exponent=exponent,
             t=t,
-            queue=queue,
-            out=out,
             check=check,
-            block=block,
+            **kwargs,
         )
 
     def transfer_fourier(
-        self, shape, pixel_size, energy, t=None, queue=None, out=None, block=False
+        self, shape, pixel_size, energy, /, *, t=None, **kwargs
     ):
         """Transfer function of the element in Fourier space of size *shape*, use *pixel_size*,
         *energy* and comput the function at time *t*. Use *queue* for OpenCL computations and *out*
@@ -76,11 +72,9 @@ class OpticalElement(object):
         """
         shape = make_tuple(shape, num_dims=2)
         pixel_size = make_tuple(pixel_size, num_dims=2)
-        if queue is None:
-            queue = cfg.OPENCL.queue
 
         return self._transfer_fourier(
-            shape, pixel_size, energy, t=t, queue=queue, out=out, block=block
+            shape, pixel_size, energy, t=t, **kwargs
         )
 
     def _transfer(
@@ -89,18 +83,18 @@ class OpticalElement(object):
         pixel_size,
         energy,
         offset,
+        /,
+        *,
         exponent=False,
         t=None,
-        queue=None,
-        out=None,
         check=True,
-        block=False,
+        **kwargs,
     ):
         """Transfer function implementation."""
         raise NotImplementedError
 
     def _transfer_fourier(
-        self, shape, pixel_size, energy, t=None, queue=None, out=None, block=False
+        self, shape, pixel_size, energy, /, *, t=None, **kwargs
     ):
         """Transfer function implementation."""
         raise NotImplementedError

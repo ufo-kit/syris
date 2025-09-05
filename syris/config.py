@@ -60,6 +60,27 @@ class Precision(object):
             list(zip(list(self.numpy_to_opencl.values()), list(self.numpy_to_opencl.keys())))
         )
 
+        self.float4 = np.dtype(
+            {
+                'names': ['x', 'y', 'z', 'w'],
+                'formats': [self.np_float] * 4,
+            }
+        )
+
+        self.float2 = np.dtype(
+            {
+                'names': ['x', 'y'],
+                'formats': [self.np_float] * 2,
+            }
+        )
+
+        self.uint2 = np.dtype(
+            {
+                'names': ['x', 'y'],
+                'formats': [np.uint32] * 2,
+            }
+        )
+
         dtype_base = "double" if double else "float"
         for i in [2, 3, 4, 8, 16]:
             setattr(self, "vfloat" + str(i), getattr(cltypes, dtype_base + str(i)))
@@ -95,6 +116,7 @@ def init_logging(level=logging.DEBUG, logger_file=None):
 
 PRECISION = None
 OPENCL = None
+BACKEND = None
 
 # Refractive index calculation program path.
 PMASF_FILE = "pmasf"

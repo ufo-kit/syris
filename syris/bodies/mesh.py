@@ -17,6 +17,7 @@
 
 """Bodies made from mesh."""
 import itertools
+from functools import cached_property
 import re
 import numpy as np
 import pyopencl.array as cl_array
@@ -28,6 +29,8 @@ import syris.gpu.util as gutil
 from syris.bodies.base import MovableBody
 from syris.util import get_magnitude, make_tuple
 
+from .accelerators import BvhCupyAccelerator, LegacyCpuAccelerator
+from meshreader import PyvistaReader
 
 class Mesh(MovableBody):
 
@@ -53,6 +56,8 @@ class Mesh(MovableBody):
         orientation=geom.Y_AX,
         iterations=1,
         center="bbox",
+        bounds=None,
+        normals=None
     ):
         """Constructor."""
         # Use homogeneous coordinates for easy matrix multiplication, i.e. the 4-th element is 1
@@ -74,8 +79,33 @@ class Mesh(MovableBody):
         self._triangles = np.copy(self._current)
         self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
         self.iterations = iterations
+
+        self.accelerator = None
+        self._normals = normals
+        self._bounds = bounds
+
         super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
+    @classmethod
+    def from_file(cls, filename, trajectory, material=None, orientation=geom.Y_AX, iterations=1, center="bbox", unit=q.m):
+        """
+        Alternative constructor to create a Mesh by loading a file. Recommended for modern mesh file formats.
+
+        Args:
+            filename (str): Path to the mesh file.
+            trajectory (Trajectory): The trajectory for the mesh.
+            material: material used to define the refractive index.
+            orientation: the "up" direction of the mesh.
+            center: the center reference point of the mesh, used for transformations.
+        
+        Returns:
+            Mesh: A fully initialized Mesh object.
+        """
+
+        reader = PyvistaReader(filename=filename, unit=unit)
+
+        return cls(reader.vertices, trajectory, material=material, orientation=orientation, iterations=iterations, center=center)
+    
     @property
     def furthest_point(self):
         """Furthest point from the center."""
@@ -163,11 +193,17 @@ class Mesh(MovableBody):
 
         return np.sqrt(np.sum(cross * cross, axis=1)) / 2 * q.um ** 2
 
-    @property
+    @cached_property
     def normals(self):
-        """Triangle normals."""
+        """
+        Returns the triangle normals. 
+        
+        If normals were provided during initialization, returns those. 
+        Otherwise, computes them from the triangle vectors and caches the result.
+        """
+        if self._normals is not None:
+            return self._normals
         v_0, v_1 = self.vectors
-
         return np.cross(v_0, v_1) * q.um
 
     @property
@@ -255,77 +291,28 @@ class Mesh(MovableBody):
         matrix = self.get_rescaled_transform_matrix(q.um)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
-        """Projection implementation."""
+    def build_acceleration_structure(self):
+        """Selects and builds the best available acceleration structure."""
+        backend_name = cfg.BACKEND.name
 
-        def get_crop(index, fov):
-            minimum = max(self.extrema[index][0], fov[index][0])
-            maximum = min(self.extrema[index][1], fov[index][1])
+        if backend_name == 'cupy':
+            self.accelerator = BvhCupyAccelerator(self)
+        else:
+            self.accelerator = LegacyCpuAccelerator(self)
 
-            return minimum - offset[::-1][index], maximum - offset[::-1][index]
+        self.accelerator.build()
+    
+    def _get_accelerator(self):
+        """Lazy-initializes and builds the best available accelerator."""
+        if self.accelerator is None:
+            self.accelerator = cfg.BACKEND.get_accelerator_for_mesh(self)
+            self.accelerator.build()
+        return self.accelerator
 
-        def get_px_value(value, round_func, ps):
-            return int(round_func(get_magnitude(value / ps)))
-
-        # Move to the desired location, apply the T matrix and resort the triangles
-        self.transform()
-        self.sort()
-
-        psm = pixel_size.simplified.magnitude
-        fov = offset + shape * pixel_size
-        fov = (
-            np.concatenate((offset.simplified.magnitude[::-1], fov.simplified.magnitude[::-1]))
-            .reshape(2, 2)
-            .transpose()
-            * q.m
-        )
-        if out is None:
-            out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
-
-        if (
-            self.extrema[0][0] < fov[0][1]
-            and self.extrema[0][1] > fov[0][0]
-            and self.extrema[1][0] < fov[1][1]
-            and self.extrema[1][1] > fov[1][0]
-        ):
-            # Object inside FOV
-            x_min, x_max = get_crop(0, fov)
-            y_min, y_max = get_crop(1, fov)
-            x_min_px = get_px_value(x_min, np.floor, pixel_size[1])
-            x_max_px = get_px_value(x_max, np.ceil, pixel_size[1])
-            y_min_px = get_px_value(y_min, np.floor, pixel_size[0])
-            y_max_px = get_px_value(y_max, np.ceil, pixel_size[0])
-            width = min(x_max_px - x_min_px, shape[1])
-            height = min(y_max_px - y_min_px, shape[0])
-            compute_offset = cltypes.make_int2(x_min_px, y_min_px)
-            v_1, v_2, v_3 = self._make_inputs(queue, pixel_size)
-            max_dx = self.max_triangle_x_diff.simplified.magnitude / psm[1]
-            # Use the same pixel size as for the x-axis, which will work for objects "not too far"
-            # from the imaging plane
-            min_z = self.extrema[2][0].simplified.magnitude / psm[1]
-            offset = gutil.make_vfloat2(*(offset / pixel_size).simplified.magnitude[::-1])
-
-            ev = cfg.OPENCL.programs["mesh"].compute_thickness(
-                queue,
-                (width, height),
-                None,
-                v_1.data,
-                v_2.data,
-                v_3.data,
-                out.data,
-                np.int32(self.num_triangles),
-                np.int32(shape[1]),
-                compute_offset,
-                offset,
-                cfg.PRECISION.np_float(psm[1]),
-                cfg.PRECISION.np_float(max_dx),
-                cfg.PRECISION.np_float(min_z),
-                np.int32(self.iterations),
-            )
-            if block:
-                ev.wait()
-
-        return out
+    def _project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs):
+        accel = self._get_accelerator()
+        return accel.project(shape, pixel_size, t=t, offset=offset, **kwargs)
+        
 
     def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
         """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for
