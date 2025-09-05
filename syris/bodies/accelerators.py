@@ -281,6 +281,9 @@ class LegacyCpuAccelerator(AcceleratorBase):
     def project(self, shape, pixel_size, /, *, t=None, offset=None, **kwargs):
         """Projection implementation."""
         xp = cfg.BACKEND.xp
+        queue = kwargs.get('queue', cfg.OPENCL.queue)
+        out = kwargs.get('out')
+        block = kwargs.get('block', False)
 
         def get_crop(index, fov):
             minimum = max(self.mesh.extrema[index][0], fov[index][0])

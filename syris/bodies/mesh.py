@@ -30,7 +30,7 @@ from syris.bodies.base import MovableBody
 from syris.util import get_magnitude, make_tuple
 
 from .accelerators import BvhCupyAccelerator, LegacyCpuAccelerator
-from meshreader import PyvistaReader
+from .meshreader import PyvistaReader
 
 class Mesh(MovableBody):
 

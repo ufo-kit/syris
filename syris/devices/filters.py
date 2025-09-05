@@ -64,12 +64,12 @@ class GaussianFilter(OpticalElement):
         pixel_size,
         energy,
         offset,
+        /,
+        *,
         exponent=False,
         t=None,
-        queue=None,
-        out=None,
         check=True,
-        block=False,
+        **kwargs,
     ):
         """Transfer function implementation. Only *energy* is relevant because a filter has the same
         thickness everywhere.
@@ -112,12 +112,12 @@ class MaterialFilter(Filter):
         pixel_size,
         energy,
         offset,
+        /,
+        *,
         exponent=False,
         t=None,
-        queue=None,
-        out=None,
         check=True,
-        block=False,
+        **kwargs,
     ):
         """Transfer function implementation. Only *energy* is relevant because a filter has the same
         thickness everywhere.

@@ -675,31 +675,25 @@ class CompositeBody(MovableBody):
         """Return True if the body moves more than *pixel_size* in time interval *t_0*, *t_1*."""
         return self.get_distance(t_0, t_1) > pixel_size
 
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+    def _project(self, shape, pixel_size, /, *, offset, t=None, **kwargs):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
+        queue = kwargs.get('queue', cfg.BACKEND.queue if cfg.BACKEND.name == 'opencl' else None)
+        out = kwargs.get('out')
+
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
+
         for body in self.bodies:
             out += body.project(
-                shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block
+                shape, pixel_size, offset=offset, t=t, **kwargs
             )
-
         return out
 
-    def _transfer(
-        self,
-        shape,
-        pixel_size,
-        energy,
-        offset,
-        exponent=False,
-        t=None,
-        queue=None,
-        out=None,
-        check=True,
-        block=False,
-    ):
+    def _transfer(self, shape, pixel_size, energy, offset, /, *, exponent=False, t=None, check=True, **kwargs):
         """Transfer function implementation based on a refractive index."""
+        queue = kwargs.get('queue', cfg.BACKEND.queue if cfg.BACKEND.name == 'opencl' else None)
+        out = kwargs.get('out')
+
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_cplx)
         else:
@@ -717,5 +711,5 @@ class CompositeBody(MovableBody):
             out=out,
             t=t,
             check=check,
-            block=block,
+            block=kwargs.get('block', False),
         )

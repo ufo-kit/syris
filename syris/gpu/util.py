@@ -632,3 +632,11 @@ def qmap(func, items, queues=None, args=(), kwargs=None):
 def get_event_duration(event, start=cl.profiling_info.START, stop=cl.profiling_info.END):
     """Get OpenCL event duration. *start* and *stop* define the OpenCL timer start and stop."""
     return (event.get_profiling_info(stop) - event.get_profiling_info(start)) * 1e-9 * q.s
+
+def _wrap_opencl():
+    import pyopencl as cl
+    import syris.config as cfg
+    from syris.gpu.util import execute_profiled
+
+    for function in cfg.PROFILED_CL_FUNCTIONS:
+        setattr(cl, function.__name__, execute_profiled(function))
