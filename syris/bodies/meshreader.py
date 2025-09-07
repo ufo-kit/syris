@@ -119,7 +119,7 @@ class PyvistaReader(MeshReaderBase):
         triangle_vertices = points[triangles]
         triangle_vertices = triangle_vertices.flatten().reshape(-1, 3)
 
-        self._vertices = np.array(triangle_vertices).astype(dtype) * unit
+        self._vertices = np.array(triangle_vertices).T.astype(dtype) * unit
         self._triangles = triangles
         self._normals = np.array(mesh.cell_normals).astype(dtype) * unit
         self._bounds = np.array(mesh.bounds).astype(dtype) * unit

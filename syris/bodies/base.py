@@ -28,6 +28,7 @@ from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength, transfer, transfer_many
 from syris.util import make_tuple
 
+import traceback
 
 LOG = logging.getLogger(__name__)
 
@@ -93,8 +94,10 @@ class MovableBody(Body):
         self._orientation = geom.normalize(orientation)
         self._center = trajectory.control_points[0].simplified
 
+        self._state = 0
+
         # Matrix holding transformation.
-        self.transform_matrix = np.identity(4, dtype=cfg.PRECISION.np_float)
+        self._transform_matrix = np.identity(4, dtype=cfg.PRECISION.np_float)
         # Maximum body enlargement in any direction.
         self._scale_factor = np.ones(3)
 
@@ -236,6 +239,37 @@ class MovableBody(Body):
     @property
     def trajectory(self):
         return self._trajectory
+    
+    @trajectory.setter
+    def trajectory(self, new_trajectory):
+        """
+        Sets a new trajectory for the body and invalidates any
+        cached projections.
+        """
+        self._trajectory = new_trajectory
+        self.update_projection_cache()
+
+    @property
+    def transform_matrix(self):
+        """The 4x4 transformation matrix for the body."""
+        return self._transform_matrix.copy()
+
+    @transform_matrix.setter
+    def transform_matrix(self, new_matrix):
+        """Sets the transformation matrix and increments the state counter."""
+        v = new_matrix[0:3, 1]
+        w = new_matrix[0:3, 2]
+        print (v, w)
+        if np.allclose(v, w) and not np.allclose(v, 0): # Check if they are the same and not zero
+            print("\n--- WARNING: Degenerate transform_matrix detected! ---")
+            print(f"Up vector (v) and Forward vector (w) are identical: {v.round(3)}")
+            print("Full Matrix:\n", new_matrix.round(3))
+            print("Setter was called from:")
+            traceback.print_stack(limit=5) # Show the last 5 calls
+            print("----------------------------------------------------\n")
+        
+        self._transform_matrix = new_matrix
+        self._state += 1
 
     def get_rescaled_transform_matrix(self, units, coeff=1):
         """The last column of the transformation matrix holds displacement
@@ -304,39 +338,31 @@ class MovableBody(Body):
         return max(total_displacement) > pixel_size
 
     def _find_next_rotation_time(self, abs_time):
+        """
+        Calculates the rotation axis and angle to align the body's orientation
+        with the trajectory direction at a given time. Includes a fix for cases
+        where the orientation and direction vectors are parallel.
+        """
         if not self.trajectory.bound:
             raise geom.TrajectoryError("Trajectory not bound")
-        orientation = self.orientation.simplified.magnitude
-        t = np.copy(abs_time.simplified.magnitude) * q.s
 
-        def compute_rotation_axis(current_time):
-            vec = self.trajectory.get_direction(current_time)
-            rot_ax = np.cross(orientation, vec)
+        orientation = self.orientation
+        direction = self.trajectory.get_direction(abs_time, norm=False)
 
-            return rot_ax
+        norm_orientation = geom.normalize(orientation)
+        norm_direction = geom.normalize(direction)
+        
+        angle = geom.angle(orientation, direction)
 
-        rot_ax = compute_rotation_axis(t)
-        vec = self.trajectory.get_direction(t).simplified.magnitude
-        angle = geom.angle(orientation, vec)
-
-        if np.all(np.isclose(rot_ax, 0)) and not (
-            np.all(np.isclose(vec, orientation)) or self.trajectory.stationary
-        ):
-            # Orientation does not coincide with trajectory direction and trajectory is not
-            # stationary.
-            dt = self.get_maximum_dt(self.trajectory.pixel_size)
-            t += dt
-            while t < self.trajectory.time and np.all(np.isclose(rot_ax, 0)):
-                # Orientation and trajectory direction are opposite, the angle between them is 180
-                # deg
-                rot_ax = compute_rotation_axis(t)
-                t += dt
-            if t >= self.trajectory.time:
-                # Orientation and trajectory direction don't deviate at all from abs_time forward,
-                # just use z axis
+        if abs(np.dot(norm_orientation, norm_direction)) > 0.999:
+            if np.allclose(norm_orientation, geom.Z_AX):
+                rot_ax = geom.X_AX
+            else:
                 rot_ax = geom.Z_AX
+        else:
+            rot_ax = np.cross(norm_orientation, norm_direction)
 
-        return (rot_ax, angle)
+        return rot_ax, angle
 
     def move(self, abs_time, clear=True):
         """Move to a position of the body in time *abs_time*. If *clear* is true clear the
@@ -344,16 +370,17 @@ class MovableBody(Body):
         """
         if clear:
             self.clear_transformation()
-        abs_time = abs_time.simplified
-        p_0 = self.trajectory.get_point(abs_time).simplified
-
-        # First translate to the point at time abs_time
-        self.translate(p_0)
-
-        # Then rotate about rotation axis given by trajectory direction
-        # and body orientation.
+            
+        # Get the target position and orientation from the trajectory
+        target_position = self.trajectory.get_point(abs_time).simplified
         rot_ax, angle = self._find_next_rotation_time(abs_time)
-        self.rotate(angle, rot_ax)
+
+        # Create the new transformation matrices
+        translation_matrix = geom.translate(target_position)
+        rotation_matrix = geom.rotate(angle, rot_ax)
+        
+        # Combine them: first rotate, then translate
+        self.transform_matrix = np.dot(translation_matrix, rotation_matrix)
 
     def translate(self, vec):
         """Translate the body by a vector *vec*."""

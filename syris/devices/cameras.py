@@ -22,10 +22,13 @@ import numpy as np
 import quantities as q
 import scipy.interpolate as interp
 import syris.gpu.util as gutil
+from syris.geometry import Trajectory
+from syris.bodies.base import MovableBody
 from syris import config as cfg
 from syris.imageprocessing import bin_image, decimate
 from syris.math import fwnm_to_sigma
-
+from syris.geometry import Z_AX
+import pyvista as pv
 
 LOG = logging.getLogger(__name__)
 
@@ -37,8 +40,10 @@ def is_fps_feasible(fps, exp_time):
     """
     return exp_time <= 1.0 / fps
 
+def is_length(param):
+    return isinstance(param, q.Quantity) and param.dimensionality.simplified == q.m.dimensionality.simplified
 
-class Camera(object):
+class Camera(MovableBody):
 
     """Base class representing a camera."""
 
@@ -55,6 +60,11 @@ class Camera(object):
         exp_time=1 * q.s,
         fps=1 / q.s,
         dtype=np.ushort,
+        focal_length=None,
+        optical_axis=None,
+        source_detector_distance=None,
+        trajectory=None,
+        parallel=True
     ):
         """Create a camera with *pixel_size*, *gain* specifying :math:`\frac{counts}{e^-}`,
         *dark_current* as mean number of electrons present without incident light, *amplifier_sigma*
@@ -66,7 +76,10 @@ class Camera(object):
         :math:`1/fps` s).  *dtype* is the sensor output data type. If the values given are
         incompatible, the frame rate is adjusted to the exposure time.
         """
-        self.pixel_size = pixel_size.simplified
+        if not isinstance(pixel_size, q.Quantity):
+            raise TypeError("pixel_size must be a quantities object (e.g., 10 * q.um)")
+        self._pixel_size = pixel_size
+        self._shape = shape
         self.gain = gain
         self.dark_current = dark_current
         self.amplifier_sigma = amplifier_sigma
@@ -74,9 +87,13 @@ class Camera(object):
         self._quantum_efficiencies = quantum_efficiencies
         self._wavelengths = wavelengths
         self.dtype = dtype
-        self.shape = shape
         self._last_input_shape = None
         self._psf = None
+        self._source_detector_distance = source_detector_distance
+        self._focal_length = focal_length
+        self.update_viewport_dimensions()
+
+        self.parallel = parallel
 
         if self._quantum_efficiencies is not None and self._wavelengths is not None:
             self._qe_tck = interp.splrep(
@@ -86,6 +103,178 @@ class Camera(object):
             fps = 1 / exp_time.simplified
         self._exp_time = exp_time
         self._fps = fps
+
+        if optical_axis is None:
+            self._optical_axis = np.copy(Z_AX)
+        else:
+            self._optical_axis = optical_axis
+
+        if trajectory is None:
+            trajectory = Trajectory([(0,0,0)]*q.m, pixel_size)            
+
+        super(Camera, self).__init__(trajectory)
+
+    def _to_cuda_vector(self, quantity_vec, w_val=0.0):
+        """
+        Converts a 3D vector (either a quantities vector or a plain array-like) 
+        to a 4D NumPy float array for CUDA.
+        """
+        try:
+            vec = quantity_vec.simplified.rescale(q.m).magnitude
+        except AttributeError:
+            vec = np.asarray(quantity_vec)
+
+        vec_4d = np.append(vec, w_val)
+        return vec_4d.astype(cfg.PRECISION.np_float)
+    
+    def update_fov(self):
+        if self._focal_length is None:
+            return
+        angle = self._viewport_dimensions / (2 * self._focal_length)
+        self._fov = 2 * np.arctan(angle.simplified)
+
+    def update_viewport_dimensions(self):
+        self._viewport_dimensions = self._pixel_size * self._shape
+        self.update_fov()
+
+    @property
+    def u(self):
+        """The local right-direction vector (x-axis) of the camera."""
+        return self.transform_matrix[0:3, 0]
+
+    @property
+    def v(self):
+        """The local up-direction vector (y-axis) of the camera."""
+        return self.transform_matrix[0:3, 1]
+
+    @property
+    def w(self):
+        """The local forward-direction vector (z-axis) of the camera."""
+        return self.transform_matrix[0:3, 2]
+
+    @property
+    def _u_vec(self):
+        """The right-direction vector as a dimensionless quantities array."""
+        return self.transform_matrix[0:3, 0] * q.dimensionless
+
+    @property
+    def _v_vec(self):
+        """The up-direction vector as a dimensionless quantities array."""
+        return self.transform_matrix[0:3, 1] * q.dimensionless
+    
+    @property
+    def _pixel_size_vec(self):
+        """Ensures pixel size is a 2-element quantities array."""
+        ps = self._pixel_size.rescale(q.m)
+        if ps.ndim == 0:
+            return np.array([ps.item(), ps.item()]) * ps.units
+        return ps
+    
+    # Cuda compatible properties
+    @property
+    def pixel_size(self):
+        ret = self._pixel_size.rescale(q.m).magnitude
+        if ret.size == 1:
+            ret = np.array([ret, ret])
+        return ret.astype(cfg.PRECISION.np_float)
+
+    @pixel_size.setter
+    def pixel_size(self, value):
+        if not is_length(value):
+            raise ValueError("Pixel size must be a length quantity")
+        if value.size > 2:
+            raise ValueError("Pixel size must be at most a 2D array")
+        if np.any(value <= 0):
+            raise ValueError("Pixel size must be greater than 0")
+        self._pixel_size = value
+        self.update_viewport_dimensions()
+        self.update_fov()
+
+    @property
+    def source_point(self):
+        """Calculates the source point based on the camera's position and orientation."""
+        # position property is inherited from MovableBody
+        vec = self.position + self._source_detector_distance * self.w
+        return self._to_cuda_vector(vec)
+    
+    @property
+    def shape(self):
+        ret = np.array(self._shape)
+        if ret.size == 1:
+            ret = np.array([ret, ret])
+        return ret.astype(np.uint32)
+
+    @shape.setter
+    def shape(self, value):
+        if value.shape[0] > 2:
+            raise ValueError("Resolution must be at most a 2D array")
+        if np.any(value <= 0):
+            raise ValueError("Resolution must be greater than 0")
+        self._shape = value
+        self.update_viewport_dimensions()
+        self.update_fov()
+
+    @property
+    def focal_length(self):
+        ret = self._focal_length.rescale(q.m).magnitude
+        return ret.astype(cfg.PRECISION.np_float)
+
+    @focal_length.setter
+    def focal_length(self, value):
+        if not is_length(value):
+            raise ValueError("Focal length must be a length quantity")
+        if value <= 0:
+            raise ValueError("Focal length must be greater than 0")
+        self._focal_length = value
+        self.update_fov()
+
+    @property
+    def viewport_dimensions(self):
+        ret = self._viewport_dimensions.rescale(q.m).magnitude
+        return ret.astype(cfg.PRECISION.np_float)
+
+    @property
+    def viewport_origin(self):
+        return self._to_cuda_vector(self.position)
+
+    @property
+    def fov(self):
+        self._fov = 2 * np.arctan(self.viewport_dimensions / (2 * self.focal_length)) * q.rad
+        ret = self._fov.magnitude
+        return ret.astype(cfg.PRECISION.np_float)
+
+    @property
+    def viewport_basis_vectors(self):
+        """Returns the camera's basis vectors as CUDA-compatible arrays."""
+        return self._to_cuda_vector(self.u), self._to_cuda_vector(self.v), self._to_cuda_vector(self.w)
+    
+    @property
+    def p00_center(self):
+        """Calculates the world coordinate of the center of the top-left pixel (0,0)."""
+        # Get dimensions as quantities objects
+        viewport_dims = self._shape * self._pixel_size_vec
+        
+        # Vector from the camera's center to the top-left corner of the sensor
+        vec_to_corner = - (viewport_dims[1] / 2) * self._u_vec - (viewport_dims[0] / 2) * self._v_vec
+        
+        # Vector from the corner to the center of the first pixel
+        vec_to_pixel_center = (self._pixel_size_vec[1] / 2) * self._u_vec + (self._pixel_size_vec[0] / 2) * self._v_vec
+
+        # Calculate the final position vector with units
+        final_vec = self.position + vec_to_corner + vec_to_pixel_center
+        
+        # Convert to unitless CUDA vector at the very end
+        return self._to_cuda_vector(final_vec)
+
+    @property
+    def focal_point(self):
+        """Calculates the focal point in world coordinates."""
+        vec = self.position - self._focal_length * self.w
+        return self._to_cuda_vector(vec)
+
+    @property
+    def viewport_center(self):
+        return self._to_cuda_vector(self.position)
 
     @property
     def wavelengths(self):
@@ -169,7 +358,6 @@ class Camera(object):
 
         # Apply quantization noise
         return counts.astype(self.dtype)
-
 
 def make_pco_dimax():
     """Make a pco.dimax camera."""

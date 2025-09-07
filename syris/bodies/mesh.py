@@ -60,6 +60,8 @@ class Mesh(MovableBody):
         normals=None
     ):
         """Constructor."""
+        self._state = 0
+        
         # Use homogeneous coordinates for easy matrix multiplication, i.e. the 4-th element is 1
         self._current = np.insert(
             triangles.rescale(q.um).magnitude, 3, np.ones(triangles.shape[1]), axis=0
@@ -73,8 +75,10 @@ class Mesh(MovableBody):
         else:
             # Arbitrary point
             point = center
-        point = np.insert(point.rescale(q.um).magnitude, 3, 0)[:, np.newaxis]
-        self._current -= point
+        # point = np.insert(point.rescale(q.um).magnitude, 3, 0)[:, np.newaxis]
+
+        point_xyz = point.rescale(q.um).magnitude[:, np.newaxis]
+        self._current[:3, :] -= point_xyz
 
         self._triangles = np.copy(self._current)
         self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
@@ -87,7 +91,7 @@ class Mesh(MovableBody):
         super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
     @classmethod
-    def from_file(cls, filename, trajectory, material=None, orientation=geom.Y_AX, iterations=1, center="bbox", unit=q.m):
+    def from_file(cls, filename, trajectory, material=None, orientation=geom.Y_AX, iterations=1, center="bbox", unit=q.um):
         """
         Alternative constructor to create a Mesh by loading a file. Recommended for modern mesh file formats.
 
@@ -104,7 +108,14 @@ class Mesh(MovableBody):
 
         reader = PyvistaReader(filename=filename, unit=unit)
 
-        return cls(reader.vertices, trajectory, material=material, orientation=orientation, iterations=iterations, center=center)
+        return cls(reader.vertices, 
+                   trajectory,
+                   material=material,
+                   orientation=orientation,
+                   iterations=iterations,
+                   center=center,
+                   normals=reader.normals,
+                   bounds=reader.bounds)
     
     @property
     def furthest_point(self):
@@ -145,7 +156,7 @@ class Mesh(MovableBody):
 
         def get_middle(ends):
             return (ends[0] + ends[1]) / 2.0
-
+        
         return np.array([get_middle(ends) for ends in self.extrema.magnitude]) * q.um
 
     @property
@@ -222,6 +233,10 @@ class Mesh(MovableBody):
     def triangles(self):
         """Return current triangle mesh."""
         return self._current[:-1, :] * q.um
+    
+    @property
+    def bounds(self):
+        return self._bounds
 
     def sort(self):
         """Sort triangles based on the greatest x-coordinate in an ascending order. Also sort
@@ -291,28 +306,19 @@ class Mesh(MovableBody):
         matrix = self.get_rescaled_transform_matrix(q.um)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
-    def build_acceleration_structure(self):
-        """Selects and builds the best available acceleration structure."""
-        backend_name = cfg.BACKEND.name
-
-        if backend_name == 'cupy':
-            self.accelerator = BvhCupyAccelerator(self)
-        else:
-            self.accelerator = LegacyCpuAccelerator(self)
-
-        self.accelerator.build()
-    
     def _get_accelerator(self):
-        """Lazy-initializes and builds the best available accelerator."""
-        if self.accelerator is None:
+        """
+        Lazy-initializes and rebuilds the accelerator only if the mesh state has changed.
+        """
+        if self.accelerator is None or self.accelerator._built_for_state != self._state:
             self.accelerator = cfg.BACKEND.get_accelerator_for_mesh(self)
             self.accelerator.build()
         return self.accelerator
 
     def _project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs):
+        # This method now correctly gets a cached or rebuilt accelerator
         accel = self._get_accelerator()
         return accel.project(shape, pixel_size, t=t, offset=offset, **kwargs)
-        
 
     def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
         """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for

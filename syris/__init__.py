@@ -44,15 +44,15 @@ def init(
 
     cfg.init_logging(level=logging.INFO if loglevel is None else loglevel, logger_file=logfile)
     cfg.PRECISION = cfg.Precision(double_precision)
-    cfg.BACKEND = ComputeBackend(compute_backend==compute_backend)
+    cfg.BACKEND = ComputeBackend(compute_backend=compute_backend)
 
     if cfg.BACKEND.name == cfg.BACKEND.CUDA:
         try:
-            kernel_dir = pkg_resources.resource_filename('syris', 'gpu/kernels/')
+            kernel_dir = pkg_resources.resource_filename('syris', 'gpu/cuda/')
 
-            source_files = ["bvh_build_kernel.cu", "projection_kernel.cu"]
+            source_files = ["Ray.cu", "source.cu"]
             abs_source_files = [os.path.join(kernel_dir, f) for f in source_files]
-            cuda_headers = (kernel_dir,)
+            cuda_headers = [kernel_dir,]
             
             LOG.info("Compiling CUDA kernels for BVH accelerator...")
 

@@ -36,6 +36,8 @@ class ComputeBackend:
     NONE = 'none'
 
     def __init__(self, compute_backend):
+        LOG.info(HAS_CUPY)
+        LOG.info(compute_backend)
         if HAS_CUPY and compute_backend == self.CUDA:
             self.name = self.CUDA
             self.xp = cp
