@@ -64,10 +64,10 @@ class Mesh(MovableBody):
         
         # Use homogeneous coordinates for easy matrix multiplication, i.e. the 4-th element is 1
         self._current = np.insert(
-            triangles.rescale(q.um).magnitude, 3, np.ones(triangles.shape[1]), axis=0
+            triangles.rescale(cfg.UNIT).magnitude, 3, np.ones(triangles.shape[1]), axis=0
         )
         if center is None:
-            point = (0, 0, 0) * q.um
+            point = (0, 0, 0) * cfg.UNIT
         elif center == "gravity":
             point = self.center_of_gravity
         elif center == "bbox":
@@ -75,9 +75,8 @@ class Mesh(MovableBody):
         else:
             # Arbitrary point
             point = center
-        # point = np.insert(point.rescale(q.um).magnitude, 3, 0)[:, np.newaxis]
 
-        point_xyz = point.rescale(q.um).magnitude[:, np.newaxis]
+        point_xyz = point.rescale(cfg.UNIT).magnitude[:, np.newaxis]
         self._current[:3, :] -= point_xyz
 
         self._triangles = np.copy(self._current)
@@ -86,7 +85,10 @@ class Mesh(MovableBody):
 
         self.accelerator = None
         self._normals = normals
-        self._bounds = bounds
+        if isinstance(bounds, q.Quantity):
+            self._bounds = bounds.rescale(cfg.UNIT).magnitude
+        else:
+            self._bounds = bounds
 
         super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
@@ -120,7 +122,7 @@ class Mesh(MovableBody):
     @property
     def furthest_point(self):
         """Furthest point from the center."""
-        return self._furthest_point * q.um
+        return self._furthest_point * cfg.UNIT
 
     @property
     def bounding_box(self):
@@ -141,14 +143,14 @@ class Mesh(MovableBody):
             (self._compute(min, 0), self._compute(max, 0)),
             (self._compute(min, 1), self._compute(max, 1)),
             (self._compute(min, 2), self._compute(max, 2)),
-        ) * q.um
+        ) * cfg.UNIT
 
     @property
     def center_of_gravity(self):
         """Get body's center of gravity as (x, y, z)."""
         center = (self._compute(np.mean, 0), self._compute(np.mean, 1), self._compute(np.mean, 2))
 
-        return np.array(center) * q.um
+        return np.array(center) * cfg.UNIT
 
     @property
     def center_of_bbox(self):
@@ -157,7 +159,7 @@ class Mesh(MovableBody):
         def get_middle(ends):
             return (ends[0] + ends[1]) / 2.0
         
-        return np.array([get_middle(ends) for ends in self.extrema.magnitude]) * q.um
+        return np.array([get_middle(ends) for ends in self.extrema.magnitude]) * cfg.UNIT
 
     @property
     def diff(self):
@@ -181,7 +183,7 @@ class Mesh(MovableBody):
             (min_nonzero(x_diff), max_nonzero(x_diff)),
             (min_nonzero(y_diff), max_nonzero(y_diff)),
             (min_nonzero(z_diff), max_nonzero(z_diff)),
-        ) * q.um
+        ) * cfg.UNIT
 
     @property
     def vectors(self):
@@ -194,7 +196,7 @@ class Mesh(MovableBody):
         v_0 = (b - a).transpose()
         v_1 = (c - a).transpose()
 
-        return v_0 * q.um, v_1 * q.um
+        return v_0 * cfg.UNIT, v_1 * cfg.UNIT
 
     @property
     def areas(self):
@@ -202,7 +204,7 @@ class Mesh(MovableBody):
         v_0, v_1 = self.vectors
         cross = np.cross(v_0, v_1)
 
-        return np.sqrt(np.sum(cross * cross, axis=1)) / 2 * q.um ** 2
+        return np.sqrt(np.sum(cross * cross, axis=1)) / 2 * cfg.UNIT ** 2
 
     @cached_property
     def normals(self):
@@ -215,7 +217,7 @@ class Mesh(MovableBody):
         if self._normals is not None:
             return self._normals
         v_0, v_1 = self.vectors
-        return np.cross(v_0, v_1) * q.um
+        return np.cross(v_0, v_1) * cfg.UNIT
 
     @property
     def max_triangle_x_diff(self):
@@ -227,12 +229,12 @@ class Mesh(MovableBody):
         d_1 = np.max(np.abs(x_1 - x_2))
         d_2 = np.max(np.abs(x_2 - x_1))
 
-        return max(d_0, d_1, d_2) * q.um
+        return max(d_0, d_1, d_2) * cfg.UNIT
 
     @property
     def triangles(self):
         """Return current triangle mesh."""
-        return self._current[:-1, :] * q.um
+        return self._current[:-1, :] * cfg.UNIT
     
     @property
     def bounds(self):
@@ -269,7 +271,7 @@ class Mesh(MovableBody):
         current transformation matrix. *eps* is the tolerance for the angle between a triangle and
         the ray to be still considered parallel.
         """
-        ray = np.array([0, 0, 1]) * q.um
+        ray = np.array([0, 0, 1]) * cfg.UNIT
         dot = np.sqrt(np.sum(self.normals ** 2, axis=1))
         theta = np.arccos(np.dot(self.normals, ray) / dot)
         diff = np.abs(theta - np.pi / 2 * q.rad)
@@ -281,7 +283,7 @@ class Mesh(MovableBody):
             t_indices[i::3] = 3 * indices + i
         close = self._current[:-1, t_indices]
 
-        return close * q.um
+        return close * cfg.UNIT
 
     def _compute(self, func, axis):
         """General function for computations with triangles."""
@@ -290,7 +292,7 @@ class Mesh(MovableBody):
     def _make_vertices(self, index, pixel_size):
         """Make a flat array of vertices belong to *triangles* at *index*."""
         # Convert to meters
-        vertices = self._current[:, index::3] / pixel_size.rescale(q.um).magnitude
+        vertices = self._current[:, index::3] / pixel_size.rescale(cfg.UNIT).magnitude
 
         return vertices.transpose().flatten().astype(cfg.PRECISION.np_float)
 
@@ -303,7 +305,7 @@ class Mesh(MovableBody):
 
     def transform(self):
         """Apply transformation *matrix* and return the resulting triangles."""
-        matrix = self.get_rescaled_transform_matrix(q.um)
+        matrix = self.get_rescaled_transform_matrix(cfg.UNIT)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
     def _get_accelerator(self):
@@ -331,12 +333,12 @@ class Mesh(MovableBody):
 
         pixel_size = make_tuple(pixel_size, num_dims=2)
         v_1, v_2, v_3 = self._make_inputs(queue, pixel_size)
-        psm = pixel_size.simplified.magnitude
-        max_dx = self.max_triangle_x_diff.simplified.magnitude / psm[1]
+        psm = pixel_size.rescale(cfg.UNIT).magnitude
+        max_dx = self.max_triangle_x_diff.rescale(cfg.UNIT).magnitude / psm[1]
         if offset is None:
             offset = gutil.make_vfloat3(0, 0, 0)
         else:
-            offset = offset.simplified.magnitude
+            offset = offset.rescale(cfg.UNIT).magnitude
             offset = gutil.make_vfloat3(offset[0] / psm[1], offset[1] / psm[0], offset[2] / psm[1])
 
         cfg.OPENCL.programs["mesh"].compute_slices(
@@ -407,4 +409,4 @@ def make_cube():
         shifted = np.roll(points, i, axis=0)[:, indices]
         triangles = np.concatenate((triangles, shifted), axis=1)
 
-    return triangles * q.m
+    return triangles * cfg.UNIT

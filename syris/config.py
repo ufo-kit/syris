@@ -117,6 +117,7 @@ def init_logging(level=logging.DEBUG, logger_file=None):
 PRECISION = None
 OPENCL = None
 BACKEND = None
+UNIT = None
 
 # Refractive index calculation program path.
 PMASF_FILE = "pmasf"

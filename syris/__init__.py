@@ -29,6 +29,7 @@ def init(
     loglevel=None,
     logfile=None,
     double_precision=False,
+    unit="um"
 ):
     """Initialize syris with the best available compute backend."""
     import atexit
@@ -39,12 +40,14 @@ def init(
     from syris.backend import ComputeBackend
     from syris.gpu.cuda_utils import CudaPipeline, CudaTimer
     from syris.gpu.util import make_opencl_defaults, init_programs
+    from quantities import Quantity
 
     LOG = logging.getLogger(__name__)
 
     cfg.init_logging(level=logging.INFO if loglevel is None else loglevel, logger_file=logfile)
     cfg.PRECISION = cfg.Precision(double_precision)
     cfg.BACKEND = ComputeBackend(compute_backend=compute_backend)
+    cfg.UNIT = Quantity(1, unit)
 
     if cfg.BACKEND.name == cfg.BACKEND.CUDA:
         try:

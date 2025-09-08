@@ -47,6 +47,9 @@ class BvhCupyAccelerator(AcceleratorBase):
         float4 = cfg.PRECISION.float4
 
         host_vertices = self.mesh.triangles.magnitude
+
+        print (host_vertices)
+
         nb_vertices = host_vertices.shape[1]
         bounds = self.mesh.bounds
         host_normals = self.mesh.normals
@@ -59,15 +62,10 @@ class BvhCupyAccelerator(AcceleratorBase):
         print(f"Vertices shape: {host_vertices.shape}")
         
         try:
-            host_vertices = host_vertices.T
-            print("vertices shape", host_vertices.shape)
-            print("vertices shape", host_normals.shape)
-            print("vertices shape", bounds.shape)
-            
+            host_vertices = host_vertices.T            
             if len(host_vertices.shape) == 1:
                 host_vertices = host_vertices.reshape(-1, 3)
                 nb_vertices = len(host_vertices)
-                print(f"Reshaped vertices to: {host_vertices.shape}")
 
             # Ensure vertices have the correct shape before proceeding
             if len(host_vertices.shape) != 2 or host_vertices.shape[1] != 3:

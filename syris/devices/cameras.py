@@ -49,12 +49,12 @@ class Camera(MovableBody):
 
     def __init__(
         self,
-        pixel_size,
-        gain,
-        dark_current,
-        amplifier_sigma,
-        bits_per_pixel,
-        shape,
+        pixel_size=None,
+        gain=None,
+        dark_current=None,
+        amplifier_sigma=None,
+        bits_per_pixel=None,
+        shape=None,
         quantum_efficiencies=None,
         wavelengths=None,
         exp_time=1 * q.s,
@@ -77,8 +77,8 @@ class Camera(MovableBody):
         incompatible, the frame rate is adjusted to the exposure time.
         """
         if not isinstance(pixel_size, q.Quantity):
-            raise TypeError("pixel_size must be a quantities object (e.g., 10 * q.um)")
-        self._pixel_size = pixel_size
+            raise TypeError("pixel_size must be a quantities object (e.g., 10 * q.m)")
+        self._pixel_size = pixel_size.rescale(cfg.UNIT)
         self._shape = shape
         self.gain = gain
         self.dark_current = dark_current
@@ -91,6 +91,13 @@ class Camera(MovableBody):
         self._psf = None
         self._source_detector_distance = source_detector_distance
         self._focal_length = focal_length
+        
+        if source_detector_distance is not None:
+            self._source_detector_distance = source_detector_distance.rescale(cfg.UNIT)
+
+        if focal_length is not None:
+            self._focal_length = focal_length.rescale(cfg.UNIT)
+
         self.update_viewport_dimensions()
 
         self.parallel = parallel
@@ -110,7 +117,7 @@ class Camera(MovableBody):
             self._optical_axis = optical_axis
 
         if trajectory is None:
-            trajectory = Trajectory([(0,0,0)]*q.m, pixel_size)            
+            trajectory = Trajectory([(0,0,0)]*cfg.UNIT, pixel_size)            
 
         super(Camera, self).__init__(trajectory)
 
@@ -120,7 +127,7 @@ class Camera(MovableBody):
         to a 4D NumPy float array for CUDA.
         """
         try:
-            vec = quantity_vec.simplified.rescale(q.m).magnitude
+            vec = quantity_vec.rescale(cfg.UNIT).magnitude
         except AttributeError:
             vec = np.asarray(quantity_vec)
 
@@ -165,7 +172,7 @@ class Camera(MovableBody):
     @property
     def _pixel_size_vec(self):
         """Ensures pixel size is a 2-element quantities array."""
-        ps = self._pixel_size.rescale(q.m)
+        ps = self._pixel_size.rescale(cfg.UNIT)
         if ps.ndim == 0:
             return np.array([ps.item(), ps.item()]) * ps.units
         return ps
@@ -173,7 +180,7 @@ class Camera(MovableBody):
     # Cuda compatible properties
     @property
     def pixel_size(self):
-        ret = self._pixel_size.rescale(q.m).magnitude
+        ret = self._pixel_size.rescale(cfg.UNIT).magnitude
         if ret.size == 1:
             ret = np.array([ret, ret])
         return ret.astype(cfg.PRECISION.np_float)
@@ -216,7 +223,7 @@ class Camera(MovableBody):
 
     @property
     def focal_length(self):
-        ret = self._focal_length.rescale(q.m).magnitude
+        ret = self._focal_length.rescale(cfg.UNIT).magnitude
         return ret.astype(cfg.PRECISION.np_float)
 
     @focal_length.setter
@@ -230,7 +237,7 @@ class Camera(MovableBody):
 
     @property
     def viewport_dimensions(self):
-        ret = self._viewport_dimensions.rescale(q.m).magnitude
+        ret = self._viewport_dimensions.rescale(cfg.UNIT).magnitude
         return ret.astype(cfg.PRECISION.np_float)
 
     @property
@@ -368,5 +375,5 @@ def make_pco_dimax():
 
     # Use a power of two padded value so that it's easier to use with FFT
     return Camera(
-        11 * q.um, 0.1, 530.0, 23.0, 12, (2048, 2048), quantum_efficiencies=qe, wavelengths=lam
+        11 * q.m, 0.1, 530.0, 23.0, 12, (2048, 2048), quantum_efficiencies=qe, wavelengths=lam
     )
