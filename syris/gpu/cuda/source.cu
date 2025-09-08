@@ -7,6 +7,21 @@
 typedef unsigned int morton_t;
 typedef int delta_t;
 
+struct Hit
+{
+    FP_T t;
+    int primID;
+    // The normal is no longer needed here if we pass the global array,
+    // but storing it can be useful for debugging. Let's keep it simple for now.
+};
+
+// Custom comparator for sorting Hits by t-value
+struct HitComparator {
+    __device__ bool operator()(const Hit& a, const Hit& b) const {
+        return a.t < b.t;
+    }
+};
+
 typedef struct
 {
     unsigned int nb_keys;
@@ -232,20 +247,21 @@ __device__ void query(const Tree &tree, const Ray &ray, List<int> &candidates)
 
 __device__ FP_T project_thickness(List<FP_T> &tvalues)
 {
-    int i, j;
-    FP_T result = 0.0;
+    constexpr FP_T DEDUP_EPSILON = FP_CONST(1e-6);
+    FP_T result = FP_CONST(0.0);
 
-    i = 0;
+    int i = 0;
     while (i < tvalues.size())
     {
-        j = i + 1;
-        while (j < tvalues.size() && FP_MATH(fabs)(tvalues.values[j] - tvalues.values[i]) < 1e-6)
+        int j = i + 1;
+        while (j < tvalues.size() && are_close(tvalues.values[j], tvalues.values[i], DEDUP_EPSILON))
         {
             j++;
         }
+        
         if (i < tvalues.size() && j < tvalues.size())
         {
-            result += FP_MATH(fabs) (tvalues.values[j] - tvalues.values[i]);
+            result += FP_MATH(fabs)(tvalues.values[j] - tvalues.values[i]);
         }
         i = j + 1;
     }
@@ -269,46 +285,83 @@ inline __device__ FP_T dot(const FP_T4 &a, const FP_T4 &b)
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+// __device__ FP_T matchOuterPairs(
+//     const List<int> &candidates, const List<FP_T> &tvalues, const Ray &ray,
+//     FP_T4 *__restrict__ vertices,
+//     FP_T4 *__restrict__ normals,
+//     const Tree &tree)
+// {
+//     FP_T thickness = FP_CONST(0.0);
+//     FP_T inner = FP_CONST(0.0);
+//     int counter = 0;
+
+//     constexpr FP_T DOT_PRODUCT_EPSILON = FP_CONST(1e-6);
+
+//     for (int i = 0; i < tvalues.size(); i++)
+//     {
+//         unsigned primIndex = candidates.values[i];
+//         FP_T dot_product = dot(ray.getDirection(), normals[primIndex]);
+        
+//         if (is_null<FP_T>(dot_product, DOT_PRODUCT_EPSILON))
+//         {
+//             continue;
+//         }
+
+//         bool is_neg = dot(ray.getDirection(), normals[primIndex]) < 0;
+//         if (!is_neg && counter == 0)
+//         {
+//             continue;
+//         }
+
+//         if (is_neg)
+//         {
+//             if (counter++ == 0)
+//                 inner = tvalues.values[i];
+//         }
+//         else
+//         {
+//             if (--counter == 0)
+//             {
+//                 thickness += tvalues.values[i] - inner;
+//             }
+//         }
+//     }
+//     return thickness;
+// }
+
 __device__ FP_T matchOuterPairs(
     const List<int> &candidates, const List<FP_T> &tvalues, const Ray &ray,
     FP_T4 *__restrict__ vertices,
     FP_T4 *__restrict__ normals,
     const Tree &tree)
 {
-    FP_T thickness = 0.0, inner = 0.0;
-    int counter = 0;
-    const double EPSILON = ::cuda::std::numeric_limits<double>::epsilon();
+    FP_T total_thickness = FP_CONST(0.0);
 
-    for (int i = 0; i < tvalues.size(); i++)
+    // Iterate through the hits in pairs (entry, exit)
+    for (int i = 0; i < tvalues.size(); i += 2)
     {
-        unsigned primIndex = candidates.values[i];
-        FP_T dot_product = dot(ray.getDirection(), normals[primIndex]);
-        if (is_null<double>(dot_product, EPSILON))
+        // Ensure we have a complete pair to process. This check is vital.
+        if (i + 1 < tvalues.size())
         {
-            continue;
-        }
+            unsigned entry_primID = candidates.get(i);
+            unsigned exit_primID = candidates.get(i + 1);
 
-        bool is_neg = dot(ray.getDirection(), normals[primIndex]) < 0;
-        if (!is_neg && counter == 0)
-        {
-            continue;
-        }
+            FP_T entry_dot = dot(ray.getDirection(), normals[entry_primID]);
+            FP_T exit_dot = dot(ray.getDirection(), normals[exit_primID]);
 
-        if (is_neg)
-        {
-            if (counter++ == 0)
-                inner = tvalues.values[i];
-        }
-        else
-        {
-            if (--counter == 0)
+            // Sanity Check: A valid pair should be an ENTRY (dot < 0)
+            // followed by an EXIT (dot > 0).
+            if (entry_dot < 0 && exit_dot > 0)
             {
-                thickness += tvalues.values[i] - inner;
+                FP_T entry_t = tvalues.get(i);
+                FP_T exit_t = tvalues.get(i + 1);
+                total_thickness += (exit_t - entry_t);
             }
         }
     }
-    return thickness;
+    return total_thickness;
 }
+
 
 struct AreFPValuesClose {
     const FP_T relative_epsilon;
@@ -321,9 +374,19 @@ struct AreFPValuesClose {
     }
 };
 
+struct AreTValuesAbsolutelyClose {
+    const FP_T t_epsilon; // This will be the value calculated in Python
+
+    __device__ AreTValuesAbsolutelyClose(FP_T ep) : t_epsilon(ep) {}
+
+    __device__ bool operator()(FP_T a, FP_T b) const {
+        return FP_MATH(fabs)(a - b) <= t_epsilon;
+    }
+};
+
 __device__ FP_T traceRay(
     const Ray &ray, const Tree &tree,
-    FP_T4 *__restrict__ vertices)
+    FP_T4 *__restrict__ vertices, FP_T &epsilon)
 {
     List<int> candidates, intersected;
     List<FP_T> tvalues;
@@ -346,8 +409,7 @@ __device__ FP_T traceRay(
         const FP_T4 V3 = vertices[primIndex + 2];
 
         FP_T t = 0.0;
-        FP_T tmax = INFINITY;
-        if (ray.intersects(V1, V2, V3, t, tmax))
+        if (ray.intersects(V1, V2, V3, t))
         {
             tvalues.push_back(t);
             intersected.push_back(candidates.get(i));
@@ -368,8 +430,6 @@ __device__ FP_T traceRay(
 
     thrust::pair<FP_T*, int*> new_ends;
 
-    const FP_T DEDUP_EPSILON = 1e-6f;
-
     new_ends = thrust::unique_by_key_copy(
         thrust::seq,                             // Explicit sequential execution policy
         tvalues.values,                          // Input keys: start
@@ -377,22 +437,22 @@ __device__ FP_T traceRay(
         intersected.values,                      // Input values: start (must match key range)
         filtered_tvalues.values,                 // Output keys: destination
         filtered_intersections.values,           // Output values: destination
-        AreFPValuesClose(DEDUP_EPSILON)          // Custom predicate for "equality"
+        AreFPValuesClose(epsilon)                // Custom predicate for "equality"
     );
 
     // Update the counts in your filtered lists
     filtered_tvalues.count = new_ends.first - filtered_tvalues.values;
     filtered_intersections.count = new_ends.second - filtered_intersections.values;
 
-    return project_thickness(filtered_tvalues); // Your original commented out line
-    // return tvalues.size();
+    return project_thickness(filtered_tvalues);
 }
 
 
 __device__ FP_T traceRay(
     const Ray &ray, const Tree &tree,
     FP_T4 *__restrict__ vertices,
-    FP_T4 *__restrict__ normals)
+    FP_T4 *__restrict__ normals,
+    FP_T &epsilon)
 {
     List<int> candidates, intersected;
     List<FP_T> tvalues;
@@ -441,7 +501,207 @@ __device__ FP_T traceRay(
 
     thrust::pair<FP_T*, int*> new_ends;
 
-    const FP_T DEDUP_EPSILON = 1e-6f;
+    new_ends = thrust::unique_by_key_copy(
+        thrust::seq,                             // Explicit sequential execution policy
+        tvalues.values,                          // Input keys: start
+        tvalues.values + tvalues.size(),         // Input keys: end
+        intersected.values,                      // Input values: start (must match key range)
+        filtered_tvalues.values,                 // Output keys: destination
+        filtered_intersections.values,           // Output values: destination
+        AreFPValuesClose(epsilon)          // Custom predicate for "equality"
+    );
+
+    // Update the counts in your filtered lists
+    filtered_tvalues.count = new_ends.first - filtered_tvalues.values;
+    filtered_intersections.count = new_ends.second - filtered_intersections.values;
+
+    if (filtered_tvalues.size() == 0) return 0.0; // or TRACE_OK
+
+    if (filtered_tvalues.size() % 2 != 0) {
+        return 0; // This is a true error
+    }
+
+    // return project_thickness(filtered_tvalues); // Your original commented out line
+    return matchOuterPairs(filtered_intersections, filtered_tvalues, ray, vertices, normals, tree);
+}
+
+__device__ FP_T matchPairs_Winding(
+    const List<Hit> &hits,
+    const Ray &ray,
+    FP_T4 *__restrict__ normals)
+{
+    FP_T total_thickness = FP_CONST(0.0);
+    FP_T entry_t = FP_CONST(0.0);
+    int winding_counter = 0;
+
+    for (int i = 0; i < hits.size(); i++)
+    {
+        const Hit& current_hit = hits.get(i);
+        FP_T dot_product = dot(ray.getDirection(), normals[current_hit.primID]);
+
+        // Ignore grazing angles, which are numerically unstable.
+        if (FP_MATH(fabs)(dot_product) < FP_CONST(1e-7))
+        {
+            continue;
+        }
+
+        bool is_entry = dot_product < 0;
+
+        if (is_entry)
+        {
+            // If this is the FIRST entry into any surface, record the t value.
+            if (winding_counter == 0)
+            {
+                entry_t = current_hit.t;
+            }
+            winding_counter++;
+        }
+        else // Is an exit
+        {
+            winding_counter--;
+            // If this exit brings us completely OUTSIDE all surfaces, add the segment to the total thickness.
+            if (winding_counter == 0 && entry_t > FP_CONST(0.0))
+            {
+                total_thickness += (current_hit.t - entry_t);
+                entry_t = FP_CONST(0.0); // Reset for the next segment
+            }
+        }
+    }
+    return total_thickness;
+}
+
+__device__ FP_T traceRay_Robust(
+    const Ray &ray, const Tree &tree,
+    FP_T4 *__restrict__ vertices,
+    FP_T4 *__restrict__ normals)
+{
+    List<int> candidates;
+    query(tree, ray, candidates);
+
+    if (candidates.size() == 0)
+    {
+        return 0.0;
+    }
+
+    // 1. Collect all valid intersections into a single list of Hits
+    List<Hit> hits;
+    for (int i = 0; i < candidates.size(); i++)
+    {
+        int primID = candidates.get(i);
+        int primIndex = primID * 3;
+
+        const FP_T4 V1 = vertices[primIndex];
+        const FP_T4 V2 = vertices[primIndex + 1];
+        const FP_T4 V3 = vertices[primIndex + 2];
+
+        FP_T t = 0.0;
+        if (ray.intersects(V1, V2, V3, t))
+        {
+            // Only consider hits in front of the ray
+            if (t > 0) {
+                 hits.push_back({t, primID});
+            }
+        }
+    }
+
+    if (hits.size() < 2)
+    {
+        return 0.0;
+    }
+
+    // 2. Sort all hits by their t-value
+    thrust::sort(thrust::seq, hits.values, hits.values + hits.size(), HitComparator());
+
+    // 3. Manually filter duplicates using a dynamic, angle-aware epsilon
+    List<Hit> filtered_hits;
+    if (hits.size() > 0)
+    {
+        filtered_hits.push_back(hits.get(0)); // Always accept the first hit
+
+        for (int i = 1; i < hits.size(); ++i)
+        {
+            const Hit& current_hit = hits.get(i);
+            const Hit& prev_filtered_hit = filtered_hits.back();
+
+            // Calculate the dynamic epsilon based on the PREVIOUS accepted hit's normal
+            FP_T dot_product = FP_MATH(fabs)(dot(ray.getDirection(), normals[prev_filtered_hit.primID]));
+
+            // Prevent division by zero and handle grazing angles robustly
+            // A larger clamp (e.g., 1e-5) makes the filter more aggressive
+            dot_product = FP_MATH(fmax)(dot_product, FP_CONST(1e-9));
+
+            FP_T t_epsilon = FP_CONST(1e-9) / dot_product;
+
+            // If the current hit is sufficiently far from the last one, accept it.
+            if ((current_hit.t - prev_filtered_hit.t) > t_epsilon)
+            {
+                filtered_hits.push_back(current_hit);
+            }
+        }
+    }
+
+    if (filtered_hits.size() < 2)
+    {
+        return 0.0;
+    }
+
+    // 4. Calculate thickness using the robust winding number algorithm
+    return matchPairs_Winding(filtered_hits, ray, normals);
+}
+
+
+__device__ FP_T traceRay_DEBUG(
+    const Ray &ray, const Tree &tree,
+    FP_T4 *__restrict__ vertices,
+    FP_T4 *__restrict__ normals,
+    FP_T &epsilon)
+{
+    List<int> candidates, intersected;
+    List<FP_T> tvalues;
+
+    // This is where the acceleration structure (BVH) is actually useful
+    query(tree, ray, candidates);
+
+    if (candidates.size() == 0)
+    {
+        return 0.0;
+    }
+
+    // Test the candidates for actual intersections
+    for (int i = 0; i < candidates.size(); i++)
+    {
+        int primIndex = candidates.get(i) * 3;
+
+        const FP_T4 V1 = vertices[primIndex];
+        const FP_T4 V2 = vertices[primIndex + 1];
+        const FP_T4 V3 = vertices[primIndex + 2];
+
+        FP_T t = 0.0, tmax = INFINITY;
+        if (ray.intersects(V1, V2, V3, t, tmax))
+        {
+            tvalues.push_back(t);
+            intersected.push_back(candidates.get(i));
+        }
+    }
+
+    if (tvalues.size() == 0)
+    {
+        return 0.0;
+    }
+
+    if (tvalues.size() == 2)
+    {
+        return FP_MATH(fabs)(tvalues.get(1) - tvalues.get(0));
+    }
+
+    thrust::stable_sort_by_key(thrust::seq, tvalues.values, tvalues.values + tvalues.size(),
+        intersected.values);
+
+    // Filter duplicates
+    List<int> filtered_intersections;
+    List<FP_T> filtered_tvalues;
+
+    thrust::pair<FP_T*, int*> new_ends;
 
     new_ends = thrust::unique_by_key_copy(
         thrust::seq,                             // Explicit sequential execution policy
@@ -450,15 +710,44 @@ __device__ FP_T traceRay(
         intersected.values,                      // Input values: start (must match key range)
         filtered_tvalues.values,                 // Output keys: destination
         filtered_intersections.values,           // Output values: destination
-        AreFPValuesClose(DEDUP_EPSILON)          // Custom predicate for "equality"
+        AreFPValuesClose(epsilon)          // Custom predicate for "equality"
     );
 
     // Update the counts in your filtered lists
     filtered_tvalues.count = new_ends.first - filtered_tvalues.values;
     filtered_intersections.count = new_ends.second - filtered_intersections.values;
 
-    // return project_thickness(filtered_tvalues); // Your original commented out line
-    return matchOuterPairs(filtered_intersections, filtered_tvalues, ray, vertices, normals, tree);
+    printf("--- DEBUG for PIXEL (%u, %u) ---\n", 1020, 439); // Assuming you can get col/row here
+    printf("Found %d unique intersections to pair:\n", filtered_intersections.size());
+
+    // --- The key new printout ---
+    for (int i = 0; i < filtered_intersections.size(); i++) {
+        unsigned primIndex = filtered_intersections.get(i);
+        FP_T t_val = filtered_tvalues.get(i);
+        FP_T4 normal = normals[primIndex];
+        FP_T dot_product = dot(ray.getDirection(), normal);
+        
+        printf("  Hit %d: t=%.17f, primID=%u, Normal=(%.3f, %.3f, %.3f), Dot=%.6f, Type=%s\n",
+               i,
+               t_val,
+               primIndex,
+               normal.x, normal.y, normal.z,
+               dot_product,
+               (dot_product < 0 ? "ENTRY" : "EXIT")
+        );
+    }
+
+    if (filtered_tvalues.size() == 0) return 0.0; // or TRACE_OK
+
+    if (filtered_tvalues.size() % 2 != 0) {
+        return 0; // This is a true error
+    }
+
+    FP_T final_thickness = matchOuterPairs(filtered_intersections, filtered_tvalues, ray, vertices, normals, tree);
+    printf("Final calculated thickness: %.17f\n", final_thickness);
+    printf("----------------------------------\n");
+
+    return final_thickness;
 }
 
 extern "C" __global__ void calculateBbBoxKernel(FP_T4 *vertices, FP_T4 *bbMin, FP_T4 *bbMax, unsigned int nb_keys)
@@ -542,7 +831,8 @@ extern "C" __global__ void project_parallel_kernel(
     FP_T4 *bboxMin,
     FP_T4 *bboxMax,
     FP_T4 *__restrict__ vertices,
-    unsigned *globalCounter
+    unsigned *globalCounter,
+    FP_T epsilon
 )
 {
     // Setup the tree structure once per thread block or globally as needed
@@ -574,7 +864,7 @@ extern "C" __global__ void project_parallel_kernel(
 
         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
         Ray ray = Ray(pixel_coordinates, W);
-        image[index] = traceRay(ray, tree, vertices);
+        image[index] = traceRay(ray, tree, vertices, epsilon);
     }
 }
 
@@ -589,7 +879,8 @@ extern "C" __global__ void project_parallel_normals_kernel(
     FP_T4 *bboxMax,
     FP_T4 *__restrict__ vertices,
     unsigned *globalCounter,
-    FP_T4 *__restrict__ normals
+    FP_T4 *__restrict__ normals,
+    FP_T epsilon
 )
 {
     // Setup the tree structure once per thread block or globally as needed
@@ -618,9 +909,18 @@ extern "C" __global__ void project_parallel_normals_kernel(
         unsigned row = index / N.x;
         unsigned col = index % N.x;
 
+        // if (col == 439 && row == 1020) {
+        //     FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
+        //     Ray ray = Ray(pixel_coordinates, W);
+
+        //     // Call a special debug version of traceRay
+        //     image[index] = traceRay_DEBUG(ray, tree, vertices, normals, epsilon);
+        // } else {
+        //     // Normal execution for all other pixels
         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
         Ray ray = Ray(pixel_coordinates, W);
-        image[index] = traceRay (ray, tree, vertices, normals);
+        image[index] = traceRay_Robust(ray, tree, vertices, normals);
+        // }
     }
 }
 
@@ -635,7 +935,8 @@ extern "C" __global__ void project_conebeam_kernel(
     FP_T4 *bboxMax,
     FP_T4 *__restrict__ vertices,
     unsigned *globalCounter,
-    FP_T4 source
+    FP_T4 source,
+    FP_T epsilon
 )
 {
     // Setup the tree structure once per thread block or globally as needed
@@ -668,7 +969,7 @@ extern "C" __global__ void project_conebeam_kernel(
         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
         FP_T4 direction = source - pixel_coordinates;
         Ray ray = Ray(pixel_coordinates, direction);
-        image[index] = traceRay(ray, tree, vertices);
+        image[index] = traceRay(ray, tree, vertices, epsilon);
     }
 }
 
@@ -684,7 +985,8 @@ extern "C" __global__ void project_conebeam_normals_kernel(
     FP_T4 *__restrict__ vertices,
     unsigned *globalCounter,
     FP_T4 *__restrict__ normals,
-    FP_T4 source
+    FP_T4 source,
+    FP_T epsilon
 )
 {
     // Setup the tree structure once per thread block or globally as needed
@@ -717,6 +1019,6 @@ extern "C" __global__ void project_conebeam_normals_kernel(
         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
         FP_T4 direction = source - pixel_coordinates;
         Ray ray = Ray(pixel_coordinates, direction);
-        image[index] = traceRay(ray, tree, vertices, normals);
+        image[index] = traceRay(ray, tree, vertices, normals, epsilon);
     }
 }

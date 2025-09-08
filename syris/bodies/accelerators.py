@@ -57,7 +57,11 @@ class BvhCupyAccelerator(AcceleratorBase):
         nb_keys = nb_vertices // 3
         sceneMin = np.array([bounds[0], bounds[2], bounds[4], 0], dtype=float)
         sceneMax = np.array([bounds[1], bounds[3], bounds[5], 0], dtype=float)
-        
+
+        t_epsilon = self.mesh.epsilon * .01
+
+        print (f"{t_epsilon:.12f}")
+
         print(f"Building tree with {nb_vertices} vertices, {nb_keys} triangles")
         print(f"Vertices shape: {host_vertices.shape}")
         
@@ -119,6 +123,7 @@ class BvhCupyAccelerator(AcceleratorBase):
                 "bbMax": bbMax,
                 "vertices": vertices,
                 "normals": normals,
+                "t_epsilon": t_epsilon
             }
 
             self._tree = tree
@@ -186,6 +191,8 @@ class BvhCupyAccelerator(AcceleratorBase):
         
         if not parallel:
             args.append(camera.source_point.view(float4))
+
+        args.append(self._tree["t_epsilon"])
 
         if parallel and use_normals:
             kernel_name = "project_parallel_normals_kernel"

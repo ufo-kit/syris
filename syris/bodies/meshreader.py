@@ -119,6 +119,32 @@ class PyvistaReader(MeshReaderBase):
         triangle_vertices = points[triangles]
         triangle_vertices = triangle_vertices.flatten().reshape(-1, 3)
 
+        if triangles.size > 0:
+            # Step 1: Get all triangle vertex coordinates
+            triangle_verts = points[triangles]
+            
+            # Step 2: Calculate all squared edge lengths
+            edge0_sq_len = np.sum((triangle_verts[:, 1, :] - triangle_verts[:, 0, :])**2, axis=1)
+            edge1_sq_len = np.sum((triangle_verts[:, 2, :] - triangle_verts[:, 1, :])**2, axis=1)
+            edge2_sq_len = np.sum((triangle_verts[:, 0, :] - triangle_verts[:, 2, :])**2, axis=1)
+
+            # Step 3: Find the minimum of all NON-ZERO squared lengths
+            all_sq_lens = np.concatenate([edge0_sq_len, edge1_sq_len, edge2_sq_len])
+            non_zero_sq_lens = all_sq_lens[all_sq_lens > 0]
+
+            if non_zero_sq_lens.size > 0:
+                min_edge_length_sq = np.min(non_zero_sq_lens)
+                smallest_feature = np.sqrt(min_edge_length_sq)
+            else:
+                print("WARNING: Mesh appears to have no edges with a length > 0.")
+                smallest_feature = np.inf
+        else:
+            smallest_feature = np.inf
+
+        self._smallest_feature_size = smallest_feature.astype(dtype)
+
+        print(f"Smallest feature size: {self._smallest_feature_size:.12f}")
+
         self._vertices = np.array(triangle_vertices).T.astype(dtype) * unit
         self._triangles = triangles
         self._normals = np.array(mesh.cell_normals).astype(dtype) * unit
@@ -135,6 +161,10 @@ class PyvistaReader(MeshReaderBase):
     @property
     def bounds(self):
         return self._bounds
+    
+    @property
+    def epsilon(self):
+        return self._smallest_feature_size
 
 
 class WavefrontAnimationReader(MeshReaderBase):

@@ -27,7 +27,6 @@
 
 constexpr unsigned MAX_COLLISIONS = 512;
 
-// Generic make function for FP_T4 to replace make_float4
 __forceinline__ __device__ __host__ FP_T4 make_fp_t4(FP_T x, FP_T y, FP_T z, FP_T w)
 {
     FP_T4 result;
@@ -62,6 +61,17 @@ struct List {
             // Decrease count if we exceeded the limit to avoid further overflows
             atomicSub(&count, 1);
         }
+    }
+
+    __device__ T& back() {
+        // Note: Assumes the list is not empty!
+        return values[count - 1];
+    }
+
+    // Returns a const reference to the last element (for read-only access)
+    __device__ const T& back() const {
+        // Note: Assumes the list is not empty!
+        return values[count - 1];
     }
 
     __device__ void insert(unsigned index, const T& value) {
@@ -111,7 +121,7 @@ __forceinline__ __device__ bool is_null(T const val, T const epsilon = 1e-8f)
 template <typename T>
 __forceinline__ __device__ bool are_close(T const a, T const b, T const epsilon)
 {
-    return fabs(a - b) <= epsilon * FP_MATH(fmax)(FP_CONST(1.0), FP_MATH(fmax)(fabs(a), fabsf(b)));
+    return FP_MATH(fabs)(a - b) <= epsilon * FP_MATH(fmax)(FP_CONST(1.0), FP_MATH(fmax)(FP_MATH(fabs)(a), FP_MATH(fabs)(b)));
 }
 
 __device__ FP_T4 operator+(const FP_T4 &lhs, const FP_T4 &rhs)

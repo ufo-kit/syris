@@ -57,7 +57,8 @@ class Mesh(MovableBody):
         iterations=1,
         center="bbox",
         bounds=None,
-        normals=None
+        normals=None,
+        epsilon=np.inf
     ):
         """Constructor."""
         self._state = 0
@@ -89,6 +90,8 @@ class Mesh(MovableBody):
             self._bounds = bounds.rescale(cfg.UNIT).magnitude
         else:
             self._bounds = bounds
+        
+        self._epsilon = epsilon
 
         super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
@@ -117,7 +120,8 @@ class Mesh(MovableBody):
                    iterations=iterations,
                    center=center,
                    normals=reader.normals,
-                   bounds=reader.bounds)
+                   bounds=reader.bounds,
+                   epsilon=reader.epsilon)
     
     @property
     def furthest_point(self):
@@ -239,6 +243,10 @@ class Mesh(MovableBody):
     @property
     def bounds(self):
         return self._bounds
+    
+    @property
+    def epsilon(self):
+        return self._epsilon
 
     def sort(self):
         """Sort triangles based on the greatest x-coordinate in an ascending order. Also sort

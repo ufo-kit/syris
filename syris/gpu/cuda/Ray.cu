@@ -158,56 +158,82 @@ __device__ void Ray::setInvDirection(FP_T4 &invDirection)
 //     return true;
 // }
 
+// __device__ bool Ray::intersects(FP_T4 const &minBbox, FP_T4 const &maxBbox, FP_T &tmin, FP_T &tmax) const
+// {
+//     // constexpr float EPSILON = 1e-9f;
+//     constexpr FP_T EPSILON = cuda::std::numeric_limits<FP_T>::epsilon();
+//     FP_T4 bounds[2];
+//     bounds[0] = minBbox;
+//     bounds[1] = maxBbox;
+    
+//     FP_T c = (bounds[this->sign[0]].x - this->tail.x);
+//     FP_T d = (bounds[1 - this->sign[0]].x - this->tail.x);
+
+//     tmin = (is_null<float>(c, EPSILON)) ? 0 : c * this->invDirection.x;
+//     tmax = (is_null<float>(d, EPSILON)) ? 0 : d * this->invDirection.x;
+
+//     FP_T tymin = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
+//     FP_T tymax = (bounds[1 - this->sign[1]].y - this->tail.y) * this->invDirection.y;
+
+//     if ((tmin > tymax) || (tymin > tmax))
+//         return false;
+
+//     if (tymin > tmin)
+//         tmin = tymin;
+
+//     if (tymax < tmax)
+//         tmax = tymax;
+
+//     FP_T tzmin = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
+//     FP_T tzmax = (bounds[1 - this->sign[2]].z - this->tail.z) * this->invDirection.z;
+
+//     if ((tmin > tzmax) || (tzmin > tmax))
+//         return false;
+
+//     if (tzmin > tmin)
+//         tmin = tzmin;
+
+//     if (tzmax < tmax)
+//         tmax = tzmax;
+
+//     return true;
+// }
+
 __device__ bool Ray::intersects(FP_T4 const &minBbox, FP_T4 const &maxBbox, FP_T &tmin, FP_T &tmax) const
 {
-    // constexpr float EPSILON = 1e-9f;
-    constexpr FP_T EPSILON = cuda::std::numeric_limits<FP_T>::epsilon();
     FP_T4 bounds[2];
     bounds[0] = minBbox;
     bounds[1] = maxBbox;
-    
-    FP_T c = (bounds[this->sign[0]].x - this->tail.x);
-    FP_T d = (bounds[1 - this->sign[0]].x - this->tail.x);
 
-    tmin = (is_null<float>(c, EPSILON)) ? 0 : c * this->invDirection.x;
-    tmax = (is_null<float>(d, EPSILON)) ? 0 : d * this->invDirection.x;
+    FP_T t_lower, t_upper;
 
-    FP_T tymin = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
-    FP_T tymax = (bounds[1 - this->sign[1]].y - this->tail.y) * this->invDirection.y;
+    // X Slab
+    t_lower = (bounds[this->sign[0]].x - this->tail.x) * this->invDirection.x;
+    t_upper = (bounds[1 - this->sign[0]].x - this->tail.x) * this->invDirection.x;
+    tmin = FP_MATH(fmax)(tmin, t_lower);
+    tmax = FP_MATH(fmin)(tmax, t_upper);
 
-    if ((tmin > tymax) || (tymin > tmax))
-        return false;
+    // Y Slab
+    t_lower = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
+    t_upper = (bounds[1 - this->sign[1]].y - this->tail.y) * this->invDirection.y;
+    tmin = FP_MATH(fmax)(tmin, t_lower);
+    tmax = FP_MATH(fmin)(tmax, t_upper);
 
-    if (tymin > tmin)
-        tmin = tymin;
-
-    if (tymax < tmax)
-        tmax = tymax;
-
-    FP_T tzmin = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
-    FP_T tzmax = (bounds[1 - this->sign[2]].z - this->tail.z) * this->invDirection.z;
-
-    if ((tmin > tzmax) || (tzmin > tmax))
-        return false;
-
-    if (tzmin > tmin)
-        tmin = tzmin;
-
-    if (tzmax < tmax)
-        tmax = tzmax;
-
-    return true;
+    // Z Slab
+    t_lower = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
+    t_upper = (bounds[1 - this->sign[2]].z - this->tail.z) * this->invDirection.z;
+    tmin = FP_MATH(fmax)(tmin, t_lower);
+    tmax = FP_MATH(fmin)(tmax, t_upper);
+    return tmax >= tmin;
 }
 
 __device__ bool Ray::intersects(FP_T4 const &minBbox, FP_T4 const &maxBbox) const
 {
-    FP_T tmin = 0, tmax = 1e9;
-    if (!this->intersects(minBbox, maxBbox, tmin, tmax)){
-        return false;
-    }
-
-    return tmin >= 0;
+    FP_T t_near = FP_CONST(0.0);
+    FP_T t_far  = cuda::std::numeric_limits<FP_T>::max();
+    return this->intersects(minBbox, maxBbox, t_near, t_far);
 }
+
 
 
 // __device__ bool Ray::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &tmin, FP_T &tmax) const {
@@ -366,53 +392,21 @@ __device__ bool Ray::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V
 
     // Calculate final intersection distance
     t = T / det;
-    return true;
+    
+    constexpr FP_T T_MIN = cuda::std::numeric_limits<FP_T>::epsilon();
+    if (t > T_MIN && t < tmax) {
+        tmax = t; // Update the max t-value for future tests
+        return true;
+    }
+
+    return false;
 }
-
-// __device__ bool Ray::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &tmin, FP_T &tmax) const
-// {
-//     constexpr FP_T EPSILON = 1e-7f;
-//     FP_T4 const e_1 = V2 - V1;
-//     FP_T4 const e_2 = V3 - V1;
-//     FP_T4 const dir = this->direction;
-//     FP_T4 const tail = this->tail;
-//     FP_T4 const P = cross4(dir, e_2);
-
-//     FP_T const det = e_1 * P;
-
-//     if (is_null<float>(det, EPSILON))
-//     {
-//         return false;
-//     }
-
-//     FP_T const inv_det = FP_CONST(1.0) / det;
-//     FP_T4 const T = tail - V1;
-//     FP_T const u = (T * P) * inv_det;
-
-//     if ((u < FP_CONST(0.0)) || (u > FP_CONST(1.0)))
-//     {
-//         return false;
-//     }
-
-//     FP_T4 const Q = cross4(T, e_1);
-//     FP_T const v = (dir * Q) * inv_det;
-//     if ((v < FP_CONST(0.0)) || (u + v > FP_CONST(1.0)))
-//     {
-//         return false;
-//     }
-
-//     tmin = (e_2 * Q) * inv_det;
-
-//     return true;
-// }
 
 __device__ bool Ray::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t) const
 {
-    FP_T tmax = 1e9;
+    // Set a default t_max to effectively infinity
+    FP_T t_max = cuda::std::numeric_limits<FP_T>::max();
     
-    if (!this->intersects(V1, V2, V3, t, tmax)) {
-        return false;
-    }
-
-    return t >= 0;
+    // Call the main function to do the actual work
+    return this->intersects(V1, V2, V3, t, t_max);
 }
