@@ -1,4 +1,5 @@
 #include "Ray.cuh"
+#include "Commons.cuh"
 
 __device__ Ray::Ray(const Ray &ray)
 {
@@ -25,13 +26,12 @@ __device__ Ray::Ray(FP_T4 tail, FP_T4 direction)
     if (this->Ky == 3)
         this->Ky = 0;
 
-    if (dir_array[this->Kz] < 0.0f)
+    if (dir_array[this->Kz] < FP_CONST(0.0))
     {
         swap<int>(this->Kx, this->Ky);
     }
 
-    // this->Sz =  __frcp_rn(dir_array[this->Kz]);
-    this->Sz = 1.0f / dir_array[this->Kz];
+    this->Sz = FP_CONST(1.0) / dir_array[this->Kz];
     this->Sx = dir_array[this->Kx] * this->Sz;
     this->Sy = dir_array[this->Ky] * this->Sz;
 };
@@ -45,8 +45,14 @@ __device__ void Ray::print() const
 
 __device__ FP_T Ray::invmagnitude(FP_T4 &v)
 {
-    return rnorm3df(v.x, v.y, v.z);
+    constexpr FP_T ZERO_VECTOR_EPSILON_SQ = FP_CONST(1e-30);
+    FP_T mag_sq = v.x * v.x + v.y * v.y + v.z * v.z;
+    if (mag_sq < ZERO_VECTOR_EPSILON_SQ) {
+        return FP_CONST(0.0);
+    }    
+    return FP_CONST(1.0) / FP_MATH(sqrt)(mag_sq);
 }
+
 
 __device__ void Ray::updateDirection()
 {
@@ -62,8 +68,8 @@ __device__ void Ray::updateDirection()
 
 __device__ void Ray::updateInvDirection()
 {
-    // this->invDirection = make_fp_t4(__frcp_rn(this->direction.x), __frcp_rn(this->direction.y), __frcp_rn(this->direction.z), 0.0f);
-    this->invDirection = make_fp_t4(1.0f / this->direction.x, 1.0f / this->direction.y, 1.0f / this->direction.z, 0.0f);
+    // this->invDirection = make_fp_t4(__frcp_rn(this->direction.x), __frcp_rn(this->direction.y), __frcp_rn(this->direction.z), FP_CONST(0.0));
+    this->invDirection = make_fp_t4(FP_CONST(1.0) / this->direction.x, FP_CONST(1.0) / this->direction.y, FP_CONST(1.0) / this->direction.z, FP_CONST(0.0));
 }
 
 __device__ void Ray::updateSign()
@@ -79,7 +85,7 @@ __device__ FP_T4 Ray::computeParametric(FP_T t)
     P.x = this->tail.x + t * this->direction.x;
     P.y = this->tail.y + t * this->direction.y;
     P.z = this->tail.z + t * this->direction.z;
-    P.w = 1.0f;
+    P.w = FP_CONST(1.0);
     return P;
 }
 
@@ -94,7 +100,7 @@ __device__ void Ray::setHead(FP_T4 &head)
 
 __device__ void Ray::setDirection(FP_T4 &direction)
 {
-    float invnorm = rnorm3df(direction.x, direction.y, direction.z);
+    FP_T invnorm = this->invmagnitude(direction);
     this->direction = direction * invnorm;
     this->updateInvDirection();
     this->updateSign();
@@ -204,55 +210,145 @@ __device__ bool Ray::intersects(FP_T4 const &minBbox, FP_T4 const &maxBbox) cons
 }
 
 
-__device__ bool Ray::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &tmin, FP_T &tmax) const {
-    constexpr FP_T EPSILON = cuda::std::numeric_limits<FP_T>::epsilon();
+// __device__ bool Ray::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &tmin, FP_T &tmax) const {
+//     constexpr FP_T EPSILON = cuda::std::numeric_limits<FP_T>::epsilon();
 
+//     // Calculate vertices relative to ray origin
+//     FP_T A[3], B[3], C[3];
+//     A[0] = V1.x - this->tail.x;
+//     A[1] = V1.y - this->tail.y;
+//     A[2] = V1.z - this->tail.z;
+//     B[0] = V2.x - this->tail.x;
+//     B[1] = V2.y - this->tail.y;
+//     B[2] = V2.z - this->tail.z;
+//     C[0] = V3.x - this->tail.x;
+//     C[1] = V3.y - this->tail.y;
+//     C[2] = V3.z - this->tail.z;
+
+//     // Perform shear and scale of vertices
+//     FP_T Ax = A[this->Kx] - this->Sx * A[this->Kz];
+//     FP_T Ay = A[this->Ky] - this->Sy * A[this->Kz];
+//     FP_T Bx = B[this->Kx] - this->Sx * B[this->Kz];
+//     FP_T By = B[this->Ky] - this->Sy * B[this->Kz];
+//     FP_T Cx = C[this->Kx] - this->Sx * C[this->Kz];
+//     FP_T Cy = C[this->Ky] - this->Sy * C[this->Kz];
+
+//     // Calculate scaled barycentric coordinates
+//     FP_T U = Cx * By - Cy * Bx;
+//     FP_T V = Ax * Cy - Ay * Cx;
+//     FP_T W = Bx * Ay - By * Ax;
+
+//     // Fall back to double precision if necessary
+//     if (is_null<float>(U, EPSILON) || is_null<float>(V, EPSILON) || is_null<float>(W, EPSILON)) {
+//         double CxBy = (double)Cx * (double)By;
+//         double CyBx = (double)Cy * (double)Bx;
+//         U = (FP_T)(CxBy - CyBx);
+//         double AxCy = (double)Ax * (double)Cy;
+//         double AyCx = (double)Ay * (double)Cx;
+//         V = (FP_T)(AxCy - AyCx);
+//         double BxAy = (double)Bx * (double)Ay;
+//         double ByAx = (double)By * (double)Ax;
+//         W = (FP_T)(BxAy - ByAx);
+//     }
+
+//     if ((U < FP_CONST(0.0) || V < FP_CONST(0.0) || W < FP_CONST(0.0)) &&
+//         (U > FP_CONST(0.0) || V > FP_CONST(0.0) || W > FP_CONST(0.0)))
+//         return false;
+
+//     // Calculate determinant
+//     FP_T det = U + V + W;
+
+//     if (is_null<float>(det, EPSILON))
+//         return false;
+
+//     // Calculate scaled z-coordinates of vertices
+//     FP_T Az = this->Sz * A[this->Kz];
+//     FP_T Bz = this->Sz * B[this->Kz];
+//     FP_T Cz = this->Sz * C[this->Kz];
+
+//     // Calculate the hit distance
+//     FP_T T = U * Az + V * Bz + W * Cz;
+
+//     // Get Signed 0 of det
+//     int det_sign = sign_mask(det);
+//     if (xorf(T, det_sign) < FP_CONST(0.0))
+//         return false;
+
+//     // invmagnitude U, V, W, and T
+//     // TODO : update this to use double accordingly
+//     tmin = T / det;
+//     return true;
+// }
+
+__device__ bool Ray::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t, FP_T &tmax) const {
     // Calculate vertices relative to ray origin
-    FP_T A[3], B[3], C[3];
-    A[0] = V1.x - this->tail.x;
-    A[1] = V1.y - this->tail.y;
-    A[2] = V1.z - this->tail.z;
-    B[0] = V2.x - this->tail.x;
-    B[1] = V2.y - this->tail.y;
-    B[2] = V2.z - this->tail.z;
-    C[0] = V3.x - this->tail.x;
-    C[1] = V3.y - this->tail.y;
-    C[2] = V3.z - this->tail.z;
+    FP_T4 A_t4 = V1 - this->tail;
+    FP_T4 B_t4 = V2 - this->tail;
+    FP_T4 C_t4 = V3 - this->tail;
 
-    // Perform shear and scale of vertices
-    FP_T Ax = A[this->Kx] - this->Sx * A[this->Kz];
-    FP_T Ay = A[this->Ky] - this->Sy * A[this->Kz];
-    FP_T Bx = B[this->Kx] - this->Sx * B[this->Kz];
-    FP_T By = B[this->Ky] - this->Sy * B[this->Kz];
-    FP_T Cx = C[this->Kx] - this->Sx * C[this->Kz];
-    FP_T Cy = C[this->Ky] - this->Sy * C[this->Kz];
+    FP_T A[3] = {A_t4.x, A_t4.y, A_t4.z};
+    FP_T B[3] = {B_t4.x, B_t4.y, B_t4.z};
+    FP_T C[3] = {C_t4.x, C_t4.y, C_t4.z};
 
-    // Calculate scaled barycentric coordinates
-    FP_T U = Cx * By - Cy * Bx;
-    FP_T V = Ax * Cy - Ay * Cx;
-    FP_T W = Bx * Ay - By * Ax;
+    // Perform shear and scale of vertices using FP_MATH(FMA) for better precision
+    FP_T Ax = FP_MATH(fma)(-this->Sx, A[this->Kz], A[this->Kx]);
+    FP_T Ay = FP_MATH(fma)(-this->Sy, A[this->Kz], A[this->Ky]);
+    FP_T Bx = FP_MATH(fma)(-this->Sx, B[this->Kz], B[this->Kx]);
+    FP_T By = FP_MATH(fma)(-this->Sy, B[this->Kz], B[this->Ky]);
+    FP_T Cx = FP_MATH(fma)(-this->Sx, C[this->Kz], C[this->Kx]);
+    FP_T Cy = FP_MATH(fma)(-this->Sy, C[this->Kz], C[this->Ky]);
 
-    // Fall back to double precision if necessary
-    if (is_null<float>(U, EPSILON) || is_null<float>(V, EPSILON) || is_null<float>(W, EPSILON)) {
-        double CxBy = (double)Cx * (double)By;
-        double CyBx = (double)Cy * (double)Bx;
-        U = (FP_T)(CxBy - CyBx);
-        double AxCy = (double)Ax * (double)Cy;
-        double AyCx = (double)Ay * (double)Cx;
-        V = (FP_T)(AxCy - AyCx);
-        double BxAy = (double)Bx * (double)Ay;
-        double ByAx = (double)By * (double)Ax;
-        W = (FP_T)(BxAy - ByAx);
-    }
-
-    if ((U < 0.0f || V < 0.0f || W < 0.0f) &&
-        (U > 0.0f || V > 0.0f || W > 0.0f))
-        return false;
+    // Calculate scaled barycentric coordinates using FP_MATH(FMA)
+    FP_T U = FP_MATH(fma)(Cx, By, -Cy * Bx);
+    FP_T V = FP_MATH(fma)(Ax, Cy, -Ay * Cx);
+    FP_T W = FP_MATH(fma)(Bx, Ay, -By * Ax);
 
     // Calculate determinant
     FP_T det = U + V + W;
 
-    if (is_null<float>(det, EPSILON))
+    // --- Dynamic Epsilon Calculation ---
+    // Calculate a conservative error bound for the determinant calculation.
+    // The number of floating point operations is ~7 to get to U,V,W.
+    // A gamma factor accounts for error propagation. gamma(n) = (n*eps)/(1-n*eps).
+    // For FP_T = float, a factor of 8*epsilon is a reasonable starting point.
+    constexpr FP_T gamma = (FP_T)8 * cuda::std::numeric_limits<FP_T>::epsilon();
+    FP_T error_bound = gamma * (fabs(U) + fabs(V) + fabs(W));
+
+    // Fall back to double precision if the single-precision result is close to the error margin.
+    if (fabs(det) < error_bound) {
+        // Fallback to double precision for higher accuracy
+        double d_Sx = (double)this->Sx, d_Sy = (double)this->Sy;
+        double d_Ax = FP_MATH(fma)(-d_Sx, (double)A[this->Kz], (double)A[this->Kx]);
+        double d_Ay = FP_MATH(fma)(-d_Sy, (double)A[this->Kz], (double)A[this->Ky]);
+        double d_Bx = FP_MATH(fma)(-d_Sx, (double)B[this->Kz], (double)B[this->Kx]);
+        double d_By = FP_MATH(fma)(-d_Sy, (double)B[this->Kz], (double)B[this->Ky]);
+        double d_Cx = FP_MATH(fma)(-d_Sx, (double)C[this->Kz], (double)C[this->Kx]);
+        double d_Cy = FP_MATH(fma)(-d_Sy, (double)C[this->Kz], (double)C[this->Ky]);
+        double d_U = FP_MATH(fma)(d_Cx, d_By, -d_Cy * d_Bx);
+        double d_V = FP_MATH(fma)(d_Ax, d_Cy, -d_Ay * d_Cx);
+        double d_W = FP_MATH(fma)(d_Bx, d_Ay, -d_By * d_Ax);
+        double d_det = d_U + d_V + d_W;
+
+        if (fabs(d_det) < cuda::std::numeric_limits<double>::epsilon()) return false;
+
+        // Check barycentric coordinates against a zero bound in double precision
+        if ((d_U < 0.0 || d_V < 0.0 || d_W < 0.0) && (d_U > 0.0 || d_V > 0.0 || d_W > 0.0)) return false;
+
+        double d_Az = (double)this->Sz * (double)A[this->Kz];
+        double d_Bz = (double)this->Sz * (double)B[this->Kz];
+        double d_Cz = (double)this->Sz * (double)C[this->Kz];
+        double d_T = FP_MATH(fma)(d_U, d_Az, FP_MATH(fma)(d_V, d_Bz, d_W * d_Cz));
+
+        if (FP_MATH(copysign)(1.0, d_T) != FP_MATH(copysign)(1.0, d_det)) return false;
+
+        t = (FP_T)(d_T / d_det);
+        return true;
+    }
+
+
+    // Check if barycentric coordinates have the same sign, accounting for error
+    if ((U < -error_bound || V < -error_bound || W < -error_bound) &&
+        (U > error_bound || V > error_bound || W > error_bound))
         return false;
 
     // Calculate scaled z-coordinates of vertices
@@ -260,17 +356,16 @@ __device__ bool Ray::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V
     FP_T Bz = this->Sz * B[this->Kz];
     FP_T Cz = this->Sz * C[this->Kz];
 
-    // Calculate the hit distance
-    FP_T T = U * Az + V * Bz + W * Cz;
+    // Calculate the hit distance using FP_MATH(FMA)
+    FP_T T = FP_MATH(fma)(U, Az, FP_MATH(fma)(V, Bz, W * Cz));
 
-    // Get Signed 0 of det
-    int det_sign = sign_mask(det);
-    if (xorf(T, det_sign) < 0.0f)
+    // Check if the intersection is in front of the ray, considering the sign of det
+    // xorf is a bitwise trick; a standard comparison is often clearer and just as fast.
+    if (FP_MATH(copysign)(FP_CONST(1.0), T) != FP_MATH(copysign)(FP_CONST(1.0), det))
         return false;
 
-    // invmagnitude U, V, W, and T
-    // TODO : update this to use double accordingly
-    tmin = T / det;
+    // Calculate final intersection distance
+    t = T / det;
     return true;
 }
 
@@ -290,18 +385,18 @@ __device__ bool Ray::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V
 //         return false;
 //     }
 
-//     FP_T const inv_det = 1.0f / det;
+//     FP_T const inv_det = FP_CONST(1.0) / det;
 //     FP_T4 const T = tail - V1;
 //     FP_T const u = (T * P) * inv_det;
 
-//     if ((u < 0.0f) || (u > 1.0f))
+//     if ((u < FP_CONST(0.0)) || (u > FP_CONST(1.0)))
 //     {
 //         return false;
 //     }
 
 //     FP_T4 const Q = cross4(T, e_1);
 //     FP_T const v = (dir * Q) * inv_det;
-//     if ((v < 0.0f) || (u + v > 1.0f))
+//     if ((v < FP_CONST(0.0)) || (u + v > FP_CONST(1.0)))
 //     {
 //         return false;
 //     }

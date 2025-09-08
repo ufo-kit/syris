@@ -31,13 +31,13 @@ __device__ unsigned int toInternalRepresentation(const Tree &tree, const unsigne
 
 __device__ void growBox(const FP_T4 &bbMinInput, const FP_T4 &bbMaxInput, FP_T4 *bbMinOutput, FP_T4 *bbMaxOutput)
 {
-    bbMinOutput->x = fminf(bbMinInput.x, bbMinOutput->x);
-    bbMinOutput->y = fminf(bbMinInput.y, bbMinOutput->y);
-    bbMinOutput->z = fminf(bbMinInput.z, bbMinOutput->z);
+    bbMinOutput->x = FP_MATH(fmin)(bbMinInput.x, bbMinOutput->x);
+    bbMinOutput->y = FP_MATH(fmin)(bbMinInput.y, bbMinOutput->y);
+    bbMinOutput->z = FP_MATH(fmin)(bbMinInput.z, bbMinOutput->z);
 
-    bbMaxOutput->x = fmaxf(bbMaxInput.x, bbMaxOutput->x);
-    bbMaxOutput->y = fmaxf(bbMaxInput.y, bbMaxOutput->y);
-    bbMaxOutput->z = fmaxf(bbMaxInput.z, bbMaxOutput->z);
+    bbMaxOutput->x = FP_MATH(fmax)(bbMaxInput.x, bbMaxOutput->x);
+    bbMaxOutput->y = FP_MATH(fmax)(bbMaxInput.y, bbMaxOutput->y);
+    bbMaxOutput->z = FP_MATH(fmax)(bbMaxInput.z, bbMaxOutput->z);
 }
 
 __device__ int delta(const Tree &tree, const int index)
@@ -239,13 +239,13 @@ __device__ FP_T project_thickness(List<FP_T> &tvalues)
     while (i < tvalues.size())
     {
         j = i + 1;
-        while (j < tvalues.size() && fabsf(tvalues.values[j] - tvalues.values[i]) < 1e-6)
+        while (j < tvalues.size() && FP_MATH(fabs)(tvalues.values[j] - tvalues.values[i]) < 1e-6)
         {
             j++;
         }
         if (i < tvalues.size() && j < tvalues.size())
         {
-            result += fabs (tvalues.values[j] - tvalues.values[i]);
+            result += FP_MATH(fabs) (tvalues.values[j] - tvalues.values[i]);
         }
         i = j + 1;
     }
@@ -311,15 +311,13 @@ __device__ FP_T matchOuterPairs(
 }
 
 struct AreFPValuesClose {
-    const FP_T epsilon;
+    const FP_T relative_epsilon;
 
-    // Constructor
-    __device__ AreFPValuesClose(FP_T ep) : epsilon(ep) {}
+    __device__ AreFPValuesClose(FP_T ep) : relative_epsilon(ep) {}
 
-    // Comparison operator: returns true if a and b are "equivalent" (close enough)
     __device__ bool operator()(FP_T a, FP_T b) const {
-        // Assuming FP_T is double, use fabs. If float, use fabsf.
-        return fabs(a - b) <= epsilon;
+        // A robust relative comparison
+        return FP_MATH(fabs)(a - b) <= relative_epsilon * FP_MATH(fmax)(FP_CONST(1.0), FP_MATH(fmax)(FP_MATH(fabs)(a), FP_MATH(fabs)(b)));
     }
 };
 
@@ -370,7 +368,7 @@ __device__ FP_T traceRay(
 
     thrust::pair<FP_T*, int*> new_ends;
 
-    const FP_T CHECK_EPSILON = cuda::std::numeric_limits<FP_T>::epsilon();
+    const FP_T DEDUP_EPSILON = 1e-6f;
 
     new_ends = thrust::unique_by_key_copy(
         thrust::seq,                             // Explicit sequential execution policy
@@ -379,7 +377,7 @@ __device__ FP_T traceRay(
         intersected.values,                      // Input values: start (must match key range)
         filtered_tvalues.values,                 // Output keys: destination
         filtered_intersections.values,           // Output values: destination
-        AreFPValuesClose(CHECK_EPSILON)          // Custom predicate for "equality"
+        AreFPValuesClose(DEDUP_EPSILON)          // Custom predicate for "equality"
     );
 
     // Update the counts in your filtered lists
@@ -431,7 +429,7 @@ __device__ FP_T traceRay(
 
     if (tvalues.size() == 2)
     {
-        return fabsf(tvalues.get(1) - tvalues.get(0));
+        return FP_MATH(fabs)(tvalues.get(1) - tvalues.get(0));
     }
 
     thrust::stable_sort_by_key(thrust::seq, tvalues.values, tvalues.values + tvalues.size(),
@@ -443,7 +441,7 @@ __device__ FP_T traceRay(
 
     thrust::pair<FP_T*, int*> new_ends;
 
-    constexpr FP_T CHECK_EPSILON = ::cuda::std::numeric_limits<FP_T>::epsilon();
+    const FP_T DEDUP_EPSILON = 1e-6f;
 
     new_ends = thrust::unique_by_key_copy(
         thrust::seq,                             // Explicit sequential execution policy
@@ -452,7 +450,7 @@ __device__ FP_T traceRay(
         intersected.values,                      // Input values: start (must match key range)
         filtered_tvalues.values,                 // Output keys: destination
         filtered_intersections.values,           // Output values: destination
-        AreFPValuesClose(CHECK_EPSILON)          // Custom predicate for "equality"
+        AreFPValuesClose(DEDUP_EPSILON)          // Custom predicate for "equality"
     );
 
     // Update the counts in your filtered lists

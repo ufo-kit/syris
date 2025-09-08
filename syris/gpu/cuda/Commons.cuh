@@ -4,15 +4,25 @@
 
 
 #ifdef __FP_T_D__
-using FP_T = double;
-using FP_T2 = double2;
-using FP_T3 = double3;
-using FP_T4 = double4;
+    using FP_T = double;
+    using FP_T2 = double2;
+    using FP_T3 = double3;
+    using FP_T4 = double4;
+
+    #define FP_MATH(func) func
+    #define FP_CONST(val) val
+    #define MAKE_FP_T2(x, y) make_double2(x, y)
+    #define MAKE_FP_T4(x, y, z, w) make_double4(x, y, z, w)
 #else
-using FP_T = float;
-using FP_T2 = float2;
-using FP_T3 = float3;
-using FP_T4 = float4;
+    using FP_T = float;
+    using FP_T2 = float2;
+    using FP_T3 = float3;
+    using FP_T4 = float4;
+
+    #define FP_MATH(func) func##f
+    #define FP_CONST(val) val##f
+    #define MAKE_FP_T2(x, y) make_float2(x, y)
+    #define MAKE_FP_T4(x, y, z, w) make_float4(x, y, z, w)
 #endif
 
 constexpr unsigned MAX_COLLISIONS = 512;
@@ -96,6 +106,12 @@ template <typename T>
 __forceinline__ __device__ bool is_null(T const val, T const epsilon = 1e-8f)
 {
     return (val < epsilon) && (val > -epsilon);
+}
+
+template <typename T>
+__forceinline__ __device__ bool are_close(T const a, T const b, T const epsilon)
+{
+    return fabs(a - b) <= epsilon * FP_MATH(fmax)(FP_CONST(1.0), FP_MATH(fmax)(fabs(a), fabsf(b)));
 }
 
 __device__ FP_T4 operator+(const FP_T4 &lhs, const FP_T4 &rhs)
@@ -206,12 +222,12 @@ __device__ inline FP_T dot4(FP_T4 a, FP_T4 b)
 
 __device__ inline FP_T max_component(FP_T4 a)
 {
-    return fmaxf(fmaxf(a.x, a.y), a.z);
+    return FP_MATH(fmax)(FP_MATH(fmax)(a.x, a.y), a.z);
 }
 
 __device__ inline FP_T min_component(FP_T4 a)
 {
-    return fminf(fminf(a.x, a.y), a.z);
+    return FP_MATH(fmin)(FP_MATH(fmin)(a.x, a.y), a.z);
 }
 
 __device__ inline int maxDimIndex(const FP_T4 &D)
@@ -263,9 +279,9 @@ __device__ inline FP_T4 getBoundingBoxCentroid(FP_T4 bboxMin, FP_T4 bboxMax)
 {
     FP_T4 centroid;
 
-    centroid.x = (bboxMin.x + bboxMax.x) / 2.0f;
-    centroid.y = (bboxMin.y + bboxMax.y) / 2.0f;
-    centroid.z = (bboxMin.z + bboxMax.z) / 2.0f;
+    centroid.x = (bboxMin.x + bboxMax.x) / FP_CONST(2.0);
+    centroid.y = (bboxMin.y + bboxMax.y) / FP_CONST(2.0);
+    centroid.z = (bboxMin.z + bboxMax.z) / FP_CONST(2.0);
 
     return centroid;
 }
