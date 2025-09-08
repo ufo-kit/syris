@@ -57,7 +57,7 @@ class CudaPipeline:
         else:
             selected_options = options + self.opts
         
-        selected_options += ['-D__CUDA_NO_HALF_CONVERSIONS__']
+        selected_options += ['-D__CUDA_NO_HALF_CONVERSIONS__', '--std=c++17']
         
         selected_options = tuple(selected_options,)
 
