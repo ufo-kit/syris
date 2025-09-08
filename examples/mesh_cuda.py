@@ -25,79 +25,55 @@ import quantities as q
 import syris
 import syris.geometry as geom
 from syris.geometry import Trajectory
-from syris.devices.cameras import Camera, make_pco_dimax
+from syris.devices.cameras import Camera
 import tqdm
-from syris.bodies.mesh import Mesh, make_cube, read_blender_obj
+from syris.bodies.mesh import Mesh
 from .util import get_default_parser, show
 
-
 LOG = logging.getLogger(__name__)
-
 
 def main():
     """Main function."""
     args = parse_args()
     syris.init(loglevel=logging.INFO, double_precision=args.double_precision, compute_backend="cuda")
-    units = q.Quantity(1, args.units)
 
-    tr = geom.Trajectory([(0, 0, 0)] * units)
-    mesh = Mesh.from_file(args.input, tr, center=args.center, iterations=args.supersampling, unit=units)
+    pixel_units = q.Quantity(1, args.pixel_size_units)
+    mesh_units = q.Quantity(1, args.mesh_units)
+
+    tr = geom.Trajectory([(0, 0, 0)] * mesh_units)
+    mesh = Mesh.from_file(args.input, tr, center=args.center, iterations=args.supersampling, unit=mesh_units)
     LOG.info("Number of triangles: {}".format(mesh.num_triangles))
 
-    shape = (args.n, args.n)
     if args.pixel_size is None:
-        if args.input is None:
-            fov = 4.0 * units
-        else:
-            # Maximum sample size in x and y direction
-            max_diff = np.max(mesh.extrema[:-1, 1] - mesh.extrema[:-1, 0])
-            fov = max_diff
-        fov *= args.margin
+        LOG.info("Pixel size not provided, calculating automatically...")
+        max_mesh_span = np.max(mesh.extrema[:-1, 1] - mesh.extrema[:-1, 0]).rescale(mesh_units)
+        fov = max_mesh_span * args.margin
         args.pixel_size = fov / args.n
     else:
         fov = args.n * args.pixel_size
 
-    if args.translate is None:
-        translate = (fov.simplified.magnitude / 2.0, fov.simplified.magnitude / 2.0, 0) * q.um
-    else:
-        translate = (
-            args.translate[0].simplified.magnitude,
-            args.translate[1].simplified.magnitude,
-            0,
-        ) * q.m
-    LOG.info("Translation: {}".format(translate.rescale(q.um)))
 
+    # --- CAMERA SETUP ---
+    camera_trajectory = geom.Trajectory([(0, 0, 0)] * mesh_units)
+    camera = Camera(pixel_size=args.pixel_size, shape=args.n, trajectory=camera_trajectory)
+    camera.translate([fov, fov, -10] * mesh_units)
 
-    control_points = [(0, 0, 0)]*q.m
+    print("\n--- Simulation Setup ---")
+    LOG.info(f"Image Resolution: {args.n}x{args.n} pixels")
+    LOG.info(f"Final Pixel Size: {args.pixel_size.rescale(pixel_units):.4f}")
+    LOG.info(f"Field of View (FOV): {fov.rescale(mesh_units):.4f}")
+    LOG.info(f"Mesh Bounding Box (min): {mesh.extrema[:, 0].rescale(mesh_units)}")
+    LOG.info(f"Mesh Bounding Box (max): {mesh.extrema[:, 1].rescale(mesh_units)}")
+    LOG.info(f"Camera Position: {camera.position.rescale(mesh_units)}\n")
 
-    print (args.pixel_size)
-
-    camera = make_pco_dimax()
-    camera.pixel_size = args.pixel_size
-    print("position", camera.position)
-    camera.translate(translate)
-    print("position", camera.position)
-
-    # mesh.rotate(args.x_rotate, geom.X_AX)
-    camera.translate([0,0,-100]*q.m)
-
-    fmt = "n: {}, pixel size: {}, FOV: {}"
-    LOG.info(fmt.format(args.n, args.pixel_size.rescale(q.um), fov.rescale(q.um)))
     st = time.time()
     for i in tqdm.tqdm(range(args.num_y_rotations)):
-        proj = mesh.project(shape, args.pixel_size, t=None, camera=camera, parallel=True)
+        proj = mesh.project(camera=camera, parallel=True)
         if args.projection_filename is not None:
             imageio.imwrite(args.projection_filename + f"_{i:>05}.tif", proj)
         mesh.rotate(args.y_rotate, geom.Y_AX)
 
     LOG.info("Duration: {} s".format(time.time() - st))
-    offset = (0, translate[1].simplified, -(fov / 2.0).simplified) * q.m
-
-    if args.compute_slice:
-        sl = mesh.compute_slices((1,) + shape, args.pixel_size, offset=offset).get()[0]
-        if args.slice_filename is not None:
-            imageio.imwrite(args.slice_filename, sl)
-        show(sl, title="Slice at y = {}".format(args.n / 2))
 
     show(proj, title="Projection")
     plt.show()
@@ -107,42 +83,30 @@ def parse_args():
     """Parse command line arguments."""
     parser = get_default_parser(__doc__)
 
-    parser.add_argument("--input", type=str, help="Input .obj file")
-    parser.add_argument("--units", type=str, default="um", help="Mesh physical units")
-    parser.add_argument("--n", type=int, default=256, help="Number of pixels")
-    parser.add_argument(
-        "--supersampling", type=int, default=1, help="Supersampling for mesh computation"
-    )
-    parser.add_argument("--pixel-size", type=float, help="Pixel size in um")
-    parser.add_argument("--center", type=str, help="Mesh centering on creation")
-    parser.add_argument("--translate", type=float, nargs=2, help="Translation as (x, y) in um")
+    # --- Mesh Arguments ---
+    parser.add_argument("--input", type=str, required=True, help="Input .obj file")
+    parser.add_argument("--mesh-units", type=str, default="um", help="Physical units of the mesh file (e.g., 'm', 'cm', 'um')")
+    parser.add_argument("--center", type=str, default="bbox", help="Mesh centering on creation")
+
+    # --- Detector Arguments ---
+    parser.add_argument("--n", type=int, default=2048, help="Number of pixels in each dimension")
+    parser.add_argument("--pixel-size", type=float, default=None, help="[Optional] Size of a single pixel. If not provided, it's calculated automatically.")
+    parser.add_argument("--pixel-size-units", type=str, default="um", help="Units for the pixel size if specified (e.g., 'm', 'cm', 'um')")
+    parser.add_argument("--margin", type=float, default=1.2, help="Margin factor for automatic FOV calculation (e.g., 1.2 for a 20%% margin)")
+    parser.add_argument("--supersampling", type=int, default=1, help="Supersampling for mesh computation")
     parser.add_argument("--x-rotate", type=float, default=0.0, help="Rotation around x axis [deg]")
     parser.add_argument("--y-rotate", type=float, default=0.0, help="Rotation around y axis [deg]")
-    parser.add_argument(
-        "--num-y-rotations",
-        type=int,
-        default=1,
-        help="How many times rotate around y axis (tomography simulation)"
-    )
-    parser.add_argument(
-        "--margin", type=float, default=1.0, help="Margin in factor of the full FOV"
-    )
-    parser.add_argument(
-        "--projection-filename",
-        type=str,
-        help="Save projection to this filename prefix (.tif is appended)"
-    )
-    parser.add_argument("--compute-slice", action="store_true", help="Compute also one slice")
-    parser.add_argument("--slice-filename", type=str, help="Save slice to this filename")
+    parser.add_argument("--num-y-rotations", type=int, default=1, help="How many times to rotate around y axis")
+    parser.add_argument("--projection-filename", type=str, help="Save projection to this filename prefix")
     parser.add_argument("--double-precision", action="store_true", help="Use double precision")
 
     args = parser.parse_args()
+
     if args.pixel_size is not None:
-        args.pixel_size = args.pixel_size * q.um
+        args.pixel_size = args.pixel_size * q.Quantity(1, args.pixel_size_units)
+        
     args.x_rotate = args.x_rotate * q.deg
     args.y_rotate = args.y_rotate * q.deg
-    if args.translate is not None:
-        args.translate = args.translate * q.um
 
     return args
 
