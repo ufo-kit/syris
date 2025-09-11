@@ -96,7 +96,7 @@ class Mesh(MovableBody):
         super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
     @classmethod
-    def from_file(cls, filename, trajectory, material=None, orientation=geom.Y_AX, iterations=1, center="bbox", unit=q.um):
+    def from_file(cls, filename, trajectory, material=None, orientation=geom.Y_AX, iterations=1, center="bbox", unit=q.um, use_normals=False):
         """
         Alternative constructor to create a Mesh by loading a file. Recommended for modern mesh file formats.
 
@@ -113,13 +113,17 @@ class Mesh(MovableBody):
 
         reader = PyvistaReader(filename=filename, unit=unit)
 
+        normals = None
+        if use_normals:
+            normals = reader.normals
+
         return cls(reader.vertices, 
                    trajectory,
                    material=material,
                    orientation=orientation,
                    iterations=iterations,
                    center=center,
-                   normals=reader.normals,
+                   normals=normals,
                    bounds=reader.bounds,
                    epsilon=reader.epsilon)
     

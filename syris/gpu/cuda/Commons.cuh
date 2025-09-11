@@ -13,6 +13,8 @@
     #define FP_CONST(val) val
     #define MAKE_FP_T2(x, y) make_double2(x, y)
     #define MAKE_FP_T4(x, y, z, w) make_double4(x, y, z, w)
+
+    #define EPSILON FP_CONST(1e-12)
 #else
     using FP_T = float;
     using FP_T2 = float2;
@@ -23,9 +25,11 @@
     #define FP_CONST(val) val##f
     #define MAKE_FP_T2(x, y) make_float2(x, y)
     #define MAKE_FP_T4(x, y, z, w) make_float4(x, y, z, w)
+
+    #define EPSILON FP_CONST(1e-7)
 #endif
 
-constexpr unsigned MAX_COLLISIONS = 512;
+constexpr unsigned MAX_COLLISIONS = 128;
 
 __forceinline__ __device__ __host__ FP_T4 make_fp_t4(FP_T x, FP_T y, FP_T z, FP_T w)
 {

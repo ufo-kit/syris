@@ -58,7 +58,7 @@ class BvhCupyAccelerator(AcceleratorBase):
         sceneMin = np.array([bounds[0], bounds[2], bounds[4], 0], dtype=float)
         sceneMax = np.array([bounds[1], bounds[3], bounds[5], 0], dtype=float)
 
-        t_epsilon = self.mesh.epsilon * .01
+        t_epsilon = self.mesh.epsilon
 
         print (f"{t_epsilon:.12f}")
 

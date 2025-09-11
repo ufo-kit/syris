@@ -7,21 +7,6 @@
 typedef unsigned int morton_t;
 typedef int delta_t;
 
-struct Hit
-{
-    FP_T t;
-    int primID;
-    // The normal is no longer needed here if we pass the global array,
-    // but storing it can be useful for debugging. Let's keep it simple for now.
-};
-
-// Custom comparator for sorting Hits by t-value
-struct HitComparator {
-    __device__ bool operator()(const Hit& a, const Hit& b) const {
-        return a.t < b.t;
-    }
-};
-
 typedef struct
 {
     unsigned int nb_keys;
@@ -244,17 +229,100 @@ __device__ void query(const Tree &tree, const Ray &ray, List<int> &candidates)
     } while (current_node != SENTINEL);
 }
 
+struct AreFPValuesClose {
+    const FP_T relative_epsilon;
 
-__device__ FP_T project_thickness(List<FP_T> &tvalues)
+    __device__ AreFPValuesClose(FP_T ep) : relative_epsilon(ep) {}
+
+    __device__ bool operator()(FP_T a, FP_T b) const {
+        // A robust relative comparison
+        return FP_MATH(fabs)(a - b) <= relative_epsilon * FP_MATH(fmax)(FP_CONST(1.0), FP_MATH(fmax)(FP_MATH(fabs)(a), FP_MATH(fabs)(b)));
+    }
+};
+
+struct AreTValuesAbsolutelyClose {
+    const FP_T t_epsilon; // This will be the value calculated in Python
+
+    __device__ AreTValuesAbsolutelyClose(FP_T ep) : t_epsilon(ep) {}
+
+    __device__ bool operator()(FP_T a, FP_T b) const {
+        return FP_MATH(fabs)(a - b) <= t_epsilon;
+    }
+};
+
+struct AreFPValuesClose_Final {
+    // A fixed distance based on the mesh's smallest feature.
+    // Any two hits closer than this are considered the same.
+    const FP_T absolute_tolerance;
+
+    // A small factor for comparing large t-values.
+    const FP_T relative_epsilon;
+
+    __device__ AreFPValuesClose_Final(FP_T smallest_feature_size, FP_T rel_ep = cuda::std::numeric_limits<FP_T>::epsilon()) :
+        // Set the absolute tolerance to 10% of the smallest edge length.
+        // This is a robust heuristic for merging grazing-angle hits.
+        absolute_tolerance(smallest_feature_size * FP_CONST(0.1)),
+        relative_epsilon(rel_ep)
+    {
+    }
+
+    __device__ bool operator()(FP_T a, FP_T b) const {
+        if (a == b) {
+            return true;
+        }
+
+        FP_T diff = FP_MATH(fabs)(a - b);
+        FP_T tolerance = FP_MATH(fmax)(absolute_tolerance, relative_epsilon * FP_MATH(fmax)(FP_MATH(fabs)(a), FP_MATH(fabs)(b)));
+
+        return diff <= tolerance;
+    }
+};
+
+struct AreFPValuesClose_Final_Debug {
+    // A fixed distance based on the mesh's smallest feature.
+    // Any two hits closer than this are considered the same.
+    const FP_T absolute_tolerance;
+
+    // A small factor for comparing large t-values.
+    const FP_T relative_epsilon;
+
+    __device__ AreFPValuesClose_Final_Debug(FP_T smallest_feature_size, FP_T rel_ep = cuda::std::numeric_limits<FP_T>::epsilon()) :
+        // Set the absolute tolerance to 10% of the smallest edge length.
+        // This is a robust heuristic for merging grazing-angle hits.
+        absolute_tolerance(smallest_feature_size * FP_CONST(0.1)),
+        relative_epsilon(rel_ep)
+    {
+        printf("Absolute : %.9f \n", absolute_tolerance);
+        printf("relative : %.9f \n", relative_epsilon);
+    }
+
+    __device__ bool operator()(FP_T a, FP_T b) const {
+        if (a == b) {
+            return true;
+        }
+
+        FP_T diff = FP_MATH(fabs)(a - b);
+        FP_T tolerance = FP_MATH(fmax)(absolute_tolerance, relative_epsilon * FP_MATH(fmax)(FP_MATH(fabs)(a), FP_MATH(fabs)(b)));
+
+        bool ret = diff < tolerance;
+
+        printf ("ret : %d \n", ret);
+
+        return ret;
+    }
+};
+
+__device__ FP_T project_thickness(List<FP_T> &tvalues, FP_T epsilon)
 {
-    constexpr FP_T DEDUP_EPSILON = FP_CONST(1e-6);
     FP_T result = FP_CONST(0.0);
+
+    AreFPValuesClose_Final close(epsilon);
 
     int i = 0;
     while (i < tvalues.size())
     {
         int j = i + 1;
-        while (j < tvalues.size() && are_close(tvalues.values[j], tvalues.values[i], DEDUP_EPSILON))
+        while (j < tvalues.size() && close(tvalues.values[j], tvalues.values[i]))
         {
             j++;
         }
@@ -284,105 +352,43 @@ inline __device__ FP_T dot(const FP_T4 &a, const FP_T4 &b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
-
-// __device__ FP_T matchOuterPairs(
-//     const List<int> &candidates, const List<FP_T> &tvalues, const Ray &ray,
-//     FP_T4 *__restrict__ vertices,
-//     FP_T4 *__restrict__ normals,
-//     const Tree &tree)
-// {
-//     FP_T thickness = FP_CONST(0.0);
-//     FP_T inner = FP_CONST(0.0);
-//     int counter = 0;
-
-//     constexpr FP_T DOT_PRODUCT_EPSILON = FP_CONST(1e-6);
-
-//     for (int i = 0; i < tvalues.size(); i++)
-//     {
-//         unsigned primIndex = candidates.values[i];
-//         FP_T dot_product = dot(ray.getDirection(), normals[primIndex]);
-        
-//         if (is_null<FP_T>(dot_product, DOT_PRODUCT_EPSILON))
-//         {
-//             continue;
-//         }
-
-//         bool is_neg = dot(ray.getDirection(), normals[primIndex]) < 0;
-//         if (!is_neg && counter == 0)
-//         {
-//             continue;
-//         }
-
-//         if (is_neg)
-//         {
-//             if (counter++ == 0)
-//                 inner = tvalues.values[i];
-//         }
-//         else
-//         {
-//             if (--counter == 0)
-//             {
-//                 thickness += tvalues.values[i] - inner;
-//             }
-//         }
-//     }
-//     return thickness;
-// }
-
-__device__ FP_T matchOuterPairs(
-    const List<int> &candidates, const List<FP_T> &tvalues, const Ray &ray,
-    FP_T4 *__restrict__ vertices,
-    FP_T4 *__restrict__ normals,
-    const Tree &tree)
+__device__ FP_T match_pairs(
+    const List<int>& candidates, const List<FP_T>& tvalues, const Ray& ray,
+    FP_T4* __restrict__ vertices,
+    FP_T4* __restrict__ normals,
+    const Tree& tree)
 {
+    // Return early if there's nothing to pair up.
+    if (tvalues.size() < 2) {
+        return FP_CONST(0.0);
+    }
+
     FP_T total_thickness = FP_CONST(0.0);
+    bool is_inside = false;
+    FP_T entry_t = FP_CONST(0.0);
 
-    // Iterate through the hits in pairs (entry, exit)
-    for (int i = 0; i < tvalues.size(); i += 2)
-    {
-        // Ensure we have a complete pair to process. This check is vital.
-        if (i + 1 < tvalues.size())
-        {
-            unsigned entry_primID = candidates.get(i);
-            unsigned exit_primID = candidates.get(i + 1);
-
-            FP_T entry_dot = dot(ray.getDirection(), normals[entry_primID]);
-            FP_T exit_dot = dot(ray.getDirection(), normals[exit_primID]);
-
-            // Sanity Check: A valid pair should be an ENTRY (dot < 0)
-            // followed by an EXIT (dot > 0).
-            if (entry_dot < 0 && exit_dot > 0)
-            {
-                FP_T entry_t = tvalues.get(i);
-                FP_T exit_t = tvalues.get(i + 1);
-                total_thickness += (exit_t - entry_t);
-            }
+    for (int i = 0; i < tvalues.size(); i++) {
+        // This simple toggle is more robust than counting normals.
+        // Every other intersection point flips the state.
+        
+        if (!is_inside) {
+            // We are currently outside, so this hit is an ENTRY.
+            entry_t = tvalues.values[i];
+            is_inside = true;
+        } else {
+            // We were inside, so this hit is an EXIT.
+            FP_T exit_t = tvalues.values[i];
+            total_thickness += (exit_t - entry_t);
+            is_inside = false;
         }
     }
+
+    // It's possible to end in an "inside" state if there's an odd number
+    // of intersections (e.g., ray starts inside a non-closed mesh).
+    // In most cases, we can ignore this, as the paired segments are what matter.
+
     return total_thickness;
 }
-
-
-struct AreFPValuesClose {
-    const FP_T relative_epsilon;
-
-    __device__ AreFPValuesClose(FP_T ep) : relative_epsilon(ep) {}
-
-    __device__ bool operator()(FP_T a, FP_T b) const {
-        // A robust relative comparison
-        return FP_MATH(fabs)(a - b) <= relative_epsilon * FP_MATH(fmax)(FP_CONST(1.0), FP_MATH(fmax)(FP_MATH(fabs)(a), FP_MATH(fabs)(b)));
-    }
-};
-
-struct AreTValuesAbsolutelyClose {
-    const FP_T t_epsilon; // This will be the value calculated in Python
-
-    __device__ AreTValuesAbsolutelyClose(FP_T ep) : t_epsilon(ep) {}
-
-    __device__ bool operator()(FP_T a, FP_T b) const {
-        return FP_MATH(fabs)(a - b) <= t_epsilon;
-    }
-};
 
 __device__ FP_T traceRay(
     const Ray &ray, const Tree &tree,
@@ -398,7 +404,7 @@ __device__ FP_T traceRay(
     {
         return 0.0;
     }
-
+    
     // Test the candidates for actual intersections
     for (unsigned i = 0; i < candidates.size(); i++) // Changed to unsigned to match List::get
     {
@@ -437,16 +443,22 @@ __device__ FP_T traceRay(
         intersected.values,                      // Input values: start (must match key range)
         filtered_tvalues.values,                 // Output keys: destination
         filtered_intersections.values,           // Output values: destination
-        AreFPValuesClose(epsilon)                // Custom predicate for "equality"
+        AreFPValuesClose_Final(epsilon)                // Custom predicate for "equality"
     );
 
     // Update the counts in your filtered lists
     filtered_tvalues.count = new_ends.first - filtered_tvalues.values;
     filtered_intersections.count = new_ends.second - filtered_intersections.values;
 
-    return project_thickness(filtered_tvalues);
+    return project_thickness(filtered_tvalues, epsilon);
+    
 }
 
+
+// , 
+#define DEBUG_X 604
+#define DEBUG_Y 1216
+#define DEBUG_PIXEL
 
 __device__ FP_T traceRay(
     const Ray &ray, const Tree &tree,
@@ -495,160 +507,40 @@ __device__ FP_T traceRay(
     thrust::stable_sort_by_key(thrust::seq, tvalues.values, tvalues.values + tvalues.size(),
         intersected.values);
 
-    // Filter duplicates
-    List<int> filtered_intersections;
     List<FP_T> filtered_tvalues;
+    List<int> filtered_candidates;
 
-    thrust::pair<FP_T*, int*> new_ends;
+    filtered_tvalues.count = 0;
+    filtered_candidates.count = 0;
 
-    new_ends = thrust::unique_by_key_copy(
-        thrust::seq,                             // Explicit sequential execution policy
-        tvalues.values,                          // Input keys: start
-        tvalues.values + tvalues.size(),         // Input keys: end
-        intersected.values,                      // Input values: start (must match key range)
-        filtered_tvalues.values,                 // Output keys: destination
-        filtered_intersections.values,           // Output values: destination
-        AreFPValuesClose(epsilon)          // Custom predicate for "equality"
-    );
+    AreFPValuesClose_Final close(epsilon);
 
-    // Update the counts in your filtered lists
-    filtered_tvalues.count = new_ends.first - filtered_tvalues.values;
-    filtered_intersections.count = new_ends.second - filtered_intersections.values;
+    if (tvalues.size() > 0) {
+        // Keep the first t-value AND its corresponding candidate
+        filtered_tvalues.push_back(tvalues.get(0));
+        filtered_candidates.push_back(candidates.get(0));
+        
+        // (Your printf for debugging)
+        
+        for (int i = 1; i < tvalues.size(); ++i) {
+            FP_T current_t = tvalues.get(i);
+            FP_T last_unique_t = filtered_tvalues.back();
+            bool is_close = close(current_t, last_unique_t);
 
-    if (filtered_tvalues.size() == 0) return 0.0; // or TRACE_OK
+            // (Your printf for debugging)
 
-    if (filtered_tvalues.size() % 2 != 0) {
-        return 0; // This is a true error
+            if (!is_close) {
+                // If the t-value is unique, keep BOTH it and its candidate from the same index
+                filtered_tvalues.push_back(current_t);
+                filtered_candidates.push_back(candidates.get(i));
+            }
+        }
     }
 
     // return project_thickness(filtered_tvalues); // Your original commented out line
-    return matchOuterPairs(filtered_intersections, filtered_tvalues, ray, vertices, normals, tree);
+    // return match_pairs(filtered_intersections, filtered_tvalues, ray, vertices, normals, tree);
+    return match_pairs(filtered_candidates, filtered_tvalues, ray, vertices, normals, tree);
 }
-
-__device__ FP_T matchPairs_Winding(
-    const List<Hit> &hits,
-    const Ray &ray,
-    FP_T4 *__restrict__ normals)
-{
-    FP_T total_thickness = FP_CONST(0.0);
-    FP_T entry_t = FP_CONST(0.0);
-    int winding_counter = 0;
-
-    for (int i = 0; i < hits.size(); i++)
-    {
-        const Hit& current_hit = hits.get(i);
-        FP_T dot_product = dot(ray.getDirection(), normals[current_hit.primID]);
-
-        // Ignore grazing angles, which are numerically unstable.
-        if (FP_MATH(fabs)(dot_product) < FP_CONST(1e-7))
-        {
-            continue;
-        }
-
-        bool is_entry = dot_product < 0;
-
-        if (is_entry)
-        {
-            // If this is the FIRST entry into any surface, record the t value.
-            if (winding_counter == 0)
-            {
-                entry_t = current_hit.t;
-            }
-            winding_counter++;
-        }
-        else // Is an exit
-        {
-            winding_counter--;
-            // If this exit brings us completely OUTSIDE all surfaces, add the segment to the total thickness.
-            if (winding_counter == 0 && entry_t > FP_CONST(0.0))
-            {
-                total_thickness += (current_hit.t - entry_t);
-                entry_t = FP_CONST(0.0); // Reset for the next segment
-            }
-        }
-    }
-    return total_thickness;
-}
-
-__device__ FP_T traceRay_Robust(
-    const Ray &ray, const Tree &tree,
-    FP_T4 *__restrict__ vertices,
-    FP_T4 *__restrict__ normals)
-{
-    List<int> candidates;
-    query(tree, ray, candidates);
-
-    if (candidates.size() == 0)
-    {
-        return 0.0;
-    }
-
-    // 1. Collect all valid intersections into a single list of Hits
-    List<Hit> hits;
-    for (int i = 0; i < candidates.size(); i++)
-    {
-        int primID = candidates.get(i);
-        int primIndex = primID * 3;
-
-        const FP_T4 V1 = vertices[primIndex];
-        const FP_T4 V2 = vertices[primIndex + 1];
-        const FP_T4 V3 = vertices[primIndex + 2];
-
-        FP_T t = 0.0;
-        if (ray.intersects(V1, V2, V3, t))
-        {
-            // Only consider hits in front of the ray
-            if (t > 0) {
-                 hits.push_back({t, primID});
-            }
-        }
-    }
-
-    if (hits.size() < 2)
-    {
-        return 0.0;
-    }
-
-    // 2. Sort all hits by their t-value
-    thrust::sort(thrust::seq, hits.values, hits.values + hits.size(), HitComparator());
-
-    // 3. Manually filter duplicates using a dynamic, angle-aware epsilon
-    List<Hit> filtered_hits;
-    if (hits.size() > 0)
-    {
-        filtered_hits.push_back(hits.get(0)); // Always accept the first hit
-
-        for (int i = 1; i < hits.size(); ++i)
-        {
-            const Hit& current_hit = hits.get(i);
-            const Hit& prev_filtered_hit = filtered_hits.back();
-
-            // Calculate the dynamic epsilon based on the PREVIOUS accepted hit's normal
-            FP_T dot_product = FP_MATH(fabs)(dot(ray.getDirection(), normals[prev_filtered_hit.primID]));
-
-            // Prevent division by zero and handle grazing angles robustly
-            // A larger clamp (e.g., 1e-5) makes the filter more aggressive
-            dot_product = FP_MATH(fmax)(dot_product, FP_CONST(1e-9));
-
-            FP_T t_epsilon = FP_CONST(1e-9) / dot_product;
-
-            // If the current hit is sufficiently far from the last one, accept it.
-            if ((current_hit.t - prev_filtered_hit.t) > t_epsilon)
-            {
-                filtered_hits.push_back(current_hit);
-            }
-        }
-    }
-
-    if (filtered_hits.size() < 2)
-    {
-        return 0.0;
-    }
-
-    // 4. Calculate thickness using the robust winding number algorithm
-    return matchPairs_Winding(filtered_hits, ray, normals);
-}
-
 
 __device__ FP_T traceRay_DEBUG(
     const Ray &ray, const Tree &tree,
@@ -656,14 +548,21 @@ __device__ FP_T traceRay_DEBUG(
     FP_T4 *__restrict__ normals,
     FP_T &epsilon)
 {
+    // It's helpful to get thread/block IDs for unique printf messages
+    const int tid = threadIdx.x;
+    const int bid = blockIdx.x;
+
     List<int> candidates, intersected;
     List<FP_T> tvalues;
 
     // This is where the acceleration structure (BVH) is actually useful
     query(tree, ray, candidates);
 
+    printf("[DEBUG][B:%d, T:%d] BVH query found %d candidate(s).\n", bid, tid, candidates.size());
+
     if (candidates.size() == 0)
     {
+        printf("[DEBUG][B:%d, T:%d] No candidates found. Exiting.\n", bid, tid);
         return 0.0;
     }
 
@@ -671,84 +570,524 @@ __device__ FP_T traceRay_DEBUG(
     for (int i = 0; i < candidates.size(); i++)
     {
         int primIndex = candidates.get(i) * 3;
-
         const FP_T4 V1 = vertices[primIndex];
         const FP_T4 V2 = vertices[primIndex + 1];
         const FP_T4 V3 = vertices[primIndex + 2];
-
         FP_T t = 0.0, tmax = INFINITY;
         if (ray.intersects(V1, V2, V3, t, tmax))
         {
+            printf("[DEBUG][B:%d, T:%d]   --> INTERSECTION! prim %d at t=%.9f\n", bid, tid, candidates.get(i), t);
             tvalues.push_back(t);
             intersected.push_back(candidates.get(i));
         }
     }
 
-    if (tvalues.size() == 0)
+    printf("[DEBUG][B:%d, T:%d] Found %d total raw intersection(s).\n", bid, tid, tvalues.size());
+
+    if (tvalues.size() < 2)
     {
+        printf("[DEBUG][B:%d, T:%d] Not enough intersections for thickness. Exiting.\n", bid, tid);
         return 0.0;
     }
 
-    if (tvalues.size() == 2)
-    {
-        return FP_MATH(fabs)(tvalues.get(1) - tvalues.get(0));
-    }
-
+    // Sort intersections by their t-value
     thrust::stable_sort_by_key(thrust::seq, tvalues.values, tvalues.values + tvalues.size(),
-        intersected.values);
+                               intersected.values);
 
-    // Filter duplicates
-    List<int> filtered_intersections;
+    for (int i = 0; i < tvalues.size(); i++) {
+        printf("[DEBUG][B:%d, T:%d] Post-sort: t=%.9f, prim=%d\n", bid, tid, tvalues.get(i), intersected.get(i));
+    }
+
     List<FP_T> filtered_tvalues;
+    List<int> filtered_candidates;
 
-    thrust::pair<FP_T*, int*> new_ends;
+    AreFPValuesClose_Final_Debug close(epsilon);
 
-    new_ends = thrust::unique_by_key_copy(
-        thrust::seq,                             // Explicit sequential execution policy
-        tvalues.values,                          // Input keys: start
-        tvalues.values + tvalues.size(),         // Input keys: end
-        intersected.values,                      // Input values: start (must match key range)
-        filtered_tvalues.values,                 // Output keys: destination
-        filtered_intersections.values,           // Output values: destination
-        AreFPValuesClose(epsilon)          // Custom predicate for "equality"
-    );
+    filtered_tvalues.count = 0;
+    filtered_candidates.count = 0;
 
-    // Update the counts in your filtered lists
-    filtered_tvalues.count = new_ends.first - filtered_tvalues.values;
-    filtered_intersections.count = new_ends.second - filtered_intersections.values;
-
-    printf("--- DEBUG for PIXEL (%u, %u) ---\n", 1020, 439); // Assuming you can get col/row here
-    printf("Found %d unique intersections to pair:\n", filtered_intersections.size());
-
-    // --- The key new printout ---
-    for (int i = 0; i < filtered_intersections.size(); i++) {
-        unsigned primIndex = filtered_intersections.get(i);
-        FP_T t_val = filtered_tvalues.get(i);
-        FP_T4 normal = normals[primIndex];
-        FP_T dot_product = dot(ray.getDirection(), normal);
+    if (tvalues.size() > 0) {
+        // Keep the first t-value and its candidate unconditionally.
+        filtered_tvalues.push_back(tvalues.get(0));
+        filtered_candidates.push_back(candidates.get(0));
+        printf("-> Kept first pair: t=%.9f, prim=%d\n", tvalues.get(0), candidates.get(0));
         
-        printf("  Hit %d: t=%.17f, primID=%u, Normal=(%.3f, %.3f, %.3f), Dot=%.6f, Type=%s\n",
-               i,
-               t_val,
-               primIndex,
-               normal.x, normal.y, normal.z,
-               dot_product,
-               (dot_product < 0 ? "ENTRY" : "EXIT")
-        );
+        for (int i = 1; i < tvalues.size(); ++i) {
+            FP_T current_t = tvalues.get(i);
+            int current_prim = candidates.get(i);
+            FP_T last_unique_t = filtered_tvalues.back();
+            
+            bool is_close = close(current_t, last_unique_t);
+            
+            printf("-> Comparing t[%d]=%.9f (prim=%d) with last_unique=%.9f. Are close? %s\n", i, current_t, current_prim, last_unique_t, is_close ? "Yes" : "No");
+
+            if (!is_close) {
+                filtered_tvalues.push_back(current_t);
+                filtered_candidates.push_back(current_prim);
+                printf("   Action: KEEPING pair.\n");
+            } else {
+                printf("   Action: DISCARDING duplicate.\n");
+            }
+        }
     }
 
-    if (filtered_tvalues.size() == 0) return 0.0; // or TRACE_OK
+    FP_T thickness = match_pairs(filtered_candidates, filtered_tvalues, ray, vertices, normals, tree);
 
-    if (filtered_tvalues.size() % 2 != 0) {
-        return 0; // This is a true error
-    }
+    printf("Final thickness: %f \n", thickness);
 
-    FP_T final_thickness = matchOuterPairs(filtered_intersections, filtered_tvalues, ray, vertices, normals, tree);
-    printf("Final calculated thickness: %.17f\n", final_thickness);
-    printf("----------------------------------\n");
-
-    return final_thickness;
+    return thickness;
 }
+// struct Hit {
+//     FP_T t;
+//     int primID;
+// };
+
+// __device__ FP_T traceRay_Clustering(
+//     const Ray &ray, const Tree &tree,
+//     FP_T4 *__restrict__ vertices,
+//     FP_T4 *__restrict__ normals,
+//     FP_T smallest_feature_size)
+// {
+//     // 1. Collect all initial intersections into a sorted, fixed-size buffer
+//     Hit hits[MAX_COLLISIONS];
+//     int hit_count = 0;
+    
+//     List<int> candidates;
+//     query(tree, ray, candidates);
+
+//     if (candidates.size() > 0) {
+//         for (int i = 0; i < candidates.size(); i++) {
+//             int primID = candidates.get(i);
+//             int primIndex = primID * 3;
+//             const FP_T4 V1 = vertices[primIndex];
+//             const FP_T4 V2 = vertices[primIndex + 1];
+//             const FP_T4 V3 = vertices[primIndex + 2];
+
+//             FP_T t = 0.0;
+//             // Call intersects without tmax to get ALL hits
+//             if (ray.intersects(V1, V2, V3, t)) {
+//                 if (t > FP_CONST(1e-5)) {
+//                     // Use on-the-fly insertion sort (fast for small, sorted arrays)
+//                     if (hit_count < MAX_COLLISIONS) {
+//                         Hit new_hit = {t, primID};
+//                         int j = hit_count;
+//                         while (j > 0 && new_hit.t < hits[j - 1].t) {
+//                             hits[j] = hits[j - 1];
+//                             j--;
+//                         }
+//                         hits[j] = new_hit;
+//                         hit_count++;
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     if (hit_count < 2) {
+//         return 0.0;
+//     }
+
+//     // 2. Perform robust filtering using the NORMAL-AWARE clustering approach
+//     Hit filtered_hits[MAX_COLLISIONS];
+//     int filtered_hit_count = 0;
+
+//     if (hit_count > 0)
+//     {
+//         Hit cluster_representative = hits[0];
+//         filtered_hits[0] = cluster_representative;
+//         filtered_hit_count = 1;
+
+//         for (int i = 1; i < hit_count; ++i)
+//         {
+//             const Hit& current_hit = hits[i];
+            
+//             const FP_T4 rep_normal = normals[cluster_representative.primID];
+//             const FP_T4 cur_normal = normals[current_hit.primID];
+//             FP_T normal_dot = dot(rep_normal, cur_normal);
+//             bool normals_are_similar = (normal_dot > 0.0f);
+
+//             FP_T ray_dot_normal = fabsf(dot(ray.getDirection(), rep_normal));
+//             ray_dot_normal = fmaxf(ray_dot_normal, FP_CONST(1e-6));
+
+//             FP_T world_space_tolerance = smallest_feature_size * 1.5f;
+//             FP_T t_space_tolerance = __fdividef(world_space_tolerance, ray_dot_normal);
+//             FP_T t_diff = current_hit.t - cluster_representative.t;
+
+//             bool is_duplicate = (t_diff <= t_space_tolerance);
+            
+//             if (is_duplicate && normals_are_similar)
+//             {
+//             }
+//             else
+//             {
+//                 if (filtered_hit_count < MAX_COLLISIONS) {
+//                     cluster_representative = current_hit;
+//                     filtered_hits[filtered_hit_count++] = cluster_representative;
+//                 }
+//             }
+//         }
+//     }
+    
+//     // 4. Convert filtered hits back to List format for compatibility with your existing code
+//     List<int> final_intersections;
+//     List<FP_T> final_tvalues;
+//     for (int i = 0; i < filtered_hit_count; i++) {
+//         final_tvalues.push_back(filtered_hits[i].t);
+//         final_intersections.push_back(filtered_hits[i].primID);
+//     }
+    
+//     FP_T final_value = match_pairs(final_intersections, final_tvalues, ray, vertices, normals, tree);
+
+//     return final_value;
+// }
+
+// #define DEBUG_X 627
+// #define DEBUG_Y 1038
+// #define DEBUG_PIXEL
+
+// __device__ FP_T cast_ray_Debug(
+//     const Ray &ray, const Tree &tree,
+//     FP_T4 *__restrict__ vertices,
+//     FP_T4 *__restrict__ normals,
+//     FP_T smallest_feature_size)
+// {
+//     // --- DEBUG SETUP: Only print for the specified pixel ---
+//     #ifdef DEBUG_PIXEL
+//     bool is_debug_thread = true;
+//     if (blockIdx.x * blockDim.x + threadIdx.x == DEBUG_X &&
+//         blockIdx.y * blockDim.y + threadIdx.y == DEBUG_Y) {
+//         is_debug_thread = true;
+//     }
+//     #endif
+
+//     // 1. Collect all initial intersections
+//     Hit hits[MAX_COLLISIONS];
+//     int hit_count = 0;
+    
+//     List<int> candidates;
+//     query(tree, ray, candidates);
+
+//     if (candidates.size() == 0)
+//     {
+//         return 0.0;
+//     }
+
+//     // 1. Collect all initial intersections
+//     // We use a fixed-size array and on-the-fly insertion sort for performance.
+//     for (int i = 0; i < candidates.size(); i++)
+//     {
+//         int primIndex = candidates.get(i) * 3;
+//         const FP_T4 V1 = vertices[primIndex];
+//         const FP_T4 V2 = vertices[primIndex + 1];
+//         const FP_T4 V3 = vertices[primIndex + 2];
+
+//         FP_T t = 0.0;
+//         if (ray.intersects(V1, V2, V3, t)) // Call intersects without tmax
+//         {
+//             if (t > FP_CONST(1e-5)) {
+//                 if (hit_count < MAX_COLLISIONS) {
+//                     Hit new_hit = {t, candidates.get(i)};
+//                     int j = hit_count;
+//                     while (j > 0 && new_hit.t < hits[j - 1].t) {
+//                         hits[j] = hits[j - 1];
+//                         j--;
+//                     }
+//                     hits[j] = new_hit;
+//                     hit_count++;
+//                 }
+//             }
+//         }
+//     }
+
+//     #ifdef DEBUG_PIXEL
+//     if (is_debug_thread) {
+//         printf("\n--- DEBUGGING RAY (%d, %d) ---\n", DEBUG_X, DEBUG_Y);
+//         printf("1. Found %d initial sorted hits.\nRAW HITS (primID: t-value):\n", hit_count);
+//         for (int i = 0; i < hit_count; i++) {
+//             printf("  - Hit %d: prim %d at t = %.9f\n", i, hits[i].primID, hits[i].t);
+//         }
+//     }
+//     #endif
+
+//     if (hit_count < 2) {
+//         return 0.0;
+//     }
+
+//     if (hit_count == 2) {
+//         #ifdef DEBUG_PIXEL
+//         if (is_debug_thread) {
+//             printf("-> Taking early exit with 2 hits.\n");
+//         }
+//         #endif
+//         return FP_MATH(fabs)(hits[1].t - hits[0].t);
+//     }
+
+//     // 2. Perform the robust, angle-aware filtering
+//     Hit filtered_hits[MAX_COLLISIONS];
+//     int filtered_hit_count = 0;
+    
+//     #ifdef DEBUG_PIXEL
+//     if (is_debug_thread) {
+//         printf("2. Filtering with smallest_feature_size = %.9f\n", smallest_feature_size);
+//     }
+//     #endif
+
+//     if (hit_count < 2) {
+//         return (hit_count == 1) ? hits[0].t : 0.0;
+//     }
+    
+//     // 3. Perform robust filtering using a clustering approach
+//     if (hit_count > 0)
+//     {
+//         Hit cluster_representative = hits[0];
+//         filtered_hits[0] = cluster_representative;
+//         filtered_hit_count = 1;
+
+//         for (int i = 1; i < hit_count; ++i)
+//         {
+//             const Hit& current_hit = hits[i];
+            
+//             // --- The Angle-Aware Dynamic Tolerance Calculation ---
+//             const FP_T4 rep_normal = normals[cluster_representative.primID];
+//             FP_T dot_product = fabsf(dot(ray.getDirection(), rep_normal));
+//             dot_product = fmaxf(dot_product, FP_CONST(1e-6));
+
+//             FP_T world_space_tolerance = smallest_feature_size * 1.5f;
+//             FP_T t_space_tolerance = __fdividef(world_space_tolerance, dot_product);
+
+//             // --- The Normal Similarity Check ---
+//             const FP_T4 cur_normal = normals[current_hit.primID];
+//             // Normals are similar if they point in the same general direction.
+//             bool normals_are_similar = (dot(rep_normal, cur_normal) > 0.0f);
+
+//             bool is_duplicate = (current_hit.t - cluster_representative.t) <= t_space_tolerance;
+
+//             // A hit is only merged if it's close AND the normals are similar.
+//             if (is_duplicate && normals_are_similar)
+//             {
+//                 // MERGE: Do nothing. The hit is part of the current cluster.
+//             }
+//             else
+//             {
+//                 // NEW CLUSTER: The hit is distinct. Finalize the previous cluster
+//                 // and start a new one with the current hit.
+//                 if (filtered_hit_count < MAX_COLLISIONS) {
+//                     cluster_representative = current_hit;
+//                     filtered_hits[filtered_hit_count++] = cluster_representative;
+//                 }
+//             }
+//         }
+//     }
+
+//     #ifdef DEBUG_PIXEL
+//     if (is_debug_thread) {
+//         printf("3. Filtering complete. Final unique hit count: %d\n", filtered_hit_count);
+//     }
+//     #endif
+
+//     // 3. Convert back to the List format for the final function call
+//     List<int> final_intersections;
+//     List<FP_T> final_tvalues;
+//     for (int i = 0; i < filtered_hit_count; i++) {
+//         final_tvalues.push_back(filtered_hits[i].t);
+//         final_intersections.push_back(filtered_hits[i].primID);
+//     }
+    
+//     FP_T final_value = match_pairs(final_intersections, final_tvalues, ray, vertices, normals, tree);
+    
+//     #ifdef DEBUG_PIXEL
+//     if (is_debug_thread) {
+//         printf("4. Final value from match_pairs is %.9f\n", final_value);
+//         printf("--- END DEBUG ---\n");
+//     }
+//     #endif
+
+//     return final_value;
+// }
+
+// __device__ FP_T traceRay_Clustering_Debug(
+//     const Ray &ray, const Tree &tree,
+//     FP_T4 *__restrict__ vertices,
+//     FP_T4 *__restrict__ normals,
+//     FP_T smallest_feature_size)
+// {
+//     // --- DEBUG SETUP ---
+//     #ifdef DEBUG_PIXEL
+//     bool is_debug_thread = true;
+//     if (blockIdx.x * blockDim.x + threadIdx.x == DEBUG_X &&
+//         blockIdx.y * blockDim.y + threadIdx.y == DEBUG_Y) {
+//         is_debug_thread = true;
+//     }
+//     #endif
+
+//     // 1. Collect all initial intersections into a sorted, fixed-size buffer
+//     Hit hits[MAX_COLLISIONS];
+//     int hit_count = 0;
+    
+//     List<int> candidates;
+//     query(tree, ray, candidates);
+
+//     if (candidates.size() > 0) {
+//         for (int i = 0; i < candidates.size(); i++) {
+//             int primID = candidates.get(i);
+//             int primIndex = primID * 3;
+//             const FP_T4 V1 = vertices[primIndex];
+//             const FP_T4 V2 = vertices[primIndex + 1];
+//             const FP_T4 V3 = vertices[primIndex + 2];
+
+//             FP_T t = 0.0;
+//             // Call intersects without tmax to get ALL hits
+//             if (ray.intersects(V1, V2, V3, t)) {
+//                 if (t > FP_CONST(1e-5)) {
+//                     // Use on-the-fly insertion sort (fast for small, sorted arrays)
+//                     if (hit_count < MAX_COLLISIONS) {
+//                         Hit new_hit = {t, primID};
+//                         int j = hit_count;
+//                         while (j > 0 && new_hit.t < hits[j - 1].t) {
+//                             hits[j] = hits[j - 1];
+//                             j--;
+//                         }
+//                         hits[j] = new_hit;
+//                         hit_count++;
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     #ifdef DEBUG_PIXEL
+//     if (is_debug_thread) {
+//         printf("\n--- DEBUGGING RAY (%d, %d) ---\
+// n", DEBUG_X, DEBUG_Y);
+//         printf("1. Found %d initial sorted hits.\nRAW HITS (primID: t-value):\n", hit_count);
+//         for (int i = 0; i < hit_count; i++) {
+//             printf("  - Hit %d: prim %d at t = %.9f\n", i, hits[i].primID, hits[i].t);
+//         }
+//     }
+//     #endif
+
+//     if (hit_count < 2) {
+//         return 0.0;
+//     }
+
+//     // 2. Perform robust filtering using the NORMAL-AWARE clustering approach
+//     Hit filtered_hits[MAX_COLLISIONS];
+//     int filtered_hit_count = 0;
+
+//     #ifdef DEBUG_PIXEL
+//     if (is_debug_thread) {
+//         printf("2. Filtering with smallest_feature_size = %.9f\n", smallest_feature_size);
+//     }
+//     #endif
+
+//     if (hit_count > 0)
+//     {
+//         Hit cluster_representative = hits[0];
+//         filtered_hits[0] = cluster_representative;
+//         filtered_hit_count = 1;
+
+//         for (int i = 1; i < hit_count; ++i)
+//         {
+//             const Hit& current_hit = hits[i];
+            
+//             const FP_T4 rep_normal = normals[cluster_representative.primID];
+//             const FP_T4 cur_normal = normals[current_hit.primID];
+//             FP_T normal_dot = dot(rep_normal, cur_normal);
+//             bool normals_are_similar = (normal_dot > 0.0f);
+
+//             FP_T ray_dot_normal = fabsf(dot(ray.getDirection(), rep_normal));
+//             ray_dot_normal = fmaxf(ray_dot_normal, FP_CONST(1e-6));
+
+//             FP_T world_space_tolerance = smallest_feature_size * 1.5f;
+//             FP_T t_space_tolerance = __fdividef(world_space_tolerance, ray_dot_normal);
+//             FP_T t_diff = current_hit.t - cluster_representative.t;
+
+//             bool is_duplicate = (t_diff <= t_space_tolerance);
+            
+//             #ifdef DEBUG_PIXEL
+//             if (is_debug_thread) {
+//                 printf("--- Clustering Step %d ---\n", i);
+//                 printf("  - Comparing current hit (prim %d, t=%.9f) with cluster rep (prim %d, t=%.9f)\n", 
+//                         current_hit.primID, current_hit.t, cluster_representative.primID, cluster_representative.t);
+//                 printf("  - Rep Normal dot Cur Normal = %.9f -> Normals similar? %s\n", normal_dot, normals_are_similar ? "YES" : "NO");
+//                 printf("  - Ray Dir dot Rep Normal    = %.9f\n", ray_dot_normal);
+//                 printf("  - World Tolerance           = %.9f\n", world_space_tolerance);
+//                 printf("  - T-Space Tolerance         = %.9f\n", t_space_tolerance);
+//                 printf("  - Actual T-Difference       = %.9f\n", t_diff);
+//                 printf("  - Is duplicate? (t_diff <= tolerance): %s\n", is_duplicate ? "YES" : "NO");
+//             }
+//             #endif
+
+//             if (is_duplicate || normals_are_similar)
+//             {
+//                 #ifdef DEBUG_PIXEL
+//                 if (is_debug_thread) printf("  - DECISION: MERGING hit into current cluster.\n");
+//                 #endif
+//                 // If the new hit is closer to the ray origin, update the representative to keep the earliest t
+//                 if (current_hit.t < cluster_representative.t) {
+//                     cluster_representative = current_hit;
+//                 }
+//             }
+//             else
+//             {
+//                 #ifdef DEBUG_PIXEL
+//                 if (is_debug_thread) printf("  - DECISION: Normals differ AND t is outside tolerance. STARTING NEW CLUSTER.\n");
+//                 #endif
+//                 if (filtered_hit_count < MAX_COLLISIONS) {
+//                     cluster_representative = current_hit;
+//                     filtered_hits[filtered_hit_count++] = cluster_representative;
+//                 }
+//             }
+//         }
+//     }
+    
+//     #ifdef DEBUG_PIXEL
+//     if (is_debug_thread) {
+//         printf("3. Filtering complete. Final unique hit count: %d\n", filtered_hit_count);
+//         for (int i = 0; i < filtered_hit_count; i++) {
+//             printf("  - Final Hit %d: prim %d at t = %.9f\n", i, filtered_hits[i].primID, filtered_hits[i].t);
+//         }
+//     }
+//     #endif
+    
+//     // 4. Convert filtered hits back to List format for compatibility with your existing code
+//     List<int> final_intersections;
+//     List<FP_T> final_tvalues;
+//     for (int i = 0; i < filtered_hit_count; i++) {
+//         final_tvalues.push_back(filtered_hits[i].t);
+//         final_intersections.push_back(filtered_hits[i].primID);
+//     }
+
+//     #ifdef DEBUG_PIXEL
+//     FP_T thickness;
+//     if (is_debug_thread) {
+//         printf("3. Filtering complete. Final unique hit count: %d\n", filtered_hit_count);
+//         for (int i = 0; i < filtered_hit_count; i++) {
+//             printf("  - Final Hit %d: prim %d at t = %.9f\n", i, filtered_hits[i].primID, filtered_hits[i].t);
+//         }
+
+//         if (filtered_hit_count >= 2) {
+//             thickness = filtered_hits[filtered_hit_count - 1].t - filtered_hits[0].t;
+//             printf("4. Manually calculated outer thickness is %.9f\n", thickness);
+//         } else {
+//             printf("4. Not enough hits to calculate outer thickness.\n");
+//         }
+//         printf("--- END DEBUG ---\n");
+//     }
+//     #endif
+    
+//     FP_T final_value = match_pairs(final_intersections, final_tvalues, ray, vertices, normals, tree);
+    
+//     #ifdef DEBUG_PIXEL
+//     if (is_debug_thread) {
+//         printf("4. Final value from matchOuterPairs is %.9f\n", final_value);
+//         printf("--- END DEBUG ---\n");
+//     }
+//     #endif
+
+//     return thickness;
+// }
+
 
 extern "C" __global__ void calculateBbBoxKernel(FP_T4 *vertices, FP_T4 *bbMin, FP_T4 *bbMax, unsigned int nb_keys)
 {
@@ -903,24 +1242,20 @@ extern "C" __global__ void project_parallel_normals_kernel(
         // Atomically fetch the next index to process
         unsigned index = atomicAdd(globalCounter, 1);
         if (index >= totalRays)
-            break; // No more rays to process
+            break;
 
         // Convert the 1D index to 2D coordinates for the ray position
         unsigned row = index / N.x;
         unsigned col = index % N.x;
 
-        // if (col == 439 && row == 1020) {
-        //     FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
-        //     Ray ray = Ray(pixel_coordinates, W);
-
-        //     // Call a special debug version of traceRay
-        //     image[index] = traceRay_DEBUG(ray, tree, vertices, normals, epsilon);
-        // } else {
-        //     // Normal execution for all other pixels
+        // Normal execution for all other pixels
         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
         Ray ray = Ray(pixel_coordinates, W);
-        image[index] = traceRay_Robust(ray, tree, vertices, normals);
-        // }
+        
+        if (col == DEBUG_X && row == DEBUG_Y)
+            image[index] = traceRay_DEBUG(ray, tree, vertices, normals, epsilon);
+        else
+            image[index] = traceRay(ray, tree, vertices, normals, epsilon);
     }
 }
 
