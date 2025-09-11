@@ -66,15 +66,37 @@ def main():
     LOG.info(f"Mesh Bounding Box (max): {mesh.extrema[:, 1].rescale(mesh_units)}")
     LOG.info(f"Camera Position: {camera.position.rescale(mesh_units)}\n")
 
+    origin = -camera.position
+
     st = time.time()
     for i in tqdm.tqdm(range(args.num_y_rotations)):
         proj = mesh.project(camera=camera, parallel=True)
         if args.projection_filename is not None:
             imageio.imwrite(args.projection_filename + f"_{i:>05}.tif", proj)
-        mesh.rotate(args.y_rotate, geom.Y_AX)
+        
+        camera.rotate(args.y_rotate, geom.Y_AX, shift=origin)
 
     LOG.info("Duration: {} s".format(time.time() - st))
 
+    # fig, ax = plt.subplots()
+    # plt.imshow(proj)
+    # def onclick(event):
+    # # event.xdata and event.ydata are the float coordinates
+    #     if event.xdata is not None and event.ydata is not None:
+    #         # Round to the nearest integer to get the pixel index
+    #         col = int(round(event.xdata))
+    #         row = int(round(event.ydata))
+
+    #         # Ensure the click is within the bounds of the array
+    #         if 0 <= row < proj.shape[0] and 0 <= col < proj.shape[1]:
+    #             pixel_value = proj[row, col]
+    #             print(f"Clicked pixel at (row, col): ({row}, {col})")
+    #             print(f"Pixel value: {pixel_value:.4f}")
+    #         else:
+    #             print("Clicked outside the image bounds.")
+
+    # # Connect the onclick function to the 'button_press_event'
+    # cid = fig.canvas.mpl_connect('button_press_event', onclick)
     show(proj, title="Projection")
     plt.show()
 
