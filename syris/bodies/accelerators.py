@@ -48,11 +48,13 @@ class BvhCupyAccelerator(AcceleratorBase):
 
         host_vertices = self.mesh.triangles.magnitude
 
-        print (host_vertices)
-
         nb_vertices = host_vertices.shape[1]
         bounds = self.mesh.bounds
-        host_normals = self.mesh.normals
+
+        if self.mesh._use_normals:
+            host_normals = self.mesh.normals
+        else:
+            host_normals = None
 
         nb_keys = nb_vertices // 3
         sceneMin = np.array([bounds[0], bounds[2], bounds[4], 0], dtype=float)
@@ -61,9 +63,6 @@ class BvhCupyAccelerator(AcceleratorBase):
         t_epsilon = self.mesh.epsilon
 
         print (f"{t_epsilon:.12f}")
-
-        print(f"Building tree with {nb_vertices} vertices, {nb_keys} triangles")
-        print(f"Vertices shape: {host_vertices.shape}")
         
         try:
             host_vertices = host_vertices.T            
@@ -114,6 +113,8 @@ class BvhCupyAccelerator(AcceleratorBase):
             del entered  # We don't store this in the tree
             xp.cuda.Stream.null.synchronize()
 
+            print (normals)
+
             tree = {
                 "keys": keys,
                 "rope": rope,
@@ -121,6 +122,8 @@ class BvhCupyAccelerator(AcceleratorBase):
                 "indices": permutation,
                 "bbMin": bbMin,
                 "bbMax": bbMax,
+                "sceneMin": sceneMin,
+                "sceneMax": sceneMax,
                 "vertices": vertices,
                 "normals": normals,
                 "t_epsilon": t_epsilon
@@ -180,6 +183,7 @@ class BvhCupyAccelerator(AcceleratorBase):
             camera.p00_center.view(float4), camera.pixel_size.view(float2),
             self._tree["rope"], self._tree["left"], self._tree["indices"],
             self._tree["bbMin"], self._tree["bbMax"],
+            self._tree["sceneMin"].view(float4), self._tree["sceneMax"].view(float4),
             self._tree["vertices"].view(float4), global_counter,
         ]
 
@@ -196,12 +200,16 @@ class BvhCupyAccelerator(AcceleratorBase):
 
         if parallel and use_normals:
             kernel_name = "project_parallel_normals_kernel"
+            print (kernel_name)
         elif parallel and not use_normals:
             kernel_name = "project_parallel_kernel"
+            print (kernel_name)
         elif not parallel and use_normals:
             kernel_name = "project_conebeam_normals_kernel"
+            print (kernel_name)
         else:
             kernel_name = "project_conebeam_kernel"
+            print (kernel_name)
 
         print (f"Launching kernel: {kernel_name}")
         args = tuple(args)

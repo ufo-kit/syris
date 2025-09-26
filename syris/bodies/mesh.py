@@ -58,7 +58,8 @@ class Mesh(MovableBody):
         center="bbox",
         bounds=None,
         normals=None,
-        epsilon=np.inf
+        epsilon=np.inf,
+        use_normals=False
     ):
         """Constructor."""
         self._state = 0
@@ -86,6 +87,8 @@ class Mesh(MovableBody):
 
         self.accelerator = None
         self._normals = normals
+        self._use_normals = use_normals
+        print("normals is none ? : ", normals is None)
         if isinstance(bounds, q.Quantity):
             self._bounds = bounds.rescale(cfg.UNIT).magnitude
         else:
@@ -125,7 +128,8 @@ class Mesh(MovableBody):
                    center=center,
                    normals=normals,
                    bounds=reader.bounds,
-                   epsilon=reader.epsilon)
+                   epsilon=reader.epsilon,
+                   use_normals=use_normals)
     
     @property
     def furthest_point(self):

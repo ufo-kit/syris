@@ -29,6 +29,10 @@
     #define EPSILON FP_CONST(1e-7)
 #endif
 
+#define POS_INFINITY __int_as_float(0x7f800000)
+#define NEG_INFINITY __int_as_float(0xff800000)
+#define INDEX 17
+
 constexpr unsigned MAX_COLLISIONS = 128;
 
 __forceinline__ __device__ __host__ FP_T4 make_fp_t4(FP_T x, FP_T y, FP_T z, FP_T w)
@@ -244,29 +248,11 @@ __device__ inline FP_T min_component(FP_T4 a)
     return FP_MATH(fmin)(FP_MATH(fmin)(a.x, a.y), a.z);
 }
 
-__device__ inline int maxDimIndex(const FP_T4 &D)
-{
-    if (D.x > D.y)
-    {
-        if (D.x > D.z)
-        {
-            return 0;
-        }
-        else
-        {
-            return 2;
-        }
-    }
-    else
-    {
-        if (D.y > D.z)
-        {
-            return 1;
-        }
-        else
-        {
-            return 2;
-        }
+__device__ int maxDimIndex(const FP_T4& v) {
+    if (v.x > v.y) {
+        return (v.x > v.z) ? 0 : 2;
+    } else {
+        return (v.y > v.z) ? 1 : 2;
     }
 }
 

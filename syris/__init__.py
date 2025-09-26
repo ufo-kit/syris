@@ -53,7 +53,7 @@ def init(
         try:
             kernel_dir = pkg_resources.resource_filename('syris', 'gpu/cuda/')
 
-            source_files = ["Ray.cu", "source.cu"]
+            source_files = ["WatertightRay.cu", "Ray.cu", "source.cu"]
             abs_source_files = [os.path.join(kernel_dir, f) for f in source_files]
             cuda_headers = [kernel_dir,]
             

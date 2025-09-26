@@ -1,5 +1,6 @@
 #include "Commons.cuh"
 #include "Ray.cuh"
+#include "WatertightRay.cuh"
 
 #define SENTINEL -1
 #define INVALID -1
@@ -199,7 +200,8 @@ __device__ void updateParents(Tree &tree, int i)
     return;
 }
 
-__device__ void query(const Tree &tree, const Ray &ray, List<int> &candidates)
+template <typename RayType>
+__device__ void query(const Tree &tree, const RayType &ray, List<int> &candidates)
 {
     int current_node = toInternalRepresentation(tree, 0);
 
@@ -258,7 +260,7 @@ struct AreFPValuesClose_Final {
     // A small factor for comparing large t-values.
     const FP_T relative_epsilon;
 
-    __device__ AreFPValuesClose_Final(FP_T smallest_feature_size, FP_T rel_ep = cuda::std::numeric_limits<FP_T>::epsilon()) :
+    __device__ AreFPValuesClose_Final(FP_T smallest_feature_size, FP_T rel_ep = EPSILON) :
         // Set the absolute tolerance to 10% of the smallest edge length.
         // This is a robust heuristic for merging grazing-angle hits.
         absolute_tolerance(smallest_feature_size * FP_CONST(0.1)),
@@ -286,7 +288,7 @@ struct AreFPValuesClose_Final_Debug {
     // A small factor for comparing large t-values.
     const FP_T relative_epsilon;
 
-    __device__ AreFPValuesClose_Final_Debug(FP_T smallest_feature_size, FP_T rel_ep = cuda::std::numeric_limits<FP_T>::epsilon()) :
+    __device__ AreFPValuesClose_Final_Debug(FP_T smallest_feature_size, FP_T rel_ep = EPSILON) :
         // Set the absolute tolerance to 10% of the smallest edge length.
         // This is a robust heuristic for merging grazing-angle hits.
         absolute_tolerance(smallest_feature_size * FP_CONST(0.1)),
@@ -390,15 +392,16 @@ __device__ FP_T match_pairs(
     return total_thickness;
 }
 
+template<typename RayType>
 __device__ FP_T traceRay(
-    const Ray &ray, const Tree &tree,
+    const RayType &ray, const Tree &tree,
     FP_T4 *__restrict__ vertices, FP_T &epsilon)
 {
     List<int> candidates, intersected;
     List<FP_T> tvalues;
 
     // This is where the acceleration structure (BVH) is actually useful
-    query(tree, ray, candidates);
+    query<RayType>(tree, ray, candidates);
 
     if (candidates.size() == 0)
     {
@@ -443,7 +446,7 @@ __device__ FP_T traceRay(
         intersected.values,                      // Input values: start (must match key range)
         filtered_tvalues.values,                 // Output keys: destination
         filtered_intersections.values,           // Output values: destination
-        AreFPValuesClose_Final(epsilon)                // Custom predicate for "equality"
+        AreFPValuesClose_Final(epsilon)          // Custom predicate for "equality"
     );
 
     // Update the counts in your filtered lists
@@ -451,7 +454,8 @@ __device__ FP_T traceRay(
     filtered_intersections.count = new_ends.second - filtered_intersections.values;
 
     return project_thickness(filtered_tvalues, epsilon);
-    
+    // return candidates.count;
+    // return sum(filtered_intersections);
 }
 
 
@@ -519,15 +523,11 @@ __device__ FP_T traceRay(
         // Keep the first t-value AND its corresponding candidate
         filtered_tvalues.push_back(tvalues.get(0));
         filtered_candidates.push_back(candidates.get(0));
-        
-        // (Your printf for debugging)
-        
+
         for (int i = 1; i < tvalues.size(); ++i) {
             FP_T current_t = tvalues.get(i);
             FP_T last_unique_t = filtered_tvalues.back();
             bool is_close = close(current_t, last_unique_t);
-
-            // (Your printf for debugging)
 
             if (!is_close) {
                 // If the t-value is unique, keep BOTH it and its candidate from the same index
@@ -541,553 +541,6 @@ __device__ FP_T traceRay(
     // return match_pairs(filtered_intersections, filtered_tvalues, ray, vertices, normals, tree);
     return match_pairs(filtered_candidates, filtered_tvalues, ray, vertices, normals, tree);
 }
-
-__device__ FP_T traceRay_DEBUG(
-    const Ray &ray, const Tree &tree,
-    FP_T4 *__restrict__ vertices,
-    FP_T4 *__restrict__ normals,
-    FP_T &epsilon)
-{
-    // It's helpful to get thread/block IDs for unique printf messages
-    const int tid = threadIdx.x;
-    const int bid = blockIdx.x;
-
-    List<int> candidates, intersected;
-    List<FP_T> tvalues;
-
-    // This is where the acceleration structure (BVH) is actually useful
-    query(tree, ray, candidates);
-
-    printf("[DEBUG][B:%d, T:%d] BVH query found %d candidate(s).\n", bid, tid, candidates.size());
-
-    if (candidates.size() == 0)
-    {
-        printf("[DEBUG][B:%d, T:%d] No candidates found. Exiting.\n", bid, tid);
-        return 0.0;
-    }
-
-    // Test the candidates for actual intersections
-    for (int i = 0; i < candidates.size(); i++)
-    {
-        int primIndex = candidates.get(i) * 3;
-        const FP_T4 V1 = vertices[primIndex];
-        const FP_T4 V2 = vertices[primIndex + 1];
-        const FP_T4 V3 = vertices[primIndex + 2];
-        FP_T t = 0.0, tmax = INFINITY;
-        if (ray.intersects(V1, V2, V3, t, tmax))
-        {
-            printf("[DEBUG][B:%d, T:%d]   --> INTERSECTION! prim %d at t=%.9f\n", bid, tid, candidates.get(i), t);
-            tvalues.push_back(t);
-            intersected.push_back(candidates.get(i));
-        }
-    }
-
-    printf("[DEBUG][B:%d, T:%d] Found %d total raw intersection(s).\n", bid, tid, tvalues.size());
-
-    if (tvalues.size() < 2)
-    {
-        printf("[DEBUG][B:%d, T:%d] Not enough intersections for thickness. Exiting.\n", bid, tid);
-        return 0.0;
-    }
-
-    // Sort intersections by their t-value
-    thrust::stable_sort_by_key(thrust::seq, tvalues.values, tvalues.values + tvalues.size(),
-                               intersected.values);
-
-    for (int i = 0; i < tvalues.size(); i++) {
-        printf("[DEBUG][B:%d, T:%d] Post-sort: t=%.9f, prim=%d\n", bid, tid, tvalues.get(i), intersected.get(i));
-    }
-
-    List<FP_T> filtered_tvalues;
-    List<int> filtered_candidates;
-
-    AreFPValuesClose_Final_Debug close(epsilon);
-
-    filtered_tvalues.count = 0;
-    filtered_candidates.count = 0;
-
-    if (tvalues.size() > 0) {
-        // Keep the first t-value and its candidate unconditionally.
-        filtered_tvalues.push_back(tvalues.get(0));
-        filtered_candidates.push_back(candidates.get(0));
-        printf("-> Kept first pair: t=%.9f, prim=%d\n", tvalues.get(0), candidates.get(0));
-        
-        for (int i = 1; i < tvalues.size(); ++i) {
-            FP_T current_t = tvalues.get(i);
-            int current_prim = candidates.get(i);
-            FP_T last_unique_t = filtered_tvalues.back();
-            
-            bool is_close = close(current_t, last_unique_t);
-            
-            printf("-> Comparing t[%d]=%.9f (prim=%d) with last_unique=%.9f. Are close? %s\n", i, current_t, current_prim, last_unique_t, is_close ? "Yes" : "No");
-
-            if (!is_close) {
-                filtered_tvalues.push_back(current_t);
-                filtered_candidates.push_back(current_prim);
-                printf("   Action: KEEPING pair.\n");
-            } else {
-                printf("   Action: DISCARDING duplicate.\n");
-            }
-        }
-    }
-
-    FP_T thickness = match_pairs(filtered_candidates, filtered_tvalues, ray, vertices, normals, tree);
-
-    printf("Final thickness: %f \n", thickness);
-
-    return thickness;
-}
-// struct Hit {
-//     FP_T t;
-//     int primID;
-// };
-
-// __device__ FP_T traceRay_Clustering(
-//     const Ray &ray, const Tree &tree,
-//     FP_T4 *__restrict__ vertices,
-//     FP_T4 *__restrict__ normals,
-//     FP_T smallest_feature_size)
-// {
-//     // 1. Collect all initial intersections into a sorted, fixed-size buffer
-//     Hit hits[MAX_COLLISIONS];
-//     int hit_count = 0;
-    
-//     List<int> candidates;
-//     query(tree, ray, candidates);
-
-//     if (candidates.size() > 0) {
-//         for (int i = 0; i < candidates.size(); i++) {
-//             int primID = candidates.get(i);
-//             int primIndex = primID * 3;
-//             const FP_T4 V1 = vertices[primIndex];
-//             const FP_T4 V2 = vertices[primIndex + 1];
-//             const FP_T4 V3 = vertices[primIndex + 2];
-
-//             FP_T t = 0.0;
-//             // Call intersects without tmax to get ALL hits
-//             if (ray.intersects(V1, V2, V3, t)) {
-//                 if (t > FP_CONST(1e-5)) {
-//                     // Use on-the-fly insertion sort (fast for small, sorted arrays)
-//                     if (hit_count < MAX_COLLISIONS) {
-//                         Hit new_hit = {t, primID};
-//                         int j = hit_count;
-//                         while (j > 0 && new_hit.t < hits[j - 1].t) {
-//                             hits[j] = hits[j - 1];
-//                             j--;
-//                         }
-//                         hits[j] = new_hit;
-//                         hit_count++;
-//                     }
-//                 }
-//             }
-//         }
-//     }
-
-//     if (hit_count < 2) {
-//         return 0.0;
-//     }
-
-//     // 2. Perform robust filtering using the NORMAL-AWARE clustering approach
-//     Hit filtered_hits[MAX_COLLISIONS];
-//     int filtered_hit_count = 0;
-
-//     if (hit_count > 0)
-//     {
-//         Hit cluster_representative = hits[0];
-//         filtered_hits[0] = cluster_representative;
-//         filtered_hit_count = 1;
-
-//         for (int i = 1; i < hit_count; ++i)
-//         {
-//             const Hit& current_hit = hits[i];
-            
-//             const FP_T4 rep_normal = normals[cluster_representative.primID];
-//             const FP_T4 cur_normal = normals[current_hit.primID];
-//             FP_T normal_dot = dot(rep_normal, cur_normal);
-//             bool normals_are_similar = (normal_dot > 0.0f);
-
-//             FP_T ray_dot_normal = fabsf(dot(ray.getDirection(), rep_normal));
-//             ray_dot_normal = fmaxf(ray_dot_normal, FP_CONST(1e-6));
-
-//             FP_T world_space_tolerance = smallest_feature_size * 1.5f;
-//             FP_T t_space_tolerance = __fdividef(world_space_tolerance, ray_dot_normal);
-//             FP_T t_diff = current_hit.t - cluster_representative.t;
-
-//             bool is_duplicate = (t_diff <= t_space_tolerance);
-            
-//             if (is_duplicate && normals_are_similar)
-//             {
-//             }
-//             else
-//             {
-//                 if (filtered_hit_count < MAX_COLLISIONS) {
-//                     cluster_representative = current_hit;
-//                     filtered_hits[filtered_hit_count++] = cluster_representative;
-//                 }
-//             }
-//         }
-//     }
-    
-//     // 4. Convert filtered hits back to List format for compatibility with your existing code
-//     List<int> final_intersections;
-//     List<FP_T> final_tvalues;
-//     for (int i = 0; i < filtered_hit_count; i++) {
-//         final_tvalues.push_back(filtered_hits[i].t);
-//         final_intersections.push_back(filtered_hits[i].primID);
-//     }
-    
-//     FP_T final_value = match_pairs(final_intersections, final_tvalues, ray, vertices, normals, tree);
-
-//     return final_value;
-// }
-
-// #define DEBUG_X 627
-// #define DEBUG_Y 1038
-// #define DEBUG_PIXEL
-
-// __device__ FP_T cast_ray_Debug(
-//     const Ray &ray, const Tree &tree,
-//     FP_T4 *__restrict__ vertices,
-//     FP_T4 *__restrict__ normals,
-//     FP_T smallest_feature_size)
-// {
-//     // --- DEBUG SETUP: Only print for the specified pixel ---
-//     #ifdef DEBUG_PIXEL
-//     bool is_debug_thread = true;
-//     if (blockIdx.x * blockDim.x + threadIdx.x == DEBUG_X &&
-//         blockIdx.y * blockDim.y + threadIdx.y == DEBUG_Y) {
-//         is_debug_thread = true;
-//     }
-//     #endif
-
-//     // 1. Collect all initial intersections
-//     Hit hits[MAX_COLLISIONS];
-//     int hit_count = 0;
-    
-//     List<int> candidates;
-//     query(tree, ray, candidates);
-
-//     if (candidates.size() == 0)
-//     {
-//         return 0.0;
-//     }
-
-//     // 1. Collect all initial intersections
-//     // We use a fixed-size array and on-the-fly insertion sort for performance.
-//     for (int i = 0; i < candidates.size(); i++)
-//     {
-//         int primIndex = candidates.get(i) * 3;
-//         const FP_T4 V1 = vertices[primIndex];
-//         const FP_T4 V2 = vertices[primIndex + 1];
-//         const FP_T4 V3 = vertices[primIndex + 2];
-
-//         FP_T t = 0.0;
-//         if (ray.intersects(V1, V2, V3, t)) // Call intersects without tmax
-//         {
-//             if (t > FP_CONST(1e-5)) {
-//                 if (hit_count < MAX_COLLISIONS) {
-//                     Hit new_hit = {t, candidates.get(i)};
-//                     int j = hit_count;
-//                     while (j > 0 && new_hit.t < hits[j - 1].t) {
-//                         hits[j] = hits[j - 1];
-//                         j--;
-//                     }
-//                     hits[j] = new_hit;
-//                     hit_count++;
-//                 }
-//             }
-//         }
-//     }
-
-//     #ifdef DEBUG_PIXEL
-//     if (is_debug_thread) {
-//         printf("\n--- DEBUGGING RAY (%d, %d) ---\n", DEBUG_X, DEBUG_Y);
-//         printf("1. Found %d initial sorted hits.\nRAW HITS (primID: t-value):\n", hit_count);
-//         for (int i = 0; i < hit_count; i++) {
-//             printf("  - Hit %d: prim %d at t = %.9f\n", i, hits[i].primID, hits[i].t);
-//         }
-//     }
-//     #endif
-
-//     if (hit_count < 2) {
-//         return 0.0;
-//     }
-
-//     if (hit_count == 2) {
-//         #ifdef DEBUG_PIXEL
-//         if (is_debug_thread) {
-//             printf("-> Taking early exit with 2 hits.\n");
-//         }
-//         #endif
-//         return FP_MATH(fabs)(hits[1].t - hits[0].t);
-//     }
-
-//     // 2. Perform the robust, angle-aware filtering
-//     Hit filtered_hits[MAX_COLLISIONS];
-//     int filtered_hit_count = 0;
-    
-//     #ifdef DEBUG_PIXEL
-//     if (is_debug_thread) {
-//         printf("2. Filtering with smallest_feature_size = %.9f\n", smallest_feature_size);
-//     }
-//     #endif
-
-//     if (hit_count < 2) {
-//         return (hit_count == 1) ? hits[0].t : 0.0;
-//     }
-    
-//     // 3. Perform robust filtering using a clustering approach
-//     if (hit_count > 0)
-//     {
-//         Hit cluster_representative = hits[0];
-//         filtered_hits[0] = cluster_representative;
-//         filtered_hit_count = 1;
-
-//         for (int i = 1; i < hit_count; ++i)
-//         {
-//             const Hit& current_hit = hits[i];
-            
-//             // --- The Angle-Aware Dynamic Tolerance Calculation ---
-//             const FP_T4 rep_normal = normals[cluster_representative.primID];
-//             FP_T dot_product = fabsf(dot(ray.getDirection(), rep_normal));
-//             dot_product = fmaxf(dot_product, FP_CONST(1e-6));
-
-//             FP_T world_space_tolerance = smallest_feature_size * 1.5f;
-//             FP_T t_space_tolerance = __fdividef(world_space_tolerance, dot_product);
-
-//             // --- The Normal Similarity Check ---
-//             const FP_T4 cur_normal = normals[current_hit.primID];
-//             // Normals are similar if they point in the same general direction.
-//             bool normals_are_similar = (dot(rep_normal, cur_normal) > 0.0f);
-
-//             bool is_duplicate = (current_hit.t - cluster_representative.t) <= t_space_tolerance;
-
-//             // A hit is only merged if it's close AND the normals are similar.
-//             if (is_duplicate && normals_are_similar)
-//             {
-//                 // MERGE: Do nothing. The hit is part of the current cluster.
-//             }
-//             else
-//             {
-//                 // NEW CLUSTER: The hit is distinct. Finalize the previous cluster
-//                 // and start a new one with the current hit.
-//                 if (filtered_hit_count < MAX_COLLISIONS) {
-//                     cluster_representative = current_hit;
-//                     filtered_hits[filtered_hit_count++] = cluster_representative;
-//                 }
-//             }
-//         }
-//     }
-
-//     #ifdef DEBUG_PIXEL
-//     if (is_debug_thread) {
-//         printf("3. Filtering complete. Final unique hit count: %d\n", filtered_hit_count);
-//     }
-//     #endif
-
-//     // 3. Convert back to the List format for the final function call
-//     List<int> final_intersections;
-//     List<FP_T> final_tvalues;
-//     for (int i = 0; i < filtered_hit_count; i++) {
-//         final_tvalues.push_back(filtered_hits[i].t);
-//         final_intersections.push_back(filtered_hits[i].primID);
-//     }
-    
-//     FP_T final_value = match_pairs(final_intersections, final_tvalues, ray, vertices, normals, tree);
-    
-//     #ifdef DEBUG_PIXEL
-//     if (is_debug_thread) {
-//         printf("4. Final value from match_pairs is %.9f\n", final_value);
-//         printf("--- END DEBUG ---\n");
-//     }
-//     #endif
-
-//     return final_value;
-// }
-
-// __device__ FP_T traceRay_Clustering_Debug(
-//     const Ray &ray, const Tree &tree,
-//     FP_T4 *__restrict__ vertices,
-//     FP_T4 *__restrict__ normals,
-//     FP_T smallest_feature_size)
-// {
-//     // --- DEBUG SETUP ---
-//     #ifdef DEBUG_PIXEL
-//     bool is_debug_thread = true;
-//     if (blockIdx.x * blockDim.x + threadIdx.x == DEBUG_X &&
-//         blockIdx.y * blockDim.y + threadIdx.y == DEBUG_Y) {
-//         is_debug_thread = true;
-//     }
-//     #endif
-
-//     // 1. Collect all initial intersections into a sorted, fixed-size buffer
-//     Hit hits[MAX_COLLISIONS];
-//     int hit_count = 0;
-    
-//     List<int> candidates;
-//     query(tree, ray, candidates);
-
-//     if (candidates.size() > 0) {
-//         for (int i = 0; i < candidates.size(); i++) {
-//             int primID = candidates.get(i);
-//             int primIndex = primID * 3;
-//             const FP_T4 V1 = vertices[primIndex];
-//             const FP_T4 V2 = vertices[primIndex + 1];
-//             const FP_T4 V3 = vertices[primIndex + 2];
-
-//             FP_T t = 0.0;
-//             // Call intersects without tmax to get ALL hits
-//             if (ray.intersects(V1, V2, V3, t)) {
-//                 if (t > FP_CONST(1e-5)) {
-//                     // Use on-the-fly insertion sort (fast for small, sorted arrays)
-//                     if (hit_count < MAX_COLLISIONS) {
-//                         Hit new_hit = {t, primID};
-//                         int j = hit_count;
-//                         while (j > 0 && new_hit.t < hits[j - 1].t) {
-//                             hits[j] = hits[j - 1];
-//                             j--;
-//                         }
-//                         hits[j] = new_hit;
-//                         hit_count++;
-//                     }
-//                 }
-//             }
-//         }
-//     }
-
-//     #ifdef DEBUG_PIXEL
-//     if (is_debug_thread) {
-//         printf("\n--- DEBUGGING RAY (%d, %d) ---\
-// n", DEBUG_X, DEBUG_Y);
-//         printf("1. Found %d initial sorted hits.\nRAW HITS (primID: t-value):\n", hit_count);
-//         for (int i = 0; i < hit_count; i++) {
-//             printf("  - Hit %d: prim %d at t = %.9f\n", i, hits[i].primID, hits[i].t);
-//         }
-//     }
-//     #endif
-
-//     if (hit_count < 2) {
-//         return 0.0;
-//     }
-
-//     // 2. Perform robust filtering using the NORMAL-AWARE clustering approach
-//     Hit filtered_hits[MAX_COLLISIONS];
-//     int filtered_hit_count = 0;
-
-//     #ifdef DEBUG_PIXEL
-//     if (is_debug_thread) {
-//         printf("2. Filtering with smallest_feature_size = %.9f\n", smallest_feature_size);
-//     }
-//     #endif
-
-//     if (hit_count > 0)
-//     {
-//         Hit cluster_representative = hits[0];
-//         filtered_hits[0] = cluster_representative;
-//         filtered_hit_count = 1;
-
-//         for (int i = 1; i < hit_count; ++i)
-//         {
-//             const Hit& current_hit = hits[i];
-            
-//             const FP_T4 rep_normal = normals[cluster_representative.primID];
-//             const FP_T4 cur_normal = normals[current_hit.primID];
-//             FP_T normal_dot = dot(rep_normal, cur_normal);
-//             bool normals_are_similar = (normal_dot > 0.0f);
-
-//             FP_T ray_dot_normal = fabsf(dot(ray.getDirection(), rep_normal));
-//             ray_dot_normal = fmaxf(ray_dot_normal, FP_CONST(1e-6));
-
-//             FP_T world_space_tolerance = smallest_feature_size * 1.5f;
-//             FP_T t_space_tolerance = __fdividef(world_space_tolerance, ray_dot_normal);
-//             FP_T t_diff = current_hit.t - cluster_representative.t;
-
-//             bool is_duplicate = (t_diff <= t_space_tolerance);
-            
-//             #ifdef DEBUG_PIXEL
-//             if (is_debug_thread) {
-//                 printf("--- Clustering Step %d ---\n", i);
-//                 printf("  - Comparing current hit (prim %d, t=%.9f) with cluster rep (prim %d, t=%.9f)\n", 
-//                         current_hit.primID, current_hit.t, cluster_representative.primID, cluster_representative.t);
-//                 printf("  - Rep Normal dot Cur Normal = %.9f -> Normals similar? %s\n", normal_dot, normals_are_similar ? "YES" : "NO");
-//                 printf("  - Ray Dir dot Rep Normal    = %.9f\n", ray_dot_normal);
-//                 printf("  - World Tolerance           = %.9f\n", world_space_tolerance);
-//                 printf("  - T-Space Tolerance         = %.9f\n", t_space_tolerance);
-//                 printf("  - Actual T-Difference       = %.9f\n", t_diff);
-//                 printf("  - Is duplicate? (t_diff <= tolerance): %s\n", is_duplicate ? "YES" : "NO");
-//             }
-//             #endif
-
-//             if (is_duplicate || normals_are_similar)
-//             {
-//                 #ifdef DEBUG_PIXEL
-//                 if (is_debug_thread) printf("  - DECISION: MERGING hit into current cluster.\n");
-//                 #endif
-//                 // If the new hit is closer to the ray origin, update the representative to keep the earliest t
-//                 if (current_hit.t < cluster_representative.t) {
-//                     cluster_representative = current_hit;
-//                 }
-//             }
-//             else
-//             {
-//                 #ifdef DEBUG_PIXEL
-//                 if (is_debug_thread) printf("  - DECISION: Normals differ AND t is outside tolerance. STARTING NEW CLUSTER.\n");
-//                 #endif
-//                 if (filtered_hit_count < MAX_COLLISIONS) {
-//                     cluster_representative = current_hit;
-//                     filtered_hits[filtered_hit_count++] = cluster_representative;
-//                 }
-//             }
-//         }
-//     }
-    
-//     #ifdef DEBUG_PIXEL
-//     if (is_debug_thread) {
-//         printf("3. Filtering complete. Final unique hit count: %d\n", filtered_hit_count);
-//         for (int i = 0; i < filtered_hit_count; i++) {
-//             printf("  - Final Hit %d: prim %d at t = %.9f\n", i, filtered_hits[i].primID, filtered_hits[i].t);
-//         }
-//     }
-//     #endif
-    
-//     // 4. Convert filtered hits back to List format for compatibility with your existing code
-//     List<int> final_intersections;
-//     List<FP_T> final_tvalues;
-//     for (int i = 0; i < filtered_hit_count; i++) {
-//         final_tvalues.push_back(filtered_hits[i].t);
-//         final_intersections.push_back(filtered_hits[i].primID);
-//     }
-
-//     #ifdef DEBUG_PIXEL
-//     FP_T thickness;
-//     if (is_debug_thread) {
-//         printf("3. Filtering complete. Final unique hit count: %d\n", filtered_hit_count);
-//         for (int i = 0; i < filtered_hit_count; i++) {
-//             printf("  - Final Hit %d: prim %d at t = %.9f\n", i, filtered_hits[i].primID, filtered_hits[i].t);
-//         }
-
-//         if (filtered_hit_count >= 2) {
-//             thickness = filtered_hits[filtered_hit_count - 1].t - filtered_hits[0].t;
-//             printf("4. Manually calculated outer thickness is %.9f\n", thickness);
-//         } else {
-//             printf("4. Not enough hits to calculate outer thickness.\n");
-//         }
-//         printf("--- END DEBUG ---\n");
-//     }
-//     #endif
-    
-//     FP_T final_value = match_pairs(final_intersections, final_tvalues, ray, vertices, normals, tree);
-    
-//     #ifdef DEBUG_PIXEL
-//     if (is_debug_thread) {
-//         printf("4. Final value from matchOuterPairs is %.9f\n", final_value);
-//         printf("--- END DEBUG ---\n");
-//     }
-//     #endif
-
-//     return thickness;
-// }
-
 
 extern "C" __global__ void calculateBbBoxKernel(FP_T4 *vertices, FP_T4 *bbMin, FP_T4 *bbMax, unsigned int nb_keys)
 {
@@ -1169,6 +622,7 @@ extern "C" __global__ void project_parallel_kernel(
     unsigned *permutation, // BVH tree
     FP_T4 *bboxMin,
     FP_T4 *bboxMax,
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
     FP_T4 *__restrict__ vertices,
     unsigned *globalCounter,
     FP_T epsilon
@@ -1202,10 +656,65 @@ extern "C" __global__ void project_parallel_kernel(
         unsigned col = index % N.x;
 
         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
-        Ray ray = Ray(pixel_coordinates, W);
-        image[index] = traceRay(ray, tree, vertices, epsilon);
+        WatertightRay ray = WatertightRay(pixel_coordinates, W, scene_bbMin, scene_bbMax);
+        image[index] = traceRay<WatertightRay>(ray, tree, vertices, epsilon);
     }
 }
+
+// extern "C" __global__ void project_parallel_kernel(
+//     unsigned nb_keys, FP_T *image, uint2 N,
+//     FP_T4 U, FP_T4 V, FP_T4 W, // projection basis and origin
+//     FP_T4 upperleft_origin, FP_T2 ps,
+//     int *rope,
+//     int *left,
+//     unsigned *permutation, // BVH tree
+//     FP_T4 *bboxMin,
+//     FP_T4 *bboxMax,
+//     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
+//     FP_T4 *__restrict__ vertices,
+//     // Note: globalCounter is no longer needed and has been removed
+//     FP_T epsilon
+// )
+// {
+//     // --- Setup (remains the same) ---
+//     Tree tree;
+//     tree.nb_keys = nb_keys;
+//     tree.rope = rope;
+//     tree.left = left;
+//     tree.indices = permutation;
+//     tree.bboxMin = bboxMin;
+//     tree.bboxMax = bboxMax;
+
+//     FP_T4 scaled_U = U * ps.x;
+//     FP_T4 scaled_V = V * ps.y;
+
+//     // --- Grid-Stride Loop Setup ---
+//     unsigned totalRays = N.x * N.y;
+//     // Each thread calculates its unique starting index
+//     unsigned startIndex = blockIdx.x * blockDim.x + threadIdx.x;
+//     // All threads step by the total number of threads in the grid
+//     unsigned stride = gridDim.x * blockDim.x;
+
+//     // --- Grid-Stride Loop ---
+//     for (unsigned index = startIndex; index < totalRays; index += stride)
+//     {
+//         // The core logic from your while loop is now inside this for loop
+//         unsigned row = index / N.x;
+//         unsigned col = index % N.x;
+
+//         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
+        
+//         // Your debug logic for a specific index remains the same
+//         if (index == INDEX){
+//             Ray ray = Ray(pixel_coordinates, W, scene_bbMin, scene_bbMax, index);
+//             image[index] = traceRay(ray, tree, vertices, epsilon, index);
+//         }
+//         else {
+//             Ray ray = Ray(pixel_coordinates, W, scene_bbMin, scene_bbMax);
+//             image[index] = traceRay(ray, tree, vertices, epsilon);
+//         }
+//     }
+// }
 
 extern "C" __global__ void project_parallel_normals_kernel(
     unsigned nb_keys, FP_T *image, uint2 N,
@@ -1252,10 +761,10 @@ extern "C" __global__ void project_parallel_normals_kernel(
         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
         Ray ray = Ray(pixel_coordinates, W);
         
-        if (col == DEBUG_X && row == DEBUG_Y)
-            image[index] = traceRay_DEBUG(ray, tree, vertices, normals, epsilon);
-        else
-            image[index] = traceRay(ray, tree, vertices, normals, epsilon);
+        // if (col == DEBUG_X && row == DEBUG_Y)
+        //     image[index] = traceRay_DEBUG(ray, tree, vertices, normals, epsilon);
+        // else
+        image[index] = traceRay(ray, tree, vertices, normals, epsilon);
     }
 }
 
