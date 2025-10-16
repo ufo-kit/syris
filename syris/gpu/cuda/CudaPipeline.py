@@ -27,7 +27,6 @@ class CudaPipeline:
         selected_options += ['-D__CUDA_NO_HALF_CONVERSIONS__']
         
         selected_options = tuple(selected_options,)
-        print (selected_options)
 
         # Prepend cub header
         code = r"""

@@ -6,8 +6,18 @@
 
 #ifdef __FP_T_D__
     using FP_T = double;
+
+    #define MAX_DEPTH 2
+    #define CACHE_DIM 5 // 1 << 2 + 1
+    #define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
+    #define MAX_QUADS_PER_PIXEL 16
 #else
     using FP_T = float;
+
+    #define MAX_DEPTH 5
+    #define CACHE_DIM 33 // 1 << 5 + 1
+    #define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
+    #define MAX_QUADS_PER_PIXEL 128
 #endif
 
 #ifdef DEBUG
@@ -23,25 +33,20 @@ constexpr int debug_row = 1259;
 
 constexpr unsigned MAX_COLLISIONS = 512;
 
-#define MAX_DEPTH 5
-#define CACHE_DIM 33 // 1 << 5 + 1
-#define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
-#define MAX_QUADS_PER_PIXEL 128
-
 typedef unsigned long long morton_t;
 typedef int long long delta_t;
 
 // A helper struct to manage quads for subdivision
 struct Quad {
-    float u, v;     // Top-left corner of the quad within the pixel (0.0 to 1.0)
-    float size;     // Size of the quad (e.g., 1.0, 0.5, 0.25...)
+    FP_T u, v;     // Top-left corner of the quad within the pixel (0.0 to 1.0)
+    FP_T size;     // Size of the quad (e.g., 1.0, 0.5, 0.25...)
     int depth;      // Current subdivision depth
 };
 
 // A struct to store the final, converged quads
 struct FinalQuad {
-    float value;
-    float area;
+    FP_T value;
+    FP_T area;
 };
 
 // --- 2. Define Vector Types from Base Precision ---
@@ -323,6 +328,16 @@ struct AreFPValuesClose {
         return diff < tolerance;
     }
 };
+
+template <typename T>
+__device__ __forceinline__ T device_fmin(T a, T b) {
+    return fmin(a, b);
+}
+
+template <typename T>
+__device__ __forceinline__ T device_fmax(T a, T b) {
+    return fmax(a, b);
+}
 
 // Swap two integers
 template <typename T>

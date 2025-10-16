@@ -93,9 +93,9 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     const FP_T U[3] = { fabsf(O[0] - bbMax[0]), fabsf(O[1] - bbMax[1]), fabsf(O[2] - bbMax[2]) };
     
     const FP_T max_dist[3] = {
-        RoundUp(fmaxf(L[0], U[0])),
-        RoundUp(fmaxf(L[1], U[1])),
-        RoundUp(fmaxf(L[2], U[2]))
+        RoundUp(device_fmax<FP_T>(L[0], U[0])),
+        RoundUp(device_fmax<FP_T>(L[1], U[1])),
+        RoundUp(device_fmax<FP_T>(L[2], U[2]))
     };
 
     const FP_T Z_max = max_dist[this->Kz];
@@ -141,20 +141,20 @@ __device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box
     // --- Kx Slab ---
     float tNearX = (B[this->near_kx_idx] - this->o_near_kx) * this->r_near_kx;
     float tFarX  = (B[this->far_kx_idx]  - this->o_far_kx)  * this->r_far_kx;
-    t_entry = fmaxf(t_entry, tNearX);
-    t_exit  = fminf(t_exit,  tFarX);
+    t_entry = device_fmax<FP_T>(t_entry, tNearX);
+    t_exit  = device_fmin<FP_T>(t_exit,  tFarX);
 
     // --- Ky Slab ---
     float tNearY = (B[this->near_ky_idx] - this->o_near_ky) * this->r_near_ky;
     float tFarY  = (B[this->far_ky_idx]  - this->o_far_ky)  * this->r_far_ky;
-    t_entry = fmaxf(t_entry, tNearY);
-    t_exit  = fminf(t_exit,  tFarY);
+    t_entry = device_fmax<FP_T>(t_entry, tNearY);
+    t_exit  = device_fmin<FP_T>(t_exit,  tFarY);
 
     // --- Kz Slab ---
     float tNearZ = (B[this->near_kz_idx] - this->o_near_kz) * this->r_near_kz;
     float tFarZ  = (B[this->far_kz_idx]  - this->o_far_kz)  * this->r_far_kz;
-    t_entry = fmaxf(t_entry, tNearZ);
-    t_exit  = fminf(t_exit,  tFarZ);
+    t_entry = device_fmax<FP_T>(t_entry, tNearZ);
+    t_exit  = device_fmin<FP_T>(t_exit,  tFarZ);
     
     // Final check for a valid, overlapping interval
     return t_entry <= t_exit;
@@ -171,20 +171,20 @@ __device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box
 //     // X Slab
 //     t_lower = (bounds[this->sign[0]].x - this->tail.x) * this->invDirection.x;
 //     t_upper = (bounds[1 - this->sign[0]].x - this->tail.x) * this->invDirection.x;
-//     tmin = (fmax)(tmin, t_lower);
-//     tmax = (fmin)(tmax, t_upper);
+//     tmin = (device_fmax<FP_T>)(tmin, t_lower);
+//     tmax = (device_fmin<FP_T>)(tmax, t_upper);
 
 //     // Y Slab
 //     t_lower = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
 //     t_upper = (bounds[1 - this->sign[1]].y - this->tail.y) * this->invDirection.y;
-//     tmin = (fmax)(tmin, t_lower);
-//     tmax = (fmin)(tmax, t_upper);
+//     tmin = (device_fmax<FP_T>)(tmin, t_lower);
+//     tmax = (device_fmin<FP_T>)(tmax, t_upper);
 
 //     // Z Slab
 //     t_lower = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
 //     t_upper = (bounds[1 - this->sign[2]].z - this->tail.z) * this->invDirection.z;
-//     tmin = (fmax)(tmin, t_lower);
-//     tmax = (fmin)(tmax, t_upper);
+//     tmin = (device_fmax<FP_T>)(tmin, t_lower);
+//     tmax = (device_fmin<FP_T>)(tmax, t_upper);
 //     return tmax >= tmin;
 // }
 
@@ -261,11 +261,14 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
     const FP_T det = U + V + W;
 
     // More Robust Dynamic Epsilon Calculation
-    constexpr FP_T gamma_factor = 8.0 * epsilon;
+    constexpr FP_T gamma_factor = 2.0 * epsilon;
     const FP_T error_bound = gamma_factor * (fabs(U) + fabs(V) + fabs(W));
 
     // Double Precision Fallback for Degenerate Cases
     if ((fabs)(det) <= error_bound) {
+        #ifdef __FP_T_D__
+        return false;
+        #else
         const double d_Sx = (double)Sx, d_Sy = (double)Sy, d_Sz = (double)Sz;
         const double d_Ax = fma(-d_Sx, (double)A[Kz], (double)A[Kx]);
         const double d_Ay = fma(-d_Sy, (double)A[Kz], (double)A[Ky]);
@@ -280,7 +283,7 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
         const double d_det = d_U + d_V + d_W;
 
         constexpr FP_T d_epsilon = ::cuda::std::numeric_limits<double>::epsilon();
-        constexpr double d_gamma_factor = 8.0 * d_epsilon;
+        constexpr double d_gamma_factor = 2.0 * d_epsilon;
         const double d_error_bound = d_gamma_factor * (fabs(d_U) + fabs(d_V) + fabs(d_W));
         if (fabs(d_det) <= d_error_bound) {
             #ifdef DEBUG
@@ -314,6 +317,7 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
         }
 
         t = (FP_T)(t_numerator / d_det);
+        #endif
     } else {
         bool signs_differ = (det > 0.0f)
                    ? (U < -error_bound || V < -error_bound || W < -error_bound)
@@ -369,12 +373,3 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
     }
     return false;
 }
-
-// __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t) const
-// {
-//     // Set a default t_max to effectively infinity
-//     FP_T t_max =  * (1.1);
-    
-//     if (this->intersects(V1, V2, V3, t, 0) && ())
-//     return ;
-// }

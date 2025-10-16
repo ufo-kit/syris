@@ -183,7 +183,6 @@ __device__ void updateParents(Tree &tree, int i)
 template <typename RayType>
 __device__ void query(const Tree &tree, const RayType &ray, List<int> &candidates, unsigned col, unsigned row)
 {
-    const bool is_debug_thread = (row == debug_row && col == debug_col);
     int current_node = toInternalRepresentation(tree, 0);
 
     do
@@ -274,7 +273,7 @@ __device__ FP_T match_pairs(
     return total_thickness;
 }
 
-__device__ void unique_from_sorted_with_epsilon(List<float>& list, const FP_T scale) {
+__device__ void unique_from_sorted_with_epsilon(List<FP_T>& list, const FP_T scale) {
     if (list.count <= 1) {
         return;
     }
@@ -603,7 +602,7 @@ __device__ FP_T traceSubPixel(
 }
 
 __device__ FP_T traceAndCache(
-    float u, float v,
+    FP_T u, FP_T v,
     FP_T* value_cache, bool* is_cached,
     // (Original traceSubPixel parameters)
     FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 W,
@@ -611,8 +610,8 @@ __device__ FP_T traceAndCache(
     Tree &tree, FP_T4 *__restrict__ vertices, FP_T min_feature_size
 ) {
     // 1. Calculate the integer grid coordinates for the cache lookup.
-    int ix = roundf(u * (CACHE_DIM - 1));
-    int iy = roundf(v * (CACHE_DIM - 1));
+    int ix = round(u * (CACHE_DIM - 1));
+    int iy = round(v * (CACHE_DIM - 1));
     int index = iy * CACHE_DIM + ix;
 
     // 2. Check if the value is already in our cache.
@@ -655,14 +654,14 @@ __device__ FP_T tracePixelAdaptive(
         is_cached[i] = false;
     }
 
-    quad_stack[stack_ptr++] = {0.0f, 0.0f, 1.0f, 0};
+    quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};
 
     // 2. ADAPTIVE SUBDIVISION LOOP
     while (stack_ptr > 0)
     {
         Quad current_quad = quad_stack[--stack_ptr];
 
-        float u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0f;
+        FP_T u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0;
         FP_T values[5];
         values[0] = traceAndCache(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, W, scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
         values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, W, scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
@@ -670,18 +669,25 @@ __device__ FP_T tracePixelAdaptive(
         values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, W, scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
         values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, W, scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
         
-        FP_T min_val = values[0], max_val = values[0];
-        for (int i = 1; i < 5; ++i) {
-            if (values[i] < min_val) min_val = values[i];
-            if (values[i] > max_val) max_val = values[i];
-        }
+        sort(values, 5);
+
+        FP_T min_val = values[0], max_val = values[4];
+        FP_T spread_low  = values[2] - values[0];
+        FP_T spread_high = values[4] - values[2];
 
         // 3. DECISION
-        FP_T threshold = fmaxf(abs_tolerance, rel_tolerance * max_val);
+        FP_T threshold = fmax(abs_tolerance, rel_tolerance * max_val);
         if ((max_val - min_val < threshold) || (current_quad.depth >= depth) || (stack_ptr + 4 > MAX_QUADS_PER_PIXEL))
         {
             if (final_quads_count < MAX_QUADS_PER_PIXEL) {
-                FP_T avg_value = (values[0] + values[1] + values[2] + values[3] + values[4]) / 5.0f;
+                FP_T avg_value;
+                if (spread_low < spread_high) {
+                    // The good data is clustered on the low side. Average the lowest three.
+                    avg_value = (values[0] + values[1] + values[2]) / 3.0;
+                } else {
+                    // The good data is clustered on the high side. Average the highest three.
+                    avg_value = (values[2] + values[3] + values[4]) / 3.0;
+                }
                 final_quads[final_quads_count++] = {avg_value, s * s};
             }
         }
@@ -696,14 +702,14 @@ __device__ FP_T tracePixelAdaptive(
     }
 
     // 4. FINAL AVERAGING
-    FP_T total_value = 0.0f;
-    FP_T total_area = 0.0f;
+    FP_T total_value = 0.0;
+    FP_T total_area = 0.0;
     for (int i = 0; i < final_quads_count; ++i) {
         total_value += final_quads[i].value * final_quads[i].area;
         total_area  += final_quads[i].area;
     }
     
-    return (total_area > 0.0f) ? (total_value / total_area) : 0.0f;
+    return (total_area > 0.0) ? (total_value / total_area) : 0.0;
 }
 
 extern "C" __global__ void project_parallel_kernel(
@@ -758,7 +764,7 @@ extern "C" __global__ void project_parallel_kernel(
         }
         else // Simple, single-ray tracing mode
         {
-            image[index] = traceSubPixel(0.5f, 0.5f, base_pixel_origin, scaled_U, scaled_V, W,
+            image[index] = traceSubPixel(0.5, 0.5, base_pixel_origin, scaled_U, scaled_V, W,
                                          scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
         }
     }
