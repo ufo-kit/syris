@@ -259,14 +259,13 @@ class MovableBody(Body):
         """Sets the transformation matrix and increments the state counter."""
         v = new_matrix[0:3, 1]
         w = new_matrix[0:3, 2]
-        print (v, w)
         if np.allclose(v, w) and not np.allclose(v, 0): # Check if they are the same and not zero
-            print("\n--- WARNING: Degenerate transform_matrix detected! ---")
-            print(f"Up vector (v) and Forward vector (w) are identical: {v.round(3)}")
-            print("Full Matrix:\n", new_matrix.round(3))
-            print("Setter was called from:")
+            LOG.warning("\n--- WARNING: Degenerate transform_matrix detected! ---")
+            LOG.warning(f"Up vector (v) and Forward vector (w) are identical: {v.round(3)}")
+            LOG.warning("Full Matrix:\n", new_matrix.round(3))
+            LOG.warning("Setter was called from:")
             traceback.print_stack(limit=5) # Show the last 5 calls
-            print("----------------------------------------------------\n")
+            LOG.warning("----------------------------------------------------\n")
         
         self._transform_matrix = new_matrix
         self._state += 1

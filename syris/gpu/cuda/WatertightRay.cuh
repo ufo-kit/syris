@@ -6,6 +6,7 @@ public:
     // --- Pre-calculated Ray Data ---
     FP_T4 tail;
     FP_T4 direction;
+    FP_T4 invDirection;
 
     // Remapped axis indices (which original axis corresponds to the new X, Y, Z)
     int Kx, Ky, Kz;
@@ -24,6 +25,10 @@ public:
     int near_kx_idx, far_kx_idx;
     int near_ky_idx, far_ky_idx;
     int near_kz_idx, far_kz_idx;
+
+    int sign[3];
+
+    FP_T4 scene_min, scene_max;
 
     /**
      * @brief Constructs a WatertightRay and performs all pre-calculations.
@@ -45,5 +50,7 @@ public:
     __device__ bool intersects(const FP_T4& minBbox, const FP_T4& maxBbox, FP_T tmin, FP_T tmax) const;
     __device__ bool intersects (FP_T4 const &minBbox, FP_T4 const &maxBbox) const; // AABB
     __device__ bool intersects (FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &tmin, FP_T &tmax) const; // Triangle
-    __device__ bool intersects (FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t) const; // Triangle
+    __device__ bool intersects (FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t, unsigned col, unsigned row) const; // Triangle
+
+    __device__ FP_T point_2_parametric (FP_T4 const &point) const;
 };

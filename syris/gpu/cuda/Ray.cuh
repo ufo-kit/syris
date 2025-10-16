@@ -29,17 +29,17 @@ public:
     __device__ FP_T4 getHead() const { return this->head; };
     __device__ FP_T4 getDirection() const { return this->direction; };
     __device__ FP_T4 getInvDirection() const { return this->invDirection; };
-    __device__ FP_T4 getOppositeDirection() const { return make_fp_t4(-this->direction.x, -this->direction.y, -this->direction.z, 0.0f); };
+    __device__ FP_T4 getOppositeDirection() const { return MAKE_FP_T4(-this->direction.x, -this->direction.y, -this->direction.z, 0.0f); };
     __device__ int getSign(int i) const { return this->sign[i]; };
 
 
     __device__ void print() const;
 
-private:
     FP_T4 tail, head;
     FP_T4 direction, invDirection;
     FP_T Sx, Sy, Sz;
     int Kx, Ky, Kz;
-
+    
     int sign[3];
+    private:
 };

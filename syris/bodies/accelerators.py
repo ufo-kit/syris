@@ -6,6 +6,9 @@ import pyopencl.array as cl_array
 import pyopencl.cltypes as cltypes
 import syris.gpu.util as gutil
 import numpy as np
+import logging
+
+LOG = logging.getLogger(__name__)
 
 class AcceleratorBase(abc.ABC):
     def __init__(self, mesh):
@@ -21,9 +24,8 @@ class AcceleratorBase(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def project(self, shape, pixel_size, /, *, t=None, offset=None, **kwargs):
+    def project(self, shape, pixel_size, offset, /, *, t=None, **kwargs):
         pass
-
 
 class BvhCupyAccelerator(AcceleratorBase):
     """The new, fast GPU-based projection strategy using a BVH tree and CUDA."""
@@ -46,8 +48,7 @@ class BvhCupyAccelerator(AcceleratorBase):
         float = cfg.PRECISION.np_float
         float4 = cfg.PRECISION.float4
 
-        host_vertices = self.mesh.triangles.magnitude
-
+        host_vertices = self.mesh._current[0:3, :]
         nb_vertices = host_vertices.shape[1]
         bounds = self.mesh.bounds
 
@@ -61,8 +62,6 @@ class BvhCupyAccelerator(AcceleratorBase):
         sceneMax = np.array([bounds[1], bounds[3], bounds[5], 0], dtype=float)
 
         t_epsilon = self.mesh.epsilon
-
-        print (f"{t_epsilon:.12f}")
         
         try:
             host_vertices = host_vertices.T            
@@ -85,7 +84,7 @@ class BvhCupyAccelerator(AcceleratorBase):
             else:
                 normals = None
 
-            keys = xp.zeros(nb_keys, dtype=xp.uint32)
+            keys = xp.zeros(nb_keys, dtype=xp.uint64)
             rope = xp.ones(2 * nb_keys, dtype=xp.int32) * -1
             left = xp.ones(2 * nb_keys, dtype=xp.int32) * -1
             entered = xp.ones(2 * nb_keys, dtype=xp.int32) * -1
@@ -97,6 +96,7 @@ class BvhCupyAccelerator(AcceleratorBase):
             block_size = (256, 1, 1)
             grid_size = (int(np.ceil(nb_keys / block_size[0])), 1, 1)
             project_t = cfg.BACKEND.pipeline.launchKernel("projectTriangleCentroid", grid_size, block_size, args)
+            LOG.debug(f"Projected triangle centroids in {project_t} ms")
 
             # Sort the keys
             sorted_keys = xp.argsort(keys)
@@ -108,12 +108,10 @@ class BvhCupyAccelerator(AcceleratorBase):
             block_size = (256, 1, 1)
             grid_size = (int(np.ceil(nb_keys / block_size[0])), 1, 1)
             grow_t = cfg.BACKEND.pipeline.launchKernel("growTreeKernel", grid_size, block_size, args)
+            LOG.debug(f"grew tree in {grow_t} ms")
 
             # Free memory we no longer need
-            del entered  # We don't store this in the tree
-            xp.cuda.Stream.null.synchronize()
-
-            print (normals)
+            cfg.BACKEND.pipeline.synchronize()
 
             tree = {
                 "keys": keys,
@@ -130,7 +128,6 @@ class BvhCupyAccelerator(AcceleratorBase):
             }
 
             self._tree = tree
-
             self._built_for_state = self.mesh._state
 
             
@@ -138,16 +135,14 @@ class BvhCupyAccelerator(AcceleratorBase):
             self._built_for_state = -1
 
             # Clean up CUDA memory in case of error
-            xp.cuda.Stream.null.synchronize()
+            cfg.BACKEND.pipeline.synchronize()
             xp.get_default_memory_pool().free_all_blocks()
             xp.get_default_pinned_memory_pool().free_all_blocks()
-            print(f"Error building BVH tree: {e}")
-            # Re-raise with more info
             raise RuntimeError(f"Failed to build BVH tree: {e}") from e
 
 
 
-    def project(self, shape, pixel_size, /, *, t=None, offset=None, **kwargs):
+    def project(self, shape, pixel_size, offset, /, *, t=None, iterations=0, abs_tolerance = 1e-5, rel_tolerance = .02, **kwargs):
         """Projection implementation using cuda ray caster."""
 
         if self._tree is None:
@@ -168,7 +163,6 @@ class BvhCupyAccelerator(AcceleratorBase):
 
         nb_keys = self._tree["keys"].shape[0]
         use_normals = (self._tree["normals"] is not None)
-
         U, V, W = camera.viewport_basis_vectors
         image = xp.ones(camera.shape[0] * camera.shape[1], dtype=float) * -1
 
@@ -177,18 +171,20 @@ class BvhCupyAccelerator(AcceleratorBase):
         block_size = (16, 1, 1)
         grid_size = (int(xp.ceil(camera.shape[0] * camera.shape[1] / block_size[0])), 1, 1)
 
+        abs_tolerance = float(abs_tolerance)
+        rel_tolerance = float(rel_tolerance)
+        iterations = int(iterations)
+
         args = [
             nb_keys, image, camera.shape.view(uint2),
             U.view(float4), V.view(float4), W.view(float4),
-            camera.p00_center.view(float4), camera.pixel_size.view(float2),
+            camera.p00_corner.view(float4), camera.pixel_size.view(float2),
             self._tree["rope"], self._tree["left"], self._tree["indices"],
             self._tree["bbMin"], self._tree["bbMax"],
             self._tree["sceneMin"].view(float4), self._tree["sceneMax"].view(float4),
-            self._tree["vertices"].view(float4), global_counter,
+            self._tree["vertices"].view(float4), global_counter, self._tree["t_epsilon"],
+            iterations, abs_tolerance, rel_tolerance
         ]
-
-        # for arg in args:
-        #     print(f'{arg=}')
 
         if use_normals:
             args.append(self._tree["normals"].view(float4))
@@ -196,155 +192,123 @@ class BvhCupyAccelerator(AcceleratorBase):
         if not parallel:
             args.append(camera.source_point.view(float4))
 
-        args.append(self._tree["t_epsilon"])
-
         if parallel and use_normals:
             kernel_name = "project_parallel_normals_kernel"
-            print (kernel_name)
         elif parallel and not use_normals:
             kernel_name = "project_parallel_kernel"
-            print (kernel_name)
         elif not parallel and use_normals:
             kernel_name = "project_conebeam_normals_kernel"
-            print (kernel_name)
         else:
             kernel_name = "project_conebeam_kernel"
-            print (kernel_name)
 
-        print (f"Launching kernel: {kernel_name}")
+        LOG.debug(f"Launching kernel: {kernel_name}")
         args = tuple(args)
         time, _ = cfg.BACKEND.pipeline.launchKernel(kernel_name, grid_size, block_size, args)
+        LOG.debug(f"Projected mesh in {time} ms")
+
+        cfg.BACKEND.pipeline.synchronize()
 
         return image.reshape(camera.shape).get()
     
-    # def visualize_bvh(self, plotter, mapto="id", cmap="viridis"): # Changed default cmap
-    #     """Visualize the bounding volume hierarchy."""
-    #     if self._tree is None:
-    #         raise ValueError("Tree is not built yet")
+    # TODO: fix params for this method
+    # def _get_color_mapping_values(self, mapto, nb_keys, bbMin_np, bbMax_np):
+    #     xp = cfg.BACKEND.xp
 
-    #     # Ensure matplotlib and its components are imported
-    #     # import matplotlib.colors as mcolors
-    #     # import matplotlib.pyplot as plt # Already imported above for standalone
-
-    #     cmapper = plt.get_cmap(cmap)
-
-    #     # vertices = self._tree["vertices"] # Not used in this snippet directly for coloring
-    #     bbMin = self._tree["bbMin"]
-    #     bbMax = self._tree["bbMax"]
-    #     nb_keys = len(self._triangles) // 3
-
-    #     if nb_keys == 0:
-    #         print("No keys to visualize.")
-    #         return
-
-    #     # Get the bounding boxes data
-    #     bbMin_np = bbMin.get() # Assuming .get() returns a numpy array
-    #     bbMax_np = bbMax.get() # Assuming .get() returns a numpy array
-
+    #     """Helper to calculate the values for color mapping based on the chosen attribute."""
     #     if mapto == "id":
-    #         minv, maxv = 0, nb_keys # Max value for normalization is nb_keys
-    #         values = xp.arange(minv, maxv, dtype=float)
-    #         if nb_keys == 1: # Special case for a single item to avoid division by zero in norm if maxv=minv
-    #              minv, maxv = 0, 1 
+    #         return xp.arange(nb_keys, dtype=float)
+
     #     elif mapto == "depth":
-    #         # --- ACCURATE DEPTH CALCULATION NEEDED ---
-    #         # The following is a placeholder. You need to replace this with
-    #         # actual depth data for each of the 'nb_keys' leaf nodes.
-    #         # This data should come from your BVH tree structure.
-    #         # Example: leaf_node_depths = self._tree.get_leaf_depths_array()
-            
-    #         # Placeholder / Example:
+    #         # This section still relies on placeholder data.
+    #         # For production, this should be replaced with actual depth calculation.
     #         if hasattr(self, '_leaf_depths_example') and len(self._leaf_depths_example) == nb_keys:
-    #             leaf_node_depths = self._leaf_depths_example
+    #             return xp.array(self._leaf_depths_example, dtype=float)
     #         else:
-    #             # Fallback if placeholder not set up or incorrect size - User must provide real data
-    #             print(f"Warning: Using dummy depth data for 'mapto=depth'. Replace with actual depths for meaningful visualization.")
-    #             # Create some plausible looking depth data if nb_keys > 0
+    #             log.warning("Using dummy depth data for 'mapto=depth'.")
+    #             if nb_keys == 0:
+    #                 return xp.array([], dtype=float)
     #             base_depth = xp.log2(nb_keys) if nb_keys > 1 else 1.0
-    #             leaf_node_depths = xp.random.uniform(base_depth * 0.8, base_depth * 1.5, size=nb_keys)
-    #             if nb_keys == 1: leaf_node_depths = xp.array([1.0])
-
-
-    #         values = xp.array(leaf_node_depths, dtype=float)
-    #         if len(values) == 0 : # Should not happen if nb_keys > 0
-    #             minv, maxv = 0,1
-    #         elif xp.all(values == values[0]): # All values are the same
-    #             minv = values[0] - 0.5
-    #             maxv = values[0] + 0.5
-    #         else:
-    #             minv, maxv = xp.min(values), xp.max(values)
-    #         # --- END ACCURATE DEPTH CALCULATION SECTION ---
+    #             depths = xp.random.uniform(base_depth * 0.8, base_depth * 1.5, size=nb_keys)
+    #             return depths if nb_keys > 1 else xp.array([1.0])
 
     #     elif mapto == "volume":
-    #         lengths = bbMax_np[nb_keys : 2 * nb_keys, :3] - bbMin_np[nb_keys : 2 * nb_keys, :3]
-    #         # Ensure we only use the leaf node bounding boxes for volume calculation
-    #         # The loop iterates i from nb_keys to 2*nb_keys-1.
-    #         # So bbMin_np[i,:] and bbMax_np[i,:] are used.
-    #         # The 'lengths' should correspond to these.
-    #         # Let's assume bbMin_np and bbMax_np are structured such that
-    #         # indices nb_keys to 2*nb_keys-1 are the leaf nodes.
-            
     #         if bbMin_np.shape[0] < 2 * nb_keys:
-    #              raise ValueError("bbMin_np/bbMax_np arrays are not large enough for leaf node indexing.")
-
-    #         # Calculate volumes for the relevant segment of bbMin_np/bbMax_np
-    #         leaf_bbMin_np = bbMin_np[nb_keys : 2 * nb_keys]
-    #         leaf_bbMax_np = bbMax_np[nb_keys : 2 * nb_keys]
+    #             raise ValueError("Bounding box arrays are too small for leaf node indexing.")
             
-    #         volumes_raw = xp.prod(leaf_bbMax_np[:, :3] - leaf_bbMin_np[:, :3], axis=1)
-    #         values = xp.log(volumes_raw + 1e-9) # add small epsilon to avoid log(0)
+    #         leaf_bbMin = bbMin_np[nb_keys : 2 * nb_keys, :3]
+    #         leaf_bbMax = bbMax_np[nb_keys : 2 * nb_keys, :3]
             
-    #         if len(values) == 0:
-    #             minv,maxv = 0,1
-    #         elif xp.all(values == values[0]): # All values are the same
-    #             minv = values[0] - 0.5
-    #             maxv = values[0] + 0.5
-    #         else:
-    #             minv, maxv = xp.min(values), xp.max(values)
+    #         # Calculate volumes, adding a small epsilon to avoid log(0)
+    #         volumes_raw = xp.prod(leaf_bbMax - leaf_bbMin, axis=1)
+    #         return xp.log(volumes_raw + 1e-9)
+            
     #     else:
-    #         raise ValueError(f"Invalid mapto value: {mapto}")
+    #         raise ValueError(f"Invalid 'mapto' value: {mapto}")
 
-    #     # Normalize the values
-    #     if minv == maxv : # Avoid error if all values are identical
-    #         norm = mcolors.Normalize(vmin=minv - 1e-6, vmax=maxv + 1e-6) # Create a tiny range
+    # def visualize_bvh(self, plotter, mapto="id", cmap="viridis"):
+    #     """
+    #     Visualize the bounding volume hierarchy by coloring leaf nodes.
+
+    #     Args:
+    #         plotter: A pyvista.Plotter object to add the meshes to.
+    #         mapto (str): The attribute to map to colors. One of 'id', 'depth', or 'volume'.
+    #         cmap (str): The name of the matplotlib colormap to use.
+    #     """
+    #     xp = cfg.BACKEND.xp
+
+    #     if self._tree is None:
+    #         raise ValueError("BVH tree has not been built yet.")
+
+    #     nb_keys = len(self._triangles) // 3
+    #     if nb_keys == 0:
+    #         log.debug("No BVH keys to visualize.")
+    #         return
+
+    #     bbMin_np = self._tree["bbMin"].get()  # Assuming .get() returns a numpy array
+    #     bbMax_np = self._tree["bbMax"].get()
+
+    #     # 1. Get the values for color mapping
+    #     values = self._get_color_mapping_values(mapto, nb_keys, bbMin_np, bbMax_np)
+
+    #     if values.size == 0:
+    #         log.debug("No values to visualize.")
+    #         return
+
+    #     # 2. Normalize the values for the colormap
+    #     minv, maxv = xp.min(values), xp.max(values)
+    #     if minv == maxv:
+    #         # Avoid division by zero if all values are the same
+    #         norm = mcolors.Normalize(vmin=minv - 1e-6, vmax=maxv + 1e-6)
     #     else:
     #         norm = mcolors.Normalize(vmin=minv, vmax=maxv)
-            
-    #     sm = plt.cm.ScalarMappable(cmap=cmapper, norm=norm) # Use cmapper which is plt.get_cmap(cmap)
+        
+    #     scalar_mappable = plt.cm.ScalarMappable(cmap=plt.get_cmap(cmap), norm=norm)
 
-    #     # Visualize the leaf nodes
-    #     for i in range(nb_keys, 2 * nb_keys):
-    #         idx = i - nb_keys  # Index in the volumes/depths/ids array (0 to nb_keys-1)
+    #     # 3. Create and add meshes for the leaf nodes
+    #     for i in range(nb_keys):
+    #         tree_index = i + nb_keys
             
-    #         # Ensure idx is within bounds for `values`
-    #         if idx >= len(values):
-    #             print(f"Warning: idx {idx} is out of bounds for values array of_len {len(values)}. Skipping.")
+    #         bounds = (
+    #             bbMin_np[tree_index, 0], bbMax_np[tree_index, 0],  # xMin, xMax
+    #             bbMin_np[tree_index, 1], bbMax_np[tree_index, 1],  # yMin, yMax
+    #             bbMin_np[tree_index, 2], bbMax_np[tree_index, 2],  # zMin, zMax
+    #         )
+
+    #         # Check for invalid bounds (min > max)
+    #         if not (bounds[1] >= bounds[0] and bounds[3] >= bounds[2] and bounds[5] >= bounds[4]):
+    #             log.warning(f"Skipping box {i} due to invalid bounds: {bounds}")
     #             continue
 
-    #         bounds = (
-    #             bbMin_np[i, 0],  # xMin
-    #             bbMax_np[i, 0],  # xMax
-    #             bbMin_np[i, 1],  # yMin
-    #             bbMax_np[i, 1],  # yMax
-    #             bbMin_np[i, 2],  # zMin
-    #             bbMax_np[i, 2],  # zMax
-    #         )
-            
-    #         # Ensure bounds are valid
-    #         if not (bbMax_np[i,0] >= bbMin_np[i,0] and \
-    #                 bbMax_np[i,1] >= bbMin_np[i,1] and \
-    #                 bbMax_np[i,2] >= bbMin_np[i,2]):
-    #             # print(f"Warning: Invalid bounds for box {idx} at tree index {i}. Skipping.")
-    #             # print(f"Bounds: {bounds}")
-    #             # It might be better to create a tiny valid box or skip
-    #             continue # Skip invalid boxes
+    #         color = scalar_mappable.to_rgba(values[i])
+    #         box_mesh = pv.Box(bounds=bounds)
+    #         plotter.add_mesh(box_mesh, color=color, show_edges=True, opacity=0.9)
 
-
-    #         color_to_use = sm.to_rgba(values[idx])
-    #         plotter.add_mesh(pv.Box(bounds=bounds), color=color_to_use, show_edges=True, opacity=0.9, name=f"Box {idx}", label=f"Box {idx}")
 
 class LegacyCpuAccelerator(AcceleratorBase):
     """The fallback CPU-based projection strategy (based on OpenCL version)."""
+
+    def __init__(self, mesh):
+        super().__init__(mesh)
     
     def build(self, **kwargs):
         """
@@ -353,8 +317,9 @@ class LegacyCpuAccelerator(AcceleratorBase):
         """
         self.mesh.transform()
         self.mesh.sort()
+        
 
-    def project(self, shape, pixel_size, /, *, t=None, offset=None, **kwargs):
+    def project(self, shape, pixel_size, offset, /, *, t=None, **kwargs):
         """Projection implementation."""
         xp = cfg.BACKEND.xp
         queue = kwargs.get('queue', cfg.OPENCL.queue)
@@ -378,8 +343,6 @@ class LegacyCpuAccelerator(AcceleratorBase):
             .transpose()
             * q.m
         )
-        if out is None:
-            out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
 
         if (
             self.mesh.extrema[0][0] < fov[0][1]
@@ -425,3 +388,133 @@ class LegacyCpuAccelerator(AcceleratorBase):
                 ev.wait()
 
         return out
+    
+class LegacyCUDAAccelerator(AcceleratorBase):
+    """The fallback CPU-based projection strategy (based on OpenCL version)."""
+
+    def __init__(self, mesh):
+        super().__init__(mesh)
+        self.pipeline = cfg.BACKEND.pipeline
+        if self.pipeline is None:
+            raise RuntimeError("CUDA backend is active, but the CudaPipeline was not initialized.")
+        self._tree = None
+    
+    def build(self, **kwargs):
+        """
+        Prepares the mesh for projection by applying transformations and sorting.
+        This version takes no arguments as it operates on the stored mesh.
+        """
+        self.mesh.transform()
+        self.mesh.sort()
+
+    def project(self, shape, pixel_size, offset, /, *, t=None, **kwargs):
+        """Projection implementation."""
+        xp = cfg.BACKEND.xp
+
+        camera = kwargs.get('camera')
+
+        
+        block_size = (1, 1, 1)
+        grid_size = (shape[0], shape[1], 1)
+
+        float = cfg.PRECISION.np_float
+        uint2 = cfg.PRECISION.uint2
+        float2 = cfg.PRECISION.float2
+        float3 = cfg.PRECISION.float3
+
+        psm = pixel_size
+        pixel_size = pixel_size.rescale(cfg.UNIT)
+        psm_np = np.array([psm[1], psm[0], psm[1]], dtype=float)
+        def make_scaled_vertices(vertex_index, px_size):
+            verts = self.mesh._current[:-1, vertex_index::3] / px_size.rescale(cfg.UNIT).magnitude
+            return verts.transpose().flatten().astype(float)
+        
+        v1_host = make_scaled_vertices(0, pixel_size[1])
+        v2_host = make_scaled_vertices(1, pixel_size[0])
+        v3_host = make_scaled_vertices(2, pixel_size[1])
+
+        V1 = xp.array(v1_host)
+        V2 = xp.array(v2_host)
+        V3 = xp.array(v3_host)
+
+        nb_triangles = self.mesh.num_triangles
+        image = xp.zeros(shape[0] * shape[1], dtype=float)
+        
+        def get_crop(index, fov):
+            minimum = max(self.mesh.extrema[index][0], fov[index][0])
+            maximum = min(self.mesh.extrema[index][1], fov[index][1])
+
+            return minimum - offset[::-1][index], maximum - offset[::-1][index]
+
+        def get_px_value(value, round_func, ps):
+            return int(round_func(get_magnitude(value / ps)))
+        
+        offset = offset.rescale(cfg.UNIT)
+        
+        fov = offset + shape * pixel_size
+        fov = (
+            np.concatenate((offset.rescale(cfg.UNIT).magnitude[::-1], fov.rescale(cfg.UNIT).magnitude[::-1]))
+            .reshape(2, 2)
+            .transpose()
+            * q.m
+        )
+        
+        max_dx = 0
+        min_z = 0
+
+        if (
+            self.mesh.extrema[0][0] < fov[0][1]
+            and self.mesh.extrema[0][1] > fov[0][0]
+            and self.mesh.extrema[1][0] < fov[1][1]
+            and self.mesh.extrema[1][1] > fov[1][0]
+        ):
+            # Calculate the cropped ROI dimensions
+            x_min, x_max = get_crop(0, fov)
+            y_min, y_max = get_crop(1, fov)
+            x_min_px = get_px_value(x_min, np.floor, pixel_size[1])
+            x_max_px = get_px_value(x_max, np.ceil, pixel_size[1])
+            y_min_px = get_px_value(y_min, np.floor, pixel_size[0])
+            y_max_px = get_px_value(y_max, np.ceil, pixel_size[0])
+            
+            # These are the actual dimensions of the work to be done
+            roi_width = min(x_max_px - x_min_px, shape[1])
+            roi_height = min(y_max_px - y_min_px, shape[0])
+
+            # Set the kernel launch grid to the smaller ROI size
+            block_size = (1, 1, 1) # Use a more efficient block size
+            grid_size = (roi_width, roi_height, 1)
+
+            # Prepare parameters for the kernel
+            # The kernel needs the offset to know where to write in the full image
+            kernel_offset = np.array([x_min_px, y_min_px], dtype=np.int32) 
+            
+            # The kernel needs the full image width for memory indexing
+            full_image_width = shape[1]
+
+            max_dx = self.mesh.max_triangle_x_diff.rescale(cfg.UNIT).magnitude / psm[1]
+            min_z = self.mesh.extrema[2][0].rescale(cfg.UNIT).magnitude / psm[1]
+            kernel_mesh_offset = (offset / pixel_size).magnitude[::-1]
+            kernel_mesh_offset = np.array(kernel_mesh_offset, dtype=float)
+
+            float32 = cfg.PRECISION.np_float
+            int32 = np.int32
+            
+            args = [
+                V1.view(float3), V2.view(float3), V3.view(float3), 
+                int32(nb_triangles), 
+                image, 
+                int32(full_image_width),
+                kernel_offset.view(uint2),
+                kernel_mesh_offset.view(float2), 
+                float32(psm[1]),
+                float32(max_dx), 
+                float32(min_z), 
+                int32(self.mesh.iterations)
+            ]
+
+            args = tuple(args)
+            time, _ = cfg.BACKEND.pipeline.launchKernel("compute_thickness_kernel", grid_size, block_size, args)
+
+            xp.cuda.Stream.null.synchronize()
+
+        return image.reshape(shape)

@@ -19,8 +19,6 @@ __device__ float roundUp_bitwise(float val) {
 __device__ float roundDown_bitwise(float val) {
     if (isinf(val) || isnan(val)) return val;
     int i = __float_as_int(val);
-
-    // BUG FIX IS HERE: The check for zero was incorrect.
     // For positive numbers, we decrement to move towards zero.
     // For negative numbers AND zero, we increment to move towards negative infinity.
     if (val > 0.0f) {
@@ -42,7 +40,9 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     // Basic setup
     this->tail = origin;
     this->direction = direction;
-    FP_T4 invDirection = make_float4(1.0f / direction.x, 1.0f / direction.y, 1.0f / direction.z, 0.0f);
+    this->invDirection = MAKE_FP_T4(1.0f / direction.x, 1.0f / direction.y, 1.0f / direction.z, 0.0f);
+    this->scene_min = scene_min;
+    this->scene_max = scene_max;
     
     // Create local arrays for indexed access
     const FP_T O[3] = { origin.x, origin.y, origin.z };
@@ -52,7 +52,7 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     const FP_T bbMax[3] = { scene_max.x, scene_max.y, scene_max.z };
 
     // 1. Remap axes based on the ray's dominant direction (Swizzling)
-    this->Kz = maxDimIndex(abs4(this->direction));
+    this->Kz = max_dim_index(abs(this->direction));
     this->Kx = this->Kz + 1;
     if (this->Kx == 3)
         this->Kx = 0;
@@ -60,12 +60,12 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     if (this->Ky == 3)
         this->Ky = 0;
 
-    if (D[this->Kz] < FP_CONST(0.0))
+    if (D[this->Kz] < (0.0))
     {
         swap<int>(this->Kx, this->Ky);
     }
 
-    this->Sz = FP_CONST(1.0) / D[this->Kz];
+    this->Sz = (1.0) / D[this->Kz];
     this->Sx = D[this->Kx] * this->Sz;
     this->Sy = D[this->Ky] * this->Sz;
 
@@ -121,6 +121,11 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     // The dominant axis (Kz) needs no shear error correction for its origin
     this->o_near_kz = O[this->Kz];
     this->o_far_kz  = O[this->Kz];
+
+
+    this->sign[0] = (this->invDirection.x < 0);
+    this->sign[1] = (this->invDirection.y < 0);
+    this->sign[2] = (this->invDirection.z < 0);
 }
 
 
@@ -155,112 +160,221 @@ __device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box
     return t_entry <= t_exit;
 }
 
+// __device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box_max, FP_T tmin, FP_T tmax) const
+// {
+//     FP_T4 bounds[2];
+//     bounds[0] = box_min;
+//     bounds[1] = box_max;
+
+//     FP_T t_lower, t_upper;
+
+//     // X Slab
+//     t_lower = (bounds[this->sign[0]].x - this->tail.x) * this->invDirection.x;
+//     t_upper = (bounds[1 - this->sign[0]].x - this->tail.x) * this->invDirection.x;
+//     tmin = (fmax)(tmin, t_lower);
+//     tmax = (fmin)(tmax, t_upper);
+
+//     // Y Slab
+//     t_lower = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
+//     t_upper = (bounds[1 - this->sign[1]].y - this->tail.y) * this->invDirection.y;
+//     tmin = (fmax)(tmin, t_lower);
+//     tmax = (fmin)(tmax, t_upper);
+
+//     // Z Slab
+//     t_lower = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
+//     t_upper = (bounds[1 - this->sign[2]].z - this->tail.z) * this->invDirection.z;
+//     tmin = (fmax)(tmin, t_lower);
+//     tmax = (fmin)(tmax, t_upper);
+//     return tmax >= tmin;
+// }
+
+__device__ FP_T WatertightRay::point_2_parametric (FP_T4 const &point) const {
+    return dot((point - this->tail), this->invDirection);
+}
+
+// __device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box_max, FP_T tmin, FP_T tmax) const
+// {
+//     FP_T4 bounds[2];
+//     bounds[0] = box_min;
+//     bounds[1] = box_max;
+
+//     FP_T tmin_new = (bounds[this->sign[0]].x - this->tail.x) * this->invDirection.x;
+//     FP_T tmax_new = (bounds[1-this->sign[0]].x - this->tail.x) * this->invDirection.x;
+//     FP_T tymin = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
+//     FP_T tymax = (bounds[1-this->sign[1]].y - this->tail.y) * this->invDirection.y;
+//     if ( (tmin_new > tymax) || (tymin > tmax_new) )
+//         return false;
+//     if (tymin > tmin_new)
+//         tmin_new = tymin;
+//     if (tymax < tmax_new)
+//         tmax_new = tymax;
+//     FP_T tzmin = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
+//     FP_T tzmax = (bounds[1-this->sign[2]].z - this->tail.z) * this->invDirection.z;
+//     if ( (tmin_new > tzmax) || (tzmin > tmax_new) )
+//         return false;
+//     if (tzmin > tmin_new)
+//         tmin_new = tzmin;
+//     if (tzmax < tmax_new)
+//         tmax_new = tzmax;
+
+//     return ( (tmin < tmax_new) && (tmax > tmin_new) );
+// }
+
 __device__ bool WatertightRay::intersects(FP_T4 const &minBbox, FP_T4 const &maxBbox) const
 {
-    FP_T t_near = FP_CONST(0.0);
+    FP_T t_near = (0.0);
     FP_T t_far  = POS_INFINITY;
     return this->intersects(minBbox, maxBbox, t_near, t_far);
 }
 
 
-__device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t, FP_T &tmax) const {
+__device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t, unsigned col, unsigned row) const {
+    constexpr FP_T epsilon = ::cuda::std::numeric_limits<FP_T>::epsilon();
+    
+    #ifdef DEBUG
+    bool is_debug = (row == debug_row) && (col == debug_col);
+    #endif
+
     // Calculate vertices relative to ray origin
     const FP_T4 A_t4 = V1 - this->tail;
     const FP_T4 B_t4 = V2 - this->tail;
     const FP_T4 C_t4 = V3 - this->tail;
 
-    // --- Correctly unpack for indexed access ---
     // This is the proper way to allow dynamic component selection via Kx, Ky, Kz.
     const FP_T A[3] = {A_t4.x, A_t4.y, A_t4.z};
     const FP_T B[3] = {B_t4.x, B_t4.y, B_t4.z};
     const FP_T C[3] = {C_t4.x, C_t4.y, C_t4.z};
 
     // Perform shear and scale of vertices using FMA for precision
-    const FP_T Ax = fma(-this->Sx, A[this->Kz], A[this->Kx]);
-    const FP_T Ay = fma(-this->Sy, A[this->Kz], A[this->Ky]);
-    const FP_T Bx = fma(-this->Sx, B[this->Kz], B[this->Kx]);
-    const FP_T By = fma(-this->Sy, B[this->Kz], B[this->Ky]);
-    const FP_T Cx = fma(-this->Sx, C[this->Kz], C[this->Kx]);
-    const FP_T Cy = fma(-this->Sy, C[this->Kz], C[this->Ky]);
+    const FP_T Ax = (fma)(-Sx, A[Kz], A[Kx]);
+    const FP_T Ay = (fma)(-Sy, A[Kz], A[Ky]);
+    const FP_T Bx = (fma)(-Sx, B[Kz], B[Kx]);
+    const FP_T By = (fma)(-Sy, B[Kz], B[Ky]);
+    const FP_T Cx = (fma)(-Sx, C[Kz], C[Kx]);
+    const FP_T Cy = (fma)(-Sy, C[Kz], C[Ky]);
 
     // Calculate scaled barycentric coordinates
-    const FP_T U = fma(Cx, By, -Cy * Bx);
-    const FP_T V = fma(Ax, Cy, -Ay * Cx);
-    const FP_T W = fma(Bx, Ay, -By * Ax);
+    const FP_T U = (fma)(Cx, By, -Cy * Bx);
+    const FP_T V = (fma)(Ax, Cy, -Ay * Cx);
+    const FP_T W = (fma)(Bx, Ay, -By * Ax);
 
     const FP_T det = U + V + W;
 
     // More Robust Dynamic Epsilon Calculation
-    constexpr FP_T gamma_factor = (FP_T)24.0 * EPSILON;
+    constexpr FP_T gamma_factor = 8.0 * epsilon;
     const FP_T error_bound = gamma_factor * (fabs(U) + fabs(V) + fabs(W));
 
     // Double Precision Fallback for Degenerate Cases
-    if (fabs(det) < error_bound) {
-        const double d_Sx = (double)this->Sx, d_Sy = (double)this->Sy;
-        const double d_Ax = fma(-d_Sx, (double)A[this->Kz], (double)A[this->Kx]);
-        const double d_Ay = fma(-d_Sy, (double)A[this->Kz], (double)A[this->Ky]);
-        const double d_Bx = fma(-d_Sx, (double)B[this->Kz], (double)B[this->Kx]);
-        const double d_By = fma(-d_Sy, (double)B[this->Kz], (double)B[this->Ky]);
-        const double d_Cx = fma(-d_Sx, (double)C[this->Kz], (double)C[this->Kx]);
-        const double d_Cy = fma(-d_Sy, (double)C[this->Kz], (double)C[this->Ky]);
+    if ((fabs)(det) <= error_bound) {
+        const double d_Sx = (double)Sx, d_Sy = (double)Sy, d_Sz = (double)Sz;
+        const double d_Ax = fma(-d_Sx, (double)A[Kz], (double)A[Kx]);
+        const double d_Ay = fma(-d_Sy, (double)A[Kz], (double)A[Ky]);
+        const double d_Bx = fma(-d_Sx, (double)B[Kz], (double)B[Kx]);
+        const double d_By = fma(-d_Sy, (double)B[Kz], (double)B[Ky]);
+        const double d_Cx = fma(-d_Sx, (double)C[Kz], (double)C[Kx]);
+        const double d_Cy = fma(-d_Sy, (double)C[Kz], (double)C[Ky]);
 
         const double d_U = fma(d_Cx, d_By, -d_Cy * d_Bx);
         const double d_V = fma(d_Ax, d_Cy, -d_Ay * d_Cx);
         const double d_W = fma(d_Bx, d_Ay, -d_By * d_Ax);
         const double d_det = d_U + d_V + d_W;
 
-        constexpr double d_gamma_factor = 24.0 * EPSILON;
+        constexpr FP_T d_epsilon = ::cuda::std::numeric_limits<double>::epsilon();
+        constexpr double d_gamma_factor = 8.0 * d_epsilon;
         const double d_error_bound = d_gamma_factor * (fabs(d_U) + fabs(d_V) + fabs(d_W));
-        if (fabs(d_det) < d_error_bound) return false;
-
-        if (d_det > 0.0) {
-            if (d_U < 0.0 || d_V < 0.0 || d_W < 0.0) return false;
-        } else {
-            if (d_U > 0.0 || d_V > 0.0 || d_W > 0.0) return false;
+        if (fabs(d_det) <= d_error_bound) {
+            #ifdef DEBUG
+            if (is_debug){
+                printf("Exit 0\n");
+            }
+            #endif
+            return false;
         }
 
-        const double d_Az = (double)this->Sz * (double)A[this->Kz];
-        const double d_Bz = (double)this->Sz * (double)B[this->Kz];
-        const double d_Cz = (double)this->Sz * (double)C[this->Kz];
+        bool signs_differ = (det > 0.0f)
+                   ? (U < -d_error_bound || V < -d_error_bound || W < -d_error_bound)
+                   : (U > d_error_bound || V > d_error_bound || W > d_error_bound);
+
+        if (signs_differ) {
+            #ifdef DEBUG
+            if (is_debug){
+                printf("Exit 1\n");
+            }
+            #endif
+            return false;
+        }
+
+        const double d_Az = d_Sz * (double)A[Kz];
+        const double d_Bz = d_Sz * (double)B[Kz];
+        const double d_Cz = d_Sz * (double)C[Kz];
         const double t_numerator = fma(d_U, d_Az, fma(d_V, d_Bz, d_W * d_Cz));
 
-        if (copysign(1.0, t_numerator) != copysign(1.0, d_det)) return false;
+        if (copysign(1.0, t_numerator) != copysign(1.0, d_det)){
+            return false;
+        }
 
         t = (FP_T)(t_numerator / d_det);
     } else {
-        // Single Precision Path (Common Case)
-        if (det > 0.0) {
-            if (U < -error_bound || V < -error_bound || W < -error_bound) return false;
-        } else {
-            if (U > error_bound || V > error_bound || W > error_bound) return false;
+        bool signs_differ = (det > 0.0f)
+                   ? (U < -error_bound || V < -error_bound || W < -error_bound)
+                   : (U > error_bound || V > error_bound || W > error_bound);
+
+        if (signs_differ) {
+            #ifdef DEBUG
+            if (is_debug){
+                printf("Exit 3\n"
+                       "  tail: (%.8g, %.8g, %.8g)\n"
+                       "  direction: (%.8g, %.8g, %.8g)\n"
+                       "  V1: (%.8g, %.8g, %.8g)\n"
+                       "  V2: (%.8g, %.8g, %.8g)\n"
+                       "  V3: (%.8g, %.8g, %.8g)\n"
+                       "  det: %.8g\n"
+                       "  U: %.8g, V: %.8g, W: %.8g\n"
+                       "  Sheared Vertices:\n"
+                       "    Ax: %.8g, Ay: %.8g\n"
+                       "    Bx: %.8g, By: %.8g\n"
+                       "    Cx: %.8g, Cy: %.8g\n",
+                       this->tail.x, this->tail.y, this->tail.z,
+                       this->direction.x, this->direction.y, this->direction.z,
+                       V1.x, V1.y, V1.z,
+                       V2.x, V2.y, V2.z,
+                       V3.x, V3.y, V3.z,
+                       det, U, V, W,
+                       Ax, Ay, Bx, By, Cx, Cy);
+            }
+            #endif
+            return false;
         }
 
-        const FP_T Az = this->Sz * A[this->Kz];
-        const FP_T Bz = this->Sz * B[this->Kz];
-        const FP_T Cz = this->Sz * C[this->Kz];
+
+        const FP_T Az = Sz * A[Kz];
+        const FP_T Bz = Sz * B[Kz];
+        const FP_T Cz = Sz * C[Kz];
         const FP_T t_numerator = fma(U, Az, fma(V, Bz, W * Cz));
 
-        if (copysign(FP_CONST(1.0), t_numerator) != copysign(FP_CONST(1.0), det)) return false;
+        if (copysign((1.0), t_numerator) != copysign((1.0), det)){
+            #ifdef DEBUG
+            printf("Exit 4\n");
+            #endif
+            return false;
+        }
 
         t = t_numerator / det;
     }
 
     // Final check for valid intersection range
-    constexpr FP_T T_MIN = EPSILON;
-    if (t > T_MIN && t < tmax) {
-        tmax = t;
+    constexpr FP_T T_MIN = epsilon;
+    if (t > T_MIN) {
         return true;
     }
-
     return false;
 }
 
-
-__device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t) const
-{
-    // Set a default t_max to effectively infinity
-    FP_T t_max = POS_INFINITY;
+// __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t) const
+// {
+//     // Set a default t_max to effectively infinity
+//     FP_T t_max =  * (1.1);
     
-    // Call the main function to do the actual work
-    return this->intersects(V1, V2, V3, t, t_max);
-}
+//     if (this->intersects(V1, V2, V3, t, 0) && ())
+//     return ;
+// }

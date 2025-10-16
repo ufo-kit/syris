@@ -256,19 +256,19 @@ class Camera(MovableBody):
         return self._to_cuda_vector(self.u), self._to_cuda_vector(self.v), self._to_cuda_vector(self.w)
     
     @property
-    def p00_center(self):
-        """Calculates the world coordinate of the center of the top-left pixel (0,0)."""
+    def p00_corner(self):
+        """
+        Calculates the world coordinate of the top-left CORNER 
+        of the top-left pixel (0,0).
+        """
         # Get dimensions as quantities objects
         viewport_dims = self._shape * self._pixel_size_vec
         
         # Vector from the camera's center to the top-left corner of the sensor
         vec_to_corner = - (viewport_dims[1] / 2) * self._u_vec - (viewport_dims[0] / 2) * self._v_vec
-        
-        # Vector from the corner to the center of the first pixel
-        vec_to_pixel_center = (self._pixel_size_vec[1] / 2) * self._u_vec + (self._pixel_size_vec[0] / 2) * self._v_vec
 
         # Calculate the final position vector with units
-        final_vec = self.position + vec_to_corner + vec_to_pixel_center
+        final_vec = self.position + vec_to_corner
         
         # Convert to unitless CUDA vector at the very end
         return self._to_cuda_vector(final_vec)

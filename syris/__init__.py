@@ -50,34 +50,37 @@ def init(
     cfg.UNIT = Quantity(1, unit)
 
     if cfg.BACKEND.name == cfg.BACKEND.CUDA:
+        kernel_dir = pkg_resources.resource_filename('syris', 'gpu/cuda/')
+
+        source_files = ["WatertightRay.cu", "Ray.cu", "source.cu", "Legacy.cu"]
+        abs_source_files = [os.path.join(kernel_dir, f) for f in source_files]
+        cuda_headers = [kernel_dir,]
+
+        options = ["-D__FP_T_D__", "-G"] if double_precision else []
+        cfg.BACKEND.pipeline = CudaPipeline(headers=cuda_headers, options=options)
+
+        module_name = "bvh_kernels"
+
         try:
-            kernel_dir = pkg_resources.resource_filename('syris', 'gpu/cuda/')
-
-            source_files = ["WatertightRay.cu", "Ray.cu", "source.cu"]
-            abs_source_files = [os.path.join(kernel_dir, f) for f in source_files]
-            cuda_headers = [kernel_dir,]
-            
-            LOG.info("Compiling CUDA kernels for BVH accelerator...")
-
-            options = ["-D__FP_T_D__"] if double_precision else []
-            cfg.BACKEND.pipeline = CudaPipeline(headers=cuda_headers, options=options)
-
-            module_name = "bvh_kernels"
             cfg.BACKEND.pipeline.readModuleFromFiles(
                 module_name, abs_source_files, jitify=False
             )
-            
-            kernel_names = [
-                "projectTriangleCentroid", "growTreeKernel", "project_parallel_kernel",
-                "project_parallel_normals_kernel", "project_conebeam_kernel",
-                "project_conebeam_normals_kernel"
-            ]
+        except Exception as e:
+            LOG.error(f"Failed to read modules: {e}")
+
+        kernel_names = [
+            "projectTriangleCentroid", "growTreeKernel", "project_parallel_kernel",
+            "compute_thickness_kernel",
+            # "project_conebeam_kernel", 
+            # "project_parallel_normals_kernel",
+            # "project_conebeam_normals_kernel"
+        ]
+
+        try:
             for kernel_name in kernel_names:
                 cfg.BACKEND.pipeline.getKernelFromModule(module_name, kernel_name)
-
-            LOG.info("CUDA kernels compiled and cached successfully.")
         except Exception as e:
-            LOG.error(f"Failed to compile CUDA kernels: {e}")
+            LOG.error(f"Failed to get kernel: {e}")
 
     if cfg.BACKEND.name == cfg.BACKEND.OPENCL:
         cfg.OPENCL = cfg.OpenCL()

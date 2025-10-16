@@ -74,6 +74,13 @@ class Precision(object):
             }
         )
 
+        self.float3 = np.dtype(
+            {
+                'names': ['x', 'y', 'z'],
+                'formats': [self.np_float] * 3,
+            }
+        )
+
         self.uint2 = np.dtype(
             {
                 'names': ['x', 'y'],

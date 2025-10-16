@@ -1,49 +1,212 @@
 #pragma once
+#include <curand_kernel.h>
 #include <cuda/std/limits>
 #include <thrust/unique.h>
 
 
 #ifdef __FP_T_D__
     using FP_T = double;
-    using FP_T2 = double2;
-    using FP_T3 = double3;
-    using FP_T4 = double4;
-
-    #define FP_MATH(func) func
-    #define FP_CONST(val) val
-    #define MAKE_FP_T2(x, y) make_double2(x, y)
-    #define MAKE_FP_T4(x, y, z, w) make_double4(x, y, z, w)
-
-    #define EPSILON FP_CONST(1e-12)
 #else
     using FP_T = float;
-    using FP_T2 = float2;
-    using FP_T3 = float3;
-    using FP_T4 = float4;
+#endif
 
-    #define FP_MATH(func) func##f
-    #define FP_CONST(val) val##f
-    #define MAKE_FP_T2(x, y) make_float2(x, y)
-    #define MAKE_FP_T4(x, y, z, w) make_float4(x, y, z, w)
-
-    #define EPSILON FP_CONST(1e-7)
+#ifdef DEBUG
+constexpr int debug_col = 1408;
+constexpr int debug_row = 1259;
 #endif
 
 #define POS_INFINITY __int_as_float(0x7f800000)
 #define NEG_INFINITY __int_as_float(0xff800000)
-#define INDEX 17
 
-constexpr unsigned MAX_COLLISIONS = 128;
+#define SENTINEL -1
+#define INVALID -1
 
-__forceinline__ __device__ __host__ FP_T4 make_fp_t4(FP_T x, FP_T y, FP_T z, FP_T w)
-{
-    FP_T4 result;
-    result.x = x;
-    result.y = y;
-    result.z = z;
-    result.w = w;
+constexpr unsigned MAX_COLLISIONS = 512;
+
+#define MAX_DEPTH 5
+#define CACHE_DIM 33 // 1 << 5 + 1
+#define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
+#define MAX_QUADS_PER_PIXEL 128
+
+typedef unsigned long long morton_t;
+typedef int long long delta_t;
+
+// A helper struct to manage quads for subdivision
+struct Quad {
+    float u, v;     // Top-left corner of the quad within the pixel (0.0 to 1.0)
+    float size;     // Size of the quad (e.g., 1.0, 0.5, 0.25...)
+    int depth;      // Current subdivision depth
+};
+
+// A struct to store the final, converged quads
+struct FinalQuad {
+    float value;
+    float area;
+};
+
+// --- 2. Define Vector Types from Base Precision ---
+template<typename T> struct Types;
+
+template<>
+struct Types<float> {
+    using Scalar = float;
+    using Vec2 = float2;
+    using Vec3 = float3;
+    using Vec4 = float4;
+};
+
+template<>
+struct Types<double> {
+    using Scalar = double;
+    using Vec2 = double2;
+    using Vec3 = double3;
+    using Vec4 = double4_32a;
+};
+
+// Use the Types struct to define the final type aliases
+using FP_T2 = typename Types<FP_T>::Vec2;
+using FP_T3 = typename Types<FP_T>::Vec3;
+using FP_T4 = typename Types<FP_T>::Vec4;
+
+
+// --- 3. Define `make_*` Helpers (Macro Required for C-style Structs) ---
+#ifdef __FP_T_D__
+    // Double precision make_* functions
+    #define MAKE_FP_T2(x, y) make_double2(x, y)
+    #define MAKE_FP_T3(x, y, z) make_double3(x, y, z)
+    #define MAKE_FP_T4(x, y, z, w) make_double4_32a(x, y, z, w)
+#else
+    // Float precision make_* functions
+    #define MAKE_FP_T2(x, y) make_float2(x, y)
+    #define MAKE_FP_T3(x, y, z) make_float3(x, y, z)
+    #define MAKE_FP_T4(x, y, z, w) make_float4(x, y, z, w)
+#endif
+
+
+// --- 4. Templated Operators (C++17 Compatible) ---
+// This single block of code works for all float and double vector types.
+
+// Helper to get the scalar type (float/double) from a vector type
+template<typename VecT> struct ScalarType;
+template<> struct ScalarType<float2> { using type = float; };
+template<> struct ScalarType<float3> { using type = float; };
+template<> struct ScalarType<float4> { using type = float; };
+template<> struct ScalarType<double2> { using type = double; };
+template<> struct ScalarType<double3> { using type = double; };
+template<> struct ScalarType<double4_32a> { using type = double; };
+
+// SFINAE helpers to check for members .z and .w (C++17 compatible)
+template<typename T, typename = void> struct has_z : std::false_type {};
+template<typename T> struct has_z<T, std::void_t<decltype(T::z)>> : std::true_type {};
+
+template<typename T, typename = void> struct has_w : std::false_type {};
+template<typename T> struct has_w<T, std::void_t<decltype(T::w)>> : std::true_type {};
+
+// Vector-Vector addition
+template <typename VecT>
+__device__ __forceinline__ VecT operator+(const VecT& a, const VecT& b) {
+    VecT result;
+    result.x = a.x + b.x;
+    result.y = a.y + b.y;
+    if constexpr (has_z<VecT>::value) { result.z = a.z + b.z; }
     return result;
 }
+
+// Vector-Vector subtraction
+template <typename VecT>
+__device__ __forceinline__ VecT operator-(const VecT& a, const VecT& b) {
+    VecT result;
+    result.x = a.x - b.x;
+    result.y = a.y - b.y;
+    if constexpr (has_z<VecT>::value) { result.z = a.z - b.z; }
+    return result;
+}
+
+// Vector-Scalar multiplication
+template <typename VecT>
+__device__ __forceinline__ VecT operator*(const VecT& v, typename ScalarType<VecT>::type s) {
+    VecT result;
+    result.x = v.x * s;
+    result.y = v.y * s;
+    if constexpr (has_z<VecT>::value) { result.z = v.z * s; }
+    return result;
+}
+
+// Scalar-Vector multiplication
+template <typename VecT>
+__device__ __forceinline__ VecT operator*(typename ScalarType<VecT>::type s, const VecT& v) {
+    return v * s; // Reuse the above operator
+}
+
+// Vector-Scalar division
+template <typename VecT>
+__device__ __forceinline__ VecT operator/(const VecT& v, typename ScalarType<VecT>::type s) {
+    VecT result;
+    result.x = v.x / s;
+    result.y = v.y / s;
+    if constexpr (has_z<VecT>::value) { result.z = v.z / s; }
+    return result;
+}
+
+// Vector-Vector multiplication (component-wise)
+template <typename VecT>
+__device__ __forceinline__ VecT operator*(const VecT& a, const VecT& b) {
+    VecT result;
+    result.x = a.x * b.x;
+    result.y = a.y * b.y;
+    if constexpr (has_z<VecT>::value) { result.z = a.z * b.z; }
+    return result;
+}
+
+template <typename VecT>
+__device__ __forceinline__ VecT abs(const VecT& v) {
+    VecT result;
+    result.x = fabs(v.x);
+    result.y = fabs(v.y);
+    if constexpr (has_z<VecT>::value) { result.z = fabs(v.z); }
+    return result;
+}
+
+// Minimum of two vectors (component-wise)
+template <typename VecT>
+__device__ __forceinline__ VecT min(const VecT& a, const VecT& b) {
+    VecT result;
+    result.x = fmin(a.x, b.x);
+    result.y = fmin(a.y, b.y);
+    if constexpr (has_z<VecT>::value) { result.z = fmin(a.z, b.z); }
+    return result;
+}
+
+// Maximum of two vectors (component-wise)
+template <typename VecT>
+__device__ __forceinline__ VecT max(const VecT& a, const VecT&  b) {
+    VecT result;
+    result.x = fmax(a.x, b.x);
+    result.y = fmax(a.y, b.y);
+    if constexpr (has_z<VecT>::value) { result.z = fmax(a.z, b.z); }
+    return result;
+}
+
+// Dot Product (explicit function)
+template <typename VecT>
+__device__ __forceinline__ typename ScalarType<VecT>::type dot(const VecT& a, const VecT& b) {
+    auto result = a.x * b.x + a.y * b.y;
+    if constexpr (has_z<VecT>::value) { result += a.z * b.z; }
+    // Note: Dot product typically ignores the .w component
+    return result;
+}
+
+typedef struct
+{
+    unsigned int nb_keys;
+    morton_t *keys;
+    unsigned int *indices;
+    int *entered;
+    int *rope;
+    int *left;
+    FP_T4 *bboxMin;
+    FP_T4 *bboxMax;
+} Tree;
 
 template <typename T>
 struct List {
@@ -120,52 +283,46 @@ struct List {
     }
 };
 
-template <typename T>
-__forceinline__ __device__ bool is_null(T const val, T const epsilon = 1e-8f)
-{
-    return (val < epsilon) && (val > -epsilon);
-}
 
-template <typename T>
-__forceinline__ __device__ bool are_close(T const a, T const b, T const epsilon)
-{
-    return FP_MATH(fabs)(a - b) <= epsilon * FP_MATH(fmax)(FP_CONST(1.0), FP_MATH(fmax)(FP_MATH(fabs)(a), FP_MATH(fabs)(b)));
-}
+struct AreFPValuesClose {
+    // A robust absolute tolerance calculated from the overall mesh scale.
+    const FP_T scale_dependent_tolerance;
 
-__device__ FP_T4 operator+(const FP_T4 &lhs, const FP_T4 &rhs)
-{
-    return make_fp_t4(lhs.x + rhs.x, lhs.y + rhs.y, lhs.z + rhs.z, lhs.w + rhs.w);
-}
+    // A small factor for comparing large t-values, defaults to machine epsilon.
+    const FP_T relative_epsilon;
 
-__device__ FP_T4 operator-(const FP_T4 &lhs, const FP_T4 &rhs)
-{
-    return make_fp_t4(lhs.x - rhs.x, lhs.y - rhs.y, lhs.z - rhs.z, lhs.w - rhs.w);
-}
+    /**
+     * @brief Constructor for the floating-point comparison functor.
+     * @param scale The overall scale of the mesh (e.g., the length of its AABB diagonal).
+     * @param rel_ep A small factor for the relative comparison part.
+     */
+    __device__ AreFPValuesClose(FP_T scale, FP_T rel_ep = ::cuda::std::numeric_limits<FP_T>::epsilon()) :
+        // Calculate a small, absolute tolerance relative to the entire mesh's size
+        scale_dependent_tolerance(scale*.01),
+        relative_epsilon(rel_ep)
+    {}
 
-__device__ FP_T4 operator*(const FP_T4 &lhs, const FP_T &rhs)
-{
-    return make_fp_t4(lhs.x * rhs, lhs.y * rhs, lhs.z * rhs, lhs.w * rhs);
-}
+    /**
+     * @brief Compares two floating-point values using a combined absolute and relative tolerance.
+     * @param a The first value.
+     * @param b The second value.
+     * @return True if the values are considered "close enough".
+     */
+    __device__ bool operator()(FP_T a, FP_T b) const {
+        // The standard check for equality to handle identical values and infinities correctly.
+        if (a == b) {
+            return true;
+        }
 
-__device__ FP_T4 operator/(const FP_T4 &lhs, const FP_T &rhs)
-{
-    return make_fp_t4(lhs.x / rhs, lhs.y / rhs, lhs.z / rhs, lhs.w / rhs);
-}
+        const FP_T diff = (fabs)(a - b);
 
-__device__ FP_T4 operator*(const FP_T &lhs, const FP_T4 &rhs)
-{
-    return make_fp_t4(lhs * rhs.x, lhs * rhs.y, lhs * rhs.z, lhs * rhs.w);
-}
+        // Use the larger of a fixed, scale-dependent tolerance or a relative tolerance.
+        // This is robust for values both close to zero and for very large values.
+        const FP_T tolerance = (fmax)(scale_dependent_tolerance, relative_epsilon * (fmax)((fabs)(a), (fabs)(b)));
 
-__device__ FP_T4 operator/(const FP_T &lhs, const FP_T4 &rhs)
-{
-    return make_fp_t4(lhs / rhs.x, lhs / rhs.y, lhs / rhs.z, lhs / rhs.w);
-}
-
-__device__ FP_T operator*(const FP_T4 &lhs, const FP_T4 &rhs)
-{
-    return lhs.x * rhs.x + lhs.y * rhs.y + lhs.z * rhs.z;
-}
+        return diff < tolerance;
+    }
+};
 
 // Swap two integers
 template <typename T>
@@ -174,42 +331,6 @@ __forceinline__ __device__ void swap(T &a, T &b)
     T tmp = a;
     a = b;
     b = tmp;
-}
-
-
-__device__ inline FP_T xor_signmask(FP_T x, int y)
-{
-    return (FP_T)(int(x) ^ y);
-}
-
-__device__ inline FP_T4 abs4(FP_T4 a)
-{
-    FP_T4 c;
-    c.x = fabs(a.x);
-    c.y = fabs(a.y);
-    c.z = fabs(a.z);
-    c.w = fabs(a.w);
-    return c;
-}
-
-__device__ inline FP_T4 min4(FP_T4 a, FP_T4 b)
-{
-    FP_T4 c;
-    c.x = fmin(a.x, b.x);
-    c.y = fmin(a.y, b.y);
-    c.z = fmin(a.z, b.z);
-    c.w = fmin(a.w, b.w);
-    return c;
-}
-
-__device__ inline FP_T4 max4(FP_T4 a, FP_T4 b)
-{
-    FP_T4 c;
-    c.x = fmax(a.x, b.x);
-    c.y = fmax(a.y, b.y);
-    c.z = fmax(a.z, b.z);
-    c.w = fmax(a.w, b.w);
-    return c;
 }
 
 __device__ inline FP_T4 cross4(FP_T4 a, FP_T4 b) // cross product between two 3D vectors
@@ -223,32 +344,63 @@ __device__ inline FP_T4 cross4(FP_T4 a, FP_T4 b) // cross product between two 3D
     return c;
 }
 
-__device__ inline FP_T4 pointwise_product (FP_T4 a, FP_T4 b)
+__device__ inline FP_T3 cross3(FP_T3 a, FP_T3 b) // cross product between two 3D vectors
 {
-    FP_T4 c;
-    c.x = a.x * b.x;
-    c.y = a.y * b.y;
-    c.z = a.z * b.z;
-    c.w = a.w * b.w;
+    FP_T3 c;
+    c.x = a.y * b.z - a.z * b.y;
+    c.y = a.z * b.x - a.x * b.z;
+    c.z = a.x * b.y - a.y * b.x;
     return c;
 }
 
-__device__ inline FP_T dot4(FP_T4 a, FP_T4 b)
-{
-    return a.x * b.x + a.y * b.y + a.z * b.z;
+__device__ inline void _swap(FP_T *array, int i, int j) {
+	FP_T tmp;
+
+	tmp = array[i];
+	array[i] = array[j];
+	array[j] = tmp;
 }
 
-__device__ inline FP_T max_component(FP_T4 a)
-{
-    return FP_MATH(fmax)(FP_MATH(fmax)(a.x, a.y), a.z);
+__device__ inline void _sift_down(FP_T *heap, int start, int end) {
+    int root = start;
+    int child;
+
+    while (root*2 + 1 <= end) {
+        child = root*2 + 1;
+        if (child + 1 <= end && (heap[child] < heap[child + 1] ||
+        								isnan(heap[child + 1]))) {
+            child++;
+        }
+        if (child <= end && (heap[root] < heap[child] || isnan(heap[child]))) {
+        	_swap(heap, root, child);
+            root = child;
+        } else {
+            return;
+        }
+    }
 }
 
-__device__ inline FP_T min_component(FP_T4 a)
-{
-    return FP_MATH(fmin)(FP_MATH(fmin)(a.x, a.y), a.z);
+__device__ inline void _heapify(FP_T *array, int size) {
+	int start = (size - 2) / 2;
+
+	while (start >= 0) {
+		_sift_down(array, start, size - 1);
+		start--;
+	}
 }
 
-__device__ int maxDimIndex(const FP_T4& v) {
+__device__ inline void sort(FP_T *array, int size) {
+	_heapify(array, size);
+    int end = size - 1;
+
+    while (end > 0) {
+    	_swap(array, 0, end);
+        _sift_down(array, 0, end - 1);
+        end--;
+    }
+}
+
+__device__ int inline max_dim_index(const FP_T4& v) {
     if (v.x > v.y) {
         return (v.x > v.z) ? 0 : 2;
     } else {
@@ -279,9 +431,9 @@ __device__ inline FP_T4 getBoundingBoxCentroid(FP_T4 bboxMin, FP_T4 bboxMax)
 {
     FP_T4 centroid;
 
-    centroid.x = (bboxMin.x + bboxMax.x) / FP_CONST(2.0);
-    centroid.y = (bboxMin.y + bboxMax.y) / FP_CONST(2.0);
-    centroid.z = (bboxMin.z + bboxMax.z) / FP_CONST(2.0);
+    centroid.x = (bboxMin.x + bboxMax.x) / (2.0);
+    centroid.y = (bboxMin.y + bboxMax.y) / (2.0);
+    centroid.z = (bboxMin.z + bboxMax.z) / (2.0);
 
     return centroid;
 }
@@ -499,83 +651,4 @@ __forceinline__ __device__ void expandBoundingBox(FP_T4 &groupBbMin, FP_T4 &grou
     groupBbMax.x = max(newBbMax.x, groupBbMax.x);
     groupBbMax.y = max(newBbMax.y, groupBbMax.y);
     groupBbMax.z = max(newBbMax.z, groupBbMax.z);
-}
-
-// Device implementations
-__device__ inline FP_T device_int_as_float(int i)
-{
-    return __int_as_float(i);
-}
-
-__device__ inline int device_float_as_int(FP_T f)
-{
-    return __float_as_int(f);
-}
-
-__device__ inline FP_T device_xorf(FP_T x, int y)
-{
-    return __int_as_float(__float_as_int(x) ^ y);
-}
-
-__device__ inline int device_sign_mask(FP_T x)
-{
-    return __float_as_int(x) & 0x80000000;
-}
-
-// Host implementations
-inline FP_T host_int_as_float(int i)
-{
-    return *(FP_T *)(&i);
-}
-
-inline int host_float_as_int(FP_T f)
-{
-    return *(int *)(&f);
-}
-
-inline FP_T host_xorf(FP_T x, int y)
-{
-    return host_int_as_float(host_float_as_int(x) ^ y);
-}
-
-inline int host_sign_mask(FP_T x)
-{
-    return host_float_as_int(x) & 0x80000000;
-}
-
-// Unified interface for both host and device
-__device__ inline FP_T __iaf(int i)
-{
-#ifdef __CUDA_ARCH__
-    return device_int_as_float(i);
-#else
-    return host_int_as_float(i);
-#endif
-}
-
-__device__ inline int __fai(FP_T f)
-{
-#ifdef __CUDA_ARCH__
-    return device_float_as_int(f);
-#else
-    return host_float_as_int(f);
-#endif
-}
-
-__device__ inline FP_T xorf(FP_T x, int y)
-{
-#ifdef __CUDA_ARCH__
-    return device_xorf(x, y);
-#else
-    return host_xorf(x, y);
-#endif
-}
-
-__device__ inline int sign_mask(FP_T x)
-{
-#ifdef __CUDA_ARCH__
-    return device_sign_mask(x);
-#else
-    return host_sign_mask(x);
-#endif
 }

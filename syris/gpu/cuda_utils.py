@@ -1,7 +1,7 @@
 
 import cupy as cp
 from cupy.cuda import Event, Stream, get_elapsed_time
-
+cp.clear_memo()
 
 class CudaTimer:
     def __init__(self, stream : Stream):

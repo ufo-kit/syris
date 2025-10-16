@@ -68,6 +68,9 @@ class Mesh(MovableBody):
         self._current = np.insert(
             triangles.rescale(cfg.UNIT).magnitude, 3, np.ones(triangles.shape[1]), axis=0
         )
+
+        self._triangles = np.copy(self._current)
+
         if center is None:
             point = (0, 0, 0) * cfg.UNIT
         elif center == "gravity":
@@ -81,6 +84,22 @@ class Mesh(MovableBody):
         point_xyz = point.rescale(cfg.UNIT).magnitude[:, np.newaxis]
         self._current[:3, :] -= point_xyz
 
+        max_val = np.max(np.abs(self._current[:3, :]))
+        normalize_factor = 1
+        if max_val > 0:
+            # normalize_factor = 1 / max_val
+            self._current[:3, :] *= normalize_factor
+
+        if bounds is not None:
+            bounds[0::2] -= point.rescale(cfg.UNIT)
+            bounds[1::2] -= point.rescale(cfg.UNIT)
+
+            bounds[0::2] *= normalize_factor
+            bounds[1::2] *= normalize_factor
+
+        self.normalization_translation = point.rescale(cfg.UNIT)
+        self.normalization_scale = normalize_factor
+
         self._triangles = np.copy(self._current)
         self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
         self.iterations = iterations
@@ -88,13 +107,13 @@ class Mesh(MovableBody):
         self.accelerator = None
         self._normals = normals
         self._use_normals = use_normals
-        print("normals is none ? : ", normals is None)
+        
         if isinstance(bounds, q.Quantity):
             self._bounds = bounds.rescale(cfg.UNIT).magnitude
         else:
             self._bounds = bounds
-        
-        self._epsilon = epsilon
+
+        self._epsilon = epsilon * normalize_factor
 
         super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
@@ -336,7 +355,7 @@ class Mesh(MovableBody):
     def _project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs):
         # This method now correctly gets a cached or rebuilt accelerator
         accel = self._get_accelerator()
-        return accel.project(shape, pixel_size, t=t, offset=offset, **kwargs)
+        return accel.project(shape, pixel_size, offset, t=t,**kwargs)
 
     def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
         """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for
@@ -349,12 +368,12 @@ class Mesh(MovableBody):
 
         pixel_size = make_tuple(pixel_size, num_dims=2)
         v_1, v_2, v_3 = self._make_inputs(queue, pixel_size)
-        psm = pixel_size.rescale(cfg.UNIT).magnitude
-        max_dx = self.max_triangle_x_diff.rescale(cfg.UNIT).magnitude / psm[1]
+        psm = pixel_size.simplified.magnitude
+        max_dx = self.max_triangle_x_diff.simplified.magnitude / psm[1]
         if offset is None:
             offset = gutil.make_vfloat3(0, 0, 0)
         else:
-            offset = offset.rescale(cfg.UNIT).magnitude
+            offset = offset.simplified.magnitude
             offset = gutil.make_vfloat3(offset[0] / psm[1], offset[1] / psm[0], offset[2] / psm[1])
 
         cfg.OPENCL.programs["mesh"].compute_slices(

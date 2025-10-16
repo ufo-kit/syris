@@ -5,6 +5,9 @@ import vtk
 from vtk.util.numpy_support import vtk_to_numpy
 import quantities as pq
 import abc
+import logging
+
+LOG = logging.getLogger(__name__)
 
 def renderMesh (polydata):
     plotter = pv.Plotter()
@@ -134,16 +137,25 @@ class PyvistaReader(MeshReaderBase):
 
             if non_zero_sq_lens.size > 0:
                 min_edge_length_sq = np.min(non_zero_sq_lens)
+                max_edge_length_sq = np.max(non_zero_sq_lens)
                 smallest_feature = np.sqrt(min_edge_length_sq)
+                largest_feature = np.sqrt(max_edge_length_sq)
             else:
-                print("WARNING: Mesh appears to have no edges with a length > 0.")
+                LOG.debug("WARNING: Mesh appears to have no edges with a length > 0.")
                 smallest_feature = np.inf
+                largest_feature = np.inf
         else:
             smallest_feature = np.inf
+            largest_feature = np.inf
 
         self._smallest_feature_size = smallest_feature.astype(dtype)
-
-        print(f"Smallest feature size: {self._smallest_feature_size:.12f}")
+        self._largest_feature_size = largest_feature.astype(dtype)        
+        
+        if self._smallest_feature_size > 0 and np.isfinite(self._smallest_feature_size):
+            dynamic_range = self._largest_feature_size / self._smallest_feature_size
+            LOG.debug(f"Dynamic Range: {dynamic_range:.2f} : 1")
+        else:
+            LOG.debug("Dynamic Range: N/A (smallest feature is zero or invalid)")
 
         self._vertices = np.array(triangle_vertices).T.astype(dtype) * unit
         self._triangles = triangles
