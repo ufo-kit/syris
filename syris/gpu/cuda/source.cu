@@ -234,51 +234,131 @@ __device__ FP_T project_thickness(List<FP_T> &tvalues)
 
     return total_thickness;
 }
-
+template<typename RayType>
 __device__ FP_T match_pairs(
-    const List<int>& candidates, const List<FP_T>& tvalues, const Ray& ray,
-    FP_T4* __restrict__ vertices,
+    const List<HitRecord>& hits, const RayType& ray,
     FP_T4* __restrict__ normals,
-    const Tree& tree)
+    // Debug parameters
+    unsigned row, unsigned col)
 {
-    // Return early if there's nothing to pair up.
-    if (tvalues.size() < 2) {
+    const FP_T epsilon = ray.m_epsilons.group_abs_epsilon;
+    const FP_T rel_epsilon = ray.m_epsilons.group_rel_epsilon;
+
+    // Set up the debug flag
+    #ifdef DEBUG
+    bool is_debug_thread = (row == debug_row) && (col == debug_col);
+    if (is_debug_thread) {
+        printf("\t[Stage 3] match pairs starting. hits.size() = %d. Using ABS_EPS=%f, REL_FAC=%f\n",
+               hits.size(), epsilon, rel_epsilon);
+    }
+    #endif
+
+    if (hits.size() < 2) {
         return (0.0);
     }
 
     FP_T total_thickness = (0.0);
-    bool is_inside = false;
-    FP_T entry_t = (0.0);
+    FP_T t_enter = (0.0);
+    int inside_count = 0; 
 
-    for (int i = 0; i < tvalues.size(); i++) {
-        // This simple toggle is more robust than counting normals.
-        // Every other intersection point flips the state.
+    int i = 0;
+    while (i < hits.size()) {
+        const FP_T t_current_event = hits.values[i].t;
         
-        if (!is_inside) {
-            // We are currently outside, so this hit is an ENTRY.
-            entry_t = tvalues.values[i];
-            is_inside = true;
-        } else {
-            // We were inside, so this hit is an EXIT.
-            FP_T exit_t = tvalues.values[i];
-            total_thickness += (exit_t - entry_t);
-            is_inside = false;
+        // --- ROBUST DYNAMIC EPSILON ---
+        // Calculate the tolerance for *this specific t-value*.
+        // It's the larger of an absolute tolerance (for t ~ 0)
+        // and a relative tolerance (for t > 1).
+        const FP_T dynamic_epsilon = fmaxf(
+            epsilon,
+            rel_epsilon * fabsf(t_current_event)
+        );
+        // ---
+
+        #ifdef DEBUG
+        if (is_debug_thread) {
+            printf("\t  Processing event at t = %.8f (i = %d). dynamic_epsilon = %.8g\n",
+                   t_current_event, i, dynamic_epsilon);
         }
+        #endif
+
+        int net_change = 0;
+        int j = i;
+
+        // 1. Process ALL hits within the DYNAMIC tolerance
+        while (j < hits.size() && fabsf(hits.values[j].t - t_current_event) < dynamic_epsilon) {
+            
+            unsigned int tri_idx = hits.values[j].triangle_idx;
+            const FP_T4 N = normals[tri_idx];
+            FP_T dot_prod = dot(ray.direction, N);
+
+            #ifdef DEBUG
+            if (is_debug_thread) {
+                printf("\t    -> Hit (j=%d): tri_idx=%u, t=%.8f, dot_prod=%.8f\n",
+                       j, tri_idx, hits.values[j].t, dot_prod);
+            }
+            #endif
+
+            if (dot_prod < 0.0) {
+                net_change++; // ENTRY
+            } else if (dot_prod > 0.0) {
+                net_change--; // EXIT
+            }
+            
+            j++;
+        }
+
+        // 2. Interpret the net change for this t-event
+        int prev_inside_count = inside_count;
+
+        if (net_change > 0) {
+            if (inside_count == 0) {
+                t_enter = t_current_event;
+            }
+            inside_count++; 
+        } 
+        else if (net_change < 0) {
+            inside_count--; 
+        }
+        
+        // 3. Check for thickness-adding transitions
+        // We use t_current_event, which is the t-value of the *first*
+        // hit in this group. This is more robust than using the last.
+        if (prev_inside_count > 0 && inside_count == 0) {
+            total_thickness += (t_current_event - t_enter);
+        }
+
+        // 4. Handle invalid states
+        if (inside_count < 0) {
+            inside_count = 0;
+        }
+
+        #ifdef DEBUG
+        if (is_debug_thread) {
+            printf("\t  Event Summary: net_change=%d, prev_inside=%d, inside_count=%d, t_enter=%.8f, total_thickness=%.8f\n",
+                   net_change, prev_inside_count, inside_count, t_enter, total_thickness);
+        }
+        #endif
+
+        // 5. Move outer loop index past all processed hits
+        i = j;
     }
 
-    // It's possible to end in an "inside" state if there's an odd number
-    // of intersections (e.g., ray starts inside a non-closed mesh).
-    // In most cases, we can ignore this, as the paired segments are what matter.
+    #ifdef DEBUG
+    if (is_debug_thread) {
+        printf("\t[Stage 3] match_pairs finished. Final thickness: %.8f\n", total_thickness);
+    }
+    #endif
 
     return total_thickness;
 }
 
-__device__ void unique_from_sorted_with_epsilon(List<FP_T>& list, const FP_T scale) {
+__device__ void unique_from_sorted_with_epsilon(List<FP_T>& list, const EpsilonParams& epsilons) {
     if (list.count <= 1) {
         return;
     }
 
-    AreFPValuesClose are_close(scale);
+    AreFPValuesClose are_close(epsilons.unique_abs_epsilon);
 
     int unique_idx = 1; // Index for the next unique element
     for (int i = 1; i < list.count; i++) {
@@ -297,7 +377,8 @@ __device__ void unique_from_sorted_with_epsilon(List<FP_T>& list, const FP_T sca
 template<typename RayType>
 __device__ FP_T traceRay(
     const RayType &ray, const Tree &tree,
-    FP_T4 *__restrict__ vertices, FP_T &scale, unsigned row, unsigned col)
+    FP_T4 *__restrict__ vertices,
+    unsigned row, unsigned col)
 {
     List<int> candidates, intersected;
     List<FP_T> tvalues;
@@ -400,7 +481,7 @@ __device__ FP_T traceRay(
     }
     #endif
 
-    unique_from_sorted_with_epsilon(tvalues, scale);
+    unique_from_sorted_with_epsilon(tvalues, ray.m_epsilons);
     
     #ifdef DEBUG
     if (is_debug_thread) {
@@ -439,84 +520,104 @@ __device__ FP_T traceRay(
 
     return final_thickness;
 }
+template<typename RayType>
+__device__ FP_T traceRay(
+    const RayType &ray, const Tree &tree,
+    FP_T4 *__restrict__ vertices,
+    FP_T4 *__restrict__ normals,
+    unsigned row, unsigned col)
+{
+    List<int> candidates;
+    // Use our new HitRecord struct
+    List<HitRecord> hits; 
 
-// __device__ FP_T traceRay(
-//     const Ray &ray, const Tree &tree,
-//     FP_T4 *__restrict__ vertices,
-//     FP_T4 *__restrict__ normals,
-//     FP_T &epsilon)
-// {
-//     List<int> candidates, intersected;
-//     List<FP_T> tvalues;
+    #ifdef DEBUG
+    bool is_debug_thread = (row == debug_row) && (col == debug_col);
+    if (is_debug_thread) {
+        printf("\n--- DEBUG TRACE FOR PIXEL (%d, %d) ---\n", row, col);
+        printf("\tRay Origin:    (%f, %f, %f)\n", ray.tail.x, ray.tail.y, ray.tail.z);
+        printf("\tRay Direction: (%f, %f, %f)\n", ray.direction.x, ray.direction.y, ray.direction.z);
+        printf("\tBVH nb_keys:   %u\n", tree.nb_keys);
+    }
+    #endif
 
-//     // This is where the acceleration structure (BVH) is actually useful
-//     query(tree, ray, candidates);
+    // This is where the acceleration structure (BVH) is actually useful
+    query<RayType>(tree, ray, candidates, row, col);
 
-//     if (candidates.size() == 0)
-//     {
-//         return 0.0;
-//     }
+    #ifdef DEBUG
+    if (is_debug_thread) {
+        printf("\t[Stage 1] BVH Query: Found %u candidate triangles.\n", candidates.size());
+    }
+    #endif
 
-//     // Test the candidates for actual intersections
-//     for (int i = 0; i < candidates.size(); i++)
-//     {
-//         int primIndex = candidates.get(i) * 3;
+    if (candidates.size() == 0)
+    {
+        return 0.0;
+    }
+    
+    // Test the candidates for actual intersections
+    for (unsigned i = 0; i < candidates.size(); i++)
+    {
+        unsigned int original_triangle_idx = candidates.get(i);
+        int primIndex = original_triangle_idx * 3;
+        
+        const FP_T4 V1 = vertices[primIndex];
+        const FP_T4 V2 = vertices[primIndex + 1];
+        const FP_T4 V3 = vertices[primIndex + 2];
 
-//         const FP_T4 V1 = vertices[primIndex];
-//         const FP_T4 V2 = vertices[primIndex + 1];
-//         const FP_T4 V3 = vertices[primIndex + 2];
+        FP_T t = 0.0;
+        bool hit = ray.intersects(V1, V2, V3, t, col, row);        
 
-//         FP_T t = 0.0, tmax = INFINITY;
-//         if (ray.intersects(V1, V2, V3, t, tmax))
-//         {
-//             tvalues.push_back(t);
-//             intersected.push_back(candidates.get(i));
-//         }
-//     }
+        if (hit) {
+            // Store both t and the triangle index
+            hits.push_back(HitRecord(t, original_triangle_idx));
+        }
 
-//     if (tvalues.size() == 0)
-//     {
-//         return 0.0;
-//     }
+        #ifdef DEBUG
+        if (is_debug_thread) {
+            printf("\t\t-> Testing candidate triangle %u... Result: %s, t-value: %f\n",
+                original_triangle_idx,
+                hit ? "HIT" : "MISS",
+                hit ? t : 0.0f);
+        }
+        #endif
+    }
 
-//     if (tvalues.size() == 2)
-//     {
-//         return (fabs)(tvalues.get(1) - tvalues.get(0));
-//     }
+    // Need at least 2 hits to form a segment
+    if (hits.size() < 2)
+    {
+        return 0.0;
+    }
 
-//     // thrust::stable_sort_by_key(thrust::seq, tvalues.values, tvalues.values + tvalues.size(),
-//     //     intersected.values);
+    // Sort the HitRecord list using our new sort function
+    sort_hit(hits.values, hits.size());
 
-//     List<FP_T> filtered_tvalues;
-//     List<int> filtered_candidates;
+    #ifdef DEBUG
+    if (is_debug_thread) {
+        printf("\t[Stage 2] Intersection Test: Found %u actual intersections.\n", hits.size());
+        if (hits.size() > 0) {
+            printf("\t -> t-values: ");
+            for(int i = 0; i < hits.size(); ++i) {
+                printf("%f ", hits.get(i).t);
+            }
+            printf("\n");
+        }
+    }
+    #endif
 
-//     filtered_tvalues.count = 0;
-//     filtered_candidates.count = 0;
+    // Call the new match_pairs function, passing the normals array
+    FP_T final_thickness = match_pairs<RayType>(hits, ray, normals, row, col);
 
-//     AreFPValuesClose_Final close(epsilon);
+    #ifdef DEBUG
+    if (is_debug_thread) {
+        printf("\t[Stage 3] Thickness Calculation using normals: ret = %f\n", final_thickness);
+        printf("---- END TRACE ----\n\n");
+    }
+    #endif
 
-//     if (tvalues.size() > 0) {
-//         // Keep the first t-value AND its corresponding candidate
-//         filtered_tvalues.push_back(tvalues.get(0));
-//         filtered_candidates.push_back(candidates.get(0));
+    return final_thickness;
+}
 
-//         for (int i = 1; i < tvalues.size(); ++i) {
-//             FP_T current_t = tvalues.get(i);
-//             FP_T last_unique_t = filtered_tvalues.back();
-//             bool is_close = close(current_t, last_unique_t);
-
-//             if (!is_close) {
-//                 // If the t-value is unique, keep BOTH it and its candidate from the same index
-//                 filtered_tvalues.push_back(current_t);
-//                 filtered_candidates.push_back(candidates.get(i));
-//             }
-//         }
-//     }
-
-//     // return project_thickness(filtered_tvalues); // Your original commented out line
-//     // return match_pairs(filtered_intersections, filtered_tvalues, ray, vertices, normals, tree);
-//     return match_pairs(filtered_candidates, filtered_tvalues, ray, vertices, normals, tree);
-// }
 
 extern "C" __global__ void calculateBbBoxKernel(FP_T4 *vertices, FP_T4 *bbMin, FP_T4 *bbMax, unsigned int nb_keys)
 {
@@ -590,282 +691,518 @@ extern "C" __global__ void growTreeKernel(
 }
 
 __device__ FP_T traceSubPixel(
-    FP_T u, FP_T v,
-    const FP_T4& base_pixel_origin, const FP_T4& scaled_U, const FP_T4& scaled_V,
-    const FP_T4& W, const FP_T4& scene_bbMin, const FP_T4& scene_bbMax,
-    Tree& tree, FP_T4 *__restrict__ vertices, FP_T min_feature_size)
+    const FP_T4& sample_origin, const FP_T4& direction,
+    const FP_T4& scene_bbMin, const FP_T4& scene_bbMax,
+    Tree& tree, FP_T4 *__restrict__ vertices,
+    const EpsilonParams& epsilons,
+    unsigned int row, unsigned int col)
 {
-    // Calculate the precise origin for this sub-pixel ray
-    FP_T4 sample_origin = base_pixel_origin - scaled_U * u - scaled_V * v;
-    WatertightRay ray = WatertightRay(sample_origin, W, scene_bbMin, scene_bbMax);
-    return traceRay<WatertightRay>(ray, tree, vertices, min_feature_size, 0, 0); // row/col args for debug not used here
+    WatertightRay ray = WatertightRay(sample_origin, direction, scene_bbMin, scene_bbMax, epsilons);
+    return traceRay<WatertightRay>(ray, tree, vertices, row, col);
 }
 
+__device__ FP_T traceSubPixel(
+    const FP_T4& sample_origin, const FP_T4& direction,
+    const FP_T4& scene_bbMin, const FP_T4& scene_bbMax,
+    Tree& tree, FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
+    const EpsilonParams& epsilons,
+    unsigned int row, unsigned int col)
+{
+    WatertightRay ray = WatertightRay(sample_origin, direction, scene_bbMin, scene_bbMax, epsilons);
+    return traceRay<WatertightRay>(ray, tree, vertices, normals, row, col);
+}
+
+// =========================================================================
+//  LEVEL 2: CACHING FUNCTIONS (One per projection type)
+// =========================================================================
+
 __device__ FP_T traceAndCache(
-    FP_T u, FP_T v,
-    FP_T* value_cache, bool* is_cached,
-    // (Original traceSubPixel parameters)
-    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 W,
+    FP_T u, FP_T v, FP_T* value_cache, bool* is_cached,
+    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
-    Tree &tree, FP_T4 *__restrict__ vertices, FP_T min_feature_size
-) {
-    // 1. Calculate the integer grid coordinates for the cache lookup.
+    Tree &tree, FP_T4 *__restrict__ vertices, 
+    const EpsilonParams& epsilons,
+    unsigned int row, unsigned int col)
+{
     int ix = round(u * (CACHE_DIM - 1));
     int iy = round(v * (CACHE_DIM - 1));
     int index = iy * CACHE_DIM + ix;
 
-    // 2. Check if the value is already in our cache.
     if (is_cached[index]) {
-        return value_cache[index]; // Return cached value instantly.
+        return value_cache[index];
     }
 
-    // 3. If not cached, perform the expensive trace.
-    FP_T value = traceSubPixel(u, v, base_pixel_origin, scaled_U, scaled_V, W, 
-                               scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
+    FP_T4 sample_origin = base_pixel_origin + scaled_U * u + scaled_V * v;
+
+    FP_T value = traceSubPixel(
+        sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col
+    );
     
-    // 4. Store the new value in the cache and mark it as valid.
     value_cache[index] = value;
     is_cached[index] = true;
 
     return value;
 }
 
-__device__ FP_T tracePixelAdaptive(
-    // Per-pixel inputs
-    FP_T4 base_pixel_origin,
-    // Global scene & camera data
-    FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 W,
+__device__ FP_T traceAndCache(
+    FP_T u, FP_T v, FP_T* value_cache, bool* is_cached,
+    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
-    Tree &tree, FP_T4 *__restrict__ vertices,
-    // Control parameters
-    FP_T min_feature_size, FP_T abs_tolerance, FP_T rel_tolerance, int depth
-) {
-    // 1. INITIALIZATION
-    Quad quad_stack[MAX_QUADS_PER_PIXEL];
-    int stack_ptr = 0;
+    Tree &tree, FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
+    const EpsilonParams& epsilons,
+    unsigned int row, unsigned int col)
+{
+    int ix = round(u * (CACHE_DIM - 1));
+    int iy = round(v * (CACHE_DIM - 1));
+    int index = iy * CACHE_DIM + ix;
 
-    FinalQuad final_quads[MAX_QUADS_PER_PIXEL];
-    int final_quads_count = 0;
-    
-    FP_T value_cache[CACHE_SIZE];
-    bool is_cached[CACHE_SIZE];
-
-    for(int i = 0; i < CACHE_SIZE; ++i) {
-        is_cached[i] = false;
+    if (is_cached[index]) {
+        return value_cache[index];
     }
 
+    FP_T4 sample_origin = base_pixel_origin + scaled_U * u + scaled_V * v;
+
+    FP_T value = traceSubPixel(
+        sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col
+    );
+    
+    value_cache[index] = value;
+    is_cached[index] = true;
+
+    return value;
+}
+
+
+// =========================================================================
+//  LEVEL 3: ADAPTIVE SAMPLING (One per projection type)
+// =========================================================================
+
+__device__ FP_T tracePixelAdaptive(
+    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree, FP_T4 *__restrict__ vertices,
+    const EpsilonParams& epsilons,
+    const AdaptiveSamplingParams& sampling_params,
+    unsigned int row, unsigned int col)
+{
+    Quad quad_stack[MAX_QUADS_PER_PIXEL]; int stack_ptr = 0;
+    FinalQuad final_quads[MAX_QUADS_PER_PIXEL]; int final_quads_count = 0;
+    FP_T value_cache[CACHE_SIZE]; bool is_cached[CACHE_SIZE];
+    for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
     quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};
 
-    // 2. ADAPTIVE SUBDIVISION LOOP
-    while (stack_ptr > 0)
-    {
+    while (stack_ptr > 0) {
         Quad current_quad = quad_stack[--stack_ptr];
-
         FP_T u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0;
-        FP_T values[5];
-        values[0] = traceAndCache(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, W, scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
-        values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, W, scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
-        values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, W, scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
-        values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, W, scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
-        values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, W, scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
         
+        FP_T values[5];
+        values[0] = traceAndCache(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        
+        // Decision
         sort(values, 5);
-
         FP_T min_val = values[0], max_val = values[4];
-        FP_T spread_low  = values[2] - values[0];
-        FP_T spread_high = values[4] - values[2];
-
-        // 3. DECISION
-        FP_T threshold = fmax(abs_tolerance, rel_tolerance * max_val);
-        if ((max_val - min_val < threshold) || (current_quad.depth >= depth) || (stack_ptr + 4 > MAX_QUADS_PER_PIXEL))
-        {
+        FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);
+        if ((max_val - min_val < threshold) || (current_quad.depth >= sampling_params.max_depth) || (stack_ptr + 4 > MAX_QUADS_PER_PIXEL)) {
             if (final_quads_count < MAX_QUADS_PER_PIXEL) {
-                FP_T avg_value;
-                if (spread_low < spread_high) {
-                    // The good data is clustered on the low side. Average the lowest three.
-                    avg_value = (values[0] + values[1] + values[2]) / 3.0;
-                } else {
-                    // The good data is clustered on the high side. Average the highest three.
-                    avg_value = (values[2] + values[3] + values[4]) / 3.0;
-                }
+                FP_T spread_low  = values[2] - values[0];
+                FP_T spread_high = values[4] - values[2];
+                FP_T avg_value = (spread_low < spread_high) ? (values[0] + values[1] + values[2]) / 3.0 : (values[2] + values[3] + values[4]) / 3.0;
                 final_quads[final_quads_count++] = {avg_value, s * s};
             }
-        }
-        else
-        {
+        } else {
             int next_depth = current_quad.depth + 1;
-            quad_stack[stack_ptr++] = {u,      v,      hs, next_depth};
-            quad_stack[stack_ptr++] = {u + hs, v,      hs, next_depth};
-            quad_stack[stack_ptr++] = {u,      v + hs, hs, next_depth};
-            quad_stack[stack_ptr++] = {u + hs, v + hs, hs, next_depth};
+            quad_stack[stack_ptr++] = {u, v, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v, hs, next_depth};
+            quad_stack[stack_ptr++] = {u, v + hs, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v + hs, hs, next_depth};
         }
     }
-
-    // 4. FINAL AVERAGING
-    FP_T total_value = 0.0;
-    FP_T total_area = 0.0;
-    for (int i = 0; i < final_quads_count; ++i) {
-        total_value += final_quads[i].value * final_quads[i].area;
-        total_area  += final_quads[i].area;
-    }
-    
+    FP_T total_value = 0.0, total_area = 0.0;
+    for (int i = 0; i < final_quads_count; ++i) { total_value += final_quads[i].value * final_quads[i].area; total_area  += final_quads[i].area; }
     return (total_area > 0.0) ? (total_value / total_area) : 0.0;
 }
 
+__device__ FP_T tracePixelAdaptive(
+    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree,
+    FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
+    const EpsilonParams& epsilons,
+    const AdaptiveSamplingParams& sampling_params,
+    unsigned int row, unsigned int col)
+{
+    Quad quad_stack[MAX_QUADS_PER_PIXEL]; int stack_ptr = 0;
+    FinalQuad final_quads[MAX_QUADS_PER_PIXEL]; int final_quads_count = 0;
+    FP_T value_cache[CACHE_SIZE]; bool is_cached[CACHE_SIZE];
+    for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
+    quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};
+
+    while (stack_ptr > 0) {
+        Quad current_quad = quad_stack[--stack_ptr];
+        FP_T u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0;
+        
+        FP_T values[5];
+        values[0] = traceAndCache(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        
+        // Decision
+        sort(values, 5);
+        FP_T min_val = values[0], max_val = values[4];
+        FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);
+        if ((max_val - min_val < threshold) || (current_quad.depth >= sampling_params.max_depth) || (stack_ptr + 4 > MAX_QUADS_PER_PIXEL)) {
+            if (final_quads_count < MAX_QUADS_PER_PIXEL) {
+                FP_T spread_low  = values[2] - values[0];
+                FP_T spread_high = values[4] - values[2];
+                FP_T avg_value = (spread_low < spread_high) ? (values[0] + values[1] + values[2]) / 3.0 : (values[2] + values[3] + values[4]) / 3.0;
+                final_quads[final_quads_count++] = {avg_value, s * s};
+            }
+        } else {
+            int next_depth = current_quad.depth + 1;
+            quad_stack[stack_ptr++] = {u, v, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v, hs, next_depth};
+            quad_stack[stack_ptr++] = {u, v + hs, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v + hs, hs, next_depth};
+        }
+    }
+    FP_T total_value = 0.0, total_area = 0.0;
+    for (int i = 0; i < final_quads_count; ++i) { total_value += final_quads[i].value * final_quads[i].area; total_area  += final_quads[i].area; }
+    return (total_area > 0.0) ? (total_value / total_area) : 0.0;
+}
+
+
+// =========================================================================
+//  LEVEL 4: KERNELS
+// =========================================================================
+
 extern "C" __global__ void project_parallel_kernel(
-    unsigned nb_keys, FP_T *image, uint2 N,
+    // base_args (4 args)
+    unsigned *globalCounter,
+    unsigned nb_keys,
+    FP_T *image,
+    FP_T4 *__restrict__ vertices,
+    
+    // camera_args (6 args)
+    uint2 N,
     FP_T4 U, FP_T4 V, FP_T4 W,
-    FP_T4 upperleft_origin, FP_T2 ps,
+    FP_T4 upperleft_origin,
+    FP_T2 ps,
+
+    // tree_args (7 args)
     int *rope, int *left, unsigned *permutation,
     FP_T4 *bboxMin, FP_T4 *bboxMax,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
-    FP_T4 *__restrict__ vertices,
-    unsigned *globalCounter, FP_T min_feature_size, int supersampling,
-    FP_T abs_tolerance, FP_T rel_tolerance
+    
+    // sampling_args (3 args)
+    FP_T p_abs_tolerance,
+    FP_T p_rel_tolerance,
+    int p_max_depth,
+    
+    // epsilon_args (9 args)
+    FP_T p_ray_box_epsilon,
+    FP_T p_tri_ray_tmin,
+    FP_T p_tri_gamma_multiplier,
+    FP_T p_tri_abs_min_error,
+    FP_T p_tri_d_gamma_multiplier,
+    FP_T p_tri_d_abs_min_error,
+    FP_T p_group_abs_epsilon,
+    FP_T p_group_rel_epsilon,
+    FP_T p_unique_abs_epsilon
 )
 {
-    Tree tree;
-    tree.nb_keys = nb_keys;
-    tree.rope = rope;
-    tree.left = left;
-    tree.indices = permutation;
-    tree.bboxMin = bboxMin;
-    tree.bboxMax = bboxMax;
+    Tree tree; /* ... tree setup ... */
+    tree.nb_keys = nb_keys; tree.rope = rope; tree.left = left; tree.indices = permutation; tree.bboxMin = bboxMin; tree.bboxMax = bboxMax;
 
-    FP_T4 scaled_U = U * ps.x;
-    FP_T4 scaled_V = V * ps.y;
-    
+    EpsilonParams epsilons(
+        p_ray_box_epsilon, p_tri_ray_tmin, p_tri_gamma_multiplier, p_tri_abs_min_error,
+        p_tri_d_gamma_multiplier, p_tri_d_abs_min_error,
+        p_group_abs_epsilon, p_group_rel_epsilon, p_unique_abs_epsilon
+    );
+
+    AdaptiveSamplingParams sampling_params(p_abs_tolerance, p_rel_tolerance, p_max_depth);
+
+    FP_T4 scaled_U = U * ps.x; FP_T4 scaled_V = V * ps.y;
     unsigned int totalPixels = N.x * N.y;
 
-    // --- Persistent Thread Loop ---
-    // Minor performance improvement because of the low quality BVH
-    // TODO: balance workload by quad subdivision, not by ray
-    while (true)
-    {
+    while (true) {
         unsigned int index = atomicAdd(globalCounter, 1);
-        if (index >= totalPixels) {
-            break; 
-        }
+        if (index >= totalPixels) break; 
 
-        // --- Per-Pixel Processing (Now much cleaner) ---
-        unsigned int row = index / N.x;
-        unsigned int col = index % N.x;
-        FP_T4 base_pixel_origin = upperleft_origin - scaled_U * col - scaled_V * row;
+        unsigned int row = index / N.x; unsigned int col = index % N.x;
+        FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
 
-        if ((supersampling > 0) && (supersampling <= MAX_DEPTH))
-        {
+        if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
             image[index] = tracePixelAdaptive(
-                base_pixel_origin,
-                scaled_U, scaled_V, W,
-                scene_bbMin, scene_bbMax,
-                tree, vertices,
-                min_feature_size, abs_tolerance, rel_tolerance, supersampling
+                base_pixel_origin, scaled_U, scaled_V, W,
+                scene_bbMin, scene_bbMax, tree, vertices,
+                epsilons, sampling_params,
+                row, col
+            );
+        } else {
+            FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
+            image[index] = traceSubPixel(
+                sample_origin, W, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col
             );
         }
-        else // Simple, single-ray tracing mode
-        {
-            image[index] = traceSubPixel(0.5, 0.5, base_pixel_origin, scaled_U, scaled_V, W,
-                                         scene_bbMin, scene_bbMax, tree, vertices, min_feature_size);
+    }
+}
+
+extern "C" __global__ void project_parallel_normals_kernel(
+    // base_args (5 args)
+    unsigned *globalCounter,
+    unsigned nb_keys,
+    FP_T *image,
+    FP_T4 *__restrict__ vertices,
+    FP_T4 *__restrict__ normals,
+    
+    // camera_args (6 args)
+    uint2 N,
+    FP_T4 U, FP_T4 V, FP_T4 W,
+    FP_T4 upperleft_origin,
+    FP_T2 ps,
+
+    // tree_args (7 args)
+    int *rope, int *left, unsigned *permutation,
+    FP_T4 *bboxMin, FP_T4 *bboxMax,
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
+    
+    // sampling_args (3 args)
+    FP_T p_abs_tolerance,
+    FP_T p_rel_tolerance,
+    int p_max_depth,
+    
+    // epsilon_args (9 args)
+    FP_T p_ray_box_epsilon,
+    FP_T p_tri_ray_tmin,
+    FP_T p_tri_gamma_multiplier,
+    FP_T p_tri_abs_min_error,
+    FP_T p_tri_d_gamma_multiplier,
+    FP_T p_tri_d_abs_min_error,
+    FP_T p_group_abs_epsilon,
+    FP_T p_group_rel_epsilon,
+    FP_T p_unique_abs_epsilon
+)
+{
+    Tree tree; /* ... tree setup ... */
+    tree.nb_keys = nb_keys; tree.rope = rope; tree.left = left; tree.indices = permutation; tree.bboxMin = bboxMin; tree.bboxMax = bboxMax;
+
+    EpsilonParams epsilons(
+        p_ray_box_epsilon, p_tri_ray_tmin, p_tri_gamma_multiplier, p_tri_abs_min_error,
+        p_tri_d_gamma_multiplier, p_tri_d_abs_min_error,
+        p_group_abs_epsilon, p_group_rel_epsilon, p_unique_abs_epsilon
+    );
+
+    AdaptiveSamplingParams sampling_params(p_abs_tolerance, p_rel_tolerance, p_max_depth);
+    
+    FP_T4 scaled_U = U * ps.x;
+    FP_T4 scaled_V = V * ps.y;
+    unsigned totalPixels = N.x * N.y;
+
+    while (true) {
+        unsigned int index = atomicAdd(globalCounter, 1);
+        if (index >= totalPixels) break; 
+
+        unsigned int row = index / N.x;
+        unsigned int col = index % N.x;
+
+        #ifdef DEBUG
+        const bool is_debug = (row == debug_row) && (col == debug_col);
+        if (is_debug) {
+            printf("Launching paralel on index %d\n", index);
+        }
+        #endif
+
+        FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
+
+        if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
+            image[index] = tracePixelAdaptive(
+                base_pixel_origin, scaled_U, scaled_V, W,
+                scene_bbMin, scene_bbMax, tree, vertices, normals,
+                epsilons, sampling_params, row, col);
+        } else {
+            FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
+            FP_T4 direction = W;
+
+            image[index] = traceSubPixel(
+                sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col
+            );
+
+            #ifdef DEBUG
+            if (is_debug) {
+                printf("Tracing sub pixel. Supersampling: no. Normals: yes. Conebeam: no. Final ret: %f \n", image[index]);
+            }
+            #endif
         }
     }
 }
 
 
-// extern "C" __global__ void project_conebeam_kernel(
-//     unsigned nb_keys, FP_T *image, uint2 N,
-//     FP_T4 U, FP_T4 V, FP_T4 W, // projection basis and origin
-//     FP_T4 upperleft_origin, FP_T2 ps,
-//     int *rope,
-//     int *left,
-//     unsigned *permutation, // BVH tree
-//     FP_T4 *bboxMin,
-//     FP_T4 *bboxMax,
-//     FP_T4 *__restrict__ vertices,
-//     unsigned *globalCounter,
-//     FP_T4 source,
-//     FP_T epsilon
-// )
-// {
-//     // Setup the tree structure once per thread block or globally as needed
-//     Tree tree;
-//     tree.nb_keys = nb_keys;
-//     tree.rope = rope;
-//     tree.left = left;
-//     tree.indices = permutation;
-//     tree.bboxMin = bboxMin;
-//     tree.bboxMax = bboxMax;
+extern "C" __global__ void project_conebeam_kernel(
+    // base_args (4 args)
+    unsigned *globalCounter,
+    unsigned nb_keys,
+    FP_T *image,
+    FP_T4 *__restrict__ vertices,
+    
+    // camera_args (7 args)
+    uint2 N,
+    FP_T4 U, FP_T4 V, FP_T4 W,
+    FP_T4 upperleft_origin,
+    FP_T2 ps,
+    FP_T4 source,
 
-//     FP_T4 scaled_U = U * ps.x;
-//     FP_T4 scaled_V = V * ps.y;
+    // tree_args (7 args)
+    int *rope, int *left, unsigned *permutation,
+    FP_T4 *bboxMin, FP_T4 *bboxMax,
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
+    
+    // sampling_args (3 args)
+    FP_T p_abs_tolerance,
+    FP_T p_rel_tolerance,
+    int p_max_depth,
+    
+    // epsilon_args (9 args)
+    FP_T p_ray_box_epsilon,
+    FP_T p_tri_ray_tmin,
+    FP_T p_tri_gamma_multiplier,
+    FP_T p_tri_abs_min_error,
+    FP_T p_tri_d_gamma_multiplier,
+    FP_T p_tri_d_abs_min_error,
+    FP_T p_group_abs_epsilon,
+    FP_T p_group_rel_epsilon,
+    FP_T p_unique_abs_epsilon
+)
+{
+    Tree tree; /* ... tree setup ... */
+    tree.nb_keys = nb_keys; tree.rope = rope; tree.left = left; tree.indices = permutation; tree.bboxMin = bboxMin; tree.bboxMax = bboxMax;
+    
+    EpsilonParams epsilons(
+        p_ray_box_epsilon, p_tri_ray_tmin, p_tri_gamma_multiplier, p_tri_abs_min_error,
+        p_tri_d_gamma_multiplier, p_tri_d_abs_min_error,
+        p_group_abs_epsilon, p_group_rel_epsilon, p_unique_abs_epsilon
+    );
 
-//     // Calculate the total number of rays using N.x and N.y
-//     unsigned totalRays = N.x * N.y;
+    AdaptiveSamplingParams sampling_params(p_abs_tolerance, p_rel_tolerance, p_max_depth);
 
-//     // Loop until all rays have been processed
-//     while (true)
-//     {
-//         // Atomically fetch the next index to process
-//         unsigned index = atomicAdd(globalCounter, 1);
-//         if (index >= totalRays)
-//             break; // No more rays to process
+    FP_T4 scaled_U = U * ps.x; FP_T4 scaled_V = V * ps.y;
+    unsigned totalPixels = N.x * N.y;
 
-//         // Convert the 1D index to 2D coordinates for the ray position
-//         unsigned row = index / N.x;
-//         unsigned col = index % N.x;
+    while (true) {
+        unsigned int index = atomicAdd(globalCounter, 1);
+        if (index >= totalPixels) break; 
 
-//         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
-//         FP_T4 direction = source - pixel_coordinates;
-//         Ray ray = Ray(pixel_coordinates, direction);
-//         // image[index] = traceRay(ray, tree, vertices, epsilon);
-//     }
-// }
+        unsigned int row = index / N.x; unsigned int col = index % N.x;
+        FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
 
-// extern "C" __global__ void project_conebeam_normals_kernel(
-//     unsigned nb_keys, FP_T *image, uint2 N,
-//     FP_T4 U, FP_T4 V, FP_T4 W, // projection basis and origin
-//     FP_T4 upperleft_origin, FP_T2 ps,
-//     int *rope,
-//     int *left,
-//     unsigned *permutation, // BVH tree
-//     FP_T4 *bboxMin,
-//     FP_T4 *bboxMax,
-//     FP_T4 *__restrict__ vertices,
-//     unsigned *globalCounter,
-//     FP_T4 *__restrict__ normals,
-//     FP_T4 source,
-//     FP_T epsilon
-// )
-// {
-//     // Setup the tree structure once per thread block or globally as needed
-//     Tree tree;
-//     tree.nb_keys = nb_keys;
-//     tree.rope = rope;
-//     tree.left = left;
-//     tree.indices = permutation;
-//     tree.bboxMin = bboxMin;
-//     tree.bboxMax = bboxMax;
+        if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
+            image[index] = tracePixelAdaptive(
+                base_pixel_origin, scaled_U, scaled_V, source,
+                scene_bbMin, scene_bbMax, tree, vertices,
+                epsilons, sampling_params,
+                row, col
+            );
+        } else {
+            FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
+            FP_T4 direction = source - sample_origin;
+            FP_T norm = rnorm3df(direction.x, direction.y, direction.z);
+            direction = direction * norm;
+            
+            image[index] = traceSubPixel(
+                sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col
+            );
+        }
+    }
+}
 
-//     FP_T4 scaled_U = U * ps.x;
-//     FP_T4 scaled_V = V * ps.y;
+extern "C" __global__ void project_conebeam_normals_kernel(
+    // base_args (5 args)
+    unsigned *globalCounter,
+    unsigned nb_keys,
+    FP_T *image,
+    FP_T4 *__restrict__ vertices,
+    FP_T4 *__restrict__ normals,
+    
+    // camera_args (7 args)
+    uint2 N,
+    FP_T4 U, FP_T4 V, FP_T4 W,
+    FP_T4 upperleft_origin,
+    FP_T2 ps,
+    FP_T4 source,
 
-//     // Calculate the total number of rays using N.x and N.y
-//     unsigned totalRays = N.x * N.y;
+    // tree_args (7 args)
+    int *rope, int *left, unsigned *permutation,
+    FP_T4 *bboxMin, FP_T4 *bboxMax,
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
+    
+    // sampling_args (3 args)
+    FP_T p_abs_tolerance,
+    FP_T p_rel_tolerance,
+    int p_max_depth,
+    
+    // epsilon_args (9 args)
+    FP_T p_ray_box_epsilon,
+    FP_T p_tri_ray_tmin,
+    FP_T p_tri_gamma_multiplier,
+    FP_T p_tri_abs_min_error,
+    FP_T p_tri_d_gamma_multiplier,
+    FP_T p_tri_d_abs_min_error,
+    FP_T p_group_abs_epsilon,
+    FP_T p_group_rel_epsilon,
+    FP_T p_unique_abs_epsilon
+)
+{
+    Tree tree; /* ... tree setup ... */
+    tree.nb_keys = nb_keys; tree.rope = rope; tree.left = left; tree.indices = permutation; tree.bboxMin = bboxMin; tree.bboxMax = bboxMax;
 
-//     // Loop until all rays have been processed
-//     while (true)
-//     {
-//         // Atomically fetch the next index to process
-//         unsigned index = atomicAdd(globalCounter, 1);
-//         if (index >= totalRays)
-//             break; // No more rays to process
+    AdaptiveSamplingParams sampling_params(p_abs_tolerance, p_rel_tolerance, p_max_depth);
 
-//         // Convert the 1D index to 2D coordinates for the ray position
-//         unsigned row = index / N.x;
-//         unsigned col = index % N.x;
+    EpsilonParams epsilons(
+        p_ray_box_epsilon, p_tri_ray_tmin, p_tri_gamma_multiplier, p_tri_abs_min_error,
+        p_tri_d_gamma_multiplier, p_tri_d_abs_min_error,
+        p_group_abs_epsilon, p_group_rel_epsilon, p_unique_abs_epsilon
+    );
+    
+    FP_T4 scaled_U = U * ps.x;
+    FP_T4 scaled_V = V * ps.y;
+    unsigned totalPixels = N.x * N.y;
+    
+    while (true) {
+        unsigned int index = atomicAdd(globalCounter, 1);
+        if (index >= totalPixels) break; 
 
-//         FP_T4 pixel_coordinates = upperleft_origin - scaled_U * col - scaled_V * row;
-//         FP_T4 direction = source - pixel_coordinates;
-//         Ray ray = Ray(pixel_coordinates, direction);
-//         // image[index] = traceRay(ray, tree, vertices, normals, epsilon);
-//     }
-// }
+        unsigned int row = index / N.x;
+        unsigned int col = index % N.x;
+
+        #ifdef DEBUG
+        const bool is_debug = (row == debug_row) && (col == debug_col);
+        if (is_debug) {
+            printf("Launching pconebeam_normals_kernel on index %d\n", index);
+        }
+        #endif
+
+        FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
+
+        if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
+            image[index] = tracePixelAdaptive(
+                base_pixel_origin, scaled_U, scaled_V, source,
+                scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, sampling_params,
+                row, col
+            );
+        } else {
+            FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
+            FP_T4 direction = source - sample_origin;
+            FP_T norm = rnorm3df(direction.x, direction.y, direction.z);
+            direction = direction * norm;
+
+            image[index] = traceSubPixel(
+                sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col
+            );
+
+            #ifdef DEBUG
+            if (is_debug) {
+                printf("Tracing sub pixel. Supersampling: no. Normals: yes. Conebeam: yes. Final ret: %f \n", image[index]);
+            }
+            #endif
+        }
+    }
+}

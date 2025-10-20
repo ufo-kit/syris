@@ -171,26 +171,45 @@ class BvhCupyAccelerator(AcceleratorBase):
         block_size = (16, 1, 1)
         grid_size = (int(xp.ceil(camera.shape[0] * camera.shape[1] / block_size[0])), 1, 1)
 
-        abs_tolerance = float(abs_tolerance)
-        rel_tolerance = float(rel_tolerance)
-        iterations = int(iterations)
-
-        args = [
-            nb_keys, image, camera.shape.view(uint2),
-            U.view(float4), V.view(float4), W.view(float4),
-            camera.p00_corner.view(float4), camera.pixel_size.view(float2),
-            self._tree["rope"], self._tree["left"], self._tree["indices"],
-            self._tree["bbMin"], self._tree["bbMax"],
-            self._tree["sceneMin"].view(float4), self._tree["sceneMax"].view(float4),
-            self._tree["vertices"].view(float4), global_counter, self._tree["t_epsilon"],
-            iterations, abs_tolerance, rel_tolerance
+        base_args = [
+            global_counter, nb_keys, image,
+            self._tree["vertices"].view(float4)
         ]
 
-        if use_normals:
-            args.append(self._tree["normals"].view(float4))
-        
+        camera_args = [
+            camera.shape.view(uint2), U.view(float4), V.view(float4), W.view(float4),
+            camera.p00_corner.view(float4), camera.pixel_size.view(float2),
+        ]
+
+        tree_args = [
+            self._tree["rope"], self._tree["left"], self._tree["indices"],
+            self._tree["bbMin"], self._tree["bbMax"],
+            self._tree["sceneMin"].view(float4), self._tree["sceneMax"].view(float4)
+        ]
+
+        sampling_args = [
+            float(abs_tolerance),
+            float(rel_tolerance),
+            int(iterations)
+        ]
+
+        epsilon_args = [
+            float(5.0 * (2**-24)),  # p_ray_box_epsilon
+            float(1e-7),            # p_tri_ray_tmin
+            float(256.0),           # p_tri_gamma_multiplier
+            float(1e-10),           # p_tri_abs_min_error
+            float(128.0),           # p_tri_d_gamma_multiplier (passed as float, cast in kernel)
+            float(1e-100),          # p_tri_d_abs_min_error (passed as float, cast in kernel)
+            float(1e-6),            # p_group_abs_epsilon
+            float(1e-5),            # p_group_rel_epsilon
+            float(1e-7)             # p_unique_abs_epsilon (for no-normal traceRay)
+        ]
+
         if not parallel:
-            args.append(camera.source_point.view(float4))
+            camera_args.append(camera.source_point.view(float4))
+
+        if use_normals:
+            base_args.append(self._tree["normals"].view(float4))
 
         if parallel and use_normals:
             kernel_name = "project_parallel_normals_kernel"
@@ -201,6 +220,13 @@ class BvhCupyAccelerator(AcceleratorBase):
         else:
             kernel_name = "project_conebeam_kernel"
 
+        args = []
+        args.extend(base_args)
+        args.extend(camera_args)
+        args.extend(tree_args)
+        args.extend(sampling_args)
+        args.extend(epsilon_args)
+
         LOG.debug(f"Launching kernel: {kernel_name}")
         args = tuple(args)
         time, _ = cfg.BACKEND.pipeline.launchKernel(kernel_name, grid_size, block_size, args)
@@ -208,7 +234,12 @@ class BvhCupyAccelerator(AcceleratorBase):
 
         cfg.BACKEND.pipeline.synchronize()
 
-        return image.reshape(camera.shape).get()
+        img = image.reshape(camera.shape).get()
+
+        import matplotlib.pyplot as plt
+        plt.imshow(img)
+
+        return img
     
     # TODO: fix params for this method
     # def _get_color_mapping_values(self, mapto, nb_keys, bbMin_np, bbMax_np):

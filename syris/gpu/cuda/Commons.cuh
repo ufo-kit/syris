@@ -14,15 +14,17 @@
 #else
     using FP_T = float;
 
-    #define MAX_DEPTH 5
-    #define CACHE_DIM 33 // 1 << 5 + 1
+    #define MAX_DEPTH 3
+    #define CACHE_DIM 9 // 1 << 3 + 1
     #define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
-    #define MAX_QUADS_PER_PIXEL 128
+    #define MAX_QUADS_PER_PIXEL 32
 #endif
 
+// #define DEBUG
+
 #ifdef DEBUG
-constexpr int debug_col = 1408;
-constexpr int debug_row = 1259;
+constexpr int debug_col = 1007;
+constexpr int debug_row = 885;
 #endif
 
 #define POS_INFINITY __int_as_float(0x7f800000)
@@ -31,22 +33,76 @@ constexpr int debug_row = 1259;
 #define SENTINEL -1
 #define INVALID -1
 
-constexpr unsigned MAX_COLLISIONS = 512;
+constexpr unsigned MAX_COLLISIONS = 256;
 
 typedef unsigned long long morton_t;
 typedef int long long delta_t;
 
 // A helper struct to manage quads for subdivision
 struct Quad {
-    FP_T u, v;     // Top-left corner of the quad within the pixel (0.0 to 1.0)
-    FP_T size;     // Size of the quad (e.g., 1.0, 0.5, 0.25...)
-    int depth;      // Current subdivision depth
+    FP_T u, v; // Top-left corner of the quad within the pixel (0.0 to 1.0)
+    FP_T size; // Size of the quad (e.g., 1.0, 0.5, 0.25...)
+    int depth; // Current subdivision depth
 };
 
 // A struct to store the final, converged quads
 struct FinalQuad {
     FP_T value;
     FP_T area;
+};
+
+struct HitRecord {
+    FP_T t;
+    unsigned int triangle_idx;
+
+    // Default constructor for List
+    __device__ HitRecord() : t(0.0), triangle_idx(0) {} 
+    
+    __device__ HitRecord(FP_T t_val, unsigned int idx) : t(t_val), triangle_idx(idx) {}
+};
+
+struct EpsilonParams {
+    FP_T ray_box_epsilon;       // For WatertightRay constructor error bounds
+    FP_T tri_ray_tmin;          // For WatertightRay::intersects(triangle) t_min check
+    FP_T tri_gamma_multiplier;  // Multiplier for float epsilon (e.g., 128.0)
+    FP_T tri_abs_min_error;     // Absolute floor for float determinant (e.g., 1e-10)
+    double tri_d_gamma_multiplier; // Multiplier for double epsilon (e.g., 128.0)
+    double tri_d_abs_min_error;  // Absolute floor for double determinant (e.g., 1e-100)
+    FP_T group_abs_epsilon;     // For match_pairs t-grouping
+    FP_T group_rel_epsilon;     // For match_pairs t-grouping
+    FP_T unique_abs_epsilon;    // For unique_from_sorted_with_epsilon
+
+    // __device__ constructor for in-kernel initialization
+    __device__ EpsilonParams(
+        FP_T p_ray_box_epsilon,
+        FP_T p_tri_ray_tmin,
+        FP_T p_tri_gamma_multiplier,
+        FP_T p_tri_abs_min_error,
+        FP_T p_tri_d_gamma_multiplier,
+        FP_T p_tri_d_abs_min_error,
+        FP_T p_group_abs_epsilon,
+        FP_T p_group_rel_epsilon,
+        FP_T p_unique_abs_epsilon
+    ) :
+        ray_box_epsilon(p_ray_box_epsilon),
+        tri_ray_tmin(p_tri_ray_tmin),
+        tri_gamma_multiplier(p_tri_gamma_multiplier),
+        tri_abs_min_error(p_tri_abs_min_error),
+        tri_d_gamma_multiplier((double)p_tri_d_gamma_multiplier),
+        tri_d_abs_min_error((double)p_tri_d_abs_min_error),
+        group_abs_epsilon(p_group_abs_epsilon),
+        group_rel_epsilon(p_group_rel_epsilon),
+        unique_abs_epsilon(p_unique_abs_epsilon)
+    {}
+};
+
+struct AdaptiveSamplingParams {
+    FP_T abs_tolerance;
+    FP_T rel_tolerance;
+    int max_depth; // It makes sense to move 'supersampling' (max_depth) in here too.
+
+    __device__ AdaptiveSamplingParams(FP_T abs_tol, FP_T rel_tol, int depth)
+        : abs_tolerance(abs_tol), rel_tolerance(rel_tol), max_depth(depth) {}
 };
 
 // --- 2. Define Vector Types from Base Precision ---
@@ -366,6 +422,52 @@ __device__ inline FP_T3 cross3(FP_T3 a, FP_T3 b) // cross product between two 3D
     c.y = a.z * b.x - a.x * b.z;
     c.z = a.x * b.y - a.y * b.x;
     return c;
+}
+
+
+__device__ inline void _swap_hit(HitRecord *array, int i, int j) {
+    HitRecord tmp;
+    tmp = array[i];
+    array[i] = array[j];
+    array[j] = tmp;
+}
+
+__device__ inline void _sift_down_hit(HitRecord *heap, int start, int end) {
+    int root = start;
+    int child;
+    while (root*2 + 1 <= end) {
+        child = root*2 + 1;
+        // Compare based on the .t value
+        if (child + 1 <= end && (heap[child].t < heap[child + 1].t ||
+                                        isnan(heap[child + 1].t))) {
+            child++;
+        }
+        // Compare based on the .t value
+        if (child <= end && (heap[root].t < heap[child].t || isnan(heap[child].t))) {
+            _swap_hit(heap, root, child);
+            root = child;
+        } else {
+            return;
+        }
+    }
+}
+
+__device__ inline void _heapify_hit(HitRecord *array, int size) {
+    int start = (size - 2) / 2;
+    while (start >= 0) {
+        _sift_down_hit(array, start, size - 1);
+        start--;
+    }
+}
+
+__device__ inline void sort_hit(HitRecord *array, int size) {
+    _heapify_hit(array, size);
+    int end = size - 1;
+    while (end > 0) {
+        _swap_hit(array, 0, end);
+        _sift_down_hit(array, 0, end - 1);
+        end--;
+    }
 }
 
 __device__ inline void _swap(FP_T *array, int i, int j) {

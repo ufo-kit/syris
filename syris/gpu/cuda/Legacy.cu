@@ -225,7 +225,7 @@ __device__ int compute_intersections (
     FP_T stop = xp + max_dx;
     
     #ifdef DEBUG
-    const bool is_debug_thread = (idx == DEBUG_X_ID && idy == DEBUG_Y_ID);
+    const bool is_debug_thread = (idx == debug_col && idy == debug_row);
     if (is_debug_thread) {
         // Use a unique identifier like [C_I] for "compute_intersections"
         printf("[C_I (%d, %d)] --- Entering compute_intersections ---\n", idx, idy);

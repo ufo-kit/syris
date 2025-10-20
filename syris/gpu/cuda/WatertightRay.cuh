@@ -29,6 +29,7 @@ public:
     int sign[3];
 
     FP_T4 scene_min, scene_max;
+    EpsilonParams m_epsilons;
 
     /**
      * @brief Constructs a WatertightRay and performs all pre-calculations.
@@ -37,7 +38,7 @@ public:
      * @param scene_min The minimum corner of the entire scene's bounding box.
      * @param scene_max The maximum corner of the entire scene's bounding box.
      */
-    __device__ WatertightRay(FP_T4 origin, FP_T4 direction, const FP_T4& scene_min, const FP_T4& scene_max);
+    __device__ WatertightRay(FP_T4 origin, FP_T4 direction, const FP_T4& scene_min, const FP_T4& scene_max, const EpsilonParams& epsilons);
 
     /**
      * @brief Performs a conservative ray-AABB intersection test.

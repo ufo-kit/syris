@@ -35,7 +35,7 @@ __device__ FP_T RoundDown(FP_T a) { return a; }
 
 
 // --- WatertightRay Constructor Implementation ---
-__device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_T4& scene_min, const FP_T4& scene_max)
+__device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_T4& scene_min, const FP_T4& scene_max, const EpsilonParams& epsilons) : m_epsilons(epsilons)
 {
     // Basic setup
     this->tail = origin;
@@ -87,6 +87,7 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     // 4. Calculate error bounds and corrected origins
     // Use a practical epsilon that won't be lost to 32-bit float rounding.
     // FP_T ROBUST_EPSILON = 0;
+    // FP_T ROBUST_EPSILON = : m_epsilons.ray_box_epsilon;
     FP_T ROBUST_EPSILON = 5.0f * ldexpf(1.0f, -24);
 
     const FP_T L[3] = { fabsf(O[0] - bbMin[0]), fabsf(O[1] - bbMin[1]), fabsf(O[2] - bbMin[2]) };
@@ -226,46 +227,43 @@ __device__ bool WatertightRay::intersects(FP_T4 const &minBbox, FP_T4 const &max
     FP_T t_far  = POS_INFINITY;
     return this->intersects(minBbox, maxBbox, t_near, t_far);
 }
-
-
-__device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t, unsigned col, unsigned row) const {
-    constexpr FP_T epsilon = ::cuda::std::numeric_limits<FP_T>::epsilon();
-    
+__device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t, unsigned col, unsigned row) const { 
     #ifdef DEBUG
-    bool is_debug = (row == debug_row) && (col == debug_col);
+    const bool is_debug = (col == debug_col) && (row == debug_row);
     #endif
+
+    const FP_T RAY_T_MIN = m_epsilons.tri_ray_tmin;
+    constexpr FP_T epsilon = ::cuda::std::numeric_limits<FP_T>::epsilon(); // ~1.19e-7
 
     // Calculate vertices relative to ray origin
     const FP_T4 A_t4 = V1 - this->tail;
     const FP_T4 B_t4 = V2 - this->tail;
     const FP_T4 C_t4 = V3 - this->tail;
 
-    // This is the proper way to allow dynamic component selection via Kx, Ky, Kz.
     const FP_T A[3] = {A_t4.x, A_t4.y, A_t4.z};
     const FP_T B[3] = {B_t4.x, B_t4.y, B_t4.z};
     const FP_T C[3] = {C_t4.x, C_t4.y, C_t4.z};
-
-    // Perform shear and scale of vertices using FMA for precision
     const FP_T Ax = (fma)(-Sx, A[Kz], A[Kx]);
     const FP_T Ay = (fma)(-Sy, A[Kz], A[Ky]);
     const FP_T Bx = (fma)(-Sx, B[Kz], B[Kx]);
     const FP_T By = (fma)(-Sy, B[Kz], B[Ky]);
     const FP_T Cx = (fma)(-Sx, C[Kz], C[Kx]);
     const FP_T Cy = (fma)(-Sy, C[Kz], C[Ky]);
-
-    // Calculate scaled barycentric coordinates
-    const FP_T U = (fma)(Cx, By, -Cy * Bx);
-    const FP_T V = (fma)(Ax, Cy, -Ay * Cx);
-    const FP_T W = (fma)(Bx, Ay, -By * Ax);
-
+    FP_T U = (fma)(Cx, By, -Cy * Bx);
+    FP_T V = (fma)(Ax, Cy, -Ay * Cx);
+    FP_T W = (fma)(Bx, Ay, -By * Ax);
     const FP_T det = U + V + W;
 
-    // More Robust Dynamic Epsilon Calculation
-    constexpr FP_T gamma_factor = 2.0 * epsilon;
-    const FP_T error_bound = gamma_factor * (fabs(U) + fabs(V) + fabs(W));
+    // Hybrid relative/absolute error bound for the determinant ---
+    const FP_T gamma_factor = m_epsilons.tri_gamma_multiplier * epsilon;
+    const FP_T absolute_min_error = m_epsilons.tri_abs_min_error;
+    const FP_T relative_error_bound = gamma_factor * (fabs(U) + fabs(V) + fabs(W));
+    
+    // The final bound is the max of the relative bound AND a fixed minimum.
+    const FP_T final_error_bound = device_fmax<FP_T>(relative_error_bound, absolute_min_error);
 
     // Double Precision Fallback for Degenerate Cases
-    if ((fabs)(det) <= error_bound) {
+    if ((fabs)(det) <= final_error_bound) {
         #ifdef __FP_T_D__
         return false;
         #else
@@ -283,8 +281,9 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
         const double d_det = d_U + d_V + d_W;
 
         constexpr FP_T d_epsilon = ::cuda::std::numeric_limits<double>::epsilon();
-        constexpr double d_gamma_factor = 2.0 * d_epsilon;
-        const double d_error_bound = d_gamma_factor * (fabs(d_U) + fabs(d_V) + fabs(d_W));
+        const double d_gamma_factor = m_epsilons.tri_d_gamma_multiplier * d_epsilon;
+        const double d_relative_error_bound = d_gamma_factor * (fabs(d_U) + fabs(d_V) + fabs(d_W));
+        const double d_error_bound = device_fmax<double>(d_relative_error_bound, m_epsilons.tri_d_abs_min_error);
         if (fabs(d_det) <= d_error_bound) {
             #ifdef DEBUG
             if (is_debug){
@@ -294,9 +293,9 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
             return false;
         }
 
-        bool signs_differ = (det > 0.0f)
-                   ? (U < -d_error_bound || V < -d_error_bound || W < -d_error_bound)
-                   : (U > d_error_bound || V > d_error_bound || W > d_error_bound);
+        bool signs_differ = (d_det > 0.0)
+                   ? (d_U < -d_error_bound || d_V < -d_error_bound || d_W < -d_error_bound)
+                   : (d_U > d_error_bound || d_V > d_error_bound || d_W > d_error_bound);
 
         if (signs_differ) {
             #ifdef DEBUG
@@ -320,32 +319,32 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
         #endif
     } else {
         bool signs_differ = (det > 0.0f)
-                   ? (U < -error_bound || V < -error_bound || W < -error_bound)
-                   : (U > error_bound || V > error_bound || W > error_bound);
+                   ? (U < -final_error_bound || V < -final_error_bound || W < -final_error_bound)
+                   : (U > final_error_bound || V > final_error_bound || W > final_error_bound);
 
         if (signs_differ) {
             #ifdef DEBUG
-            if (is_debug){
-                printf("Exit 3\n"
-                       "  tail: (%.8g, %.8g, %.8g)\n"
-                       "  direction: (%.8g, %.8g, %.8g)\n"
-                       "  V1: (%.8g, %.8g, %.8g)\n"
-                       "  V2: (%.8g, %.8g, %.8g)\n"
-                       "  V3: (%.8g, %.8g, %.8g)\n"
-                       "  det: %.8g\n"
-                       "  U: %.8g, V: %.8g, W: %.8g\n"
-                       "  Sheared Vertices:\n"
-                       "    Ax: %.8g, Ay: %.8g\n"
-                       "    Bx: %.8g, By: %.8g\n"
-                       "    Cx: %.8g, Cy: %.8g\n",
-                       this->tail.x, this->tail.y, this->tail.z,
-                       this->direction.x, this->direction.y, this->direction.z,
-                       V1.x, V1.y, V1.z,
-                       V2.x, V2.y, V2.z,
-                       V3.x, V3.y, V3.z,
-                       det, U, V, W,
-                       Ax, Ay, Bx, By, Cx, Cy);
-            }
+            // if (is_debug){
+            //     printf("Exit 3\n"
+            //            "  tail: (%.8g, %.8g, %.8g)\n"
+            //            "  direction: (%.8g, %.8g, %.8g)\n"
+            //            "  V1: (%.8g, %.8g, %.8g)\n"
+            //            "  V2: (%.8g, %.8g, %.8g)\n"
+            //            "  V3: (%.8g, %.8g, %.8g)\n"
+            //            "  det: %.8g\n"
+            //            "  U: %.8g, V: %.8g, W: %.8g\n"
+            //            "  Sheared Vertices:\n"
+            //            "    Ax: %.8g, Ay: %.8g\n"
+            //            "    Bx: %.8g, By: %.8g\n"
+            //            "    Cx: %.8g, Cy: %.8g\n",
+            //            this->tail.x, this->tail.y, this->tail.z,
+            //            this->direction.x, this->direction.y, this->direction.z,
+            //            V1.x, V1.y, V1.z,
+            //            V2.x, V2.y, V2.z,
+            //            V3.x, V3.y, V3.z,
+            //            det, U, V, W,
+            //            Ax, Ay, Bx, By, Cx, Cy);
+            // }
             #endif
             return false;
         }
@@ -367,9 +366,15 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
     }
 
     // Final check for valid intersection range
-    constexpr FP_T T_MIN = epsilon;
-    if (t > T_MIN) {
+    if (t > RAY_T_MIN) {
         return true;
     }
+
+    #ifdef DEBUG
+    if (is_debug && t <= RAY_T_MIN){
+        printf("Exit 5 (Hit too close, t=%.8g, RAY_T_MIN=%.8g)\n", t, RAY_T_MIN);
+    }
+    #endif
+
     return false;
 }

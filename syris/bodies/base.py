@@ -213,6 +213,33 @@ class MovableBody(Body):
         """Current position."""
         return self.transform_matrix[:3, -1] * q.m
 
+    @position.setter
+    def position(self, new_position):
+        """
+        Sets the absolute position of the body's center in world coordinates,
+        preserving its current orientation.
+        
+        This method directly updates the transformation matrix and invalidates
+        the projection cache.
+
+        :param new_position: A 3D vector (list, tuple, or numpy array) 
+                             representing the new world coordinates,
+                             ideally with units.
+        """
+        LOG.debug(f"Setting {self} position to {new_position}")
+        
+        try:
+            pos_vector = new_position.simplified
+        except AttributeError:
+            pos_vector = np.asarray(new_position, dtype=cfg.PRECISION.np_float)
+
+        current_matrix = self.transform_matrix
+        current_matrix[:3, 3] = pos_vector
+        self.transform_matrix = current_matrix
+
+        # Invalidate the projection cache to ensure the next projection is recomputed
+        self.update_projection_cache()
+
     @property
     def last_position(self):
         """Last position."""

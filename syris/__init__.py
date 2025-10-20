@@ -71,9 +71,9 @@ def init(
         kernel_names = [
             "projectTriangleCentroid", "growTreeKernel", "project_parallel_kernel",
             "compute_thickness_kernel",
-            # "project_conebeam_kernel", 
-            # "project_parallel_normals_kernel",
-            # "project_conebeam_normals_kernel"
+            "project_conebeam_kernel", 
+            "project_parallel_normals_kernel",
+            "project_conebeam_normals_kernel"
         ]
 
         try:
