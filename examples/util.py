@@ -30,10 +30,10 @@ def get_default_parser(description):
     )
 
 
-def show(image, title=""):
-    """Show *image* with *title* on its own figure."""
+def show(image, title="", **kwargs):
+    """Show *image* with *title* on its own figure. *kwargs* are passed to imshow."""
     plt.figure()
-    image = plt.imshow(image)
+    image = plt.imshow(image, **kwargs)
     plt.title(title)
     plt.colorbar()
     plt.show(block=False)
