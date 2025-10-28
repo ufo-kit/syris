@@ -61,7 +61,7 @@ void vf_heapify(vfloat *array, int size) {
 	}
 }
 
-void vf_sort(vfloat *array, int size) {
+void sort(vfloat *array, int size) {
 	vf_heapify(array, size);
     int end = size - 1;
 
@@ -81,7 +81,7 @@ __kernel void sort_kernel(__global vfloat *array) {
 		ar[i] = array[i];
 	}
 
-	vf_sort(ar, 10);
+	sort(ar, 10);
 
 	for (i = 0; i < 10; i++) {
 		array[i] = ar[i];

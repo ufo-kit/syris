@@ -19,6 +19,7 @@
 
 __version__ = "0.4dev"
 
+
 def init(
     compute_backend="opencl",
     platform_name=None,
@@ -29,7 +30,7 @@ def init(
     loglevel=None,
     logfile=None,
     double_precision=False,
-    unit="um"
+    unit="um",
 ):
     """Initialize syris with the best available compute backend."""
     import atexit
@@ -38,23 +39,27 @@ def init(
     import pkg_resources
     import os
     from syris.backend import ComputeBackend
-    from syris.gpu.cuda_utils import CudaPipeline, CudaTimer
+    from syris.gpu.cuda_utils import CudaPipeline
     from syris.gpu.util import make_opencl_defaults, init_programs
     from quantities import Quantity
 
     LOG = logging.getLogger(__name__)
 
-    cfg.init_logging(level=logging.INFO if loglevel is None else loglevel, logger_file=logfile)
+    cfg.init_logging(
+        level=logging.INFO if loglevel is None else loglevel, logger_file=logfile
+    )
     cfg.PRECISION = cfg.Precision(double_precision)
     cfg.BACKEND = ComputeBackend(compute_backend=compute_backend)
     cfg.UNIT = Quantity(1, unit)
 
     if cfg.BACKEND.name == cfg.BACKEND.CUDA:
-        kernel_dir = pkg_resources.resource_filename('syris', 'gpu/cuda/')
+        kernel_dir = pkg_resources.resource_filename("syris", "gpu/cuda/")
 
         source_files = ["WatertightRay.cu", "Ray.cu", "source.cu", "Legacy.cu"]
         abs_source_files = [os.path.join(kernel_dir, f) for f in source_files]
-        cuda_headers = [kernel_dir,]
+        cuda_headers = [
+            kernel_dir,
+        ]
 
         options = ["-D__FP_T_D__", "-G"] if double_precision else []
         cfg.BACKEND.pipeline = CudaPipeline(headers=cuda_headers, options=options)
@@ -69,11 +74,13 @@ def init(
             LOG.error(f"Failed to read modules: {e}")
 
         kernel_names = [
-            "projectTriangleCentroid", "growTreeKernel", "project_parallel_kernel",
+            "projectTriangleCentroid",
+            "growTreeKernel",
+            "project_parallel_kernel",
             "compute_thickness_kernel",
-            "project_conebeam_kernel", 
+            "project_conebeam_kernel",
             "project_parallel_normals_kernel",
-            "project_conebeam_normals_kernel"
+            "project_conebeam_normals_kernel",
         ]
 
         try:
@@ -92,13 +99,13 @@ def init(
         )
         cfg.BACKEND.queue = cfg.OPENCL.queue
         init_programs()
-    
+
     if profiling:
         if cfg.BACKEND.name == cfg.BACKEND.OPENCL:
             from syris import profiling as prf
             from syris.gpu.util import _wrap_opencl
-            
-            _wrap_opencl() # This function monkey-patches pyopencl, keep it specific
+
+            _wrap_opencl()  # This function monkey-patches pyopencl, keep it specific
             prf.PROFILER = prf.Profiler(cfg.OPENCL.queues, profiling_file)
             prf.PROFILER.start()
 

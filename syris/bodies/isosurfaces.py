@@ -18,6 +18,7 @@
 """
 Bodies based on isosurfaces.
 """
+
 import itertools
 import logging
 import numpy as np
@@ -37,8 +38,7 @@ LOG = logging.getLogger(__name__)
 
 
 class MetaBall(MovableBody):
-
-    """"Metaball bodies are smooth blobs formed by summing density functions representing particular
+    """ "Metaball bodies are smooth blobs formed by summing density functions representing particular
     bodies.
     """
 
@@ -48,7 +48,9 @@ class MetaBall(MovableBody):
             raise ValueError("Radius must be greater than zero.")
 
         self._radius = radius.simplified
-        super(MetaBall, self).__init__(trajectory, material=material, orientation=orientation)
+        super(MetaBall, self).__init__(
+            trajectory, material=material, orientation=orientation
+        )
 
     @property
     def radius(self):
@@ -77,7 +79,9 @@ class MetaBall(MovableBody):
 
         return BoundingBox(np.array(transformed) * q.m)
 
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+    def _project(
+        self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False
+    ):
         return project_metaballs(
             [self], shape, pixel_size, offset, queue=queue, out=out, block=block
         )
@@ -90,7 +94,7 @@ class MetaBall(MovableBody):
         a_x = self.transform_matrix[0][2]
         a_y = self.transform_matrix[1][2]
         a_z = self.transform_matrix[2][2]
-        return a_x ** 2 + a_y ** 2 + a_z ** 2
+        return a_x**2 + a_y**2 + a_z**2
 
     def pack(self):
         """Pack the body into a structure suitable for OpenCL kernels. Packed units are in
@@ -114,13 +118,16 @@ class MetaBall(MovableBody):
 
 
 class MetaBalls(CompositeBody):
-
     """Composite body composed of metaballs."""
 
     def __init__(self, trajectory, metaballs, orientation=geom.Y_AX):
-        super(MetaBalls, self).__init__(trajectory, orientation=orientation, bodies=metaballs)
+        super(MetaBalls, self).__init__(
+            trajectory, orientation=orientation, bodies=metaballs
+        )
 
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+    def _project(
+        self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False
+    ):
         """Projection implementation."""
         return project_metaballs(
             self._bodies, shape, pixel_size, offset, queue=queue, out=out, block=block
@@ -163,7 +170,9 @@ def get_format_string(string):
     return string.replace("vf", float_string)
 
 
-def project_metaballs(metaballs, shape, pixel_size, offset=None, queue=None, out=None, block=False):
+def project_metaballs(
+    metaballs, shape, pixel_size, offset=None, queue=None, out=None, block=False
+):
     """Project a list of :class:`.MetaBall` on an image plane with *shape*, *pixel_size*.  *offset*
     is the physical spatial body offset as (y, x). Use OpenCL *queue* and *out* pyopencl Array
     instance for returning the result. If *block* is True, wait for the kernel to finish.
@@ -177,10 +186,14 @@ def project_metaballs(metaballs, shape, pixel_size, offset=None, queue=None, out
         queue = cfg.OPENCL.queue
 
     bodies_mem = cl.Buffer(
-        cfg.OPENCL.ctx, cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR, hostbuf=string
+        cfg.OPENCL.ctx,
+        cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
+        hostbuf=string,
     )
     pbodies_mem = cl.Buffer(
-        cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE, size=m * n * cfg.MAX_META_BODIES * 4 * 7
+        cfg.OPENCL.ctx,
+        cl.mem_flags.READ_WRITE,
+        size=m * n * cfg.MAX_META_BODIES * 4 * 7,
     )
     left_mem = cl.Buffer(
         cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE, size=m * n * 2 * cfg.MAX_META_BODIES
@@ -215,7 +228,14 @@ def project_metaballs(metaballs, shape, pixel_size, offset=None, queue=None, out
 
 
 def project_metaballs_naive(
-    metaballs, shape, pixel_size, offset=None, z_step=None, queue=None, out=None, block=False
+    metaballs,
+    shape,
+    pixel_size,
+    offset=None,
+    z_step=None,
+    queue=None,
+    out=None,
+    block=False,
 ):
     """Project a list of :class:`.MetaBall` on an image plane with *shape*, *pixel_size*. *z_step*
     is the physical step in the z-dimension, if not specified it is the same as *pixel_size*.

@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Synchrotron radiation imaging experiments base module."""
+
 import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
@@ -30,7 +31,6 @@ LOG = logging.getLogger(__name__)
 
 
 class Experiment(object):
-
     """A virtual synchrotron experiment base class."""
 
     def __init__(self, samples, source, detector, propagation_distance, energies):
@@ -46,7 +46,11 @@ class Experiment(object):
         """Total time of all samples."""
         if self._time is None:
             self._time = max(
-                [obj.trajectory.time for obj in self.samples if obj.trajectory is not None]
+                [
+                    obj.trajectory.time
+                    for obj in self.samples
+                    if obj.trajectory is not None
+                ]
             )
 
         return self._time
@@ -63,7 +67,10 @@ class Experiment(object):
         size = self.source.size
         width = (self.propagation_distance * size[1] / d_sample).simplified.magnitude
         height = (self.propagation_distance * size[0] / d_sample).simplified.magnitude
-        sigma = (smath.fwnm_to_sigma(height, n=2), smath.fwnm_to_sigma(width, n=2)) * q.m
+        sigma = (
+            smath.fwnm_to_sigma(height, n=2),
+            smath.fwnm_to_sigma(width, n=2),
+        ) * q.m
 
         return ip.get_gauss_2d(
             shape, sigma, pixel_size=pixel_size, fourier=True, queue=queue, block=block
@@ -118,7 +125,9 @@ class Experiment(object):
         image = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_float)
         source_blur_kernel = None
         if source_blur:
-            source_blur_kernel = self.make_source_blur(shape, ps, queue=queue, block=False)
+            source_blur_kernel = self.make_source_blur(
+                shape, ps, queue=queue, block=False
+            )
 
         fmt = "Making sequence with shape {} and pixel size {} from {} to {}"
         LOG.debug(fmt.format(shape, ps, t_start, t_end))

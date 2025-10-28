@@ -16,24 +16,23 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Bodies made from mesh."""
+
 import itertools
 from functools import cached_property
 import re
 import numpy as np
 import pyopencl.array as cl_array
-import pyopencl.cltypes as cltypes
 import quantities as q
 import syris.config as cfg
 import syris.geometry as geom
 import syris.gpu.util as gutil
 from syris.bodies.base import MovableBody
-from syris.util import get_magnitude, make_tuple
+from syris.util import make_tuple
 
-from .accelerators import BvhCupyAccelerator, LegacyCpuAccelerator
 from .meshreader import PyvistaReader
 
-class Mesh(MovableBody):
 
+class Mesh(MovableBody):
     """Rigid Body based on *triangles* which form a polygon mesh. The triangles are a 2D array with
     shape (3, N), where N / 3 is the number of triangles. One polygon is formed by three consecutive
     triangles, e.g. when::
@@ -59,14 +58,19 @@ class Mesh(MovableBody):
         bounds=None,
         normals=None,
         epsilon=np.inf,
-        use_normals=False
+        use_normals=False,
+        visualize_bvh=False,
+        dynamic_range=1,
     ):
         """Constructor."""
         self._state = 0
-        
+
         # Use homogeneous coordinates for easy matrix multiplication, i.e. the 4-th element is 1
         self._current = np.insert(
-            triangles.rescale(cfg.UNIT).magnitude, 3, np.ones(triangles.shape[1]), axis=0
+            triangles.rescale(cfg.UNIT).magnitude,
+            3,
+            np.ones(triangles.shape[1]),
+            axis=0,
         )
 
         self._triangles = np.copy(self._current)
@@ -101,55 +105,75 @@ class Mesh(MovableBody):
         self.normalization_scale = normalize_factor
 
         self._triangles = np.copy(self._current)
-        self._furthest_point = np.max(np.sqrt(np.sum(self._triangles ** 2, axis=0)))
+        self._furthest_point = np.max(np.sqrt(np.sum(self._triangles**2, axis=0)))
         self.iterations = iterations
 
         self.accelerator = None
         self._normals = normals
         self._use_normals = use_normals
-        
+
         if isinstance(bounds, q.Quantity):
             self._bounds = bounds.rescale(cfg.UNIT).magnitude
         else:
             self._bounds = bounds
 
         self._epsilon = epsilon * normalize_factor
+        self.visualize_bvh = visualize_bvh
+        self.dynamic_range = dynamic_range
 
-        super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
+        super(Mesh, self).__init__(
+            trajectory, material=material, orientation=orientation
+        )
 
     @classmethod
-    def from_file(cls, filename, trajectory, material=None, orientation=geom.Y_AX, iterations=1, center="bbox", unit=q.um, use_normals=False):
+    def from_file(
+        cls,
+        source,
+        trajectory,
+        material=None,
+        orientation=geom.Y_AX,
+        iterations=1,
+        center="bbox",
+        unit=q.um,
+        use_normals=False,
+        visualize_bvh=False,
+    ):
         """
-        Alternative constructor to create a Mesh by loading a file. Recommended for modern mesh file formats.
+        Alternative constructor to create a Mesh by loading a file or PyVista object.
+        Recommended for modern mesh file formats.
 
         Args:
-            filename (str): Path to the mesh file.
+            source (str, pathlib.Path, or pv.DataSet): Path to the mesh file or a
+                                                        pre-loaded PyVista object. # <-- Updated docstring
             trajectory (Trajectory): The trajectory for the mesh.
             material: material used to define the refractive index.
             orientation: the "up" direction of the mesh.
             center: the center reference point of the mesh, used for transformations.
-        
+
         Returns:
             Mesh: A fully initialized Mesh object.
         """
-
-        reader = PyvistaReader(filename=filename, unit=unit)
+        reader = PyvistaReader(filename=source, unit=unit)
 
         normals = None
         if use_normals:
             normals = reader.normals
 
-        return cls(reader.vertices, 
-                   trajectory,
-                   material=material,
-                   orientation=orientation,
-                   iterations=iterations,
-                   center=center,
-                   normals=normals,
-                   bounds=reader.bounds,
-                   epsilon=reader.epsilon,
-                   use_normals=use_normals)
-    
+        return cls(
+            reader.vertices,
+            trajectory,
+            material=material,
+            orientation=orientation,
+            iterations=iterations,
+            center=center,
+            normals=normals,
+            bounds=reader.bounds,
+            epsilon=reader.epsilon,
+            use_normals=use_normals,
+            visualize_bvh=visualize_bvh,
+            dynamic_range=reader.dynamic_range,
+        )
+
     @property
     def furthest_point(self):
         """Furthest point from the center."""
@@ -179,7 +203,11 @@ class Mesh(MovableBody):
     @property
     def center_of_gravity(self):
         """Get body's center of gravity as (x, y, z)."""
-        center = (self._compute(np.mean, 0), self._compute(np.mean, 1), self._compute(np.mean, 2))
+        center = (
+            self._compute(np.mean, 0),
+            self._compute(np.mean, 1),
+            self._compute(np.mean, 2),
+        )
 
         return np.array(center) * cfg.UNIT
 
@@ -189,14 +217,17 @@ class Mesh(MovableBody):
 
         def get_middle(ends):
             return (ends[0] + ends[1]) / 2.0
-        
-        return np.array([get_middle(ends) for ends in self.extrema.magnitude]) * cfg.UNIT
+
+        return (
+            np.array([get_middle(ends) for ends in self.extrema.magnitude]) * cfg.UNIT
+        )
 
     @property
     def diff(self):
         """Smallest and greatest difference between all mesh points in all three dimensions. Returns
         ((min(dx), max(dx)), (min(dy), max(dy)), (min(dz), max(dz))).
         """
+
         def min_nonzero(ar):
             return min(ar[np.where(ar != 0)])
 
@@ -235,14 +266,14 @@ class Mesh(MovableBody):
         v_0, v_1 = self.vectors
         cross = np.cross(v_0, v_1)
 
-        return np.sqrt(np.sum(cross * cross, axis=1)) / 2 * cfg.UNIT ** 2
+        return np.sqrt(np.sum(cross * cross, axis=1)) / 2 * cfg.UNIT**2
 
     @cached_property
     def normals(self):
         """
-        Returns the triangle normals. 
-        
-        If normals were provided during initialization, returns those. 
+        Returns the triangle normals.
+
+        If normals were provided during initialization, returns those.
         Otherwise, computes them from the triangle vectors and caches the result.
         """
         if self._normals is not None:
@@ -266,14 +297,18 @@ class Mesh(MovableBody):
     def triangles(self):
         """Return current triangle mesh."""
         return self._current[:-1, :] * cfg.UNIT
-    
+
     @property
     def bounds(self):
         return self._bounds
-    
+
     @property
     def epsilon(self):
         return self._epsilon
+
+    @property
+    def tree(self):
+        return self.accelerator._tree
 
     def sort(self):
         """Sort triangles based on the greatest x-coordinate in an ascending order. Also sort
@@ -307,7 +342,7 @@ class Mesh(MovableBody):
         the ray to be still considered parallel.
         """
         ray = np.array([0, 0, 1]) * cfg.UNIT
-        dot = np.sqrt(np.sum(self.normals ** 2, axis=1))
+        dot = np.sqrt(np.sum(self.normals**2, axis=1))
         theta = np.arccos(np.dot(self.normals, ray) / dot)
         diff = np.abs(theta - np.pi / 2 * q.rad)
         indices = np.where(diff < eps)[0]
@@ -343,19 +378,21 @@ class Mesh(MovableBody):
         matrix = self.get_rescaled_transform_matrix(cfg.UNIT)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
-    def _get_accelerator(self):
+    def build_accelerator(self):
         """
         Lazy-initializes and rebuilds the accelerator only if the mesh state has changed.
         """
         if self.accelerator is None or self.accelerator._built_for_state != self._state:
             self.accelerator = cfg.BACKEND.get_accelerator_for_mesh(self)
-            self.accelerator.build()
+            self.accelerator.build(visualize_bvh=self.visualize_bvh)
         return self.accelerator
 
-    def _project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs):
+    def _project(
+        self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs
+    ):
         # This method now correctly gets a cached or rebuilt accelerator
-        accel = self._get_accelerator()
-        return accel.project(shape, pixel_size, offset, t=t,**kwargs)
+        accel = self.build_accelerator()
+        return accel.project(shape, pixel_size, offset, t=t, **kwargs)
 
     def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
         """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for
@@ -374,7 +411,9 @@ class Mesh(MovableBody):
             offset = gutil.make_vfloat3(0, 0, 0)
         else:
             offset = offset.simplified.magnitude
-            offset = gutil.make_vfloat3(offset[0] / psm[1], offset[1] / psm[0], offset[2] / psm[1])
+            offset = gutil.make_vfloat3(
+                offset[0] / psm[1], offset[1] / psm[0], offset[2] / psm[1]
+            )
 
         cfg.OPENCL.programs["mesh"].compute_slices(
             queue,
@@ -426,7 +465,9 @@ def read_blender_obj(filename, objects=None):
             if triangles is None:
                 triangles = v[f - face_start].transpose()
             else:
-                triangles = np.concatenate((triangles, v[f - face_start].transpose()), axis=1)
+                triangles = np.concatenate(
+                    (triangles, v[f - face_start].transpose()), axis=1
+                )
         face_start += len(v)
         i += 1
 

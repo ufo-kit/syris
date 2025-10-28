@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """A static body."""
+
 import numpy as np
 import quantities as q
 import syris.config as cfg
@@ -26,7 +27,6 @@ from syris.util import make_tuple
 
 
 class StaticBody(Body):
-
     """A static body is defined by its projected *thickness*, which is a quantity and it is
     always converted to meters, thus the :meth:`~Body.project` method always returns the
     projection in meters. *pixel_size* is the pixel size of the *thickness* and *material* is
@@ -42,7 +42,9 @@ class StaticBody(Body):
         """A simple body doesn't move, this function returns infinity."""
         return np.inf * q.s
 
-    def _project(self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False):
+    def _project(
+        self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False
+    ):
         """Project thickness."""
         orig_shape = self.thickness.shape
         orig_region = (0, 0) + orig_shape
@@ -54,7 +56,12 @@ class StaticBody(Body):
         start = [int(num) for num in start]
 
         cy, cx = (max(0, start[0]), max(0, start[1]))
-        crop_region = (cy, cx, min(end[0], orig_shape[0]) - cy, min(end[1], orig_shape[1]) - cx)
+        crop_region = (
+            cy,
+            cx,
+            min(end[0], orig_shape[0]) - cy,
+            min(end[1], orig_shape[1]) - cx,
+        )
 
         py, px = (abs(min(0, start[0])), abs(min(0, start[1])))
         pad_region = (py, px, end[0] - start[0], end[1] - start[1])
@@ -71,7 +78,13 @@ class StaticBody(Body):
 
 
 def make_grid(
-    n, period, width=1 * q.m, thickness=1 * q.m, pixel_size=1 * q.m, material=None, queue=None
+    n,
+    period,
+    width=1 * q.m,
+    thickness=1 * q.m,
+    pixel_size=1 * q.m,
+    material=None,
+    queue=None,
 ):
     """Make a rectangluar grid with shape (*n*, *n*), the bars are spaced *period* and are *width*
     in diameter. *thickness* is the projected thickness and *pixel_size*, *material* and *queue*,
@@ -103,7 +116,7 @@ def make_sphere(n, radius, pixel_size=1 * q.m, material=None, queue=None):
     x = (x + 0.5) * pixel_size[1].simplified.magnitude
     y = (y + 0.5) * pixel_size[0].simplified.magnitude
     radius = radius.simplified.magnitude
-    valid = np.where(x ** 2 + y ** 2 < radius ** 2)
-    image[valid] = 2 * np.sqrt(radius ** 2 - x[valid] ** 2 - y[valid] ** 2)
+    valid = np.where(x**2 + y**2 < radius**2)
+    image[valid] = 2 * np.sqrt(radius**2 - x[valid] ** 2 - y[valid] ** 2)
 
     return StaticBody(image * q.m, pixel_size, material=material, queue=queue)

@@ -51,7 +51,7 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     const FP_T bbMin[3] = { scene_min.x, scene_min.y, scene_min.z };
     const FP_T bbMax[3] = { scene_max.x, scene_max.y, scene_max.z };
 
-    // 1. Remap axes based on the ray's dominant direction (Swizzling)
+    // Remap axes based on the ray's dominant direction (Swizzling)
     this->Kz = max_dim_index(abs(this->direction));
     this->Kx = this->Kz + 1;
     if (this->Kx == 3)
@@ -69,7 +69,7 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     this->Sx = D[this->Kx] * this->Sz;
     this->Sy = D[this->Ky] * this->Sz;
 
-    // 2. Pre-calculate sorted plane indices based on ray direction
+    // Pre-calculate sorted plane indices based on ray direction
     const int near_p[3] = {0, 1, 2}; // Indices for min planes
     const int far_p[3]  = {3, 4, 5}; // Indices for max planes
     this->near_kx_idx = near_p[this->Kx]; this->far_kx_idx = far_p[this->Kx];
@@ -79,16 +79,13 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     if (D[this->Ky] < 0.0f) swap(this->near_ky_idx, this->far_ky_idx);
     if (D[this->Kz] < 0.0f) swap(this->near_kz_idx, this->far_kz_idx);
 
-    // 3. Pre-calculate conservatively rounded reciprocal directions
+    // Pre-calculate conservatively rounded reciprocal directions
     this->r_near_kx = RoundDown(RoundDown(invD[this->Kx])); this->r_far_kx = RoundUp(RoundUp(invD[this->Kx]));
     this->r_near_ky = RoundDown(RoundDown(invD[this->Ky])); this->r_far_ky = RoundUp(RoundUp(invD[this->Ky]));
     this->r_near_kz = RoundDown(RoundDown(invD[this->Kz])); this->r_far_kz = RoundUp(RoundUp(invD[this->Kz]));
     
-    // 4. Calculate error bounds and corrected origins
-    // Use a practical epsilon that won't be lost to 32-bit float rounding.
-    // FP_T ROBUST_EPSILON = 0;
-    // FP_T ROBUST_EPSILON = : m_epsilons.ray_box_epsilon;
-    FP_T ROBUST_EPSILON = 5.0f * ldexpf(1.0f, -24);
+    // Calculate error bounds and corrected origins
+    FP_T ROBUST_EPSILON = m_epsilons.ray_box_epsilon;
 
     const FP_T L[3] = { fabsf(O[0] - bbMin[0]), fabsf(O[1] - bbMin[1]), fabsf(O[2] - bbMin[2]) };
     const FP_T U[3] = { fabsf(O[0] - bbMax[0]), fabsf(O[1] - bbMax[1]), fabsf(O[2] - bbMax[2]) };
@@ -122,7 +119,6 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     // The dominant axis (Kz) needs no shear error correction for its origin
     this->o_near_kz = O[this->Kz];
     this->o_far_kz  = O[this->Kz];
-
 
     this->sign[0] = (this->invDirection.x < 0);
     this->sign[1] = (this->invDirection.y < 0);
@@ -193,34 +189,6 @@ __device__ FP_T WatertightRay::point_2_parametric (FP_T4 const &point) const {
     return dot((point - this->tail), this->invDirection);
 }
 
-// __device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box_max, FP_T tmin, FP_T tmax) const
-// {
-//     FP_T4 bounds[2];
-//     bounds[0] = box_min;
-//     bounds[1] = box_max;
-
-//     FP_T tmin_new = (bounds[this->sign[0]].x - this->tail.x) * this->invDirection.x;
-//     FP_T tmax_new = (bounds[1-this->sign[0]].x - this->tail.x) * this->invDirection.x;
-//     FP_T tymin = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
-//     FP_T tymax = (bounds[1-this->sign[1]].y - this->tail.y) * this->invDirection.y;
-//     if ( (tmin_new > tymax) || (tymin > tmax_new) )
-//         return false;
-//     if (tymin > tmin_new)
-//         tmin_new = tymin;
-//     if (tymax < tmax_new)
-//         tmax_new = tymax;
-//     FP_T tzmin = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
-//     FP_T tzmax = (bounds[1-this->sign[2]].z - this->tail.z) * this->invDirection.z;
-//     if ( (tmin_new > tzmax) || (tzmin > tmax_new) )
-//         return false;
-//     if (tzmin > tmin_new)
-//         tmin_new = tzmin;
-//     if (tzmax < tmax_new)
-//         tmax_new = tzmax;
-
-//     return ( (tmin < tmax_new) && (tmax > tmin_new) );
-// }
-
 __device__ bool WatertightRay::intersects(FP_T4 const &minBbox, FP_T4 const &maxBbox) const
 {
     FP_T t_near = (0.0);
@@ -232,8 +200,7 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
     const bool is_debug = (col == debug_col) && (row == debug_row);
     #endif
 
-    const FP_T RAY_T_MIN = m_epsilons.tri_ray_tmin;
-    constexpr FP_T epsilon = ::cuda::std::numeric_limits<FP_T>::epsilon(); // ~1.19e-7
+    const FP_T epsilon = m_epsilons.tri_abs_min_error;
 
     // Calculate vertices relative to ray origin
     const FP_T4 A_t4 = V1 - this->tail;
@@ -366,13 +333,13 @@ __device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T
     }
 
     // Final check for valid intersection range
-    if (t > RAY_T_MIN) {
+    if (t > m_epsilons.tri_ray_tmin) {
         return true;
     }
 
     #ifdef DEBUG
-    if (is_debug && t <= RAY_T_MIN){
-        printf("Exit 5 (Hit too close, t=%.8g, RAY_T_MIN=%.8g)\n", t, RAY_T_MIN);
+    if (is_debug && t <= epsilon){
+        printf("Exit 5 (Hit too close, t=%.8g, epsilon=%.8g)\n", t, epsilon);
     }
     #endif
 

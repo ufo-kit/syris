@@ -49,11 +49,13 @@ def transfer(
     artefacts. Returned *out* array is different from the input one because of the pyopencl.clmath
     behavior.
     """
-    queue = kwargs.get('queue', cfg.BACKEND.queue if cfg.BACKEND.name == 'opencl' else None)
-    out = kwargs.get('out')
-    block = kwargs.get('block', False)
-    
-    if queue is None and cfg.BACKEND.name == 'opencl':
+    queue = kwargs.get(
+        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
+    )
+    out = kwargs.get("out")
+    block = kwargs.get("block", False)
+
+    if queue is None and cfg.BACKEND.name == "opencl":
         queue = cfg.OPENCL.queue
 
     if isinstance(thickness, cl_array.Array):
@@ -123,14 +125,16 @@ def compute_propagator(
     *mollifier* can be "gauss" or "butterworth". If command *queue* is specified, execute the kernel
     on it. If *block* is True, wait for the kernel to finish.
     """
-    queue = kwargs.get('queue', cfg.BACKEND.queue if cfg.BACKEND.name == 'opencl' else None)
-    block = kwargs.get('block', False)
+    queue = kwargs.get(
+        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
+    )
+    block = kwargs.get("block", False)
 
     if mollifier not in ("gauss", "butterworth"):
         raise ValueError("Mollifier can be either 'gauss' or 'butterworth'")
     if size % 2:
         raise ValueError("Only even sizes are supported")
-    if queue is None and cfg.BACKEND.name == 'opencl':
+    if queue is None and cfg.BACKEND.name == "opencl":
         queue = cfg.OPENCL.queue
 
     pixel_size = make_tuple(pixel_size)
@@ -139,13 +143,17 @@ def compute_propagator(
 
     def check_cutoff(ps):
         # Check the sampling
-        r_cutoff = compute_aliasing_limit(size, lam, ps, distance, fov=region, fourier=False)
+        r_cutoff = compute_aliasing_limit(
+            size, lam, ps, distance, fov=region, fourier=False
+        )
         min_n = 4
         if r_cutoff < min_n:
             LOG.warning(
                 "Propagator too narrow, propagation distance too small or pixel size too large"
             )
-        f_cutoff = compute_aliasing_limit(size, lam, ps, distance, fov=region, fourier=True)
+        f_cutoff = compute_aliasing_limit(
+            size, lam, ps, distance, fov=region, fourier=True
+        )
         if f_cutoff < min_n:
             LOG.warning(
                 "Propagator too wide, propagation distance too large or pixel size too small"
@@ -181,12 +189,7 @@ def compute_propagator(
             cutoff = compute_aliasing_limit(size, lam, ps, distance, fourier=fourier)
             if region is not None:
                 cutoff_region = compute_aliasing_limit(
-                    size,
-                    lam,
-                    ps,
-                    distance,
-                    fov=region,
-                    fourier=fourier
+                    size, lam, ps, distance, fov=region, fourier=fourier
                 )
                 cutoff = min(cutoff_region, cutoff)
 
@@ -197,12 +200,16 @@ def compute_propagator(
 
         cutoff = (
             compute_sigma_component(pixel_size[0]),
-            compute_sigma_component(pixel_size[1])
+            compute_sigma_component(pixel_size[1]),
         )
         if mollifier == "gauss":
-            mollifier = get_gauss_2d(size, cutoff, fourier=False, queue=queue, block=block)
+            mollifier = get_gauss_2d(
+                size, cutoff, fourier=False, queue=queue, block=block
+            )
         else:
-            mollifier = get_butterworth(size, cutoff[1] // 2, order=5, queue=queue, block=block)
+            mollifier = get_butterworth(
+                size, cutoff[1] // 2, order=5, queue=queue, block=block
+            )
         out = out * mollifier
 
         if not fourier:
@@ -217,11 +224,13 @@ def is_wavefield_sampling_ok(wavefield_exponent, **kwargs):
     """Check the sampling of the *wavefield_exponent*. Use OpenCL *queue* and *out* array. Return
     True if the sampling is OK, False otherwise.
     """
-    queue = kwargs.get('queue', cfg.BACKEND.queue if cfg.BACKEND.name == 'opencl' else None)
-    out = kwargs.get('out')
+    queue = kwargs.get(
+        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
+    )
+    out = kwargs.get("out")
 
     shape = wavefield_exponent.shape
-    if queue is None and cfg.BACKEND.name == 'opencl':
+    if queue is None and cfg.BACKEND.name == "opencl":
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl_array.zeros(queue, shape, np.int8)
@@ -258,16 +267,16 @@ def transfer_many(
     wait for OpenCL kernels if *block* is True. Returned *out* array is different from the input one
     because of the pyopencl.clmath behavior.
     """
-    queue = kwargs.get('queue', cfg.BACKEND.queue if cfg.BACKEND.name == 'opencl' else None)
-    out = kwargs.get('out')
-    block = kwargs.get('block', False)
+    queue = kwargs.get(
+        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
+    )
+    out = kwargs.get("out")
+    block = kwargs.get("block", False)
 
-    if queue is None and cfg.BACKEND.name == 'opencl':
+    if queue is None and cfg.BACKEND.name == "opencl":
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl_array.zeros(queue, shape, cfg.PRECISION.np_cplx)
-
-    u_sample = cl_array.Array(queue, shape, cfg.PRECISION.np_cplx)
 
     for i, sample in enumerate(objects):
         try:
@@ -279,7 +288,8 @@ def transfer_many(
                 exponent=True,
                 t=t,
                 check=False,
-                **kwargs, # Pass all kwargs
+                block=block,
+                **kwargs,  # Pass all kwargs
             )
         except NotImplementedError:
             LOG.debug("%s does not support real space transfer", sample)
@@ -318,11 +328,12 @@ def propagate(
     *out* a PyOpenCL Array. If *block* is True, wait for the kernels to finish. If *check* is True,
     check the transmission function sampling.
     """
-    queue = kwargs.get('queue', cfg.BACKEND.queue if cfg.BACKEND.name == 'opencl' else None)
-    out = kwargs.get('out')
-    block = kwargs.get('block', False)
+    queue = kwargs.get(
+        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
+    )
+    block = kwargs.get("block", False)
 
-    if queue is None and cfg.BACKEND.name == 'opencl':
+    if queue is None and cfg.BACKEND.name == "opencl":
         queue = cfg.OPENCL.queue
 
     u = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
@@ -336,9 +347,11 @@ def propagate(
             pixel_size,
             energy,
             offset=offset,
+            queue=queue,
+            out=u,
             t=t,
             check=check,
-            out=u,
+            block=block,
             **kwargs,
         )
         if distance != 0 * q.m:
@@ -353,12 +366,20 @@ def propagate(
                 mollified=mollified,
                 queue=queue,
                 block=block,
+                **kwargs,
             )
             fft_2(u, queue=queue, block=block)
             for sample in samples:
                 try:
                     u *= sample.transfer_fourier(
-                        shape, pixel_size, energy, t=t, queue=queue, out=None, block=block
+                        shape,
+                        pixel_size,
+                        energy,
+                        t=t,
+                        queue=queue,
+                        out=None,
+                        block=block,
+                        **kwargs,
                     )
                 except NotImplementedError:
                     LOG.debug("%s does not support fourier space transfer", sample)
@@ -398,7 +419,7 @@ def compute_collection(num_aperture, opt_ref_index):
     """Get the collection efficiency of the scintillator combined with a lens. The efficiency is
     given by :math:`\eta = \\frac{1 - \\sqrt{1 - \\left( \\frac{N\!A}{n} \\right)^2}}{2}`, where
     :math:`N\!A` is the numerical aperture *num_aperture* of the lens, :math:`n` is the optical
-    refractive index *opt_ref_index* given by the :class:`.Scintillator`.  """
+    refractive index *opt_ref_index* given by the :class:`.Scintillator`."""
     return (1 - np.sqrt(1 - (num_aperture / opt_ref_index) ** 2)) / 2
 
 
@@ -412,7 +433,9 @@ def compute_diffraction_angle(diameter, propagation_distance):
     return np.arctan(diameter / (2 * distance))
 
 
-def compute_aliasing_limit(n, wavelength, pixel_size, propagation_distance, fov=None, fourier=True):
+def compute_aliasing_limit(
+    n, wavelength, pixel_size, propagation_distance, fov=None, fourier=True
+):
     """Get the non-aliased fraction of data points when propagating a wavefield to a region :math:`n
     \\times pixel\\_size` to *propagation_distance* using *wavelength*, *pixel_size* and field of
     view *fov* (if not specified computed as *n* * *pixel_size*). If *fourier* is True then the
@@ -438,7 +461,7 @@ def compute_propagation_sampling(wavelength, distance, fov, fresnel=True):
     if fresnel:
         r = distance + (fov / 2) ** 2 / (2 * distance)
     else:
-        r = np.sqrt((fov / 2) ** 2 + distance ** 2)
+        r = np.sqrt((fov / 2) ** 2 + distance**2)
     # Nyquist f_max = 1 / 2 pixels
     # cos_alpha = lam / (2 * ps) = fov / (2 * r)
     ps = (wavelength * r / fov).rescale(q.um)

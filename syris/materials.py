@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Sample material represented by a complex refractive index."""
+
 import pickle
 import logging
 import os
@@ -132,7 +133,6 @@ ELEMENTS = [
 
 
 class Material(object):
-
     """A material represented by its *name* and *refractive_indices* calculated for *energies*."""
 
     def __init__(self, name, refractive_indices, energies, f_1=None, f_2=None):
@@ -219,7 +219,7 @@ class Material(object):
         """Save this instance to a *filename*."""
         if filename is None:
             filename = "{}.mat".format(self.name)
-        with open(filename, 'wb') as f:
+        with open(filename, "wb") as f:
             pickle.dump(self, f)
 
     def __eq__(self, other):
@@ -268,7 +268,9 @@ def make_pmasf(name, energies):
     pipe = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=True)
     out, err = pipe.communicate()
     if pipe.returncode != 0:
-        raise RuntimeError("pmasf error (code: {0}, message: {1})".format(pipe.returncode, err))
+        raise RuntimeError(
+            "pmasf error (code: {0}, message: {1})".format(pipe.returncode, err)
+        )
 
     # Parse the text output to obtain the refractive indices.
     lines = out.split("\n")
@@ -288,7 +290,9 @@ def make_henke(name, energies, formula=None, density=None):
     """Use the https://henke.lbl.gov database to lookup a material *name* for *energies*, use the
     specified chemical *formula* and *density*.
     """
-    indices = _HenkeQuery(name, energies, formula=formula, density=density).refractive_indices
+    indices = _HenkeQuery(
+        name, energies, formula=formula, density=density
+    ).refractive_indices
     element = formula or name
     element = element.lower()
     f_1 = f_2 = None
@@ -326,7 +330,7 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
             raise ValueError("'density' must be specified for formula-based lookup")
         if not formula:
             formula = name
-        density = density.rescale(q.g / q.cm ** 3).magnitude
+        density = density.rescale(q.g / q.cm**3).magnitude
         mat = "&coway=2&chem={}&rho={}".format(formula, density)
 
     base = "https://x-server.gmca.aps.anl.gov/cgi/x0h_form.exe?xway=2"
@@ -339,7 +343,7 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
         url = base + energy_text + mat + apdx
         LOG.debug(url)
         res = urllib.request.urlopen(url)
-        encoding = res.headers.get_content_charset('utf-8')
+        encoding = res.headers.get_content_charset("utf-8")
         res = res.read().decode(encoding)
         for line in res.split("\n"):
             if "delta=" in line:
@@ -360,7 +364,6 @@ def make_fromfile(filename):
 
 
 class _HenkeQuery(object):
-
     """Class for obtaining refractive indices obtained from `The Center For X-ray Optics`_.
 
     .. _The Center For X-ray Optics: https://henke.lbl.gov/optical_constants/getdb2.html
@@ -369,7 +372,6 @@ class _HenkeQuery(object):
     _URL = "https://henke.lbl.gov"
 
     class HenkeHTMLParser(HTMLParser):
-
         """HTML parser for obtaining the link with refractive indices after form submission."""
 
         def __init__(self):
@@ -390,7 +392,7 @@ class _HenkeQuery(object):
             raise ValueError("Minimum acceptable energy is 30 eV")
         if energies[-1] > 30 * q.keV:
             raise ValueError("Maximum acceptable energy is 30 keV")
-        density = -1 if density is None else density.rescale(q.g / q.cm ** 3).magnitude
+        density = -1 if density is None else density.rescale(q.g / q.cm**3).magnitude
 
         self.energies = energies
         self.formula = formula
@@ -407,7 +409,10 @@ class _HenkeQuery(object):
             energies_henke, indices = _parse_henke(values)
             self.refractive_indices = self._interpolate(energies_henke, indices)
         except urllib.error.URLError:
-            print("Cannot contact server, please check your Internet connection", file=sys.stderr)
+            print(
+                "Cannot contact server, please check your Internet connection",
+                file=sys.stderr,
+            )
             raise
 
     def _query_server(self, formula, density):
@@ -465,6 +470,4 @@ def _parse_henke(response):
 
 
 class MaterialError(Exception):
-
     """Material errors"""
-

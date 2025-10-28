@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Module for GPU-based image processing."""
+
 import itertools
 import logging
 import numpy as np
@@ -44,7 +45,7 @@ def fft_2(data, queue=None, block=True):
 def ifft_2(data, queue=None, block=True):
     """2D inverse FFT executed on *data*. *block* specifies if the execution will wait until the
     scheduled FFT kernels finish. The transformation is done in-place if *data* is a pyopencl Array
-    class and has complex data type, otherwise the data is converted first.  """
+    class and has complex data type, otherwise the data is converted first."""
     return _fft_2(data, inverse=True, queue=queue, block=block)
 
 
@@ -137,12 +138,7 @@ def get_butterworth(n, cutoff, order=5, queue=None, block=False):
     out = cl.array.Array(queue, (n, n), dtype=cfg.PRECISION.np_float)
 
     ev = cfg.OPENCL.programs["improc"].butterworth(
-        queue,
-        (n, n),
-        None,
-        out.data,
-        cfg.PRECISION.np_float(cutoff),
-        np.int32(order)
+        queue, (n, n), None, out.data, cfg.PRECISION.np_float(cutoff), np.int32(order)
     )
     if block:
         ev.wait()
@@ -215,7 +211,9 @@ def crop(image, region, out=None, queue=None, block=False):
     return out
 
 
-def bin_image(image, summed_shape, offset=(0, 0), average=False, out=None, queue=None, block=False):
+def bin_image(
+    image, summed_shape, offset=(0, 0), average=False, out=None, queue=None, block=False
+):
     """Bin an *image*. The resulting buffer has shape *summed_shape* (y, x). *Offset* (y, x) is the
     offset to the original *image*. *summed_shape* has to be a divisor of the original shape minus
     the *offset*. If *average* is True, the summed pixel is normalized by the region area.  *out* is
@@ -274,7 +272,9 @@ def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
     if image.shape != pow_shape:
         image = pad(image, region=(0, 0) + pow_shape, queue=queue)
     if sigma is None:
-        sigma = tuple([fwnm_to_sigma(float(image.shape[i]) / shape[i], n=2) for i in range(2)])
+        sigma = tuple(
+            [fwnm_to_sigma(float(image.shape[i]) / shape[i], n=2) for i in range(2)]
+        )
 
     LOG.debug(
         "decimate, shape: %s, final_shape: %s, sigma: %s, average: %s",
@@ -316,7 +316,9 @@ def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
     shape = make_tuple(shape)
     # OpenCL order
     factor = float(shape[1]) / image.shape[1], float(shape[0]) / image.shape[0]
-    LOG.debug("rescale, shape: %s, final_shape: %s, factor: %s", image.shape, shape, factor)
+    LOG.debug(
+        "rescale, shape: %s, final_shape: %s, factor: %s", image.shape, shape, factor
+    )
 
     if queue is None:
         queue = cfg.OPENCL.queue
@@ -325,7 +327,10 @@ def rescale(image, shape, sampler=None, queue=None, out=None, block=False):
 
     if not sampler:
         sampler = cl.Sampler(
-            cfg.OPENCL.ctx, False, cl.addressing_mode.CLAMP_TO_EDGE, cl.filter_mode.LINEAR
+            cfg.OPENCL.ctx,
+            False,
+            cl.addressing_mode.CLAMP_TO_EDGE,
+            cl.filter_mode.LINEAR,
         )
     image = g_util.get_image(image)
 
@@ -355,7 +360,13 @@ def compute_intensity(wavefield, queue=None, out=None, block=False):
 
 
 def varconvolve(
-    kernel_name, shape, kernel_args, local_size=None, program=None, queue=None, block=False
+    kernel_name,
+    shape,
+    kernel_args,
+    local_size=None,
+    program=None,
+    queue=None,
+    block=False,
 ):
     """Variable convolution with OpenCL kernel function *kernel_name*, gloal size *shape* (y, x),
     kernel arguments *kernel_args*, work group size *local_size* (can be None, i.e. OpenCL will
@@ -395,7 +406,10 @@ def _varconvolve_2d_parametrized(
         out = cl.array.Array(queue, image.shape, dtype=cfg.PRECISION.np_float)
     if sampler is None:
         sampler = cl.Sampler(
-            queue.context, False, cl.addressing_mode.CLAMP_TO_EDGE, cl.filter_mode.NEAREST
+            queue.context,
+            False,
+            cl.addressing_mode.CLAMP_TO_EDGE,
+            cl.filter_mode.NEAREST,
         )
     if not isinstance(parameters, cl_array.Array):
         params_host = np.empty(parameters[0].shape, dtype=cfg.PRECISION.vfloat2)
@@ -437,7 +451,14 @@ def varconvolve_gauss(
 
 
 def varconvolve_disk(
-    image, radii, normalized=True, smooth=True, sampler=None, queue=None, out=None, block=False
+    image,
+    radii,
+    normalized=True,
+    smooth=True,
+    sampler=None,
+    queue=None,
+    out=None,
+    block=False,
 ):
     """Variable convolution of input *image* with an elliptical disk with y and x radii. *radii*
     specify the convolution kernel disk y and x radius for every output point. They are specified as
@@ -471,7 +492,6 @@ def _check_tiling(shape, tiles_count):
 
 
 class Tiler(object):
-
     """Class for breaking images into smaller tiles."""
 
     def __init__(self, shape, tiles_count, outlier=True, supersampling=1, cplx=False):
@@ -501,7 +521,12 @@ class Tiler(object):
     @property
     def result_tile_shape(self):
         """Result tile shape without outlier and supersampling."""
-        return tuple([dim // self.supersampling // self._outlier_coeff for dim in self.tile_shape])
+        return tuple(
+            [
+                dim // self.supersampling // self._outlier_coeff
+                for dim in self.tile_shape
+            ]
+        )
 
     @property
     def outlier(self):
@@ -527,10 +552,16 @@ class Tiler(object):
         of a given tile in (y, x) fashion.
         """
         y_ind = np.array(
-            [i * self.tile_shape[0] // self._outlier_coeff for i in range(self.tiles_count[0])]
+            [
+                i * self.tile_shape[0] // self._outlier_coeff
+                for i in range(self.tiles_count[0])
+            ]
         )
         x_ind = np.array(
-            [i * self.tile_shape[1] // self._outlier_coeff for i in range(self.tiles_count[1])]
+            [
+                i * self.tile_shape[1] // self._outlier_coeff
+                for i in range(self.tiles_count[1])
+            ]
         )
 
         if self.outlier:
@@ -540,7 +571,9 @@ class Tiler(object):
             y_ind = y_ind - self.tile_shape[0] // 4
             x_ind = x_ind - self.tile_shape[1] // 4
 
-        return np.array(list(itertools.product(y_ind, x_ind))).reshape(self.tiles_count + (2,))
+        return np.array(list(itertools.product(y_ind, x_ind))).reshape(
+            self.tiles_count + (2,)
+        )
 
     def average(self, tile, out=None):
         """Average :class:`pyopencl.array.Array` *tile* based on supersampling and outlier specified
@@ -578,7 +611,14 @@ def make_tile_offsets(shape, tile_shape, outlier=(0, 0)):
 
 
 def make_tiles(
-    func, shape, tile_shape, iterable=None, outlier=(0, 0), queues=None, args=(), kwargs=None
+    func,
+    shape,
+    tile_shape,
+    iterable=None,
+    outlier=(0, 0),
+    queues=None,
+    args=(),
+    kwargs=None,
 ):
     """Make tiles using *func* which can either have signature func(item, *args, **kwargs) or
     func(item, queue, *args, **kwargs), where queue is the OpenCL command queue. In the latter case,
@@ -599,7 +639,10 @@ def make_tiles(
     else:
         # Use multiple comand queues
         return (
-            item for item in g_util.qmap(func, iterable, queues=queues, args=args, kwargs=kwargs)
+            item
+            for item in g_util.qmap(
+                func, iterable, queues=queues, args=args, kwargs=kwargs
+            )
         )
 
 
@@ -631,7 +674,7 @@ def get_num_tiles(tiles, num_tiles=None):
     """Determine number of tiles in the *tiles* list."""
     if num_tiles is None:
         num_tiles = int(np.sqrt(len(tiles)))
-        if num_tiles ** 2 != len(tiles):
+        if num_tiles**2 != len(tiles):
             raise ValueError(
                 "There must be equal number of tiles in both dimensions if "
                 "num_tiles is not specified"

@@ -6,15 +6,19 @@ from vtk.util.numpy_support import vtk_to_numpy
 import quantities as pq
 import abc
 import logging
+import pathlib
+import typing
 
 LOG = logging.getLogger(__name__)
 
-def renderMesh (polydata):
+
+def renderMesh(polydata):
     plotter = pv.Plotter()
     plotter.add_mesh(polydata)
     plotter.show()
 
-def extractContiguousTriangles (polydata):
+
+def extractContiguousTriangles(polydata):
     points = polydata.GetPoints()
     cells = polydata.GetPolys()
 
@@ -32,14 +36,16 @@ def extractContiguousTriangles (polydata):
 
     if len(vertices) != len(cells_np):
         raise Exception("Vertices and cells do not match")
-    
+
     return vertices, cells_np
+
 
 class MeshReaderBase(abc.ABC):
     """
     Abstract interface for all mesh readers.
     Ensures that any subclass will have the required properties.
     """
+
     @property
     @abc.abstractmethod
     def vertices(self):
@@ -65,19 +71,21 @@ class MeshReaderBase(abc.ABC):
         for better performance if they already have a PolyData object.
         """
         verts = self.vertices
-        
+
         verts_magnitude = verts.rescale(pq.m).magnitude
 
         num_points = len(verts_magnitude)
         if num_points % 3 != 0:
             raise ValueError("Vertex data does not represent a valid triangle mesh.")
-        
+
         num_triangles = num_points // 3
-        
-        faces = np.hstack((
-            np.full((num_triangles, 1), 3),
-            np.arange(num_points).reshape(num_triangles, 3)
-        )).flatten()
+
+        faces = np.hstack(
+            (
+                np.full((num_triangles, 1), 3),
+                np.arange(num_points).reshape(num_triangles, 3),
+            )
+        ).flatten()
 
         polydata = pv.PolyData(verts_magnitude, faces)
 
@@ -87,7 +95,14 @@ class MeshReaderBase(abc.ABC):
 
 
 class PyvistaReader(MeshReaderBase):
-    def __init__(self, filename : str, unit : pq.Quantity = pq.m, dtype=np.float32, compute_normals=False, triangulate=True, **kwargs):
+    def __init__(
+        self,
+        filename: typing.Union[str, pathlib.Path, pv.DataSet],
+        unit: pq.Quantity = pq.m,
+        dtype=np.float32,
+        compute_normals=False,
+        **kwargs,
+    ):
         """
         Read a mesh file using PyVista and convert it to a format suitable for rendering.
 
@@ -98,40 +113,65 @@ class PyvistaReader(MeshReaderBase):
         unit : pq.Quantity, optional"
         """
         super().__init__()
-        self.filename = filename
 
-        mesh = pv.read(self.filename)
+        if isinstance(filename, (str, pathlib.Path)):
+            self.filename = str(filename)
+            mesh = pv.read(self.filename)
+        elif isinstance(filename, pv.DataSet):
+            self.filename = "in-memory-mesh"
+            mesh = filename
+        else:
+            raise TypeError(
+                f"Expected a filename (str or Path) or a PyVista object, "
+                f"but got {type(filename)}."
+            )
 
         # Handle MultiBlock datasets
         while isinstance(mesh, pv.MultiBlock):
             mesh = mesh[0]
-        
-        # Ensure the mesh is triangulated
-        if 3 * mesh.n_cells != mesh.n_points:
+
+        if not mesh.is_all_triangles:
+            LOG.debug("Mesh is not all triangles. Triangulating...")
             mesh = mesh.triangulate(inplace=False, progress_bar=True)
+        else:
+            LOG.debug("Mesh is already all triangles.")
 
         self.polydata = mesh
 
-        # Ensure the normals are calculated
-        if mesh.cell_normals is None and compute_normals:
-            mesh = mesh.compute_normals(cell_normals=True, point_normals=False, inplace=False, progress_bar=True)
+        if compute_normals and mesh.cell_normals is None:
+            LOG.debug("Computing cell normals...")
+            mesh = mesh.compute_normals(
+                cell_normals=True, point_normals=False, inplace=False, progress_bar=True
+            )
 
-        triangles = mesh.faces.reshape(-1, 4)[:, 1:]
+        LOG.debug("Copying mesh data to contiguous NumPy arrays...")
+        points = np.array(mesh.points, copy=True, dtype=dtype)
+        faces_vtk = np.array(mesh.faces, copy=True)
 
-        points = mesh.points
+        # Handle potentially empty normals
+        cell_normals = (
+            np.array(mesh.cell_normals, copy=True, dtype=dtype)
+            if mesh.cell_normals is not None
+            else np.array([])
+        )
+        bounds = np.array(mesh.bounds, copy=True, dtype=dtype)
+
+        triangles = faces_vtk.reshape(-1, 4)[:, 1:]
+
         triangle_vertices = points[triangles]
         triangle_vertices = triangle_vertices.flatten().reshape(-1, 3)
 
         if triangles.size > 0:
-            # Step 1: Get all triangle vertex coordinates
             triangle_verts = points[triangles]
-            
-            # Step 2: Calculate all squared edge lengths
-            edge0_sq_len = np.sum((triangle_verts[:, 1, :] - triangle_verts[:, 0, :])**2, axis=1)
-            edge1_sq_len = np.sum((triangle_verts[:, 2, :] - triangle_verts[:, 1, :])**2, axis=1)
-            edge2_sq_len = np.sum((triangle_verts[:, 0, :] - triangle_verts[:, 2, :])**2, axis=1)
-
-            # Step 3: Find the minimum of all NON-ZERO squared lengths
+            edge0_sq_len = np.sum(
+                (triangle_verts[:, 1, :] - triangle_verts[:, 0, :]) ** 2, axis=1
+            )
+            edge1_sq_len = np.sum(
+                (triangle_verts[:, 2, :] - triangle_verts[:, 1, :]) ** 2, axis=1
+            )
+            edge2_sq_len = np.sum(
+                (triangle_verts[:, 0, :] - triangle_verts[:, 2, :]) ** 2, axis=1
+            )
             all_sq_lens = np.concatenate([edge0_sq_len, edge1_sq_len, edge2_sq_len])
             non_zero_sq_lens = all_sq_lens[all_sq_lens > 0]
 
@@ -149,18 +189,21 @@ class PyvistaReader(MeshReaderBase):
             largest_feature = np.inf
 
         self._smallest_feature_size = smallest_feature.astype(dtype)
-        self._largest_feature_size = largest_feature.astype(dtype)        
-        
+        self._largest_feature_size = largest_feature.astype(dtype)
+        self.dynamic_range = 1
         if self._smallest_feature_size > 0 and np.isfinite(self._smallest_feature_size):
-            dynamic_range = self._largest_feature_size / self._smallest_feature_size
-            LOG.debug(f"Dynamic Range: {dynamic_range:.2f} : 1")
+            self.dynamic_range = (
+                self._largest_feature_size / self._smallest_feature_size
+            )
+            LOG.debug(f"Dynamic Range: {self.dynamic_range:.2f} : 1")
         else:
             LOG.debug("Dynamic Range: N/A (smallest feature is zero or invalid)")
 
-        self._vertices = np.array(triangle_vertices).T.astype(dtype) * unit
+        # Store the final NumPy arrays
+        self._vertices = triangle_vertices.T.copy().astype(dtype) * unit
         self._triangles = triangles
-        self._normals = np.array(mesh.cell_normals).astype(dtype) * unit
-        self._bounds = np.array(mesh.bounds).astype(dtype) * unit
+        self._normals = cell_normals * unit
+        self._bounds = bounds * unit
 
     @property
     def vertices(self):
@@ -173,7 +216,7 @@ class PyvistaReader(MeshReaderBase):
     @property
     def bounds(self):
         return self._bounds
-    
+
     @property
     def epsilon(self):
         return self._smallest_feature_size
@@ -181,12 +224,12 @@ class PyvistaReader(MeshReaderBase):
 
 class WavefrontAnimationReader(MeshReaderBase):
     def __init__(self, folder: str):
-        self.filenames = sorted([
-            os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.obj')
-        ])
+        self.filenames = sorted(
+            [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".obj")]
+        )
         if not self.filenames:
             raise FileNotFoundError(f"No .obj files found in folder: {folder}")
-        
+
         # Initialize properties to None; they will be set by the iterator
         self._vertices = None
         self._normals = None
@@ -215,14 +258,16 @@ class WavefrontAnimationReader(MeshReaderBase):
         reader.SetFileName(filename)
         reader.Update()
         polydata = reader.GetOutput()
-        
+
         # Extract and process data
         points_np = vtk_to_numpy(polydata.GetPoints().GetData())
-        cells_np = vtk_to_numpy(polydata.GetPolys().GetData()).reshape(-1, 4)[:, 1:].flatten()
-        
+        cells_np = (
+            vtk_to_numpy(polydata.GetPolys().GetData()).reshape(-1, 4)[:, 1:].flatten()
+        )
+
         vertices = points_np[cells_np].astype(np.float32)
         bounds = np.array(polydata.GetBounds()).astype(np.float32)
-        
+
         # Compute normals if not present
         if polydata.GetCellData().GetNormals() is None:
             normal_filter = vtk.vtkPolyDataNormals()
@@ -230,10 +275,14 @@ class WavefrontAnimationReader(MeshReaderBase):
             normal_filter.ComputeCellNormalsOn()
             normal_filter.ComputePointNormalsOff()
             normal_filter.Update()
-            normals = vtk_to_numpy(normal_filter.GetOutput().GetCellData().GetNormals()).astype(np.float32)
+            normals = vtk_to_numpy(
+                normal_filter.GetOutput().GetCellData().GetNormals()
+            ).astype(np.float32)
         else:
-            normals = vtk_to_numpy(polydata.GetCellData().GetNormals()).astype(np.float32)
-            
+            normals = vtk_to_numpy(polydata.GetCellData().GetNormals()).astype(
+                np.float32
+            )
+
         return vertices, normals, bounds
 
     def iter_frames(self):
@@ -241,23 +290,23 @@ class WavefrontAnimationReader(MeshReaderBase):
         for filename in self.filenames:
             # Read the data for the current frame
             v, n, b = self._read_file(filename)
-            
+
             # Update instance properties so they can be accessed after iteration
             self._vertices = v
             self._normals = n
             self._bounds = b
-            
-            yield self # Yield the reader instance itself
+
+            yield self  # Yield the reader instance itself
 
 
 class RandomMeshReader(MeshReaderBase):
-    def __init__(self, n : int, eps : float, lengths : np.ndarray, origin : np.ndarray):
+    def __init__(self, n: int, eps: float, lengths: np.ndarray, origin: np.ndarray):
         super().__init__()
 
         rng = np.random.default_rng()
-        
+
         self.points = rng.random((n, 3)) * lengths + origin - lengths / 2
-        
+
         # Create an empty array for vertices
         self._vertices = np.empty((n * 3, 3)).astype(np.float32)
 
@@ -273,18 +322,25 @@ class RandomMeshReader(MeshReaderBase):
         # New random seed
         rng = np.random.default_rng()
         self._normals = np.random.rand(n, 3).astype(np.float32) - 0.5
-        self._bounds = np.array([origin[0] - lengths[0] / 2, origin[0] + lengths[0] / 2, origin[1] - lengths[1] / 2, origin[1] + lengths[1] / 2, origin[2] - lengths[2] / 2, origin[2] + lengths[2] / 2]).astype(np.float32)
-    
+        self._bounds = np.array(
+            [
+                origin[0] - lengths[0] / 2,
+                origin[0] + lengths[0] / 2,
+                origin[1] - lengths[1] / 2,
+                origin[1] + lengths[1] / 2,
+                origin[2] - lengths[2] / 2,
+                origin[2] + lengths[2] / 2,
+            ]
+        ).astype(np.float32)
+
     @property
-    def scene (self):
+    def scene(self):
         return [self.vertices, self.normals, self.bounds]
-    
-    def visualize (self, normals=False, figsize=(800, 1024)):
+
+    def visualize(self, normals=False, figsize=(800, 1024)):
         plotter = pv.Plotter(window_size=figsize)
         plotter.add_mesh(self.polydata)
-        plotter.add_points(self.points, color='red')
+        plotter.add_points(self.points, color="red")
         if normals:
             plotter.add_arrows(self.points, self.normals, mag=0.1)
         plotter.show()
-    
-    

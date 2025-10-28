@@ -54,7 +54,6 @@ LOG = logging.getLogger(__name__)
 
 
 class BoundingBox(object):
-
     """Class representing a graphical object's bounding box."""
 
     def __init__(self, points):
@@ -101,7 +100,9 @@ class BoundingBox(object):
         z_min = min(self.get_min(Z), other.get_min(Z))
         z_max = max(self.get_max(Z), other.get_max(Z))
 
-        self._points = make_points([x_min, x_max] * q.m, [y_min, y_max] * q.m, [z_min, z_max] * q.m)
+        self._points = make_points(
+            [x_min, x_max] * q.m, [y_min, y_max] * q.m, [z_min, z_max] * q.m
+        )
 
     def overlaps(self, other):
         """
@@ -113,7 +114,9 @@ class BoundingBox(object):
         x_interval_1 = other.get_min(X), other.get_max(X)
         y_interval_1 = other.get_min(Y), other.get_max(Y)
 
-        return overlap(x_interval_0, x_interval_1) and overlap(y_interval_0, y_interval_1)
+        return overlap(x_interval_0, x_interval_1) and overlap(
+            y_interval_0, y_interval_1
+        )
 
     def __repr__(self):
         return "BoundingBox(%s)" % (str(self))
@@ -130,7 +133,6 @@ class BoundingBox(object):
 
 
 class Trajectory(object):
-
     """Class representing object's trajectory.
 
     Trajectory is a spline interpolated from a set of points.
@@ -163,7 +165,9 @@ class Trajectory(object):
         self._num_points = num_points
 
         if time_dist is not None and velocity is not None:
-            raise ValueError("time_dist and velocity can't be specified at the same time.")
+            raise ValueError(
+                "time_dist and velocity can't be specified at the same time."
+            )
 
         self._tck = None
         self._u = None
@@ -187,7 +191,11 @@ class Trajectory(object):
             max_du = self.get_maximum_du()
             coeff = max(np.gradient(self.parameter)) / max_du
             # Use 4 times more points then approximated to try to fit the curve the best
-            n = 4 * int(np.ceil(coeff * len(self.parameter))) if coeff > 1 else len(self.parameter)
+            n = (
+                4 * int(np.ceil(coeff * len(self.parameter)))
+                if coeff > 1
+                else len(self.parameter)
+            )
         else:
             n = self._num_points
 
@@ -415,7 +423,9 @@ class Trajectory(object):
         # doesn't move the body by more than *distance*
         distances = self.get_distances()
         tck = interp.splprep(distances, u=self.parameter, s=0)[0]
-        max_du = maximum_derivative_parameter(tck, self.parameter, distance.simplified.magnitude)
+        max_du = maximum_derivative_parameter(
+            tck, self.parameter, distance.simplified.magnitude
+        )
 
         return max_du
 
@@ -510,7 +520,7 @@ class Trajectory(object):
         def part(x_d, y_d, z_d):
             # for a 3D parametric curve the length is
             # sqrt((d_x/d_u)^2 + (d_y/d_u)^2 + (d_z/d_u)^2).
-            return np.sqrt(x_d ** 2 + y_d ** 2 + z_d ** 2)
+            return np.sqrt(x_d**2 + y_d**2 + z_d**2)
 
         der_tck = interp.splrep(self._u, part(*self._derivatives))
 
@@ -518,7 +528,6 @@ class Trajectory(object):
 
 
 class TrajectoryError(Exception):
-
     """Exceptions related to trajectory."""
 
 
@@ -533,7 +542,7 @@ def closest(values, min_value):
 
 def length(vector):
     """Get length of a *vector*."""
-    return np.sqrt(np.sum(vector ** 2, axis=0))
+    return np.sqrt(np.sum(vector**2, axis=0))
 
 
 def normalize(vector):
@@ -597,15 +606,15 @@ def rotate(phi, axis, shift=None):
         t_1 = translate(shift)
 
     rot_matrix = np.identity(4)
-    rot_matrix[0][0] = cos + v_x ** 2 * (1 - cos)
+    rot_matrix[0][0] = cos + v_x**2 * (1 - cos)
     rot_matrix[0][1] = v_x * v_y * (1 - cos) - v_z * sin
     rot_matrix[0][2] = v_x * v_z * (1 - cos) + v_y * sin
     rot_matrix[1][0] = v_x * v_y * (1 - cos) + v_z * sin
-    rot_matrix[1][1] = cos + v_y ** 2 * (1 - cos)
+    rot_matrix[1][1] = cos + v_y**2 * (1 - cos)
     rot_matrix[1][2] = v_y * v_z * (1 - cos) - v_x * sin
     rot_matrix[2][0] = v_z * v_x * (1 - cos) - v_y * sin
     rot_matrix[2][1] = v_z * v_y * (1 - cos) + v_x * sin
-    rot_matrix[2][2] = cos + v_z ** 2 * (1 - cos)
+    rot_matrix[2][2] = cos + v_z**2 * (1 - cos)
 
     if shift is not None:
         t_2 = translate(-shift)
@@ -700,6 +709,7 @@ def get_rotation_displacement(d_0, d_1, length):
     Return the displacement of a sphere with radius *length* caused by rotation around vectors *d_0*
     and *d_1*. The displacement is returned for every axis (x, y, z).
     """
+
     # return np.abs(length * (normalize(d_1) - normalize(d_0)))
     def get_displacement(axis, rot_axis, phi):
         """

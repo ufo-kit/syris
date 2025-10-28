@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Cameras used by experiments."""
+
 import logging
 import pkg_resources
 import numpy as np
@@ -28,7 +29,6 @@ from syris import config as cfg
 from syris.imageprocessing import bin_image, decimate
 from syris.math import fwnm_to_sigma
 from syris.geometry import Z_AX
-import pyvista as pv
 
 LOG = logging.getLogger(__name__)
 
@@ -40,11 +40,15 @@ def is_fps_feasible(fps, exp_time):
     """
     return exp_time <= 1.0 / fps
 
+
 def is_length(param):
-    return isinstance(param, q.Quantity) and param.dimensionality.simplified == q.m.dimensionality.simplified
+    return (
+        isinstance(param, q.Quantity)
+        and param.dimensionality.simplified == q.m.dimensionality.simplified
+    )
+
 
 class Camera(MovableBody):
-
     """Base class representing a camera."""
 
     def __init__(
@@ -64,7 +68,7 @@ class Camera(MovableBody):
         optical_axis=None,
         source_detector_distance=None,
         trajectory=None,
-        parallel=True
+        parallel=True,
     ):
         """Create a camera with *pixel_size*, *gain* specifying :math:`\frac{counts}{e^-}`,
         *dark_current* as mean number of electrons present without incident light, *amplifier_sigma*
@@ -91,7 +95,7 @@ class Camera(MovableBody):
         self._psf = None
         self._source_detector_distance = source_detector_distance
         self._focal_length = focal_length
-        
+
         if source_detector_distance is not None:
             self._source_detector_distance = source_detector_distance.rescale(cfg.UNIT)
 
@@ -117,13 +121,13 @@ class Camera(MovableBody):
             self._optical_axis = optical_axis
 
         if trajectory is None:
-            trajectory = Trajectory([(0,0,0)]*cfg.UNIT, pixel_size)            
+            trajectory = Trajectory([(0, 0, 0)] * cfg.UNIT, pixel_size)
 
         super(Camera, self).__init__(trajectory)
 
     def _to_cuda_vector(self, quantity_vec, w_val=0.0):
         """
-        Converts a 3D vector (either a quantities vector or a plain array-like) 
+        Converts a 3D vector (either a quantities vector or a plain array-like)
         to a 4D NumPy float array for CUDA.
         """
         try:
@@ -133,7 +137,7 @@ class Camera(MovableBody):
 
         vec_4d = np.append(vec, w_val)
         return vec_4d.astype(cfg.PRECISION.np_float)
-    
+
     def update_fov(self):
         if self._focal_length is None:
             return
@@ -168,7 +172,7 @@ class Camera(MovableBody):
     def _v_vec(self):
         """The up-direction vector as a dimensionless quantities array."""
         return self.transform_matrix[0:3, 1] * q.dimensionless
-    
+
     @property
     def _pixel_size_vec(self):
         """Ensures pixel size is a 2-element quantities array."""
@@ -176,7 +180,7 @@ class Camera(MovableBody):
         if ps.ndim == 0:
             return np.array([ps.item(), ps.item()]) * ps.units
         return ps
-    
+
     # Cuda compatible properties
     @property
     def pixel_size(self):
@@ -203,7 +207,7 @@ class Camera(MovableBody):
         # position property is inherited from MovableBody
         vec = self.position + self._source_detector_distance * self.w
         return self._to_cuda_vector(vec)
-    
+
     @property
     def shape(self):
         ret = np.array(self._shape)
@@ -220,6 +224,22 @@ class Camera(MovableBody):
         self._shape = value
         self.update_viewport_dimensions()
         self.update_fov()
+
+    @property
+    def kernel_shape_xy(self):
+        """
+        Returns the shape as (x, y) [width, height],
+        contiguous, for CUDA kernels.
+        """
+        return self.shape[::-1].copy()
+
+    @property
+    def kernel_pixel_size_xy(self):
+        """
+        Returns the pixel_size as (x, y) [ps_x, ps_y],
+        contiguous, for CUDA kernels.
+        """
+        return self.pixel_size[::-1].copy()
 
     @property
     def focal_length(self):
@@ -246,30 +266,38 @@ class Camera(MovableBody):
 
     @property
     def fov(self):
-        self._fov = 2 * np.arctan(self.viewport_dimensions / (2 * self.focal_length)) * q.rad
+        self._fov = (
+            2 * np.arctan(self.viewport_dimensions / (2 * self.focal_length)) * q.rad
+        )
         ret = self._fov.magnitude
         return ret.astype(cfg.PRECISION.np_float)
 
     @property
     def viewport_basis_vectors(self):
         """Returns the camera's basis vectors as CUDA-compatible arrays."""
-        return self._to_cuda_vector(self.u), self._to_cuda_vector(self.v), self._to_cuda_vector(self.w)
-    
+        return (
+            self._to_cuda_vector(self.u),
+            self._to_cuda_vector(self.v),
+            self._to_cuda_vector(self.w),
+        )
+
     @property
     def p00_corner(self):
         """
-        Calculates the world coordinate of the top-left CORNER 
+        Calculates the world coordinate of the top-left CORNER
         of the top-left pixel (0,0).
         """
         # Get dimensions as quantities objects
         viewport_dims = self._shape * self._pixel_size_vec
-        
+
         # Vector from the camera's center to the top-left corner of the sensor
-        vec_to_corner = - (viewport_dims[1] / 2) * self._u_vec - (viewport_dims[0] / 2) * self._v_vec
+        vec_to_corner = (
+            -(viewport_dims[1] / 2) * self._u_vec - (viewport_dims[0] / 2) * self._v_vec
+        )
 
         # Calculate the final position vector with units
         final_vec = self.position + vec_to_corner
-        
+
         # Convert to unitless CUDA vector at the very end
         return self._to_cuda_vector(final_vec)
 
@@ -306,20 +334,24 @@ class Camera(MovableBody):
     @fps.setter
     def fps(self, fps):
         if not is_fps_feasible(fps, self.exp_time):
-            fmt = "FPS {} not possible for exposure time {}, setting exposure time to {}"
+            fmt = (
+                "FPS {} not possible for exposure time {}, setting exposure time to {}"
+            )
             LOG.debug(fmt.format(fps, self.exp_time, 1 / fps.simplified))
             self._exp_time = 1 / fps.simplified
         self._fps = fps.simplified
 
     @property
     def max_grey_value(self):
-        return 2 ** self.bpp - 1
+        return 2**self.bpp - 1
 
     def get_quantum_efficiency(self, wavelength):
         """Get quantum efficiency [dimensionless] at *wavelength*."""
         return interp.splev(wavelength.rescale(q.nm).magnitude, self._qe_tck)
 
-    def get_image(self, photons, shot_noise=True, amplifier_noise=True, psf=True, queue=None):
+    def get_image(
+        self, photons, shot_noise=True, amplifier_noise=True, psf=True, queue=None
+    ):
         """Get digital counts image from incoming *photons*. The resulting image is based on the
         incoming photons and dark current. We apply noise based on EMVA 1288 standard according to
         which the variance :math:`\sigma_y^2 = K^2 ( \sigma_e^2 + \sigma_d^2 ) + \sigma_q^2`, where
@@ -331,7 +363,10 @@ class Camera(MovableBody):
         """
         if self._last_input_shape != photons.shape:
             self._last_input_shape = photons.shape
-            self._bin_factor = (photons.shape[0] / self.shape[0], photons.shape[1] / self.shape[1])
+            self._bin_factor = (
+                photons.shape[0] / self.shape[0],
+                photons.shape[1] / self.shape[1],
+            )
 
         if queue is None:
             queue = cfg.OPENCL.queue
@@ -343,7 +378,10 @@ class Camera(MovableBody):
 
         if self._bin_factor != (1, 1):
             if psf:
-                sigma = (fwnm_to_sigma(self._bin_factor[0]), fwnm_to_sigma(self._bin_factor[1]))
+                sigma = (
+                    fwnm_to_sigma(self._bin_factor[0]),
+                    fwnm_to_sigma(self._bin_factor[1]),
+                )
                 small = decimate(electrons, self.shape, sigma=sigma, queue=queue)
             else:
                 small = bin_image(electrons, self.shape, queue=queue)
@@ -366,6 +404,7 @@ class Camera(MovableBody):
         # Apply quantization noise
         return counts.astype(self.dtype)
 
+
 def make_pco_dimax():
     """Make a pco.dimax camera."""
     lam, qe = np.load(
@@ -375,5 +414,12 @@ def make_pco_dimax():
 
     # Use a power of two padded value so that it's easier to use with FFT
     return Camera(
-        11 * q.m, 0.1, 530.0, 23.0, 12, (2048, 2048), quantum_efficiencies=qe, wavelengths=lam
+        11 * q.m,
+        0.1,
+        530.0,
+        23.0,
+        12,
+        (2048, 2048),
+        quantum_efficiencies=qe,
+        wavelengths=lam,
     )

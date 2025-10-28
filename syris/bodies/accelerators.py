@@ -1,8 +1,7 @@
 import abc
 import syris.config as cfg
 import quantities as q
-from syris.util import get_magnitude, make_tuple
-import pyopencl.array as cl_array
+from syris.util import get_magnitude
 import pyopencl.cltypes as cltypes
 import syris.gpu.util as gutil
 import numpy as np
@@ -10,12 +9,13 @@ import logging
 
 LOG = logging.getLogger(__name__)
 
+
 class AcceleratorBase(abc.ABC):
     def __init__(self, mesh):
         self.mesh = mesh
         self.backend = cfg.BACKEND
         self._built_for_state = -1
-        
+
     @abc.abstractmethod
     def build(self, **kwargs):
         """
@@ -27,96 +27,140 @@ class AcceleratorBase(abc.ABC):
     def project(self, shape, pixel_size, offset, /, *, t=None, **kwargs):
         pass
 
+
 class BvhCupyAccelerator(AcceleratorBase):
-    """The new, fast GPU-based projection strategy using a BVH tree and CUDA."""
+    """CUDA-based ray caster accelerated by a LBVH tree"""
+
     def __init__(self, mesh):
         super().__init__(mesh)
         self.pipeline = cfg.BACKEND.pipeline
         if self.pipeline is None:
-            raise RuntimeError("CUDA backend is active, but the CudaPipeline was not initialized.")
+            raise RuntimeError(
+                "CUDA backend is active, but the CudaPipeline was not initialized."
+            )
+
+        self.xp = cfg.BACKEND.xp
+
+        self.float_dtype = cfg.PRECISION.np_float
+        self.float4_view = cfg.PRECISION.float4
+        self.float2_view = cfg.PRECISION.float2
+        self.uint2_view = cfg.PRECISION.uint2
+
+        is_double = self.float_dtype is np.float64
+        rc_cfg = cfg.RayCasting(is_double, self.mesh.dynamic_range)
+
+        self._epsilon_args = (
+            self.float_dtype(rc_cfg.p_ray_box_epsilon),
+            self.float_dtype(rc_cfg.p_tri_ray_tmin),
+            self.float_dtype(rc_cfg.p_tri_gamma_multiplier),
+            self.float_dtype(rc_cfg.p_tri_abs_min_error),
+            self.float_dtype(rc_cfg.p_tri_d_gamma_multiplier),
+            self.float_dtype(rc_cfg.p_tri_d_abs_min_error),
+            self.float_dtype(rc_cfg.p_group_abs_epsilon),
+            self.float_dtype(rc_cfg.p_group_rel_epsilon),
+            self.float_dtype(rc_cfg.p_unique_abs_epsilon),
+        )
+
+        self._tree = None
         self._tree = None
 
     def build(self, **kwargs):
         """
         Build a bounding volume hierarchy tree for the mesh.
         """
-
         self.mesh.transform()
-
-        xp = cfg.BACKEND.xp
-        
-        float = cfg.PRECISION.np_float
-        float4 = cfg.PRECISION.float4
 
         host_vertices = self.mesh._current[0:3, :]
         nb_vertices = host_vertices.shape[1]
+        nb_keys = self.mesh.num_triangles
+
+        host_normals = self.mesh.normals if self.mesh._use_normals else None
+
         bounds = self.mesh.bounds
-
-        if self.mesh._use_normals:
-            host_normals = self.mesh.normals
-        else:
-            host_normals = None
-
-        nb_keys = nb_vertices // 3
-        sceneMin = np.array([bounds[0], bounds[2], bounds[4], 0], dtype=float)
-        sceneMax = np.array([bounds[1], bounds[3], bounds[5], 0], dtype=float)
-
+        sceneMin = np.array(
+            [bounds[0], bounds[2], bounds[4], 0], dtype=self.float_dtype
+        )
+        sceneMax = np.array(
+            [bounds[1], bounds[3], bounds[5], 0], dtype=self.float_dtype
+        )
         t_epsilon = self.mesh.epsilon
-        
+
+        host_vertices = host_vertices.T
+        if len(host_vertices.shape) == 1:
+            host_vertices = host_vertices.reshape(-1, 3)
+            nb_vertices = len(host_vertices)
+
+        if len(host_vertices.shape) != 2 or host_vertices.shape[1] != 3:
+            raise ValueError(
+                f"Vertices must have shape (N, 3), but got {host_vertices.shape}"
+            )
+
         try:
-            host_vertices = host_vertices.T            
-            if len(host_vertices.shape) == 1:
-                host_vertices = host_vertices.reshape(-1, 3)
-                nb_vertices = len(host_vertices)
-
-            # Ensure vertices have the correct shape before proceeding
-            if len(host_vertices.shape) != 2 or host_vertices.shape[1] != 3:
-                raise ValueError(f"Vertices must have shape (N, 3), but got {host_vertices.shape}")
-
             # Create and transfer vertex data to the GPU in a single operation
-            vertices = xp.zeros((nb_vertices, 4), dtype=float)
-            vertices[:, :3] = xp.array(host_vertices, dtype=float)
-            
-            # Create and transfer normal data to the GPU if it exists
-            if host_normals is not None:
-                normals = xp.zeros((nb_keys, 4), dtype=float)
-                normals[:, :3] = xp.array(host_normals, dtype=float)
-            else:
-                normals = None
+            vertices = self.xp.zeros((nb_vertices, 4), dtype=self.float_dtype)
+            vertices[:, :3] = self.xp.array(host_vertices, dtype=self.float_dtype)
 
-            keys = xp.zeros(nb_keys, dtype=xp.uint64)
-            rope = xp.ones(2 * nb_keys, dtype=xp.int32) * -1
-            left = xp.ones(2 * nb_keys, dtype=xp.int32) * -1
-            entered = xp.ones(2 * nb_keys, dtype=xp.int32) * -1
-            bbMin = xp.zeros((2 * nb_keys, 4), dtype=float)
-            bbMax = xp.zeros((2 * nb_keys, 4), dtype=float)
+            # Create and transfer normal data to the GPU if it exists
+            normals = None
+            if host_normals is not None:
+                normals = self.xp.zeros((nb_keys, 4), dtype=self.float_dtype)
+                normals[:, :3] = self.xp.array(host_normals, dtype=self.float_dtype)
+
+            keys = self.xp.zeros(nb_keys, dtype=self.xp.uint64)
+            rope = self.xp.full(2 * nb_keys, -1, dtype=self.xp.int32)
+            left = self.xp.full(2 * nb_keys, -1, dtype=self.xp.int32)
+            entered = self.xp.full(2 * nb_keys, -1, dtype=self.xp.int32)
+            bbMin = self.xp.zeros((2 * nb_keys, 4), dtype=self.float_dtype)
+            bbMax = self.xp.zeros((2 * nb_keys, 4), dtype=self.float_dtype)
 
             # Project the triangle centroids
-            args = (nb_keys, vertices, keys, bbMin.view(float4), bbMax.view(float4), sceneMin.view(float4), sceneMax.view(float4))
             block_size = (256, 1, 1)
             grid_size = (int(np.ceil(nb_keys / block_size[0])), 1, 1)
-            project_t = cfg.BACKEND.pipeline.launchKernel("projectTriangleCentroid", grid_size, block_size, args)
+
+            project_args = (
+                nb_keys,
+                vertices,
+                keys,
+                bbMin.view(self.float4_view),
+                bbMax.view(self.float4_view),
+                sceneMin.view(self.float4_view),
+                sceneMax.view(self.float4_view),
+            )
+            project_t = self.pipeline.launchKernel(
+                "projectTriangleCentroid", grid_size, block_size, project_args
+            )
             LOG.debug(f"Projected triangle centroids in {project_t} ms")
 
             # Sort the keys
-            sorted_keys = xp.argsort(keys)
+            sorted_keys = self.xp.argsort(keys)
             keys = keys[sorted_keys]
             permutation = sorted_keys
 
             # Grow the tree
-            args = (nb_keys, keys, permutation, rope, left, entered, bbMin.view(float4), bbMax.view(float4))
+            grow_args = (
+                nb_keys,
+                keys,
+                permutation,
+                rope,
+                left,
+                entered,
+                bbMin.view(self.float4_view),
+                bbMax.view(self.float4_view),
+            )
             block_size = (256, 1, 1)
             grid_size = (int(np.ceil(nb_keys / block_size[0])), 1, 1)
-            grow_t = cfg.BACKEND.pipeline.launchKernel("growTreeKernel", grid_size, block_size, args)
+            grow_t = cfg.BACKEND.pipeline.launchKernel(
+                "growTreeKernel", grid_size, block_size, grow_args
+            )
             LOG.debug(f"grew tree in {grow_t} ms")
 
             # Free memory we no longer need
-            cfg.BACKEND.pipeline.synchronize()
+            self.pipeline.synchronize()
 
             tree = {
                 "keys": keys,
                 "rope": rope,
-                "left": left, 
+                "left": left,
                 "indices": permutation,
                 "bbMin": bbMin,
                 "bbMax": bbMax,
@@ -124,215 +168,125 @@ class BvhCupyAccelerator(AcceleratorBase):
                 "sceneMax": sceneMax,
                 "vertices": vertices,
                 "normals": normals,
-                "t_epsilon": t_epsilon
+                "t_epsilon": t_epsilon,
             }
 
             self._tree = tree
             self._built_for_state = self.mesh._state
 
-            
         except Exception as e:
             self._built_for_state = -1
-
-            # Clean up CUDA memory in case of error
-            cfg.BACKEND.pipeline.synchronize()
-            xp.get_default_memory_pool().free_all_blocks()
-            xp.get_default_pinned_memory_pool().free_all_blocks()
+            self.pipeline.synchronize()
+            self.xp.get_default_memory_pool().free_all_blocks()
+            self.xp.get_default_pinned_memory_pool().free_all_blocks()
             raise RuntimeError(f"Failed to build BVH tree: {e}") from e
 
-
-
-    def project(self, shape, pixel_size, offset, /, *, t=None, iterations=0, abs_tolerance = 1e-5, rel_tolerance = .02, **kwargs):
-        """Projection implementation using cuda ray caster."""
-
+    def project(
+        self,
+        shape,
+        pixel_size,
+        offset,
+        /,
+        *,
+        t=None,
+        iterations=0,
+        abs_tolerance=1e-5,
+        rel_tolerance=0.02,
+        **kwargs,
+    ):
         if self._tree is None:
             raise RuntimeError("BVH tree must be built before projection.")
-        
-        camera = kwargs.get('camera')
-        parallel = kwargs.get('parallel', True)
 
-        if self._tree == None:
-            raise RuntimeError("Tree must be built first")
+        camera = kwargs.get("camera")
+        if camera is None:
+            raise ValueError("Missing required keyword argument: 'camera'")
 
-        xp = cfg.BACKEND.xp
-
-        float = cfg.PRECISION.np_float
-        float4 = cfg.PRECISION.float4
-        float2 = cfg.PRECISION.float2
-        uint2 = cfg.PRECISION.uint2
+        parallel = kwargs.get("parallel", True)
 
         nb_keys = self._tree["keys"].shape[0]
-        use_normals = (self._tree["normals"] is not None)
+        use_normals = self._tree["normals"] is not None
         U, V, W = camera.viewport_basis_vectors
-        image = xp.ones(camera.shape[0] * camera.shape[1], dtype=float) * -1
 
-        global_counter = xp.zeros(1, dtype=xp.uint32)
-        
-        block_size = (16, 1, 1)
-        grid_size = (int(xp.ceil(camera.shape[0] * camera.shape[1] / block_size[0])), 1, 1)
+        # --- Calculate Scaling ---
+        # Scale geometry to [-1, 1] for numerical stability in kernel
+        max_bound = float(self.mesh.furthest_point.magnitude)
+        scale = 1.0
+        if max_bound > 0:
+            scale = float(1.0 / max_bound)
 
+        # --- Prepare Kernel Launch ---
+        image = (
+            self.xp.ones(camera.shape[0] * camera.shape[1], dtype=self.float_dtype) * -1
+        )
+        global_counter = self.xp.zeros(1, dtype=self.xp.uint32)
+
+        block_size = (256, 1, 1)
+        grid_size = (
+            int(self.xp.ceil(camera.shape[0] * camera.shape[1] / block_size[0])),
+            1,
+            1,
+        )
+
+        # --- Build Kernel Arguments ---
         base_args = [
-            global_counter, nb_keys, image,
-            self._tree["vertices"].view(float4)
+            global_counter,
+            nb_keys,
+            image,
+            (self._tree["vertices"] * scale).view(self.float4_view),
         ]
+        if use_normals:
+            base_args.append((self._tree["normals"] * scale).view(self.float4_view))
 
         camera_args = [
-            camera.shape.view(uint2), U.view(float4), V.view(float4), W.view(float4),
-            camera.p00_corner.view(float4), camera.pixel_size.view(float2),
-        ]
-
-        tree_args = [
-            self._tree["rope"], self._tree["left"], self._tree["indices"],
-            self._tree["bbMin"], self._tree["bbMax"],
-            self._tree["sceneMin"].view(float4), self._tree["sceneMax"].view(float4)
-        ]
-
-        sampling_args = [
-            float(abs_tolerance),
-            float(rel_tolerance),
-            int(iterations)
-        ]
-
-        epsilon_args = [
-            float(5.0 * (2**-24)),  # p_ray_box_epsilon
-            float(1e-7),            # p_tri_ray_tmin
-            float(256.0),           # p_tri_gamma_multiplier
-            float(1e-10),           # p_tri_abs_min_error
-            float(128.0),           # p_tri_d_gamma_multiplier (passed as float, cast in kernel)
-            float(1e-100),          # p_tri_d_abs_min_error (passed as float, cast in kernel)
-            float(1e-6),            # p_group_abs_epsilon
-            float(1e-5),            # p_group_rel_epsilon
-            float(1e-7)             # p_unique_abs_epsilon (for no-normal traceRay)
+            camera.kernel_shape_xy.view(self.uint2_view),
+            U.view(self.float4_view),
+            V.view(self.float4_view),
+            W.view(self.float4_view),
+            (camera.p00_corner * scale).view(self.float4_view),
+            (camera.kernel_pixel_size_xy * scale).view(self.float2_view),
         ]
 
         if not parallel:
-            camera_args.append(camera.source_point.view(float4))
+            camera_args.append((camera.source_point * scale).view(self.float4_view))
 
-        if use_normals:
-            base_args.append(self._tree["normals"].view(float4))
+        tree_args = [
+            self._tree["rope"],
+            self._tree["left"],
+            self._tree["indices"],
+            self._tree["bbMin"] * scale,
+            self._tree["bbMax"] * scale,
+            (self._tree["sceneMin"] * scale).view(self.float4_view),
+            (self._tree["sceneMax"] * scale).view(self.float4_view),
+        ]
 
-        if parallel and use_normals:
-            kernel_name = "project_parallel_normals_kernel"
-        elif parallel and not use_normals:
-            kernel_name = "project_parallel_kernel"
-        elif not parallel and use_normals:
-            kernel_name = "project_conebeam_normals_kernel"
-        else:
-            kernel_name = "project_conebeam_kernel"
+        sampling_args = [float(abs_tolerance), float(rel_tolerance), int(iterations)]
 
-        args = []
-        args.extend(base_args)
-        args.extend(camera_args)
-        args.extend(tree_args)
-        args.extend(sampling_args)
-        args.extend(epsilon_args)
+        # --- Select Kernel Name ---
+        mode = "parallel" if parallel else "conebeam"
+        suffix = "_normals" if use_normals else ""
+        kernel_name = f"project_{mode}{suffix}_kernel"
+
+        # --- Assemble All Arguments and Launch ---
+        all_args = (
+            *base_args,
+            *camera_args,
+            *tree_args,
+            *sampling_args,
+            *self._epsilon_args,
+        )
 
         LOG.debug(f"Launching kernel: {kernel_name}")
-        args = tuple(args)
-        time, _ = cfg.BACKEND.pipeline.launchKernel(kernel_name, grid_size, block_size, args)
+        time, _ = self.pipeline.launchKernel(
+            kernel_name, grid_size, block_size, all_args
+        )
         LOG.debug(f"Projected mesh in {time} ms")
 
-        cfg.BACKEND.pipeline.synchronize()
+        self.pipeline.synchronize()
 
-        img = image.reshape(camera.shape).get()
+        img = image.reshape(camera.shape)
 
-        import matplotlib.pyplot as plt
-        plt.imshow(img)
-
-        return img
-    
-    # TODO: fix params for this method
-    # def _get_color_mapping_values(self, mapto, nb_keys, bbMin_np, bbMax_np):
-    #     xp = cfg.BACKEND.xp
-
-    #     """Helper to calculate the values for color mapping based on the chosen attribute."""
-    #     if mapto == "id":
-    #         return xp.arange(nb_keys, dtype=float)
-
-    #     elif mapto == "depth":
-    #         # This section still relies on placeholder data.
-    #         # For production, this should be replaced with actual depth calculation.
-    #         if hasattr(self, '_leaf_depths_example') and len(self._leaf_depths_example) == nb_keys:
-    #             return xp.array(self._leaf_depths_example, dtype=float)
-    #         else:
-    #             log.warning("Using dummy depth data for 'mapto=depth'.")
-    #             if nb_keys == 0:
-    #                 return xp.array([], dtype=float)
-    #             base_depth = xp.log2(nb_keys) if nb_keys > 1 else 1.0
-    #             depths = xp.random.uniform(base_depth * 0.8, base_depth * 1.5, size=nb_keys)
-    #             return depths if nb_keys > 1 else xp.array([1.0])
-
-    #     elif mapto == "volume":
-    #         if bbMin_np.shape[0] < 2 * nb_keys:
-    #             raise ValueError("Bounding box arrays are too small for leaf node indexing.")
-            
-    #         leaf_bbMin = bbMin_np[nb_keys : 2 * nb_keys, :3]
-    #         leaf_bbMax = bbMax_np[nb_keys : 2 * nb_keys, :3]
-            
-    #         # Calculate volumes, adding a small epsilon to avoid log(0)
-    #         volumes_raw = xp.prod(leaf_bbMax - leaf_bbMin, axis=1)
-    #         return xp.log(volumes_raw + 1e-9)
-            
-    #     else:
-    #         raise ValueError(f"Invalid 'mapto' value: {mapto}")
-
-    # def visualize_bvh(self, plotter, mapto="id", cmap="viridis"):
-    #     """
-    #     Visualize the bounding volume hierarchy by coloring leaf nodes.
-
-    #     Args:
-    #         plotter: A pyvista.Plotter object to add the meshes to.
-    #         mapto (str): The attribute to map to colors. One of 'id', 'depth', or 'volume'.
-    #         cmap (str): The name of the matplotlib colormap to use.
-    #     """
-    #     xp = cfg.BACKEND.xp
-
-    #     if self._tree is None:
-    #         raise ValueError("BVH tree has not been built yet.")
-
-    #     nb_keys = len(self._triangles) // 3
-    #     if nb_keys == 0:
-    #         log.debug("No BVH keys to visualize.")
-    #         return
-
-    #     bbMin_np = self._tree["bbMin"].get()  # Assuming .get() returns a numpy array
-    #     bbMax_np = self._tree["bbMax"].get()
-
-    #     # 1. Get the values for color mapping
-    #     values = self._get_color_mapping_values(mapto, nb_keys, bbMin_np, bbMax_np)
-
-    #     if values.size == 0:
-    #         log.debug("No values to visualize.")
-    #         return
-
-    #     # 2. Normalize the values for the colormap
-    #     minv, maxv = xp.min(values), xp.max(values)
-    #     if minv == maxv:
-    #         # Avoid division by zero if all values are the same
-    #         norm = mcolors.Normalize(vmin=minv - 1e-6, vmax=maxv + 1e-6)
-    #     else:
-    #         norm = mcolors.Normalize(vmin=minv, vmax=maxv)
-        
-    #     scalar_mappable = plt.cm.ScalarMappable(cmap=plt.get_cmap(cmap), norm=norm)
-
-    #     # 3. Create and add meshes for the leaf nodes
-    #     for i in range(nb_keys):
-    #         tree_index = i + nb_keys
-            
-    #         bounds = (
-    #             bbMin_np[tree_index, 0], bbMax_np[tree_index, 0],  # xMin, xMax
-    #             bbMin_np[tree_index, 1], bbMax_np[tree_index, 1],  # yMin, yMax
-    #             bbMin_np[tree_index, 2], bbMax_np[tree_index, 2],  # zMin, zMax
-    #         )
-
-    #         # Check for invalid bounds (min > max)
-    #         if not (bounds[1] >= bounds[0] and bounds[3] >= bounds[2] and bounds[5] >= bounds[4]):
-    #             log.warning(f"Skipping box {i} due to invalid bounds: {bounds}")
-    #             continue
-
-    #         color = scalar_mappable.to_rgba(values[i])
-    #         box_mesh = pv.Box(bounds=bounds)
-    #         plotter.add_mesh(box_mesh, color=color, show_edges=True, opacity=0.9)
+        # Rescale image values back to original world coordinates
+        return img * max_bound
 
 
 class LegacyCpuAccelerator(AcceleratorBase):
@@ -340,7 +294,7 @@ class LegacyCpuAccelerator(AcceleratorBase):
 
     def __init__(self, mesh):
         super().__init__(mesh)
-    
+
     def build(self, **kwargs):
         """
         Prepares the mesh for projection by applying transformations and sorting.
@@ -348,14 +302,13 @@ class LegacyCpuAccelerator(AcceleratorBase):
         """
         self.mesh.transform()
         self.mesh.sort()
-        
 
     def project(self, shape, pixel_size, offset, /, *, t=None, **kwargs):
         """Projection implementation."""
         xp = cfg.BACKEND.xp
-        queue = kwargs.get('queue', cfg.OPENCL.queue)
-        out = kwargs.get('out')
-        block = kwargs.get('block', False)
+        queue = kwargs.get("queue", cfg.OPENCL.queue)
+        out = kwargs.get("out")
+        block = kwargs.get("block", False)
 
         def get_crop(index, fov):
             minimum = max(self.mesh.extrema[index][0], fov[index][0])
@@ -369,7 +322,9 @@ class LegacyCpuAccelerator(AcceleratorBase):
         psm = pixel_size.simplified.magnitude
         fov = offset + shape * pixel_size
         fov = (
-            xp.concatenate((offset.simplified.magnitude[::-1], fov.simplified.magnitude[::-1]))
+            xp.concatenate(
+                (offset.simplified.magnitude[::-1], fov.simplified.magnitude[::-1])
+            )
             .reshape(2, 2)
             .transpose()
             * q.m
@@ -396,7 +351,9 @@ class LegacyCpuAccelerator(AcceleratorBase):
             # Use the same pixel size as for the x-axis, which will work for objects "not too far"
             # from the imaging plane
             min_z = self.mesh.extrema[2][0].simplified.magnitude / psm[1]
-            offset = gutil.make_vfloat2(*(offset / pixel_size).simplified.magnitude[::-1])
+            offset = gutil.make_vfloat2(
+                *(offset / pixel_size).simplified.magnitude[::-1]
+            )
 
             ev = cfg.OPENCL.programs["mesh"].compute_thickness(
                 queue,
@@ -419,7 +376,8 @@ class LegacyCpuAccelerator(AcceleratorBase):
                 ev.wait()
 
         return out
-    
+
+
 class LegacyCUDAAccelerator(AcceleratorBase):
     """The fallback CPU-based projection strategy (based on OpenCL version)."""
 
@@ -427,9 +385,11 @@ class LegacyCUDAAccelerator(AcceleratorBase):
         super().__init__(mesh)
         self.pipeline = cfg.BACKEND.pipeline
         if self.pipeline is None:
-            raise RuntimeError("CUDA backend is active, but the CudaPipeline was not initialized.")
+            raise RuntimeError(
+                "CUDA backend is active, but the CudaPipeline was not initialized."
+            )
         self._tree = None
-    
+
     def build(self, **kwargs):
         """
         Prepares the mesh for projection by applying transformations and sorting.
@@ -442,9 +402,6 @@ class LegacyCUDAAccelerator(AcceleratorBase):
         """Projection implementation."""
         xp = cfg.BACKEND.xp
 
-        camera = kwargs.get('camera')
-
-        
         block_size = (1, 1, 1)
         grid_size = (shape[0], shape[1], 1)
 
@@ -455,11 +412,14 @@ class LegacyCUDAAccelerator(AcceleratorBase):
 
         psm = pixel_size
         pixel_size = pixel_size.rescale(cfg.UNIT)
-        psm_np = np.array([psm[1], psm[0], psm[1]], dtype=float)
+
         def make_scaled_vertices(vertex_index, px_size):
-            verts = self.mesh._current[:-1, vertex_index::3] / px_size.rescale(cfg.UNIT).magnitude
+            verts = (
+                self.mesh._current[:-1, vertex_index::3]
+                / px_size.rescale(cfg.UNIT).magnitude
+            )
             return verts.transpose().flatten().astype(float)
-        
+
         v1_host = make_scaled_vertices(0, pixel_size[1])
         v2_host = make_scaled_vertices(1, pixel_size[0])
         v3_host = make_scaled_vertices(2, pixel_size[1])
@@ -470,7 +430,7 @@ class LegacyCUDAAccelerator(AcceleratorBase):
 
         nb_triangles = self.mesh.num_triangles
         image = xp.zeros(shape[0] * shape[1], dtype=float)
-        
+
         def get_crop(index, fov):
             minimum = max(self.mesh.extrema[index][0], fov[index][0])
             maximum = min(self.mesh.extrema[index][1], fov[index][1])
@@ -479,17 +439,22 @@ class LegacyCUDAAccelerator(AcceleratorBase):
 
         def get_px_value(value, round_func, ps):
             return int(round_func(get_magnitude(value / ps)))
-        
+
         offset = offset.rescale(cfg.UNIT)
-        
+
         fov = offset + shape * pixel_size
         fov = (
-            np.concatenate((offset.rescale(cfg.UNIT).magnitude[::-1], fov.rescale(cfg.UNIT).magnitude[::-1]))
+            np.concatenate(
+                (
+                    offset.rescale(cfg.UNIT).magnitude[::-1],
+                    fov.rescale(cfg.UNIT).magnitude[::-1],
+                )
+            )
             .reshape(2, 2)
             .transpose()
             * q.m
         )
-        
+
         max_dx = 0
         min_z = 0
 
@@ -506,19 +471,19 @@ class LegacyCUDAAccelerator(AcceleratorBase):
             x_max_px = get_px_value(x_max, np.ceil, pixel_size[1])
             y_min_px = get_px_value(y_min, np.floor, pixel_size[0])
             y_max_px = get_px_value(y_max, np.ceil, pixel_size[0])
-            
+
             # These are the actual dimensions of the work to be done
             roi_width = min(x_max_px - x_min_px, shape[1])
             roi_height = min(y_max_px - y_min_px, shape[0])
 
             # Set the kernel launch grid to the smaller ROI size
-            block_size = (1, 1, 1) # Use a more efficient block size
+            block_size = (1, 1, 1)  # Use a more efficient block size
             grid_size = (roi_width, roi_height, 1)
 
             # Prepare parameters for the kernel
             # The kernel needs the offset to know where to write in the full image
-            kernel_offset = np.array([x_min_px, y_min_px], dtype=np.int32) 
-            
+            kernel_offset = np.array([x_min_px, y_min_px], dtype=np.int32)
+
             # The kernel needs the full image width for memory indexing
             full_image_width = shape[1]
 
@@ -529,22 +494,26 @@ class LegacyCUDAAccelerator(AcceleratorBase):
 
             float32 = cfg.PRECISION.np_float
             int32 = np.int32
-            
+
             args = [
-                V1.view(float3), V2.view(float3), V3.view(float3), 
-                int32(nb_triangles), 
-                image, 
+                V1.view(float3),
+                V2.view(float3),
+                V3.view(float3),
+                int32(nb_triangles),
+                image,
                 int32(full_image_width),
                 kernel_offset.view(uint2),
-                kernel_mesh_offset.view(float2), 
+                kernel_mesh_offset.view(float2),
                 float32(psm[1]),
-                float32(max_dx), 
-                float32(min_z), 
-                int32(self.mesh.iterations)
+                float32(max_dx),
+                float32(min_z),
+                int32(self.mesh.iterations),
             ]
 
             args = tuple(args)
-            time, _ = cfg.BACKEND.pipeline.launchKernel("compute_thickness_kernel", grid_size, block_size, args)
+            time, _ = cfg.BACKEND.pipeline.launchKernel(
+                "compute_thickness_kernel", grid_size, block_size, args
+            )
 
             xp.cuda.Stream.null.synchronize()
 

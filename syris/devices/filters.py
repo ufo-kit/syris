@@ -19,6 +19,7 @@
 to be homogeneous, thus no phase change effects are introduced when
 a wavefield passes through them.
 """
+
 import numpy as np
 import quantities as q
 import scipy.interpolate as interp
@@ -29,7 +30,6 @@ from syris.util import get_gauss
 
 
 class Filter(OpticalElement):
-
     """Beam frequency filter."""
 
     def get_next_time(self, t_0, distance):
@@ -38,7 +38,6 @@ class Filter(OpticalElement):
 
 
 class GaussianFilter(OpticalElement):
-
     """Gaussian beam filter."""
 
     def __init__(self, energies, center, sigma, peak_transmission=1):
@@ -86,7 +85,6 @@ class GaussianFilter(OpticalElement):
 
 
 class MaterialFilter(Filter):
-
     """Beam frequency filter."""
 
     def __init__(self, thickness, material):
@@ -134,7 +132,6 @@ class MaterialFilter(Filter):
 
 
 class Scintillator(MaterialFilter):
-
     """Scintillator emits visible light when it is irradiated by X-rays."""
 
     def __init__(

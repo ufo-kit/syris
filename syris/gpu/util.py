@@ -61,14 +61,20 @@ typedef double16 vfloat16;
 
 def init_programs():
     """Initialize all OpenCL kernels needed by syris."""
-    cfg.OPENCL.programs["improc"] = get_program(get_source(["vcomplex.cl", "imageprocessing.cl"]))
-    cfg.OPENCL.programs["physics"] = get_program(get_source(["vcomplex.cl", "physics.cl"]))
+    cfg.OPENCL.programs["improc"] = get_program(
+        get_source(["vcomplex.cl", "imageprocessing.cl"])
+    )
+    cfg.OPENCL.programs["physics"] = get_program(
+        get_source(["vcomplex.cl", "physics.cl"])
+    )
     cfg.OPENCL.programs["geometry"] = get_program(get_metaobjects_source())
     cfg.OPENCL.programs["mesh"] = get_program(get_source(["heapsort.cl", "mesh.cl"]))
     cfg.OPENCL.programs["varconv"] = get_program(get_all_varconvolutions())
 
 
-def make_opencl_defaults(platform_name=None, device_type=None, device_index=None, profiling=True):
+def make_opencl_defaults(
+    platform_name=None, device_type=None, device_index=None, profiling=True
+):
     """Create default OpenCL context from *platform_name* and a command queue based on
     *device_index* to the devices list. If None, all devices are used in the context. If
     *platform_name* is not specified and *device_type* is, get a platform which has devices of that
@@ -87,7 +93,9 @@ def make_opencl_defaults(platform_name=None, device_type=None, device_index=None
         else:
             platform = get_cuda_platform()
     except LookupError:
-        LOG.error("Platform %s not found, using first one which can be found", platform_name)
+        LOG.error(
+            "Platform %s not found, using first one which can be found", platform_name
+        )
         platform = get_platform("")
     LOG.debug("Using platform '%s'", platform.name)
     devices = platform.get_devices()
@@ -123,7 +131,9 @@ def get_source(file_names, precision_sensitive=True):
     """
     string = ""
     for file_name in file_names:
-        string += pkg_resources.resource_string(__name__, "opencl/{}".format(file_name)).decode()
+        string += pkg_resources.resource_string(
+            __name__, "opencl/{}".format(file_name)
+        ).decode()
 
     if precision_sensitive:
         string = get_precision_header() + string
@@ -135,7 +145,13 @@ def get_metaobjects_source():
     """Get source string for metaobjects creation."""
     source = "#define MAX_OBJECTS {}".format(cfg.MAX_META_BODIES)
     source += get_source(
-        ["polyobject.cl", "heapsort.cl", "polynoms_heapsort.cl", "rootfinding.cl", "metaobjects.cl"]
+        [
+            "polyobject.cl",
+            "heapsort.cl",
+            "polynoms_heapsort.cl",
+            "rootfinding.cl",
+            "metaobjects.cl",
+        ]
     )
 
     return source
@@ -211,7 +227,9 @@ def get_varconvolution_source(
         if cplx:
             top += get_source(["vcomplex.cl"], precision_sensitive=False)
 
-    return top + kernel_src.format(header, name, inputs, init, compute_outer, compute_inner, after)
+    return top + kernel_src.format(
+        header, name, inputs, init, compute_outer, compute_inner, after
+    )
 
 
 def _get_varconvolve_2d_parametrized(
@@ -263,7 +281,9 @@ def get_varconvolve_gauss(normalized=True, window_fwnm=1000, only_kernel=False):
     src = get_source(["varconvolution.in"], precision_sensitive=False).split("%nl")[2]
     # Make the kernel window size variable based on the
     fwnm_factor = 2 * np.sqrt(2 * np.log(window_fwnm))
-    LOG.debug("Creating Gaussian convolution with window size FW(1/{})M".format(window_fwnm))
+    LOG.debug(
+        "Creating Gaussian convolution with window size FW(1/{})M".format(window_fwnm)
+    )
     additional_init = "window.x = (int) ({} * param.x + 0.5);".format(fwnm_factor)
     additional_init += "window.y = (int) ({} * param.y + 0.5);".format(fwnm_factor)
     additional_init += "window.x += 1 - window.x % 2;"
@@ -364,7 +384,9 @@ def get_cache(buf):
         result = buf
     else:
         result = cl.Buffer(
-            cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE | cl.mem_flags.COPY_HOST_PTR, hostbuf=buf
+            cfg.OPENCL.ctx,
+            cl.mem_flags.READ_WRITE | cl.mem_flags.COPY_HOST_PTR,
+            hostbuf=buf,
         )
 
     return result
@@ -491,7 +513,7 @@ def make_vcomplex(value):
     """Make complex value for OpenCL based on the set floating point
     precision.
     """
-    return getattr(sys.modules[__name__], 'make_vfloat2')(value.real, value.imag)
+    return getattr(sys.modules[__name__], "make_vfloat2")(value.real, value.imag)
 
 
 def get_host(data, queue=None):
@@ -566,8 +588,12 @@ def get_image(data, access=cl.mem_flags.READ_ONLY, queue=None):
     fmt = cl.ImageFormat(cl.channel_order.INTENSITY, cl.channel_type.FLOAT)
     mf = cl.mem_flags
 
-    if fmt not in cl.get_supported_image_formats(queue.context, access, cl.mem_object_type.IMAGE2D):
-        raise RuntimeError("INTENSITY|FLOAT image format not supported by this platform")
+    if fmt not in cl.get_supported_image_formats(
+        queue.context, access, cl.mem_object_type.IMAGE2D
+    ):
+        raise RuntimeError(
+            "INTENSITY|FLOAT image format not supported by this platform"
+        )
 
     if isinstance(data, cl.Image):
         result = data
@@ -582,10 +608,16 @@ def get_image(data, access=cl.mem_flags.READ_ONLY, queue=None):
 
         if isinstance(data, cl_array.Array):
             result = cl.Image(cfg.OPENCL.ctx, access, fmt, shape=data.shape[::-1])
-            cl.enqueue_copy(queue, result, data.data, offset=0, origin=(0, 0), region=result.shape)
+            cl.enqueue_copy(
+                queue, result, data.data, offset=0, origin=(0, 0), region=result.shape
+            )
         elif isinstance(data, np.ndarray):
             result = cl.Image(
-                cfg.OPENCL.ctx, access | mf.COPY_HOST_PTR, fmt, shape=data.shape[::-1], hostbuf=data
+                cfg.OPENCL.ctx,
+                access | mf.COPY_HOST_PTR,
+                fmt,
+                shape=data.shape[::-1],
+                hostbuf=data,
             )
 
     return result
@@ -614,7 +646,9 @@ def qmap(func, items, queues=None, args=(), kwargs=None):
     def process(item):
         queue = queue_of_queues.get()
         LOG.debug(
-            "Mapping '{}' to item {} and queue {}".format(func.__name__, item, queues.index(queue))
+            "Mapping '{}' to item {} and queue {}".format(
+                func.__name__, item, queues.index(queue)
+            )
         )
         result = func(item, queue, *args, **kwargs)
         queue_of_queues.task_done()
@@ -629,9 +663,14 @@ def qmap(func, items, queues=None, args=(), kwargs=None):
     return results
 
 
-def get_event_duration(event, start=cl.profiling_info.START, stop=cl.profiling_info.END):
+def get_event_duration(
+    event, start=cl.profiling_info.START, stop=cl.profiling_info.END
+):
     """Get OpenCL event duration. *start* and *stop* define the OpenCL timer start and stop."""
-    return (event.get_profiling_info(stop) - event.get_profiling_info(start)) * 1e-9 * q.s
+    return (
+        (event.get_profiling_info(stop) - event.get_profiling_info(start)) * 1e-9 * q.s
+    )
+
 
 def _wrap_opencl():
     import pyopencl as cl

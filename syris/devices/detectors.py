@@ -16,12 +16,12 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Detector composed of a scintillator, a lens and a camera."""
+
 import numpy as np
 from syris.physics import compute_collection
 
 
 class Detector(object):
-
     """A detector consisting of a camera and an objective lens."""
 
     def __init__(self, scintillator, lens, camera):

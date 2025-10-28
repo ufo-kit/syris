@@ -872,14 +872,14 @@ __device__ FP_T tracePixelAdaptive(
 
 
 // =========================================================================
-//  LEVEL 4: KERNELS
+// KERNELS
 // =========================================================================
 
 extern "C" __global__ void project_parallel_kernel(
     // base_args (4 args)
-    unsigned *globalCounter,
+    unsigned *__restrict__ globalCounter,
     unsigned nb_keys,
-    FP_T *image,
+    FP_T *__restrict__ image,
     FP_T4 *__restrict__ vertices,
     
     // camera_args (6 args)
@@ -889,8 +889,9 @@ extern "C" __global__ void project_parallel_kernel(
     FP_T2 ps,
 
     // tree_args (7 args)
-    int *rope, int *left, unsigned *permutation,
-    FP_T4 *bboxMin, FP_T4 *bboxMax,
+    int *__restrict__ rope, int *__restrict__ left,
+    unsigned *__restrict__ permutation,
+    FP_T4 *__restrict__ bboxMin, FP_T4 *__restrict__ bboxMax,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
     
     // sampling_args (3 args)
@@ -1039,9 +1040,9 @@ extern "C" __global__ void project_parallel_normals_kernel(
 
 extern "C" __global__ void project_conebeam_kernel(
     // base_args (4 args)
-    unsigned *globalCounter,
+    unsigned *__restrict__ globalCounter,
     unsigned nb_keys,
-    FP_T *image,
+    FP_T *__restrict__ image,
     FP_T4 *__restrict__ vertices,
     
     // camera_args (7 args)
@@ -1052,8 +1053,9 @@ extern "C" __global__ void project_conebeam_kernel(
     FP_T4 source,
 
     // tree_args (7 args)
-    int *rope, int *left, unsigned *permutation,
-    FP_T4 *bboxMin, FP_T4 *bboxMax,
+    int *__restrict__ rope, int *__restrict__ left,
+    unsigned *__restrict__ permutation,
+    FP_T4 *__restrict__ bboxMin, FP_T4 *__restrict__ bboxMax,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
     
     // sampling_args (3 args)
@@ -1118,7 +1120,7 @@ extern "C" __global__ void project_conebeam_normals_kernel(
     // base_args (5 args)
     unsigned *globalCounter,
     unsigned nb_keys,
-    FP_T *image,
+    FP_T *__restrict__ image,
     FP_T4 *__restrict__ vertices,
     FP_T4 *__restrict__ normals,
     
@@ -1130,8 +1132,9 @@ extern "C" __global__ void project_conebeam_normals_kernel(
     FP_T4 source,
 
     // tree_args (7 args)
-    int *rope, int *left, unsigned *permutation,
-    FP_T4 *bboxMin, FP_T4 *bboxMax,
+    int *__restrict__ rope, int *__restrict__ left,
+    unsigned *__restrict__ permutation,
+    FP_T4 *__restrict__ bboxMin, FP_T4 *__restrict__ bboxMax,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
     
     // sampling_args (3 args)

@@ -21,6 +21,7 @@ Synchrotron radiation sources provide high photon flux of photons with
 different energies, which form a spectrum characteristic for a given source
 type.
 """
+
 import logging
 import numpy as np
 import quantities as q
@@ -122,9 +123,9 @@ class XRaySource(OpticalElement):
         """Compute the flat field wavefield. Returned *out* array is different from the input
         one.
         """
-        queue = kwargs.get('queue', cfg.OPENCL.queue)
-        out = kwargs.get('out')
-        block = kwargs.get('block', False)
+        queue = kwargs.get("queue", cfg.OPENCL.queue)
+        out = kwargs.get("out")
+        block = kwargs.get("block", False)
 
         if out is None:
             out = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
@@ -142,7 +143,16 @@ class XRaySource(OpticalElement):
         compute_exponent = exponent or check and phase
 
         self._transfer_real(
-            shape, center, ps, energy, compute_exponent, phase, parabola, out, queue, block
+            shape,
+            center,
+            ps,
+            energy,
+            compute_exponent,
+            phase,
+            parabola,
+            out,
+            queue,
+            block,
         )
 
         if compute_exponent:
@@ -158,7 +168,12 @@ class XRaySource(OpticalElement):
         fwhm = (distance * self.size / self.sample_distance).simplified
         sigma = smath.fwnm_to_sigma(fwhm, n=2)
         psf = ip.get_gauss_2d(
-            intensity.shape, sigma, pixel_size=pixel_size, fourier=True, queue=queue, block=block
+            intensity.shape,
+            sigma,
+            pixel_size=pixel_size,
+            fourier=True,
+            queue=queue,
+            block=block,
         )
 
         return ip.ifft_2(ip.fft_2(intensity) * psf).real
@@ -230,7 +245,9 @@ class FixedSpectrumSource(XRaySource):
         )
         cl_image = gutil.get_image(flux, queue=queue)
 
-        sampler = cl.Sampler(cfg.OPENCL.ctx, False, cl.addressing_mode.CLAMP, cl.filter_mode.LINEAR)
+        sampler = cl.Sampler(
+            cfg.OPENCL.ctx, False, cl.addressing_mode.CLAMP, cl.filter_mode.LINEAR
+        )
 
         cl_center = gutil.make_vfloat3(*center)
         cl_ps = gutil.make_vfloat2(*pixel_size.simplified.magnitude[::-1])
@@ -261,10 +278,9 @@ class FixedSpectrumSource(XRaySource):
 
 
 class BendingMagnet(XRaySource):
-
     """Bending magnet X-ray source."""
 
-    _SR_CONST = 3 * fine_structure_constant.simplified / (4 * np.pi ** 2)
+    _SR_CONST = 3 * fine_structure_constant.simplified / (4 * np.pi**2)
 
     def __init__(
         self,
@@ -309,14 +325,14 @@ class BendingMagnet(XRaySource):
     @property
     def gama(self):
         """:math:`\\frac{E}{m_ec^2}`"""
-        return self.electron_energy / (qe.electron_mass * q.c ** 2)
+        return self.electron_energy / (qe.electron_mass * q.c**2)
 
     @property
     def critical_energy(self):
         """Critical energy of the source is defined as
-            .. math::
+        .. math::
 
-                \epsilon_c [keV] = 0.665 E^2 [GeV] B[T]
+            \epsilon_c [keV] = 0.665 E^2 [GeV] B[T]
         """
         return (
             0.665
@@ -380,7 +396,9 @@ class BendingMagnet(XRaySource):
         fov = np.arange(0, shape[0]) * pixel_size[0] - center[1] * q.m
         angles = np.arctan((fov / self.sample_distance).simplified)
         profile = (
-            self._create_vertical_profile(energy, angles, pixel_size[0]).rescale(1 / q.s).magnitude
+            self._create_vertical_profile(energy, angles, pixel_size[0])
+            .rescale(1 / q.s)
+            .magnitude
         )
         profile = cl_array.to_device(queue, profile.astype(cfg.PRECISION.np_float))
         z_sample = self.sample_distance.simplified.magnitude
@@ -423,23 +441,27 @@ class BendingMagnet(XRaySource):
         with *photon_energy* and get it at the vertical observation angle
         *vertical_angle*.
         """
-        gama = Quantity(self.electron_energy / (qe.electron_mass * q.c ** 2)).simplified
+        gama = Quantity(self.electron_energy / (qe.electron_mass * q.c**2)).simplified
         gama_psi = gama * vertical_angle.rescale(q.rad)
-        norm_energy = photon_energy.rescale(self.critical_energy.units) / self.critical_energy
-        xi = Quantity(0.5 * norm_energy.magnitude * (1.0 + gama_psi ** 2) ** (3.0 / 2)).magnitude
+        norm_energy = (
+            photon_energy.rescale(self.critical_energy.units) / self.critical_energy
+        )
+        xi = Quantity(
+            0.5 * norm_energy.magnitude * (1.0 + gama_psi**2) ** (3.0 / 2)
+        ).magnitude
         angle_step = np.arctan(pixel_size.simplified / self.sample_distance.simplified)
 
         # 1e-3 for 0.1 % BW
         return Quantity(
             BendingMagnet._SR_CONST
-            * gama ** 2
+            * gama**2
             * self.el_current
             / q.elementary_charge
-            * norm_energy ** 2
-            * (1.0 + gama_psi ** 2) ** 2
+            * norm_energy**2
+            * (1.0 + gama_psi**2) ** 2
             * (
                 special.kv(2.0 / 3, xi) ** 2
-                + gama_psi ** 2 / (1.0 + gama_psi ** 2) * special.kv(1.0 / 3, xi) ** 2
+                + gama_psi**2 / (1.0 + gama_psi**2) * special.kv(1.0 / 3, xi) ** 2
             )
             * angle_step.rescale(q.rad) ** 2
             * 1e-3
@@ -447,7 +469,6 @@ class BendingMagnet(XRaySource):
 
 
 class Wiggler(BendingMagnet):
-
     """Wiggler source."""
 
     def __init__(

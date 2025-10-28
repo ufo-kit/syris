@@ -16,11 +16,11 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Lenses used in experiments."""
+
 import math
 
 
 class Lens(object):
-
     """Class holding lenses."""
 
     def __init__(
@@ -41,7 +41,9 @@ class Lens(object):
             raise ValueError("Transmission efficiency must be between 0 and 1.")
 
         if na is None and focal_length is None and f_number is None:
-            raise ValueError("Either 'na' must be specified or both 'focal_length' and 'f_number'")
+            raise ValueError(
+                "Either 'na' must be specified or both 'focal_length' and 'f_number'"
+            )
         self.f_number = f_number
         self.focal_length = focal_length
         self.magnification = magnification

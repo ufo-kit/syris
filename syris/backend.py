@@ -1,11 +1,13 @@
 import numpy as np
 import logging
+from .bodies.accelerators import BvhCupyAccelerator, LegacyCpuAccelerator
 
 LOG = logging.getLogger(__name__)
 
 # --- Library Availability Detection ---
 try:
     import cupy as cp
+
     # A simple check to ensure a device is actually available
     if cp.cuda.runtime.getDeviceCount() > 0:
         HAS_CUPY = True
@@ -18,6 +20,7 @@ except ImportError:
 
 try:
     import pyopencl as cl
+
     if cl.get_platforms():
         HAS_OPENCL = True
     else:
@@ -27,14 +30,14 @@ except ImportError:
     HAS_OPENCL = False
     cl = None
 
-from .bodies.accelerators import BvhCupyAccelerator, LegacyCpuAccelerator, LegacyCUDAAccelerator
 
 class ComputeBackend:
     """Detects and configures the compute engine (CUDA or OpenCL)."""
-    CUDA = 'cuda'
-    CUDA_LEGACY = 'cuda_legacy'
-    OPENCL = 'opencl'
-    NONE = 'none'
+
+    CUDA = "cuda"
+    CUDA_LEGACY = "cuda_legacy"
+    OPENCL = "opencl"
+    NONE = "none"
 
     def __init__(self, compute_backend):
         if HAS_CUPY and compute_backend == self.CUDA:

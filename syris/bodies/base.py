@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """A base module for pysical bodies, which are optical elements having spatial extent."""
+
 import logging
 import numpy as np
 import pyopencl.array as cl_array
@@ -34,7 +35,6 @@ LOG = logging.getLogger(__name__)
 
 
 class Body(OpticalElement):
-
     """An abstract body class with a *material*, which is a :class:`syris.materials.Material`
     instance.
     """
@@ -60,30 +60,50 @@ class Body(OpticalElement):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
-    def _transfer(self, shape, pixel_size, energy, offset, /, *, exponent=False, t=None, check=True, **kwargs):
+    def _transfer(
+        self,
+        shape,
+        pixel_size,
+        energy,
+        offset,
+        /,
+        *,
+        exponent=False,
+        t=None,
+        check=True,
+        **kwargs,
+    ):
         """Transfer function implementation based on a refractive index."""
         ri = self.material.get_refractive_index(energy)
         lam = energy_to_wavelength(energy)
 
         project_kwargs = kwargs.copy()
-        project_kwargs.pop('offset', None)
+        project_kwargs.pop("offset", None)
 
         proj = self.project(shape, pixel_size, offset=offset, t=t, **project_kwargs)
 
-        queue = kwargs.get('queue', cfg.OPENCL.queue)
-        out = kwargs.get('out')
-        block = kwargs.get('block', False)
+        queue = kwargs.get("queue", cfg.OPENCL.queue)
+        out = kwargs.get("out")
+        block = kwargs.get("block", False)
 
         return transfer(
-            proj, ri, lam, exponent=exponent, queue=queue, out=out, check=check, block=block
+            proj,
+            ri,
+            lam,
+            exponent=exponent,
+            queue=queue,
+            out=out,
+            check=check,
+            block=block,
         )
 
 
 class MovableBody(Body):
-
     """Class representing a movable body."""
 
-    def __init__(self, trajectory, material=None, orientation=geom.Y_AX, cache_projection=True):
+    def __init__(
+        self, trajectory, material=None, orientation=geom.Y_AX, cache_projection=True
+    ):
         """Create a body with a :class:`~syris.geometry.Trajectory` and *orientation*,
         which is an (x, y, z) vector specifying body's "up" vector. If *cache_projection* is True,
         the projection is computed only if the object moves between the last projection time and the
@@ -120,7 +140,7 @@ class MovableBody(Body):
         result. If *block* is True, wait for the kernel to finish.
         """
         _pixel_size = make_tuple(pixel_size, 2) if pixel_size is not None else None
-        
+
         if offset is None:
             offset = (0, 0) * q.m
         if t is not None:
@@ -128,15 +148,20 @@ class MovableBody(Body):
 
         if self.cache_projection:
             cache_is_invalid = (
-                self._p_cache["time"] is None or
-                (_pixel_size is not None and np.any(self._p_cache["ps"] != _pixel_size)) or
-                (shape is not None and self._p_cache["shape"] != shape) or
-                np.any(self._p_cache["offset"] != offset)
+                self._p_cache["time"] is None
+                or (
+                    _pixel_size is not None
+                    and np.any(self._p_cache["ps"] != _pixel_size)
+                )
+                or (shape is not None and self._p_cache["shape"] != shape)
+                or np.any(self._p_cache["offset"] != offset)
             )
-            
+
             if cache_is_invalid:
                 moved = True
-                self.update_projection_cache(t=t, shape=shape, pixel_size=_pixel_size, offset=offset)
+                self.update_projection_cache(
+                    t=t, shape=shape, pixel_size=_pixel_size, offset=offset
+                )
             else:
                 moved = self.moved(
                     min(self._p_cache["time"], t),
@@ -167,7 +192,9 @@ class MovableBody(Body):
         ):
             fmt = "Binding trajectory to pixel size {} and furthest point {}"
             LOG.debug(fmt.format(pixel_size, self.furthest_point))
-            self.trajectory.bind(pixel_size=pixel_size, furthest_point=self.furthest_point)
+            self.trajectory.bind(
+                pixel_size=pixel_size, furthest_point=self.furthest_point
+            )
 
     @property
     def cache_projection(self):
@@ -218,16 +245,16 @@ class MovableBody(Body):
         """
         Sets the absolute position of the body's center in world coordinates,
         preserving its current orientation.
-        
+
         This method directly updates the transformation matrix and invalidates
         the projection cache.
 
-        :param new_position: A 3D vector (list, tuple, or numpy array) 
+        :param new_position: A 3D vector (list, tuple, or numpy array)
                              representing the new world coordinates,
                              ideally with units.
         """
         LOG.debug(f"Setting {self} position to {new_position}")
-        
+
         try:
             pos_vector = new_position.simplified
         except AttributeError:
@@ -266,7 +293,7 @@ class MovableBody(Body):
     @property
     def trajectory(self):
         return self._trajectory
-    
+
     @trajectory.setter
     def trajectory(self, new_trajectory):
         """
@@ -286,14 +313,18 @@ class MovableBody(Body):
         """Sets the transformation matrix and increments the state counter."""
         v = new_matrix[0:3, 1]
         w = new_matrix[0:3, 2]
-        if np.allclose(v, w) and not np.allclose(v, 0): # Check if they are the same and not zero
+        if np.allclose(v, w) and not np.allclose(
+            v, 0
+        ):  # Check if they are the same and not zero
             LOG.warning("\n--- WARNING: Degenerate transform_matrix detected! ---")
-            LOG.warning(f"Up vector (v) and Forward vector (w) are identical: {v.round(3)}")
+            LOG.warning(
+                f"Up vector (v) and Forward vector (w) are identical: {v.round(3)}"
+            )
             LOG.warning("Full Matrix:\n", new_matrix.round(3))
             LOG.warning("Setter was called from:")
-            traceback.print_stack(limit=5) # Show the last 5 calls
+            traceback.print_stack(limit=5)  # Show the last 5 calls
             LOG.warning("----------------------------------------------------\n")
-        
+
         self._transform_matrix = new_matrix
         self._state += 1
 
@@ -377,7 +408,7 @@ class MovableBody(Body):
 
         norm_orientation = geom.normalize(orientation)
         norm_direction = geom.normalize(direction)
-        
+
         angle = geom.angle(orientation, direction)
 
         if abs(np.dot(norm_orientation, norm_direction)) > 0.999:
@@ -396,7 +427,7 @@ class MovableBody(Body):
         """
         if clear:
             self.clear_transformation()
-            
+
         # Get the target position and orientation from the trajectory
         target_position = self.trajectory.get_point(abs_time).simplified
         rot_ax, angle = self._find_next_rotation_time(abs_time)
@@ -404,7 +435,7 @@ class MovableBody(Body):
         # Create the new transformation matrices
         translation_matrix = geom.translate(target_position)
         rotation_matrix = geom.rotate(angle, rot_ax)
-        
+
         # Combine them: first rotate, then translate
         self.transform_matrix = np.dot(translation_matrix, rotation_matrix)
 
@@ -417,11 +448,12 @@ class MovableBody(Body):
         takes place before the rotation and -*shift* takes place afterward, resulting in the
         transformation TRT^-1.
         """
-        self.transform_matrix = np.dot(self.transform_matrix, geom.rotate(angle, axis, shift=shift))
+        self.transform_matrix = np.dot(
+            self.transform_matrix, geom.rotate(angle, axis, shift=shift)
+        )
 
 
 class CompositeBody(MovableBody):
-
     """Class representing a body consisting of more sub-bodies.  A composite body can be thought of
     as a tree structure with children representing another bodies.
     """
@@ -510,7 +542,9 @@ class CompositeBody(MovableBody):
         return self.bodies.__iter__()
 
     def __repr__(self):
-        strings = ", ".join([repr(item) for item in self.bodies[: min(3, len(self.bodies))]])
+        strings = ", ".join(
+            [repr(item) for item in self.bodies[: min(3, len(self.bodies))]]
+        )
         if len(self.bodies) > 3:
             strings += ", ..."
         return "CompositeBody({})".format(strings)
@@ -614,7 +648,9 @@ class CompositeBody(MovableBody):
                     self._dt = None
                 fmt = "Binding trajectory to pixel size {} and furthest point {}"
                 LOG.debug(fmt.format(pixel_size, body.furthest_point))
-                body.trajectory.bind(pixel_size=pixel_size, furthest_point=body.furthest_point)
+                body.trajectory.bind(
+                    pixel_size=pixel_size, furthest_point=body.furthest_point
+                )
 
     def get_maximum_dt(self, pixel_size):
         """Get the maximum delta time for which the body will not move more than *pixel_size*
@@ -626,7 +662,9 @@ class CompositeBody(MovableBody):
             if self.trajectory.stationary:
                 dts = []
             else:
-                dts = [MovableBody.get_maximum_dt(self, pixel_size / len(self.all_bodies))]
+                dts = [
+                    MovableBody.get_maximum_dt(self, pixel_size / len(self.all_bodies))
+                ]
             dts += [
                 body.get_maximum_dt(pixel_size / len(self.all_bodies))
                 for body in self
@@ -717,7 +755,9 @@ class CompositeBody(MovableBody):
         for i in range(len(self.primitive_bodies)):
             rot.append(
                 geom.get_rotation_displacement(
-                    d_0[i], d_1[i], self.primitive_bodies[i].furthest_point.simplified.magnitude
+                    d_0[i],
+                    d_1[i],
+                    self.primitive_bodies[i].furthest_point.simplified.magnitude,
                 )
             )
         rot = np.array(rot) * q.m
@@ -730,22 +770,36 @@ class CompositeBody(MovableBody):
 
     def _project(self, shape, pixel_size, /, *, offset, t=None, **kwargs):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
-        queue = kwargs.get('queue', cfg.BACKEND.queue if cfg.BACKEND.name == 'opencl' else None)
-        out = kwargs.get('out')
+        queue = kwargs.get(
+            "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
+        )
+        out = kwargs.get("out")
 
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
 
         for body in self.bodies:
-            out += body.project(
-                shape, pixel_size, offset=offset, t=t, **kwargs
-            )
+            out += body.project(shape, pixel_size, offset=offset, t=t, **kwargs)
         return out
 
-    def _transfer(self, shape, pixel_size, energy, offset, /, *, exponent=False, t=None, check=True, **kwargs):
+    def _transfer(
+        self,
+        shape,
+        pixel_size,
+        energy,
+        offset,
+        /,
+        *,
+        exponent=False,
+        t=None,
+        check=True,
+        **kwargs,
+    ):
         """Transfer function implementation based on a refractive index."""
-        queue = kwargs.get('queue', cfg.BACKEND.queue if cfg.BACKEND.name == 'opencl' else None)
-        out = kwargs.get('out')
+        queue = kwargs.get(
+            "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
+        )
+        out = kwargs.get("out")
 
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_cplx)
@@ -764,5 +818,5 @@ class CompositeBody(MovableBody):
             out=out,
             t=t,
             check=check,
-            block=kwargs.get('block', False),
+            block=kwargs.get("block", False),
         )
