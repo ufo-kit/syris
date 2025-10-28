@@ -209,9 +209,18 @@ def main():
     )
 
     tr = geom.Trajectory([(0, 0, 0)] * mesh_units)
+
+    if args.input:
+        input = args.input
+        LOG.info(f"Loading mesh from file: {input}")
+    else:
+        input = pv.examples.download_dragon()
+        LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
+
     mesh = Mesh.from_file(
-        args.input, tr, center=args.center, unit=mesh_units, use_normals=True
+        input, tr, center=args.center, unit=mesh_units, use_normals=True
     )
+
     mesh.build_accelerator()
 
     plotter = pv.Plotter()
@@ -302,11 +311,10 @@ def main():
 
 
 def parse_args():
-    """REFACTORED: Parse command line arguments with original names."""
     parser = get_default_parser(__doc__)
 
     # --- Viz Arguments ---
-    parser.add_argument("--input", type=str, required=True, help="Input .obj file")
+    parser.add_argument("--input", type=str, help="Input .obj file")
     parser.add_argument(
         "--mesh-units",
         type=str,
@@ -314,7 +322,7 @@ def parse_args():
         help="Physical units of the mesh file (e.g., 'm', 'cm', 'um')",
     )
     parser.add_argument(
-        "--center", type=str, default=None, help="Mesh centering on creation"
+        "--center", type=str, default="bbox", help="Mesh centering on creation"
     )
     parser.add_argument(
         "--double-precision", action="store_true", help="Use double precision"

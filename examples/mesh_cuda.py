@@ -29,13 +29,26 @@ from syris.devices.cameras import Camera
 import tqdm
 from syris.bodies.mesh import Mesh
 from .util import get_default_parser, show
+import pyvista as pv
 
 LOG = logging.getLogger(__name__)
 
 
 def main():
-    """Main function."""
+    """
+    Demonstrates CUDA-accelerated (BVH) mesh projection.
+
+    This script loads a 3D mesh and simulates a rotational scan,
+    projecting the object at various angles.
+
+    If detector specifications (e.g., pixel size, SOD, SDD) are not
+    provided, the script automatically calculates values based on the
+    mesh's bounding box to ensure the object is centered and fits
+    within the field of view (FOV).
+    """
     args = parse_args()
+
+    shape = np.array([args.n_y, args.n_x])
 
     pixel_units = q.Quantity(1, args.pixel_size_units)
     mesh_units = q.Quantity(1, args.mesh_units)
@@ -47,17 +60,26 @@ def main():
     )
 
     tr = geom.Trajectory([(0, 0, 0)] * mesh_units)
+
+    if args.input:
+        input = args.input
+        LOG.info(f"Loading mesh from file: {input}")
+    else:
+        input = pv.examples.download_dragon()
+        LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
+
     mesh = Mesh.from_file(
-        args.input, tr, center=args.center, unit=mesh_units, use_normals=True
+        input, tr, center=args.center, unit=mesh_units, use_normals=True
     )
+
     LOG.info(f"Number of triangles: {mesh.num_triangles}")
 
-    xmin, xmax, ymin, ymax, zmin, zmax = mesh.bounds
     xmin, xmax, ymin, ymax, zmin, zmax = mesh.bounds
 
     width = xmax - xmin
     height = ymax - ymin
-    max_span = np.sqrt(width**2 + height**2) * mesh_units
+    depth = zmax - zmin
+    max_span = np.sqrt(width**2 + height**2 + depth**2) * mesh_units
 
     if args.conebeam:
         LOG.info("Setting up for CONE-BEAM projection...")
@@ -73,12 +95,14 @@ def main():
             )
 
         magnification = args.sdd / args.sod
-        LOG.info(f"Magnification: {magnification:.2f}x")
+        LOG.info(f"Magnification: {magnification.magnitude:.2f}x")
 
         if args.pixel_size is None:
             fov = (max_span * magnification) * args.margin
             LOG.info(f"Required FOV on detector: {fov:.2f} {mesh_units}")
-            args.pixel_size = fov / args.n
+
+            min_pixel_dim = np.min(shape)
+            args.pixel_size = fov / min_pixel_dim
 
         camera_z_position = args.sdd - args.sod
         sdd_for_camera = args.sdd
@@ -89,17 +113,19 @@ def main():
         if args.pixel_size is None:
             fov = max_span * args.margin
             LOG.info(f"Required FOV on detector: {fov:.2f} {mesh_units}")
-            args.pixel_size = fov / args.n
+
+            min_pixel_dim = np.min(shape)
+            args.pixel_size = fov / min_pixel_dim
 
         camera_z_position = max_span
         sdd_for_camera = 0 * mesh_units
 
-    fov = args.n * args.pixel_size
+    fov = np.array(shape) * args.pixel_size
 
     camera_trajectory = geom.Trajectory([(0, 0, 0)] * mesh_units)
     camera = Camera(
         pixel_size=args.pixel_size,
-        shape=args.n,
+        shape=shape,
         trajectory=camera_trajectory,
         source_detector_distance=sdd_for_camera,
     )
@@ -108,9 +134,10 @@ def main():
 
     print("\n--- Simulation Setup ---")
     LOG.info(f"Projection Mode: {'Cone-Beam' if args.conebeam else 'Parallel-Beam'}")
-    LOG.info(f"Image Resolution: {args.n}x{args.n} pixels")
+    LOG.info(f"Image Resolution: {shape[0]}x{shape[1]} pixels")
     LOG.info(f"Final Pixel Size: {args.pixel_size.rescale(pixel_units):.4f}")
-    LOG.info(f"Field of View (FOV): {fov.rescale(mesh_units):.4f}")
+    fov_rescaled = fov.rescale(mesh_units)
+    LOG.info(f"Field of View (FOV): {fov_rescaled[0].magnitude:.4f}")
     if args.conebeam:
         LOG.info(f"SOD: {args.sod}, SDD: {args.sdd}")
     LOG.info(f"Mesh Bounding Box (min): {mesh.extrema[:, 0].rescale(mesh_units)}")
@@ -121,9 +148,13 @@ def main():
 
     st = time.time()
     for i in tqdm.tqdm(range(args.num_y_rotations)):
-        proj = mesh.project(
-            camera=camera, parallel=not args.conebeam, iterations=args.supersampling
-        ).astype(np.float32)
+        proj = (
+            mesh.project(
+                camera=camera, parallel=not args.conebeam, iterations=args.supersampling
+            )
+            .get()
+            .astype(np.float32)
+        )
 
         if args.projection_filename is not None:
             imageio.imwrite(args.projection_filename + f"_{i:>05}.tif", proj)
@@ -141,7 +172,7 @@ def parse_args():
     parser = get_default_parser(__doc__)
 
     # --- Mesh Arguments ---
-    parser.add_argument("--input", type=str, required=True, help="Input .obj file")
+    parser.add_argument("--input", type=str, help="Input .obj file")
     parser.add_argument(
         "--mesh-units",
         type=str,
@@ -154,7 +185,16 @@ def parse_args():
 
     # --- Detector Arguments ---
     parser.add_argument(
-        "--n", type=int, default=2048, help="Number of pixels in each dimension"
+        "--n-y",
+        type=int,
+        default=2048,
+        help="Number of pixels in y dimension (rows)",
+    )
+    parser.add_argument(
+        "--n-x",
+        type=int,
+        default=2048,
+        help="Number of pixels in x dimension (cols)",
     )
     parser.add_argument(
         "--pixel-size",
