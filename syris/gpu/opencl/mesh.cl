@@ -131,7 +131,7 @@ int compute_intersections (const global vfloat3 *v_1,
         i++;
     }
 
-    sort (intersections, num_intersections);
+    vfsort (intersections, num_intersections);
 
     return num_intersections;
 }
@@ -235,7 +235,7 @@ kernel void compute_thickness (const global vfloat3 *v_1,
         }
     }
 
-    sort (results, supersampling * supersampling);
+    vfsort (results, supersampling * supersampling);
     output[(idy + offset.y) * image_width + idx + offset.x] = scale * results[supersampling * supersampling / 2];
 }
 

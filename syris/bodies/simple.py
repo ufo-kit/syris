@@ -43,9 +43,13 @@ class StaticBody(Body):
         return np.inf * q.s
 
     def _project(
-        self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False
+        self, shape=None, pixel_size=None, /, **kwargs
     ):
         """Project thickness."""
+
+        offset = kwargs.pop("offset", None)
+        block = kwargs.pop("block", False)
+
         orig_shape = self.thickness.shape
         orig_region = (0, 0) + orig_shape
         end = ((offset + shape * pixel_size) / self.pixel_size).simplified.magnitude

@@ -3,6 +3,7 @@ import syris.config as cfg
 import quantities as q
 from syris.util import get_magnitude
 import pyopencl.cltypes as cltypes
+import pyopencl.array as cl_array
 import syris.gpu.util as gutil
 import numpy as np
 import logging
@@ -15,6 +16,7 @@ class AcceleratorBase(abc.ABC):
         self.mesh = mesh
         self.backend = cfg.BACKEND
         self._built_for_state = -1
+        self.tree = None
 
     @abc.abstractmethod
     def build(self, **kwargs):
@@ -24,7 +26,7 @@ class AcceleratorBase(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def project(self, shape, pixel_size, offset, /, *, t=None, **kwargs):
+    def project(self, shape=None, pixel_size=None, /, **kwargs):
         pass
 
 
@@ -61,8 +63,7 @@ class BvhCupyAccelerator(AcceleratorBase):
             self.float_dtype(rc_cfg.p_unique_abs_epsilon),
         )
 
-        self._tree = None
-        self._tree = None
+        self.tree = None
 
     def build(self, **kwargs):
         """
@@ -171,7 +172,7 @@ class BvhCupyAccelerator(AcceleratorBase):
                 "t_epsilon": t_epsilon,
             }
 
-            self._tree = tree
+            self.tree = tree
             self._built_for_state = self.mesh._state
 
         except Exception as e:
@@ -183,28 +184,26 @@ class BvhCupyAccelerator(AcceleratorBase):
 
     def project(
         self,
-        shape,
-        pixel_size,
-        offset,
+        shape=None,
+        pixel_size=None,
         /,
         *,
-        t=None,
         iterations=0,
         abs_tolerance=1e-5,
         rel_tolerance=0.02,
+        camera=None,
         **kwargs,
     ):
-        if self._tree is None:
+        if self.tree is None:
             raise RuntimeError("BVH tree must be built before projection.")
 
-        camera = kwargs.get("camera")
         if camera is None:
             raise ValueError("Missing required keyword argument: 'camera'")
 
         parallel = kwargs.get("parallel", True)
 
-        nb_keys = self._tree["keys"].shape[0]
-        use_normals = self._tree["normals"] is not None
+        nb_keys = self.tree["keys"].shape[0]
+        use_normals = self.tree["normals"] is not None
         U, V, W = camera.viewport_basis_vectors
 
         # --- Calculate Scaling ---
@@ -232,10 +231,10 @@ class BvhCupyAccelerator(AcceleratorBase):
             global_counter,
             nb_keys,
             image,
-            (self._tree["vertices"] * scale).view(self.float4_view),
+            (self.tree["vertices"] * scale).view(self.float4_view),
         ]
         if use_normals:
-            base_args.append((self._tree["normals"] * scale).view(self.float4_view))
+            base_args.append((self.tree["normals"] * scale).view(self.float4_view))
 
         camera_args = [
             camera.kernel_shape_xy.view(self.uint2_view),
@@ -250,13 +249,13 @@ class BvhCupyAccelerator(AcceleratorBase):
             camera_args.append((camera.source_point * scale).view(self.float4_view))
 
         tree_args = [
-            self._tree["rope"],
-            self._tree["left"],
-            self._tree["indices"],
-            self._tree["bbMin"] * scale,
-            self._tree["bbMax"] * scale,
-            (self._tree["sceneMin"] * scale).view(self.float4_view),
-            (self._tree["sceneMax"] * scale).view(self.float4_view),
+            self.tree["rope"],
+            self.tree["left"],
+            self.tree["indices"],
+            self.tree["bbMin"] * scale,
+            self.tree["bbMax"] * scale,
+            (self.tree["sceneMin"] * scale).view(self.float4_view),
+            (self.tree["sceneMax"] * scale).view(self.float4_view),
         ]
 
         sampling_args = [float(abs_tolerance), float(rel_tolerance), int(iterations)]
@@ -303,12 +302,19 @@ class LegacyCpuAccelerator(AcceleratorBase):
         self.mesh.transform()
         self.mesh.sort()
 
-    def project(self, shape, pixel_size, offset, /, *, t=None, **kwargs):
+    def project(self, shape=None, pixel_size=None, /, **kwargs):
         """Projection implementation."""
         xp = cfg.BACKEND.xp
-        queue = kwargs.get("queue", cfg.OPENCL.queue)
-        out = kwargs.get("out")
-        block = kwargs.get("block", False)
+        queue = kwargs.pop("queue", None)
+        out = kwargs.pop("out", None)
+        block = kwargs.pop("block", False)
+        offset = kwargs.pop("offset", False)
+
+        if queue is None:
+            queue = cfg.OPENCL.queue
+
+        if out is None:
+            out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
 
         def get_crop(index, fov):
             minimum = max(self.mesh.extrema[index][0], fov[index][0])
@@ -388,7 +394,7 @@ class LegacyCUDAAccelerator(AcceleratorBase):
             raise RuntimeError(
                 "CUDA backend is active, but the CudaPipeline was not initialized."
             )
-        self._tree = None
+        self.tree = None
 
     def build(self, **kwargs):
         """
@@ -398,7 +404,7 @@ class LegacyCUDAAccelerator(AcceleratorBase):
         self.mesh.transform()
         self.mesh.sort()
 
-    def project(self, shape, pixel_size, offset, /, *, t=None, **kwargs):
+    def project(self, shape=None, pixel_size=None, /, **kwargs):
         """Projection implementation."""
         xp = cfg.BACKEND.xp
 

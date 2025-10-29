@@ -80,10 +80,15 @@ class MetaBall(MovableBody):
         return BoundingBox(np.array(transformed) * q.m)
 
     def _project(
-        self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False
+        self, shape=None, pixel_size=None, /, **kwargs
     ):
+        offset = kwargs.pop("offset", None)
+        queue = kwargs.pop("queue", None)
+        out = kwargs.pop("out", None)
+        block = kwargs.pop("block", False)
+
         return project_metaballs(
-            [self], shape, pixel_size, offset, queue=queue, out=out, block=block
+            [self], shape, pixel_size, offset=offset, queue=queue, out=out, block=block
         )
 
     def get_transform_const(self):
@@ -126,11 +131,16 @@ class MetaBalls(CompositeBody):
         )
 
     def _project(
-        self, shape, pixel_size, offset, t=None, queue=None, out=None, block=False
+        self, shape=None, pixel_size=None, /, **kwargs
     ):
+        offset = kwargs.pop("offset", None)
+        queue = kwargs.pop("queue", None)
+        out = kwargs.pop("out", None)
+        block = kwargs.pop("block", False)
+
         """Projection implementation."""
         return project_metaballs(
-            self._bodies, shape, pixel_size, offset, queue=queue, out=out, block=block
+            self._bodies, shape, pixel_size, offset=offset, queue=queue, out=out, block=block
         )
 
 

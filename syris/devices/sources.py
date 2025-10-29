@@ -123,10 +123,12 @@ class XRaySource(OpticalElement):
         """Compute the flat field wavefield. Returned *out* array is different from the input
         one.
         """
-        queue = kwargs.get("queue", cfg.OPENCL.queue)
-        out = kwargs.get("out")
-        block = kwargs.get("block", False)
+        queue = kwargs.pop("queue", None)
+        out = kwargs.pop("out", None)
+        block = kwargs.pop("block", False)
 
+        if queue is None:
+            queue = cfg.OPENCL.queue
         if out is None:
             out = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
 

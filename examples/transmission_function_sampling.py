@@ -53,7 +53,7 @@ def main():
     lam = energy_to_wavelength(energy)
     # Delta causes phase shift between two adjacent pixels by 2 Pi
     delta = (lam / ps).simplified.magnitude
-    ri = np.ones_like(energies.magnitude, dtype=np.complex) * delta + 0j
+    ri = np.ones_like(energies.magnitude, dtype=np.complex128) * delta + 0j
     material = Material("dummy", ri, energies)
     fmt = "Computing with n: {:>4}, pixel size: {}"
 

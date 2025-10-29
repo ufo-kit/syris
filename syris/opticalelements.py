@@ -20,6 +20,7 @@ Optical Elements are entities capable of producing wavefields as a function of t
 """
 
 import quantities as q
+import syris.config as cfg
 from syris.util import make_tuple
 
 
@@ -31,13 +32,16 @@ class OpticalElement(object):
         shape,
         pixel_size,
         energy,
-        offset=None,
         /,
         *,
         exponent=False,
+        offset=None,
         t=None,
+        queue=None,
+        out=None,
         check=True,
-        **kwargs,
+        block=False,
+        **kwargs
     ):
         """Transfer function of the element in real space on an image plane of size *shape*, use
         *pixel_size*, *energy*, *offset* is the physical spatial offset of the element as (y, x),
@@ -58,19 +62,36 @@ class OpticalElement(object):
             offset,
             exponent=exponent,
             t=t,
+            queue=queue,
+            out=out,
             check=check,
+            block=block,
             **kwargs,
         )
 
-    def transfer_fourier(self, shape, pixel_size, energy, /, *, t=None, **kwargs):
+    def transfer_fourier(
+            self,
+            shape,
+            pixel_size,
+            energy,
+            t=None,
+            queue=None,
+            out=None,
+            block=False,
+            **kwargs
+        ):
         """Transfer function of the element in Fourier space of size *shape*, use *pixel_size*,
         *energy* and comput the function at time *t*. Use *queue* for OpenCL computations and *out*
         pyopencl array. If *block* is True, wait for the kernel to finish.
         """
         shape = make_tuple(shape, num_dims=2)
         pixel_size = make_tuple(pixel_size, num_dims=2)
+        if queue is None:
+            queue = cfg.OPENCL.queue
 
-        return self._transfer_fourier(shape, pixel_size, energy, t=t, **kwargs)
+        return self._transfer_fourier(
+            shape, pixel_size, energy, t=t, queue=queue, out=out, block=block
+        )
 
     def _transfer(
         self,
@@ -79,16 +100,12 @@ class OpticalElement(object):
         energy,
         offset,
         /,
-        *,
-        exponent=False,
-        t=None,
-        check=True,
         **kwargs,
     ):
         """Transfer function implementation."""
         raise NotImplementedError
 
-    def _transfer_fourier(self, shape, pixel_size, energy, /, *, t=None, **kwargs):
+    def _transfer_fourier(self, shape, pixel_size, energy, /, **kwargs):
         """Transfer function implementation."""
         raise NotImplementedError
 

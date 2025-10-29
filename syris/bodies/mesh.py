@@ -108,7 +108,7 @@ class Mesh(MovableBody):
         self._furthest_point = np.max(np.sqrt(np.sum(self._triangles**2, axis=0)))
         self.iterations = iterations
 
-        self.accelerator = None
+        self._accelerator = None
         self._normals = normals
         self._use_normals = use_normals
 
@@ -308,7 +308,10 @@ class Mesh(MovableBody):
 
     @property
     def tree(self):
-        return self.accelerator._tree
+        if self._accelerator is not None:
+            return self._accelerator.tree
+        else:
+            return None 
 
     def sort(self):
         """Sort triangles based on the greatest x-coordinate in an ascending order. Also sort
@@ -382,17 +385,17 @@ class Mesh(MovableBody):
         """
         Lazy-initializes and rebuilds the accelerator only if the mesh state has changed.
         """
-        if self.accelerator is None or self.accelerator._built_for_state != self._state:
-            self.accelerator = cfg.BACKEND.get_accelerator_for_mesh(self)
-            self.accelerator.build(visualize_bvh=self.visualize_bvh)
-        return self.accelerator
+        if self._accelerator is None or self._accelerator._built_for_state != self._state:
+            self._accelerator = cfg.BACKEND.get_accelerator_for_mesh(self)
+            self._accelerator.build(visualize_bvh=self.visualize_bvh)
+        return self._accelerator
 
     def _project(
-        self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs
+        self, shape=None, pixel_size=None, /, **kwargs
     ):
         # This method now correctly gets a cached or rebuilt accelerator
         accel = self.build_accelerator()
-        return accel.project(shape, pixel_size, offset, t=t, **kwargs)
+        return accel.project(shape, pixel_size, **kwargs)
 
     def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
         """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for

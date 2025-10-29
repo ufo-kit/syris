@@ -184,10 +184,7 @@ class Camera(MovableBody):
     # Cuda compatible properties
     @property
     def pixel_size(self):
-        ret = self._pixel_size.rescale(cfg.UNIT).magnitude
-        if ret.size == 1:
-            ret = np.array([ret, ret])
-        return ret.astype(cfg.PRECISION.np_float)
+        return self._pixel_size.rescale(cfg.UNIT)
 
     @pixel_size.setter
     def pixel_size(self, value):
@@ -239,7 +236,11 @@ class Camera(MovableBody):
         Returns the pixel_size as (x, y) [ps_x, ps_y],
         contiguous, for CUDA kernels.
         """
-        return self.pixel_size[::-1].copy()
+        ret = self._pixel_size.rescale(cfg.UNIT).magnitude
+        if ret.size == 1:
+            ret = np.array([ret, ret])
+        ret = ret[::-1]
+        return ret.astype(cfg.PRECISION.np_float)
 
     @property
     def focal_length(self):

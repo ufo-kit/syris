@@ -97,25 +97,15 @@ def main():
     tr = geom.Trajectory([(0, 0, 0)] * mesh_units)
 
     if args.input:
-        LOG.info(f"Loading mesh from file: {args.input}")
-        mesh = Mesh.from_file(
-            args.input, tr, center=args.center, unit=mesh_units, use_normals=True
-        )
+        input = args.input
+        LOG.info(f"Loading mesh from file: {input}")
     else:
+        input = pv.examples.download_dragon()
         LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
-        pv_mesh = pv.examples.download_dragon()
 
-        vertices = pv_mesh.points
-        faces = pv_mesh.faces.reshape(-1, 4)[:, 1:4]
-
-        mesh = Mesh(
-            vertices=vertices,
-            triangles=faces,
-            trajectory=tr,
-            center=args.center,
-            unit=mesh_units,
-            use_normals=True,
-        )
+    mesh = Mesh.from_file(
+        input, tr, center=args.center, unit=mesh_units, use_normals=True
+    )
 
     mesh.build_accelerator()
 

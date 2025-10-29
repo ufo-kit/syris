@@ -42,7 +42,7 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs):
+    def project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, queue=None, out=None, block=False, **kwargs):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D.
         *offset* is the physical spatial body offset as (y, x). *queue* is an OpenCL command queue,
@@ -54,9 +54,9 @@ class Body(OpticalElement):
         if offset is None:
             offset = (0, 0) * q.m
 
-        return self._project(shape, pixel_size, offset=offset, t=t, **kwargs)
+        return self._project(shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block, **kwargs)
 
-    def _project(self, shape, pixel_size, /, *, offset=None, t=None, **kwargs):
+    def _project(self, shape=None, pixel_size=None, /, **kwargs):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
@@ -67,24 +67,29 @@ class Body(OpticalElement):
         energy,
         offset,
         /,
-        *,
-        exponent=False,
-        t=None,
-        check=True,
-        **kwargs,
+        **kwargs
     ):
         """Transfer function implementation based on a refractive index."""
         ri = self.material.get_refractive_index(energy)
         lam = energy_to_wavelength(energy)
 
-        project_kwargs = kwargs.copy()
-        project_kwargs.pop("offset", None)
+        exponent = kwargs.pop("exponent", False)
+        t = kwargs.pop("t", None)
+        queue = kwargs.pop("queue", None)
+        out = kwargs.pop("out", None)
+        check = kwargs.pop("check", True)
+        block = kwargs.pop("block", False)
 
-        proj = self.project(shape, pixel_size, offset=offset, t=t, **project_kwargs)
-
-        queue = kwargs.get("queue", cfg.OPENCL.queue)
-        out = kwargs.get("out")
-        block = kwargs.get("block", False)
+        proj = self.project(
+            shape,
+            pixel_size,
+            offset=offset,
+            t=t,
+            queue=queue,
+            out=out,
+            block=block,
+            **kwargs
+        )
 
         return transfer(
             proj,
@@ -95,6 +100,7 @@ class Body(OpticalElement):
             out=out,
             check=check,
             block=block,
+            **kwargs
         )
 
 
@@ -132,15 +138,14 @@ class MovableBody(Body):
         self._cache_projection = cache_projection
         self.update_projection_cache()
 
-    def project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, **kwargs):
+    def project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, queue=None, out=None,  block=False, **kwargs):
         """Project thickness at time *t* (if it is None no transformation is applied) to the image
         plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
         *pixel_size* is the point size, also either 1D or 2D. *offset* is the physical spatial body
         offset as (y, x). *queue* is an OpenCL command queue, *out* is the pyopencl array used for
         result. If *block* is True, wait for the kernel to finish.
         """
-        _pixel_size = make_tuple(pixel_size, 2) if pixel_size is not None else None
-
+        pixel_size = make_tuple(pixel_size, 2)
         if offset is None:
             offset = (0, 0) * q.m
         if t is not None:
@@ -149,24 +154,21 @@ class MovableBody(Body):
         if self.cache_projection:
             cache_is_invalid = (
                 self._p_cache["time"] is None
-                or (
-                    _pixel_size is not None
-                    and np.any(self._p_cache["ps"] != _pixel_size)
-                )
-                or (shape is not None and self._p_cache["shape"] != shape)
+                or np.any(self._p_cache["ps"] != pixel_size)
+                or self._p_cache["shape"] != shape
                 or np.any(self._p_cache["offset"] != offset)
             )
 
             if cache_is_invalid:
                 moved = True
                 self.update_projection_cache(
-                    t=t, shape=shape, pixel_size=_pixel_size, offset=offset
+                    t=t, shape=shape, pixel_size=pixel_size, offset=offset
                 )
             else:
                 moved = self.moved(
                     min(self._p_cache["time"], t),
                     max(self._p_cache["time"], t),
-                    0.99 * min(_pixel_size),
+                    0.99 * min(pixel_size),
                     bind=False,
                 )
 
@@ -174,12 +176,26 @@ class MovableBody(Body):
                 LOG.debug("{} computing projection at {}".format(self, t))
                 self._p_cache["time"] = t
                 self._p_cache["projection"] = super(MovableBody, self).project(
-                    shape, pixel_size, offset=offset, t=t, **kwargs
+                    shape,
+                    pixel_size,
+                    offset=offset,
+                    t=t,
+                    queue=queue,
+                    out=None,
+                    block=block,
+                    **kwargs
                 )
             projection = self._p_cache["projection"]
         else:
             projection = super(MovableBody, self).project(
-                shape, pixel_size, offset=offset, t=t, **kwargs
+                shape,
+                pixel_size,
+                offset=offset,
+                t=t,
+                queue=queue,
+                out=None,
+                block=block,
+                **kwargs
             )
 
         return projection
@@ -412,7 +428,7 @@ class MovableBody(Body):
         angle = geom.angle(orientation, direction)
 
         if abs(np.dot(norm_orientation, norm_direction)) > 0.999:
-            if np.allclose(norm_orientation, geom.Z_AX):
+            if np.allclose(norm_orientation.magnitude, geom.Z_AX.magnitude):
                 rot_ax = geom.X_AX
             else:
                 rot_ax = geom.Z_AX
@@ -768,18 +784,22 @@ class CompositeBody(MovableBody):
         """Return True if the body moves more than *pixel_size* in time interval *t_0*, *t_1*."""
         return self.get_distance(t_0, t_1) > pixel_size
 
-    def _project(self, shape, pixel_size, /, *, offset, t=None, **kwargs):
+    def _project(self, shape=None, pixel_size=None, /, **kwargs):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
-        queue = kwargs.get(
-            "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
-        )
-        out = kwargs.get("out")
+        offset = kwargs.pop("offset", None)
+        t = kwargs.pop("t", None) 
+        queue = kwargs.pop("queue", None)
+        out = kwargs.pop("out", None)
+
+        if queue is None:
+            queue = cfg.BACKEND.queue
 
         if out is None:
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
 
         for body in self.bodies:
             out += body.project(shape, pixel_size, offset=offset, t=t, **kwargs)
+            
         return out
 
     def _transfer(

@@ -286,7 +286,7 @@ void split_intervals(vfloat left_end, vfloat right_end,
 	intervals[degree] = left_end;
 	intervals[degree + 1] = right_end;
 
-	sort(intervals, POLY_DEG + 1);
+	vfsort(intervals, POLY_DEG + 1);
 }
 
 void get_roots(const vfloat *previous_coeffs, const vfloat *coeffs,
@@ -343,7 +343,7 @@ void get_roots(const vfloat *previous_coeffs, const vfloat *coeffs,
 		 * points. */
 		get_interval_roots(previous_coeffs, coeffs, next_coeffs, degree,
 								left_end, right_end, intervals, results, eps);
-		sort(results, degree + 1);
+		vfsort(results, degree + 1);
 		break;
 	}
 }

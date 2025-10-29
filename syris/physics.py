@@ -37,9 +37,13 @@ def transfer(
     thickness,
     refractive_index,
     wavelength,
+    /,
     *,
     exponent=False,
+    queue=None,
+    out=None,
     check=True,
+    block=False,
     **kwargs,
 ):
     """Transfer *thickness* (can be either a numpy or pyopencl array) with *refractive_index* and
@@ -49,13 +53,7 @@ def transfer(
     artefacts. Returned *out* array is different from the input one because of the pyopencl.clmath
     behavior.
     """
-    queue = kwargs.get(
-        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
-    )
-    out = kwargs.get("out")
-    block = kwargs.get("block", False)
-
-    if queue is None and cfg.BACKEND.name == "opencl":
+    if queue is None:
         queue = cfg.OPENCL.queue
 
     if isinstance(thickness, cl_array.Array):
@@ -63,7 +61,7 @@ def transfer(
     else:
         prep = thickness.simplified.magnitude.astype(cfg.PRECISION.np_float)
         thickness_mem = cl_array.to_device(queue, prep)
-
+    
     if out is None:
         out = cl_array.Array(queue, thickness_mem.shape, cfg.PRECISION.np_cplx)
 
@@ -105,6 +103,7 @@ def compute_propagator(
     distance,
     lam,
     pixel_size,
+    /,
     *,
     fresnel=True,
     region=None,
@@ -112,6 +111,8 @@ def compute_propagator(
     mollified=True,
     mollifier="gauss",
     fourier=True,
+    queue=None,
+    block=False,
     **kwargs,
 ):
     """Create a propagator with (*size*, *size*) dimensions for propagation *distance*, wavelength
@@ -125,18 +126,12 @@ def compute_propagator(
     *mollifier* can be "gauss" or "butterworth". If command *queue* is specified, execute the kernel
     on it. If *block* is True, wait for the kernel to finish.
     """
-    queue = kwargs.get(
-        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
-    )
-    block = kwargs.get("block", False)
-
     if mollifier not in ("gauss", "butterworth"):
         raise ValueError("Mollifier can be either 'gauss' or 'butterworth'")
     if size % 2:
         raise ValueError("Only even sizes are supported")
-    if queue is None and cfg.BACKEND.name == "opencl":
+    if queue is None:
         queue = cfg.OPENCL.queue
-
     pixel_size = make_tuple(pixel_size)
     if mollified and mollifier == "butterworth" and pixel_size[0] != pixel_size[1]:
         raise RuntimeError("Butterworth requires identical pixel sizes")
@@ -220,17 +215,12 @@ def compute_propagator(
     return out
 
 
-def is_wavefield_sampling_ok(wavefield_exponent, **kwargs):
+def is_wavefield_sampling_ok(wavefield_exponent, queue=None, out=None, **kwargs):
     """Check the sampling of the *wavefield_exponent*. Use OpenCL *queue* and *out* array. Return
     True if the sampling is OK, False otherwise.
     """
-    queue = kwargs.get(
-        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
-    )
-    out = kwargs.get("out")
-
     shape = wavefield_exponent.shape
-    if queue is None and cfg.BACKEND.name == "opencl":
+    if queue is None:
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl_array.zeros(queue, shape, np.int8)
@@ -257,8 +247,11 @@ def transfer_many(
     *,
     exponent=False,
     offset=None,
+    queue=None,
+    out=None,
     t=None,
     check=True,
+    block=False,
     **kwargs,
 ):
     """Compute transmission from more *objects*. If *exponent* is True, compute only the exponent,
@@ -267,16 +260,11 @@ def transfer_many(
     wait for OpenCL kernels if *block* is True. Returned *out* array is different from the input one
     because of the pyopencl.clmath behavior.
     """
-    queue = kwargs.get(
-        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
-    )
-    out = kwargs.get("out")
-    block = kwargs.get("block", False)
-
-    if queue is None and cfg.BACKEND.name == "opencl":
+    if queue is None:
         queue = cfg.OPENCL.queue
     if out is None:
         out = cl_array.zeros(queue, shape, cfg.PRECISION.np_cplx)
+    u_sample = cl_array.Array(queue, shape, cfg.PRECISION.np_cplx)
 
     for i, sample in enumerate(objects):
         try:
@@ -284,12 +272,14 @@ def transfer_many(
                 shape,
                 pixel_size,
                 energy,
-                offset=offset,
                 exponent=True,
+                offset=offset,
                 t=t,
+                queue=queue,
+                out=u_sample,
                 check=False,
                 block=block,
-                **kwargs,  # Pass all kwargs
+                **kwargs,
             )
         except NotImplementedError:
             LOG.debug("%s does not support real space transfer", sample)
@@ -317,8 +307,11 @@ def propagate(
     mollified=True,
     detector=None,
     offset=None,
+    queue=None,
+    out=None,
     t=None,
     check=True,
+    block=False,
     **kwargs,
 ):
     """Propagate *samples* with *shape* as (y, x) which are
@@ -328,14 +321,8 @@ def propagate(
     *out* a PyOpenCL Array. If *block* is True, wait for the kernels to finish. If *check* is True,
     check the transmission function sampling.
     """
-    queue = kwargs.get(
-        "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
-    )
-    block = kwargs.get("block", False)
-
-    if queue is None and cfg.BACKEND.name == "opencl":
+    if queue is None:
         queue = cfg.OPENCL.queue
-
     u = cl_array.Array(queue, shape, dtype=cfg.PRECISION.np_cplx)
     intensity = cl_array.zeros(queue, shape, cfg.PRECISION.np_float)
 
