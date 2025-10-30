@@ -35,11 +35,15 @@ LOCK = Lock()
 LOG = logging.getLogger(__name__)
 
 
-def make_projection(mesh, camera, parallel=True, ss=1, orig_shape=None, subsampling=0):
+def make_projection(
+    mesh, camera, parallel=True, ss=1, orig_shape=None, subsampling=0
+):
     from syris.imageprocessing import bin_image
 
     # t=None for trajectory override
-    projection = mesh.project(camera=camera, parallel=parallel, iterations=subsampling)
+    projection = mesh.project(
+        camera=camera, parallel=parallel, iterations=subsampling
+    )
     if ss > 1:
         projection = bin_image(projection, orig_shape, average=True)
 
@@ -87,7 +91,9 @@ def scan(camera, mesh, args, index=0, shift_coeff=1e4, orig_shape=None):
     lamino_axis = X_AX
     tomo_axis = Y_AX if args.rotation_axis == "y" else Z_AX
     num_projs = (
-        int(np.pi * args.n) if args.num_projections is None else args.num_projections
+        int(np.pi * args.n)
+        if args.num_projections is None
+        else args.num_projections
     )
     tomo_angle = args.rotation_angle / (num_projs - 1) * q.deg
 
@@ -114,7 +120,8 @@ def scan(camera, mesh, args, index=0, shift_coeff=1e4, orig_shape=None):
 
         # 2. Check for faulty pixels (if not the first frame)
         if (
-            last is not None and (max_vals[0] > 2 * last or np.isnan(max_vals[0]))
+            last is not None
+            and (max_vals[0] > 2 * last or np.isnan(max_vals[0]))
         ) and not args.skip_pixel_testing:
             checked_indices.append(i)
             shift_val = psm / shift_coeff
@@ -145,7 +152,12 @@ def scan(camera, mesh, args, index=0, shift_coeff=1e4, orig_shape=None):
         with LOCK:
             LOG.info(
                 log_fmt.format(
-                    index, i + 1, num_projs, duration, current_tomo_angle, max_vals
+                    index,
+                    i + 1,
+                    num_projs,
+                    duration,
+                    current_tomo_angle,
+                    max_vals,
                 )
             )
 
@@ -196,12 +208,16 @@ def make_ground_truth(args, shape, mesh):
     mesh.transform()
     mesh.sort()
 
-    z_stack = np.empty((args.supersampling,) + orig_shape, dtype=cfg.PRECISION.np_float)
+    z_stack = np.empty(
+        (args.supersampling,) + orig_shape, dtype=cfg.PRECISION.np_float
+    )
 
     for i in range(0, shape[0], args.z_chunk):
         end = min(i + args.z_chunk, shape[0])
         offset = (0, i * ps.rescale(q.um).magnitude, 0) * q.um
-        slices = mesh.compute_slices((end - i,) + shape, ps, offset=offset).get()
+        slices = mesh.compute_slices(
+            (end - i,) + shape, ps, offset=offset
+        ).get()
         LOG.info("Computing slices {}-{}".format(i, end))
         enumerated = list(enumerate(slices))[:: args.supersampling]
         for j, sl in enumerated:
@@ -237,7 +253,9 @@ def process(args, device_index):
         LOG.info(f"Loading mesh from file: {input}")
     else:
         input = pv.examples.download_dragon()
-        LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
+        LOG.info(
+            "No input file provided, loading default PyVista mesh (dragon)..."
+        )
 
     mesh = Mesh.from_file(input, tr, center=None, unit=q.um, use_normals=True)
 
@@ -269,7 +287,9 @@ def process(args, device_index):
     else:
         if device_index == 0:
             LOG.info("n: {}, ps: {}, FOV: {}".format(n, args.pixel_size, fov))
-            LOG.info("Total rotation angle: {} deg".format(args.rotation_angle))
+            LOG.info(
+                "Total rotation angle: {} deg".format(args.rotation_angle)
+            )
             LOG.info("--- Mesh info ---")
             log_attributes(mesh)
             LOG.info("--- Args info ---")
@@ -291,9 +311,13 @@ def parse_args():
         help="Pixel-wise adaptive subsampling. 0 for single sample, n for n levels of adaptive subsampling.",
     )
     parser.add_argument(
-        "--dset", type=str, help="Data set name, if not specified guessed from input"
+        "--dset",
+        type=str,
+        help="Data set name, if not specified guessed from input",
     )
-    parser.add_argument("--num-projections", type=int, help="Number of projections")
+    parser.add_argument(
+        "--num-projections", type=int, help="Number of projections"
+    )
     parser.add_argument(
         "--out-directory",
         type=str,
@@ -302,7 +326,11 @@ def parse_args():
         "or 'out-directory/dset/truth', depending on the --make-gt switch",
     )
     parser.add_argument(
-        "--pixel-size", type=float, default=[750.0], nargs="+", help="Pixel size in nm"
+        "--pixel-size",
+        type=float,
+        default=[750.0],
+        nargs="+",
+        help="Pixel size in nm",
     )
     parser.add_argument(
         "--rotation-angle",
@@ -325,11 +353,18 @@ def parse_args():
         nargs="+",
         help="Rotation axis (y - up, z - beam direction)",
     )
-    parser.add_argument("--conebeam", action="store_true", help="Use conebeam geometry")
-    parser.add_argument("--sod", type=float, help="Source to object distance")
-    parser.add_argument("--sdd", type=float, help="Source to detector distance")
     parser.add_argument(
-        "--num-devices", type=int, default=1, help="Number of compute devices to use"
+        "--conebeam", action="store_true", help="Use conebeam geometry"
+    )
+    parser.add_argument("--sod", type=float, help="Source to object distance")
+    parser.add_argument(
+        "--sdd", type=float, help="Source to detector distance"
+    )
+    parser.add_argument(
+        "--num-devices",
+        type=int,
+        default=1,
+        help="Number of compute devices to use",
     )
     parser.add_argument(
         "--supersampling",
@@ -366,7 +401,10 @@ def main():
     args = parse_args()
     combinations = list(
         itertools.product(
-            args.lamino_angle, args.pixel_size, args.rotation_axis, args.supersampling
+            args.lamino_angle,
+            args.pixel_size,
+            args.rotation_axis,
+            args.supersampling,
         )
     )
     if args.make_gt:

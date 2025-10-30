@@ -88,12 +88,16 @@ class CudaPipeline:
             backend=backend,
         )
 
-    def getKernelFromModule(self, moduleName: str, kernelName: str) -> cp.RawKernel:
+    def getKernelFromModule(
+        self, moduleName: str, kernelName: str
+    ) -> cp.RawKernel:
         if moduleName not in self.modules:
             raise Exception("Module not found")
 
         if kernelName not in self.kernels:
-            self.kernels[kernelName] = self.modules[moduleName].get_function(kernelName)
+            self.kernels[kernelName] = self.modules[moduleName].get_function(
+                kernelName
+            )
 
         return self.kernels[kernelName]
 

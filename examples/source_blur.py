@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Source blur example."""
+
 import matplotlib.pyplot as plt
 import quantities as q
 import syris
@@ -36,10 +37,17 @@ def main():
     ps = 1 * q.um
     energy = 20 * q.keV
     tr = Trajectory([(n / 2, n / 2, 0)] * ps, pixel_size=ps)
-    sample = make_sphere(n, n / 30 * ps, pixel_size=ps, material=get_material("air_5_30_kev.mat"))
+    sample = make_sphere(
+        n,
+        n / 30 * ps,
+        pixel_size=ps,
+        material=get_material("air_5_30_kev.mat"),
+    )
 
     bm = make_topotomo(pixel_size=ps, trajectory=tr)
-    print("Source size FWHM (height x width): {}".format(bm.size.rescale(q.um)))
+    print(
+        "Source size FWHM (height x width): {}".format(bm.size.rescale(q.um))
+    )
 
     intensity = propagate([sample], shape, [energy], d, ps).get()
     incoh = bm.apply_blur(intensity, d, ps).get()
@@ -56,7 +64,10 @@ def main():
 def parse_args():
     parser = get_default_parser(__doc__)
     parser.add_argument(
-        "--propagation-distance", type=float, default=2, help="Propagation distance [m]"
+        "--propagation-distance",
+        type=float,
+        default=2,
+        help="Propagation distance [m]",
     )
 
     return parser.parse_args()

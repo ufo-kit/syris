@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Example of a trajectory which simulates tomographic rotation."""
+
 import matplotlib.pyplot as plt
 import quantities as q
 import syris
@@ -34,7 +35,9 @@ def main():
     triangles = make_cube().magnitude * n / 8.0 * ps
     # Rotation around the vertical axis
     points = make_circle(axis="y").magnitude * fov / 30000 + fov / 2
-    trajectory = geom.Trajectory(points, pixel_size=ps, velocity=10 * q.um / q.s)
+    trajectory = geom.Trajectory(
+        points, pixel_size=ps, velocity=10 * q.um / q.s
+    )
     # *orientation* aligns the object with the trajectory derivative
     mesh = Mesh(triangles, trajectory, orientation=geom.Z_AX)
     # Compute projection at the angle Pi/4

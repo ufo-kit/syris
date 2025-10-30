@@ -104,7 +104,9 @@ class Mesh(MovableBody):
         self.normalization_scale = normalize_factor
 
         self._triangles = np.copy(self._current)
-        self._furthest_point = np.max(np.sqrt(np.sum(self._triangles**2, axis=0)))
+        self._furthest_point = np.max(
+            np.sqrt(np.sum(self._triangles**2, axis=0))
+        )
         self.iterations = iterations
 
         self._accelerator = None
@@ -215,7 +217,8 @@ class Mesh(MovableBody):
             return (ends[0] + ends[1]) / 2.0
 
         return (
-            np.array([get_middle(ends) for ends in self.extrema.magnitude]) * cfg.UNIT
+            np.array([get_middle(ends) for ends in self.extrema.magnitude])
+            * cfg.UNIT
         )
 
     @property
@@ -361,7 +364,9 @@ class Mesh(MovableBody):
     def _make_vertices(self, index, pixel_size):
         """Make a flat array of vertices belong to *triangles* at *index*."""
         # Convert to meters
-        vertices = self._current[:, index::3] / pixel_size.rescale(cfg.UNIT).magnitude
+        vertices = (
+            self._current[:, index::3] / pixel_size.rescale(cfg.UNIT).magnitude
+        )
 
         return vertices.transpose().flatten().astype(cfg.PRECISION.np_float)
 
@@ -375,7 +380,9 @@ class Mesh(MovableBody):
     def transform(self):
         """Apply transformation *matrix* and return the resulting triangles."""
         matrix = self.get_rescaled_transform_matrix(cfg.UNIT)
-        self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
+        self._current = np.dot(
+            matrix.astype(self._triangles.dtype), self._triangles
+        )
 
     def build_accelerator(self):
         """
@@ -394,7 +401,9 @@ class Mesh(MovableBody):
         accel = self.build_accelerator()
         return accel.project(shape, pixel_size, **kwargs)
 
-    def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
+    def compute_slices(
+        self, shape, pixel_size, queue=None, out=None, offset=None
+    ):
         """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for
         outuput. Offset is the starting point offset as (x, y, z).
         """
@@ -445,7 +454,9 @@ def _extract_object(txt):
     v_pattern = re.compile(pattern.format("v"))
     f_pattern = re.compile(pattern.format("f"))
     vertices = np.array(re.findall(v_pattern, subtxt)).astype(np.float32)
-    faces = np.array(re.findall(f_pattern, subtxt)).astype(np.int32).flatten() - 1
+    faces = (
+        np.array(re.findall(f_pattern, subtxt)).astype(np.int32).flatten() - 1
+    )
 
     remainder = txt[obj_end:] if obj_end else None
 

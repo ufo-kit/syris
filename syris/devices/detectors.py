@@ -53,7 +53,9 @@ class Detector(object):
         """Convert X-ray *photons* at *energy* to visible light photons with *wavelengths*."""
         if wavelengths is None:
             wavelengths = self.camera.wavelengths
-        x_to_vis = self.scintillator.get_conversion_factor(energy).simplified.item()
+        x_to_vis = self.scintillator.get_conversion_factor(
+            energy
+        ).simplified.item()
         vis = self.get_visible_attenuation(wavelengths).simplified.item()
 
         return photons * x_to_vis * vis

@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Trajectory and motion example."""
+
 import os
 import matplotlib.pyplot as plt
 import numpy as np
@@ -37,7 +38,7 @@ def make_triangle(n=128):
 
 def make_power_2(n=128):
     x = np.linspace(0, 1, n, endpoint=False)
-    y = x ** 2
+    y = x**2
     z = np.zeros(n)
 
     return list(zip(x, y, z)) * q.mm
@@ -89,7 +90,7 @@ def make_sine(n=128, x_ends=(0, 1) * q.mm, y_ends=(0, 1) * q.mm):
 def get_ds(points):
     d_points = np.gradient(points)[1]
 
-    return np.sqrt(np.sum(d_points ** 2, axis=0))
+    return np.sqrt(np.sum(d_points**2, axis=0))
 
 
 def get_diffs(obj, ps, units=q.um, do_plot=True):
@@ -104,7 +105,14 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
 
     times = times * q.s
     points = np.array(
-        list(zip(*[obj.trajectory.get_point(tt).rescale(q.um).magnitude for tt in times]))
+        list(
+            zip(
+                *[
+                    obj.trajectory.get_point(tt).rescale(q.um).magnitude
+                    for tt in times
+                ]
+            )
+        )
     )
     dt = np.gradient(times)
 
@@ -181,7 +189,10 @@ def main():
         for i, t in enumerate(times):
             mb.clear_transformation()
             proj = mb.project((n, n), ps, t=t).get()
-            scipy.misc.imsave(os.path.join(args.output, "projection_{:>04}.tif".format(i)), proj)
+            scipy.misc.imsave(
+                os.path.join(args.output, "projection_{:>04}.tif".format(i)),
+                proj,
+            )
 
     plt.show()
 
@@ -189,7 +200,9 @@ def main():
 def parse_args():
     """Parse command line arguments."""
     parser = get_default_parser(__doc__)
-    parser.add_argument("--output", type=str, help="Output directory for moving objects.")
+    parser.add_argument(
+        "--output", type=str, help="Output directory for moving objects."
+    )
 
     return parser.parse_args()
 

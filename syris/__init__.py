@@ -46,7 +46,8 @@ def init(
     LOG = logging.getLogger(__name__)
 
     cfg.init_logging(
-        level=logging.INFO if loglevel is None else loglevel, logger_file=logfile
+        level=logging.INFO if loglevel is None else loglevel,
+        logger_file=logfile,
     )
     cfg.PRECISION = cfg.Precision(double_precision)
     cfg.BACKEND = ComputeBackend(compute_backend=compute_backend)
@@ -62,7 +63,9 @@ def init(
         ]
 
         options = ["-D__FP_T_D__", "-G"] if double_precision else []
-        cfg.BACKEND.pipeline = CudaPipeline(headers=cuda_headers, options=options)
+        cfg.BACKEND.pipeline = CudaPipeline(
+            headers=cuda_headers, options=options
+        )
 
         module_name = "bvh_kernels"
 
@@ -85,7 +88,9 @@ def init(
 
         try:
             for kernel_name in kernel_names:
-                cfg.BACKEND.pipeline.getKernelFromModule(module_name, kernel_name)
+                cfg.BACKEND.pipeline.getKernelFromModule(
+                    module_name, kernel_name
+                )
         except Exception as e:
             LOG.error(f"Failed to get kernel: {e}")
 

@@ -46,7 +46,9 @@ LOG = logging.getLogger(__name__)
 
 
 class XRaySource(OpticalElement):
-    def __init__(self, sample_distance, size, trajectory, phase_profile="plane"):
+    def __init__(
+        self, sample_distance, size, trajectory, phase_profile="plane"
+    ):
         self.sample_distance = sample_distance.simplified
         self.size = size.simplified
         self.trajectory = trajectory
@@ -59,7 +61,9 @@ class XRaySource(OpticalElement):
     @phase_profile.setter
     def phase_profile(self, phase_profile):
         if phase_profile not in ["plane", "parabola", "sphere"]:
-            raise XRaySourceError("Unknown phase profile: '{}'".format(phase_profile))
+            raise XRaySourceError(
+                "Unknown phase profile: '{}'".format(phase_profile)
+            )
         self._phase_profile = phase_profile
 
     def get_next_time(self, t_0, distance):
@@ -158,14 +162,20 @@ class XRaySource(OpticalElement):
         )
 
         if compute_exponent:
-            if check and phase and not is_wavefield_sampling_ok(out, queue=queue):
+            if (
+                check
+                and phase
+                and not is_wavefield_sampling_ok(out, queue=queue)
+            ):
                 LOG.error("Insufficient beam phase sampling")
             if not exponent:
                 out = clmath.exp(out, queue=queue)
 
         return out
 
-    def apply_blur(self, intensity, distance, pixel_size, queue=None, block=False):
+    def apply_blur(
+        self, intensity, distance, pixel_size, queue=None, block=False
+    ):
         """Apply source blur based on van Cittert-Zernike theorem at *distance*."""
         fwhm = (distance * self.size / self.sample_distance).simplified
         sigma = smath.fwnm_to_sigma(fwhm, n=2)
@@ -205,7 +215,9 @@ class FixedSpectrumSource(XRaySource):
         if len(flux) != len(energies):
             raise XRaySourceError("Flux must have the same length as energies")
         if flux.ndim == 3 and pixel_size is None:
-            raise XRaySourceError("pixel_size must be specified for 3D flux input")
+            raise XRaySourceError(
+                "pixel_size must be specified for 3D flux input"
+            )
         self._pixel_size = make_tuple(pixel_size, num_dims=2)
         self._energies = energies
         self._flux = flux
@@ -219,7 +231,9 @@ class FixedSpectrumSource(XRaySource):
         else:
             i_0 = np.where(self._energies < photon_energy)[0][-1]
             i_1 = np.where(self._energies >= photon_energy)[0][0]
-            d_e = (self._energies[i_1] - self._energies[i_0]).simplified.magnitude
+            d_e = (
+                self._energies[i_1] - self._energies[i_0]
+            ).simplified.magnitude
             w_0 = (photon_energy - self._energies[i_0]).simplified.magnitude
             w_1 = (self._energies[i_1] - photon_energy).simplified.magnitude
             flux = (self._flux[i_0] * w_1 + self._flux[i_1] * w_0) / d_e
@@ -248,12 +262,17 @@ class FixedSpectrumSource(XRaySource):
         cl_image = gutil.get_image(flux, queue=queue)
 
         sampler = cl.Sampler(
-            cfg.OPENCL.ctx, False, cl.addressing_mode.CLAMP, cl.filter_mode.LINEAR
+            cfg.OPENCL.ctx,
+            False,
+            cl.addressing_mode.CLAMP,
+            cl.filter_mode.LINEAR,
         )
 
         cl_center = gutil.make_vfloat3(*center)
         cl_ps = gutil.make_vfloat2(*pixel_size.simplified.magnitude[::-1])
-        cl_input_ps = gutil.make_vfloat2(*self._pixel_size.simplified.magnitude[::-1])
+        cl_input_ps = gutil.make_vfloat2(
+            *self._pixel_size.simplified.magnitude[::-1]
+        )
         z_sample = self.sample_distance.simplified.magnitude
         lam = energy_to_wavelength(energy).simplified.magnitude
         kernel = cfg.OPENCL.programs["physics"].make_flat_from_2D_profile
@@ -364,14 +383,19 @@ class BendingMagnet(XRaySource):
         def _get_flux_at_angle(angle, energy, d_energy):
             e_0 = energy - d_energy / 2.0
             e_1 = energy + d_energy / 2.0
-            return integrate.romberg(_get_flux_wrapper, e_0, e_1, args=(angle,))
+            return integrate.romberg(
+                _get_flux_wrapper, e_0, e_1, args=(angle,)
+            )
 
         get_profiles = np.vectorize(_get_flux_at_angle)
 
         energy = energy.rescale(q.keV).magnitude
         d_energy = self.dE.rescale(q.keV).magnitude
 
-        return get_profiles(angles.rescale(q.rad).magnitude, energy, d_energy) / q.s
+        return (
+            get_profiles(angles.rescale(q.rad).magnitude, energy, d_energy)
+            / q.s
+        )
 
     def get_next_time(self, t_0, distance):
         """Get the next time when the source will have moved more than *distance*."""
@@ -402,7 +426,9 @@ class BendingMagnet(XRaySource):
             .rescale(1 / q.s)
             .magnitude
         )
-        profile = cl_array.to_device(queue, profile.astype(cfg.PRECISION.np_float))
+        profile = cl_array.to_device(
+            queue, profile.astype(cfg.PRECISION.np_float)
+        )
         z_sample = self.sample_distance.simplified.magnitude
         lam = energy_to_wavelength(energy).simplified.magnitude
         kernel = cfg.OPENCL.programs["physics"].make_flat_from_vertical_profile
@@ -443,15 +469,20 @@ class BendingMagnet(XRaySource):
         with *photon_energy* and get it at the vertical observation angle
         *vertical_angle*.
         """
-        gama = Quantity(self.electron_energy / (qe.electron_mass * q.c**2)).simplified
+        gama = Quantity(
+            self.electron_energy / (qe.electron_mass * q.c**2)
+        ).simplified
         gama_psi = gama * vertical_angle.rescale(q.rad)
         norm_energy = (
-            photon_energy.rescale(self.critical_energy.units) / self.critical_energy
+            photon_energy.rescale(self.critical_energy.units)
+            / self.critical_energy
         )
         xi = Quantity(
             0.5 * norm_energy.magnitude * (1.0 + gama_psi**2) ** (3.0 / 2)
         ).magnitude
-        angle_step = np.arctan(pixel_size.simplified / self.sample_distance.simplified)
+        angle_step = np.arctan(
+            pixel_size.simplified / self.sample_distance.simplified
+        )
 
         # 1e-3 for 0.1 % BW
         return Quantity(
@@ -463,7 +494,9 @@ class BendingMagnet(XRaySource):
             * (1.0 + gama_psi**2) ** 2
             * (
                 special.kv(2.0 / 3, xi) ** 2
-                + gama_psi**2 / (1.0 + gama_psi**2) * special.kv(1.0 / 3, xi) ** 2
+                + gama_psi**2
+                / (1.0 + gama_psi**2)
+                * special.kv(1.0 / 3, xi) ** 2
             )
             * angle_step.rescale(q.rad) ** 2
             * 1e-3
@@ -506,7 +539,9 @@ class Wiggler(BendingMagnet):
 
     def get_flux(self, photon_energy, vertical_angle, pixel_size):
         return (
-            super(Wiggler, self).get_flux(photon_energy, vertical_angle, pixel_size)
+            super(Wiggler, self).get_flux(
+                photon_energy, vertical_angle, pixel_size
+            )
             * self.num_periods
         )
 
@@ -515,7 +550,9 @@ class XRaySourceError(Exception):
     """X-ray source related exceptions."""
 
 
-def make_topotomo(dE=None, trajectory=None, pixel_size=None, ring_current=200 * q.mA):
+def make_topotomo(
+    dE=None, trajectory=None, pixel_size=None, ring_current=200 * q.mA
+):
     """Make the TopoTomo bending magnet source located at ANKA, KIT. Use *dE* for energy spacing (1
     keV if not specified), *trajectory* for simulating beam fluctuations. If it is None a (1024,
     1024) window is used with the beam center in the middle and no fluctuations.  *pixel_size*

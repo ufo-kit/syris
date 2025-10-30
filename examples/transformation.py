@@ -16,12 +16,15 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Demonstrates the order of transformations."""
+
 import numpy as np
 import quantities as q
 import syris.geometry as geom
 
 
-def transform(point=(1, 0, 0) * q.m, x_rot=90 * q.deg, y_rot=90 * q.deg, z_rot=0 * q.deg):
+def transform(
+    point=(1, 0, 0) * q.m, x_rot=90 * q.deg, y_rot=90 * q.deg, z_rot=0 * q.deg
+):
     """Transform *point* by a series of rotations, *x_rot* around x axis and so on for *y_rot* and
     *z_rot*.
     """

@@ -66,7 +66,9 @@ def transfer(
         out = cl_array.Array(queue, thickness_mem.shape, cfg.PRECISION.np_cplx)
 
     if exponent or check:
-        wavenumber = cfg.PRECISION.np_float(2 * np.pi / wavelength.simplified.magnitude)
+        wavenumber = cfg.PRECISION.np_float(
+            2 * np.pi / wavelength.simplified.magnitude
+        )
         ev = cfg.OPENCL.programs["physics"].transmission_add(
             queue,
             thickness_mem.shape[::-1],
@@ -133,7 +135,11 @@ def compute_propagator(
     if queue is None:
         queue = cfg.OPENCL.queue
     pixel_size = make_tuple(pixel_size)
-    if mollified and mollifier == "butterworth" and pixel_size[0] != pixel_size[1]:
+    if (
+        mollified
+        and mollifier == "butterworth"
+        and pixel_size[0] != pixel_size[1]
+    ):
         raise RuntimeError("Butterworth requires identical pixel sizes")
 
     def check_cutoff(ps):
@@ -159,7 +165,9 @@ def compute_propagator(
 
     out = cl_array.Array(queue, (size, size), cfg.PRECISION.np_cplx)
     if apply_phase_factor:
-        phase_factor = np.exp(2 * np.pi * distance.simplified / lam.simplified * 1j)
+        phase_factor = np.exp(
+            2 * np.pi * distance.simplified / lam.simplified * 1j
+        )
     else:
         phase_factor = 0 + 0j
 
@@ -181,7 +189,9 @@ def compute_propagator(
     if mollified:
 
         def compute_sigma_component(ps):
-            cutoff = compute_aliasing_limit(size, lam, ps, distance, fourier=fourier)
+            cutoff = compute_aliasing_limit(
+                size, lam, ps, distance, fourier=fourier
+            )
             if region is not None:
                 cutoff_region = compute_aliasing_limit(
                     size, lam, ps, distance, fov=region, fourier=fourier
@@ -215,7 +225,9 @@ def compute_propagator(
     return out
 
 
-def is_wavefield_sampling_ok(wavefield_exponent, queue=None, out=None, **kwargs):
+def is_wavefield_sampling_ok(
+    wavefield_exponent, queue=None, out=None, **kwargs
+):
     """Check the sampling of the *wavefield_exponent*. Use OpenCL *queue* and *out* array. Return
     True if the sampling is OK, False otherwise.
     """
@@ -369,7 +381,9 @@ def propagate(
                         **kwargs,
                     )
                 except NotImplementedError:
-                    LOG.debug("%s does not support fourier space transfer", sample)
+                    LOG.debug(
+                        "%s does not support fourier space transfer", sample
+                    )
             u *= propagator
             ifft_2(u, queue=queue, block=block)
         if detector:

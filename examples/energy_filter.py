@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Energy filter based on Gaussian profile."""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
@@ -30,7 +31,9 @@ from .util import get_default_parser, show
 
 
 def get_spectrum(source, energies, pixel_size):
-    return np.array([source.get_flux(e, 0 * q.rad, pixel_size) for e in energies])
+    return np.array(
+        [source.get_flux(e, 0 * q.rad, pixel_size) for e in energies]
+    )
 
 
 def main():
@@ -45,23 +48,40 @@ def main():
     sigma = smath.fwnm_to_sigma(fwhm, n=2)
     # Make sure we resolve the curve nicely
     energies = (
-        np.arange(max(1 * q.keV, energy_center - 2 * fwhm), energy_center + 2 * fwhm, fwhm / 25)
+        np.arange(
+            max(1 * q.keV, energy_center - 2 * fwhm),
+            energy_center + 2 * fwhm,
+            fwhm / 25,
+        )
         * q.keV
     )
     dE = energies[1] - energies[0]
-    print("Energy from, to, step, number:", energies[0], energies[-1], dE, len(energies))
+    print(
+        "Energy from, to, step, number:",
+        energies[0],
+        energies[-1],
+        dE,
+        len(energies),
+    )
 
     bm = make_topotomo(dE=dE, pixel_size=ps, trajectory=tr)
     spectrum_energies = np.arange(1, 50, 1) * q.keV
     native_spectrum = get_spectrum(bm, spectrum_energies, ps)
 
     fltr = GaussianFilter(energies, energy_center, sigma)
-    gauss = get_gauss(energies.magnitude, energy_center.magnitude, sigma.magnitude)
+    gauss = get_gauss(
+        energies.magnitude, energy_center.magnitude, sigma.magnitude
+    )
     filtered_spectrum = get_spectrum(bm, energies, ps) * gauss
 
     intensity = propagate([bm, fltr], shape, energies, 0 * q.m, ps).get()
 
-    show(intensity, title="Intensity for energy range {} - {}".format(energies[0], energies[-1]))
+    show(
+        intensity,
+        title="Intensity for energy range {} - {}".format(
+            energies[0], energies[-1]
+        ),
+    )
 
     plt.figure()
     plt.plot(spectrum_energies.magnitude, native_spectrum)

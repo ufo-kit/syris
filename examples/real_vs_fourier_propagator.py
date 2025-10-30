@@ -18,6 +18,7 @@
 """Comparison of computing propagator in real vs. Fourier space, using different supersampling and
 mollifiers in the edge-enhancement regime.
 """
+
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
@@ -42,7 +43,7 @@ def propagate_numerically(args, u_0, ps, d, lam, fourier=True):
         ps,
         mollified=args.mollified,
         mollifier=args.mollifier,
-        fourier=fourier
+        fourier=fourier,
     )
     if not fourier:
         propagator = fft_2(propagator)
@@ -76,7 +77,7 @@ def main():
         nh,
         nh // 6 * psh,
         pixel_size=psh,
-        material=get_material("air_5_30_kev.mat")
+        material=get_material("air_5_30_kev.mat"),
     )
     u_0 = sample.transfer((nh, nh), psh, e)
 
@@ -87,7 +88,7 @@ def main():
         psh,
         mollified=args.mollified,
         mollifier=args.mollifier,
-        fourier=True
+        fourier=True,
     ).get()
     rp = compute_propagator(
         nh,
@@ -96,7 +97,7 @@ def main():
         psh,
         mollified=args.mollified,
         mollifier=args.mollifier,
-        fourier=False
+        fourier=False,
     ).get()
     res_syris_f = propagate_numerically(args, u_0, psh, d, lam, fourier=True)
     if args.supersampling > 1:
@@ -124,16 +125,22 @@ def main():
 def parse_args():
     """Parse command line arguments."""
     parser = get_default_parser(__doc__)
-    parser.add_argument("--supersampling", type=int, default=4, help="Supersampling")
-    parser.add_argument("--mollified", action="store_true", help="Suppress aliased frequencies")
+    parser.add_argument(
+        "--supersampling", type=int, default=4, help="Supersampling"
+    )
+    parser.add_argument(
+        "--mollified", action="store_true", help="Suppress aliased frequencies"
+    )
     parser.add_argument(
         "--mollifier",
         type=str,
         choices=["gauss", "butterworth"],
         default="gauss",
-        help="Mollifier type"
+        help="Mollifier type",
     )
-    parser.add_argument("--filename", type=str, help="Save figure to this filename.")
+    parser.add_argument(
+        "--filename", type=str, help="Save figure to this filename."
+    )
 
     return parser.parse_args()
 

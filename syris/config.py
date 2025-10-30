@@ -98,7 +98,9 @@ class Precision(object):
 
         dtype_base = "double" if double else "float"
         for i in [2, 3, 4, 8, 16]:
-            setattr(self, "vfloat" + str(i), getattr(cltypes, dtype_base + str(i)))
+            setattr(
+                self, "vfloat" + str(i), getattr(cltypes, dtype_base + str(i))
+            )
 
 
 class OpenCL(object):

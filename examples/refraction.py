@@ -42,9 +42,7 @@ def main():
     material = get_material("pmma_5_30_kev.mat")
     # Pure phase object
     material_phase = Material(
-        "pmma_phase",
-        material.refractive_indices.real + 0j,
-        material.energies
+        "pmma_phase", material.refractive_indices.real + 0j, material.energies
     )
     energy = 29 * q.keV
     ps = 0.2 * q.um  # Pixel size
@@ -68,16 +66,27 @@ def main():
 
     c = ifft2(np.conj(fft2(im - 1)) * fft2(im_sample - 1)).real
     dy, dx = np.unravel_index(c.argmax(), c.shape)
-    print(f"Desired shift: dx: {(shift / ps).simplified.magnitude} pixels, dy: 0 pixels")
+    print(
+        f"Desired shift: dx: {(shift / ps).simplified.magnitude} pixels, dy: 0 pixels"
+    )
     print(f"Computed shift: dx: {dx} pixels, dy: {dy} pixels")
 
     if args.output_directory:
         if not os.path.exists(args.output_directory):
             os.makedirs(args.output_directory, exist_ok=True)
-        imageio.imwrite(os.path.join(args.output_directory, "image.tif"), im_sample)
-        imageio.imwrite(os.path.join(args.output_directory, "image-wedge.tif"), im)
+        imageio.imwrite(
+            os.path.join(args.output_directory, "image.tif"), im_sample
+        )
+        imageio.imwrite(
+            os.path.join(args.output_directory, "image-wedge.tif"), im
+        )
 
-    show(im, title="Sphere and wedge", vmin=im_sample.min(), vmax=im_sample.max())
+    show(
+        im,
+        title="Sphere and wedge",
+        vmin=im_sample.min(),
+        vmax=im_sample.max(),
+    )
     show(im_sample, title="Only sphere")
     show(u_wedge.real, title="Real part of wedge transmission function")
     plt.show()
@@ -88,7 +97,7 @@ def parse_args():
     parser.add_argument(
         "--output-directory",
         type=str,
-        help="Output directory for the two X-ray projections image.tif and image-wedge.tif"
+        help="Output directory for the two X-ray projections image.tif and image-wedge.tif",
     )
 
     return parser.parse_args()

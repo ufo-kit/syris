@@ -61,10 +61,14 @@ def create_tree_visualization(nb_keys, left_all, rope_all, leaf_keys):
 
         if IS_LEAF(node):
             label = f"Leaf {node}\nKey: {leaf_keys[node]}"
-            g.node(str(node), label=label, style="filled", color="#c8e6c9")  # Greenish
+            g.node(
+                str(node), label=label, style="filled", color="#c8e6c9"
+            )  # Greenish
         else:
             label = f"Internal {node}"
-            g.node(str(node), label=label, style="filled", color="#bbdefb")  # Bluish
+            g.node(
+                str(node), label=label, style="filled", color="#bbdefb"
+            )  # Bluish
 
         if IS_LEAF(node):
             continue
@@ -101,7 +105,9 @@ def main():
         LOG.info(f"Loading mesh from file: {input}")
     else:
         input = pv.examples.download_dragon()
-        LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
+        LOG.info(
+            "No input file provided, loading default PyVista mesh (dragon)..."
+        )
 
     mesh = Mesh.from_file(
         input, tr, center=args.center, unit=mesh_units, use_normals=True

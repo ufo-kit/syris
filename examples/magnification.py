@@ -35,7 +35,7 @@ from .util import get_default_parser
 def crop(image):
     n = image.shape[0]
 
-    return image[n // 4:3 * n // 4, n // 4: 3 * n // 4]
+    return image[n // 4 : 3 * n // 4, n // 4 : 3 * n // 4]
 
 
 def main():
@@ -50,20 +50,24 @@ def main():
     beta = 1e-9
     delta = 1e-7
     k = 2 * np.pi / lam
-    l = d / (M - 1)     # source - sample distance in meters
+    l = d / (M - 1)  # source - sample distance in meters
     x = np.arange(-n // 2, n // 2) * ps
     x, y = np.meshgrid(x, x)
-    r = np.sqrt(x ** 2 + y ** 2 + l ** 2)
+    r = np.sqrt(x**2 + y**2 + l**2)
     f = fftfreq(n) / ps
     f, g = np.meshgrid(f, f)
-    fg = np.sqrt(f ** 2 + g ** 2)
+    fg = np.sqrt(f**2 + g**2)
     print(f"source - sample: {l} m, sample - detector: {d} m")
 
     # Spherical incident wave which magnifies by M -> Kirchhof-Fresnel diffraction
     # Incident wave field with unit amplitude and spherical phase profile
     u_inc = np.exp(1j * k * r)
     # Sphere with n / 8 pixels radius
-    proj = make_sphere(n, n // 8 * ps * q.m, pixel_size=ps * q.m).project((n, n) , ps * q.m).get()
+    proj = (
+        make_sphere(n, n // 8 * ps * q.m, pixel_size=ps * q.m)
+        .project((n, n), ps * q.m)
+        .get()
+    )
     # Tranmission function
     u_obj = np.exp(-k * proj * (beta + 1j * delta))
     # Wavefield immediatly after the object
@@ -80,12 +84,14 @@ def main():
     # r ~ l + x^2 / (2 * l) -> keeps only second order wrt x, same for the propagator
     # This is an unusual form with the prefactor in so that you can compare u_inc and u_inc_parabola
     # directly
-    u_inc_parabola = np.exp(1j * k * (l + (x ** 2 + y ** 2) / (2 * l)))
+    u_inc_parabola = np.exp(1j * k * (l + (x**2 + y**2) / (2 * l)))
     u = u_inc_parabola * u_obj
 
     # This is an unusual form with the prefactor in so that you can compare prop and prop_fresnel
     # directly
-    prop_fresnel = np.exp(1j * k * d * (1 - (lam * f) ** 2 / 2 - (lam * g) ** 2 / 2))
+    prop_fresnel = np.exp(
+        1j * k * d * (1 - (lam * f) ** 2 / 2 - (lam * g) ** 2 / 2)
+    )
     im_parabola = crop(np.abs(ifft2(fft2(u) * prop_fresnel * butt)) ** 2)
 
     # Plane wave and no rescaling -> no magnification
@@ -96,14 +102,18 @@ def main():
     d /= M
     f *= M
     g *= M
-    proj = make_sphere(
-        n,
-        M * n // 8 * ps * q.m,
-        pixel_size=ps * q.m
-    ).project((n, n) , ps * q.m).get()
+    proj = (
+        make_sphere(n, M * n // 8 * ps * q.m, pixel_size=ps * q.m)
+        .project((n, n), ps * q.m)
+        .get()
+    )
     u_obj = np.exp(-k * proj * (beta + 1j * delta))
-    prop_fresnel_plane = np.exp(1j * k * d * (1 - (lam * f) ** 2 / 2 - (lam * g) ** 2 / 2))
-    im_plane = crop(np.abs(ifft2(fft2(u_obj) * prop_fresnel_plane * butt)) ** 2 / M ** 2)
+    prop_fresnel_plane = np.exp(
+        1j * k * d * (1 - (lam * f) ** 2 / 2 - (lam * g) ** 2 / 2)
+    )
+    im_plane = crop(
+        np.abs(ifft2(fft2(u_obj) * prop_fresnel_plane * butt)) ** 2 / M**2
+    )
 
     fig, ax = plt.subplots(nrows=2, ncols=2)
     ax[0, 0].imshow(im_noscale)

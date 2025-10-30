@@ -32,7 +32,9 @@ def make_tuple(value, num_dims=2):
             value = (value,) * num_dims
     else:
         if len(value) != num_dims:
-            raise ValueError("Value is a tuple already and with different dimensions")
+            raise ValueError(
+                "Value is a tuple already and with different dimensions"
+            )
         if not hasattr(value, "magnitude") and hasattr(value[0], "magnitude"):
             # Convert tuple of quantities to quantity of a tuple
             unit = value[0].units

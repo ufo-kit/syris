@@ -82,7 +82,9 @@ class Camera(MovableBody):
         incompatible, the frame rate is adjusted to the exposure time.
         """
         if not isinstance(pixel_size, q.Quantity):
-            raise TypeError("pixel_size must be a quantities object (e.g., 10 * q.m)")
+            raise TypeError(
+                "pixel_size must be a quantities object (e.g., 10 * q.m)"
+            )
         self._pixel_size = pixel_size.rescale(cfg.UNIT)
         self._shape = shape
         self.gain = gain
@@ -98,7 +100,9 @@ class Camera(MovableBody):
         self._focal_length = focal_length
 
         if source_detector_distance is not None:
-            self._source_detector_distance = source_detector_distance.rescale(cfg.UNIT)
+            self._source_detector_distance = source_detector_distance.rescale(
+                cfg.UNIT
+            )
 
         if focal_length is not None:
             self._focal_length = focal_length.rescale(cfg.UNIT)
@@ -107,9 +111,13 @@ class Camera(MovableBody):
 
         self.parallel = parallel
 
-        if self._quantum_efficiencies is not None and self._wavelengths is not None:
+        if (
+            self._quantum_efficiencies is not None
+            and self._wavelengths is not None
+        ):
             self._qe_tck = interp.splrep(
-                self._wavelengths.rescale(q.nm).magnitude, self._quantum_efficiencies
+                self._wavelengths.rescale(q.nm).magnitude,
+                self._quantum_efficiencies,
             )
         if not is_fps_feasible(fps, exp_time):
             fps = 1 / exp_time.simplified
@@ -268,7 +276,9 @@ class Camera(MovableBody):
     @property
     def fov(self):
         self._fov = (
-            2 * np.arctan(self.viewport_dimensions / (2 * self.focal_length)) * q.rad
+            2
+            * np.arctan(self.viewport_dimensions / (2 * self.focal_length))
+            * q.rad
         )
         ret = self._fov.magnitude
         return ret.astype(cfg.PRECISION.np_float)
@@ -293,7 +303,8 @@ class Camera(MovableBody):
 
         # Vector from the camera's center to the top-left corner of the sensor
         vec_to_corner = (
-            -(viewport_dims[1] / 2) * self._u_vec - (viewport_dims[0] / 2) * self._v_vec
+            -(viewport_dims[1] / 2) * self._u_vec
+            - (viewport_dims[0] / 2) * self._v_vec
         )
 
         # Calculate the final position vector with units
@@ -335,9 +346,7 @@ class Camera(MovableBody):
     @fps.setter
     def fps(self, fps):
         if not is_fps_feasible(fps, self.exp_time):
-            fmt = (
-                "FPS {} not possible for exposure time {}, setting exposure time to {}"
-            )
+            fmt = "FPS {} not possible for exposure time {}, setting exposure time to {}"
             LOG.debug(fmt.format(fps, self.exp_time, 1 / fps.simplified))
             self._exp_time = 1 / fps.simplified
         self._fps = fps.simplified
@@ -351,7 +360,12 @@ class Camera(MovableBody):
         return interp.splev(wavelength.rescale(q.nm).magnitude, self._qe_tck)
 
     def get_image(
-        self, photons, shot_noise=True, amplifier_noise=True, psf=True, queue=None
+        self,
+        photons,
+        shot_noise=True,
+        amplifier_noise=True,
+        psf=True,
+        queue=None,
     ):
         """Get digital counts image from incoming *photons*. The resulting image is based on the
         incoming photons and dark current. We apply noise based on EMVA 1288 standard according to
@@ -374,7 +388,11 @@ class Camera(MovableBody):
 
         # Shot noise
         # Adjust dark current for later binning and gain
-        dark = float(self.dark_current) / self._bin_factor[0] / self._bin_factor[1]
+        dark = (
+            float(self.dark_current)
+            / self._bin_factor[0]
+            / self._bin_factor[1]
+        )
         electrons = dark + gutil.get_host(photons)
 
         if self._bin_factor != (1, 1):
@@ -383,7 +401,9 @@ class Camera(MovableBody):
                     fwnm_to_sigma(self._bin_factor[0]),
                     fwnm_to_sigma(self._bin_factor[1]),
                 )
-                small = decimate(electrons, self.shape, sigma=sigma, queue=queue)
+                small = decimate(
+                    electrons, self.shape, sigma=sigma, queue=queue
+                )
             else:
                 small = bin_image(electrons, self.shape, queue=queue)
             electrons = gutil.get_host(small)
@@ -469,7 +489,9 @@ class Camera(MovableBody):
 def make_pco_dimax():
     """Make a pco.dimax camera."""
     lam, qe = np.load(
-        pkg_resources.resource_filename(__name__, "data/dimax_quantum_efficiencies.npy")
+        pkg_resources.resource_filename(
+            __name__, "data/dimax_quantum_efficiencies.npy"
+        )
     )
     lam = lam * q.m
 

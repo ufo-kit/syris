@@ -20,6 +20,7 @@ option. If this value is too low (1), the propagators are not resolved correctly
 images contain artefacts. Increase this value to e.g. 4 and you will see how the propagators and the
 results change.
 """
+
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
@@ -77,7 +78,9 @@ def main():
     # Scintillator emits visible light into a region given by a Gaussian distribution
     x = camera.wavelengths.rescale(q.nm).magnitude
     sigma = fwnm_to_sigma(50)
-    emission = np.exp(-((x - 600) ** 2) / (2 * sigma ** 2)) / (sigma * np.sqrt(2 * np.pi))
+    emission = np.exp(-((x - 600) ** 2) / (2 * sigma**2)) / (
+        sigma * np.sqrt(2 * np.pi)
+    )
     # Scintillator 50 um thick, light yield 14 and refractive index 1.84
     luag = get_material("luag.mat")
     scintillator = Scintillator(
@@ -106,18 +109,34 @@ def main():
     sample = make_sphere(n, n / 4.0 * ps, pixel_size=ps, material=material)
     # Propagation with a monochromatic plane incident wave
     coherent = propagate(
-        [source, sample], shape, [15 * q.keV], d, ps, t=0 * q.s, detector=detector
+        [source, sample],
+        shape,
+        [15 * q.keV],
+        d,
+        ps,
+        t=0 * q.s,
+        detector=detector,
     ).get()
     coherent *= camera.exp_time.simplified.magnitude
     # Decimate to fit the effective pixel size of the detector system
-    coherent_ld = camera.get_image(coherent, shot_noise=False, amplifier_noise=False)
+    coherent_ld = camera.get_image(
+        coherent, shot_noise=False, amplifier_noise=False
+    )
 
     # Propagation which takes into account polychromaticity
     poly = propagate(
-        [source, sample], shape, list(range(10, 30)) * q.keV, d, ps, t=0 * q.s, detector=detector
+        [source, sample],
+        shape,
+        list(range(10, 30)) * q.keV,
+        d,
+        ps,
+        t=0 * q.s,
+        detector=detector,
     ).get()
     poly *= camera.exp_time.simplified.magnitude
-    poly_ld = camera.get_image(poly, shot_noise=args.noise, amplifier_noise=args.noise)
+    poly_ld = camera.get_image(
+        poly, shot_noise=args.noise, amplifier_noise=args.noise
+    )
 
     # Compute and show some of the used propagators
     propagator_10 = get_propagator_psf(n, d, ps, 10 * q.keV)
@@ -141,7 +160,9 @@ def parse_args():
         help="Supersampling used to prevent propagation artefacts",
     )
     parser.add_argument(
-        "--noise", action="store_true", help="Apply noise on the polychromatic image"
+        "--noise",
+        action="store_true",
+        help="Apply noise on the polychromatic image",
     )
     parser.add_argument(
         "--exposure",

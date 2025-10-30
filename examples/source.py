@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """An X-ray source example."""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
@@ -43,12 +44,25 @@ def run_bending_magnet():
     cp = make_triangle(n=16) * 1e-1
     tr = Trajectory(cp, velocity=10 * q.um / q.s, pixel_size=ps)
 
-    bm = BendingMagnet(2.5 * q.GeV, 100 * q.mA, 1.5 * q.T, 30 * q.m, dE, (200, 800) * q.um, ps, tr)
+    bm = BendingMagnet(
+        2.5 * q.GeV,
+        100 * q.mA,
+        1.5 * q.T,
+        30 * q.m,
+        dE,
+        (200, 800) * q.um,
+        ps,
+        tr,
+    )
 
     # Flat at time = 0
-    flat_0 = (abs(bm.transfer((512, 256), ps, energies[0], t=0 * q.s)) ** 2).real.get()
+    flat_0 = (
+        abs(bm.transfer((512, 256), ps, energies[0], t=0 * q.s)) ** 2
+    ).real.get()
     # Flat at half the time
-    flat_1 = (abs(bm.transfer((512, 256), ps, energies[0], t=tr.time / 2)) ** 2).real.get()
+    flat_1 = (
+        abs(bm.transfer((512, 256), ps, energies[0], t=tr.time / 2)) ** 2
+    ).real.get()
 
     plt.subplot(121)
     plt.imshow(flat_0)
@@ -63,28 +77,35 @@ def run_fixed():
     ps = 1 * q.um
     energies = np.arange(5, 30) * q.keV
     y, x = np.mgrid[-n // 2 : n // 2, -n // 2 : n // 2]
-    flux = np.exp(-(x ** 2 + y ** 2) / (100 ** 2)) / q.s
+    flux = np.exp(-(x**2 + y**2) / (100**2)) / q.s
     weights = np.arange(1, len(energies) + 1)[:, np.newaxis, np.newaxis]
     flux = weights * flux
     traj = Trajectory([(n / 2, n / 2, 0)] * ps)
-    source = FixedSpectrumSource(energies, flux, 30 * q.m, (100, 500) * q.um, traj, pixel_size=ps)
+    source = FixedSpectrumSource(
+        energies, flux, 30 * q.m, (100, 500) * q.um, traj, pixel_size=ps
+    )
 
     im = ip.compute_intensity(source.transfer((n, n), ps, 5 * q.keV)).get()
     show(im, title="Original sampling")
-    im = ip.compute_intensity(source.transfer((2 * n,) * 2, ps / 2, 5 * q.keV)).get()
+    im = ip.compute_intensity(
+        source.transfer((2 * n,) * 2, ps / 2, 5 * q.keV)
+    ).get()
     show(im, title="2x supersampled")
     plt.show()
 
 
 def main():
     parser = get_default_parser(__doc__)
-    subparsers = parser.add_subparsers(help="sub-command help", dest="sub-commands", required=True)
+    subparsers = parser.add_subparsers(
+        help="sub-command help", dest="sub-commands", required=True
+    )
 
     bm = subparsers.add_parser("bm", help="BendingMagnet example")
     bm.set_defaults(_func=run_bending_magnet)
 
     fixed = subparsers.add_parser(
-        "fixed", help="FixedSpectrumSource example with Gaussian intensity profile"
+        "fixed",
+        help="FixedSpectrumSource example with Gaussian intensity profile",
     )
     fixed.set_defaults(_func=run_fixed)
 

@@ -23,6 +23,7 @@ which is lost due to insufficient pixel spacing in case of no supersampling.
 The used material is a pure phase material, i.e. beta = 0. The results are the real part of the T(x,
 y), which is cos(-2 Pi / lambda x delta).
 """
+
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
@@ -64,7 +65,9 @@ def main():
     u = compute_transmission_function(n, ps, 1, energy, material)
     # Supersampling helps resolve the transmission function
     print(fmt.format(n * args.supersampling, ps / args.supersampling))
-    u_s = compute_transmission_function(n, ps, args.supersampling, energy, material)
+    u_s = compute_transmission_function(
+        n, ps, args.supersampling, energy, material
+    )
 
     show(wedge.magnitude, title="Projected Object [um]")
     show(u.real, title="Re[T(x, y)]")

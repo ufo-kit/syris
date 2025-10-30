@@ -18,6 +18,7 @@
 """
 Visualization of the Angular spectrum method.
 """
+
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.fft import fft, ifft
@@ -39,7 +40,7 @@ def main():
     # x direction cosine
     kx = lam / lam_s
     # z direction cosine
-    kz = np.sqrt(1 - kx ** 2)
+    kz = np.sqrt(1 - kx**2)
     # 3D plane wave at y=0, so actually 2D computation
     u = np.exp(1j * k * (kx * x + kz * z))
     show(u.real, title="xz cut through a 3D plane wave")
@@ -57,13 +58,21 @@ def main():
     print("Phase shift of the 3D plane wave at z=4:", k * d * kz)
     # Phase shift of the 2D "projected" plane wave with wavenumber ks = 2 Pi / lam_s.
     # Phase shift is ks * d * tan(alpha) = ks * d * sin(alpha) / kx = ks * d * Sqrt(1 - kx^2) / kx
-    print("Phase shift of the 2D plane wave at z=4:", ks * d * np.sqrt(1 - kx ** 2) / kx)
+    print(
+        "Phase shift of the 2D plane wave at z=4:",
+        ks * d * np.sqrt(1 - kx**2) / kx,
+    )
 
     plt.figure()
     plt.plot(ks * x[0], u[0].real, label="Plane wave at z=0")
     plt.plot(ks * x[0], u[d].real, label="Plane wave at z=4")
     plt.plot(ks * x[0], up.real, label="Plane wave at z=0 propagated to z=4")
-    plt.plot(ks * x[0], (up[0].real,) * n, color="gray", label="Visual guide for phase shift")
+    plt.plot(
+        ks * x[0],
+        (up[0].real,) * n,
+        color="gray",
+        label="Visual guide for phase shift",
+    )
     plt.ylim(-1.25, 1.5)
     plt.grid()
     plt.legend()

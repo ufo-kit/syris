@@ -33,7 +33,9 @@ LOG = logging.getLogger(__name__)
 class Experiment(object):
     """A virtual synchrotron experiment base class."""
 
-    def __init__(self, samples, source, detector, propagation_distance, energies):
+    def __init__(
+        self, samples, source, detector, propagation_distance, energies
+    ):
         self.source = source
         self.samples = samples
         self.detector = detector
@@ -65,18 +67,29 @@ class Experiment(object):
         """
         d_sample = self.source.sample_distance
         size = self.source.size
-        width = (self.propagation_distance * size[1] / d_sample).simplified.magnitude
-        height = (self.propagation_distance * size[0] / d_sample).simplified.magnitude
+        width = (
+            self.propagation_distance * size[1] / d_sample
+        ).simplified.magnitude
+        height = (
+            self.propagation_distance * size[0] / d_sample
+        ).simplified.magnitude
         sigma = (
             smath.fwnm_to_sigma(height, n=2),
             smath.fwnm_to_sigma(width, n=2),
         ) * q.m
 
         return ip.get_gauss_2d(
-            shape, sigma, pixel_size=pixel_size, fourier=True, queue=queue, block=block
+            shape,
+            sigma,
+            pixel_size=pixel_size,
+            fourier=True,
+            queue=queue,
+            block=block,
         )
 
-    def compute_intensity(self, t_0, t_1, shape, pixel_size, queue=None, block=False):
+    def compute_intensity(
+        self, t_0, t_1, shape, pixel_size, queue=None, block=False
+    ):
         """Compute intensity between times *t_0* and *t_1*."""
         exp_time = (t_1 - t_0).simplified.magnitude
         image = (

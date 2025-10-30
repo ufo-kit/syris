@@ -18,6 +18,7 @@
 """Comparison of analytical and numerical Fresnel diffraction pattern. The object is a square
 aperture from Introduction to Fourier Optics by J. W. Goodmann, 2nd edition.
 """
+
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
@@ -26,7 +27,11 @@ import scipy.special
 import syris
 import syris.config as cfg
 from syris.imageprocessing import fft_2, ifft_2, crop
-from syris.physics import compute_propagator, compute_propagation_sampling, energy_to_wavelength
+from syris.physics import (
+    compute_propagator,
+    compute_propagation_sampling,
+    energy_to_wavelength,
+)
 from .util import get_default_parser
 
 
@@ -88,13 +93,20 @@ def main():
     # Width of the aperture is 2w, make the aperture half the image size
     fov = 4 * w
     ss = args.supersampling
-    d = (w ** 2 / args.fn / lam).simplified
+    d = (w**2 / args.fn / lam).simplified
     ns, ps = compute_propagation_sampling(lam, d, fov, fresnel=True)
     # Convolution outlier
     ns *= 2
     ps /= ss
     fmt = "n sampling: {}, ps: {}, FOV: {}, propagation distance: {}"
-    LOG.info(fmt.format(ns, np.round(ps.rescale(q.nm), 2), fov, np.round(d.rescale(q.cm), 2)))
+    LOG.info(
+        fmt.format(
+            ns,
+            np.round(ps.rescale(q.nm), 2),
+            fov,
+            np.round(d.rescale(q.cm), 2),
+        )
+    )
 
     res_a = propagate_analytically(ns * ss, w, ps, d, lam)
 
@@ -103,7 +115,7 @@ def main():
     # Supersampling of the pixel size requires supersampling^2 more data points because we enlarge
     # the FOV by changing the diffraction angle via changing the pixel size and this enlarged FOV is
     # then sampled by supersampling-smaller pixel size
-    n_proper = n * ss ** 2
+    n_proper = n * ss**2
     numerical_results = {}
     for divisor in args.numerical_divisors:
         if np.modf(np.log2(divisor))[0] != 0:
@@ -111,11 +123,15 @@ def main():
         n_current = n_proper // divisor
         if n_current < n * ss:
             raise ValueError("divisor too large, maximum is {}".format(ss))
-        numerical_results[n_current] = propagate_numerically(n_current, w, ps, d, lam)
+        numerical_results[n_current] = propagate_numerically(
+            n_current, w, ps, d, lam
+        )
 
     x_data = np.linspace(-2 * w.magnitude, 2 * w.magnitude, res_a.shape[0])
     aperture = np.zeros(res_a.shape[1])
-    aperture[res_a.shape[1] // 4 : 3 * res_a.shape[1] // 4] = res_a[n // 4 // ss].max()
+    aperture[res_a.shape[1] // 4 : 3 * res_a.shape[1] // 4] = res_a[
+        n // 4 // ss
+    ].max()
 
     if args.txt_output:
         txt_data = [x_data, aperture, res_a[n // 4 // ss]]
@@ -128,7 +144,12 @@ def main():
         if args.txt_output:
             txt_header += "\t{}".format(fraction)
             txt_data.append(num_result[n // 4 // ss])
-        plt.plot(x_data, num_result[n // 4 // ss], "--", label="Numerical {}".format(fraction))
+        plt.plot(
+            x_data,
+            num_result[n // 4 // ss],
+            "--",
+            label="Numerical {}".format(fraction),
+        )
         LOG.info("MSE: {}".format(np.mean((num_result - res_a) ** 2)))
     plt.plot(x_data, res_a[n // 4 // ss], "-.", label="Analytical")
     plt.title("Analytical vs. Numerical Diffraction Pattern")
@@ -139,7 +160,13 @@ def main():
 
     if args.txt_output:
         txt_data = np.array(txt_data).T
-        np.savetxt(args.txt_output, txt_data, fmt="%g", delimiter="\t", header=txt_header)
+        np.savetxt(
+            args.txt_output,
+            txt_data,
+            fmt="%g",
+            delimiter="\t",
+            header=txt_header,
+        )
 
     plt.show()
 
@@ -148,11 +175,18 @@ def parse_args():
     """Parse command line arguments."""
     parser = get_default_parser(__doc__)
     parser.add_argument("--fn", type=float, default=4.0, help="Fresnel number")
-    parser.add_argument("--energy", type=float, default=1.0, help="Energy [keV]")
     parser.add_argument(
-        "--aperture", type=float, default=100.0, help="Half the aperture width [um]"
+        "--energy", type=float, default=1.0, help="Energy [keV]"
     )
-    parser.add_argument("--supersampling", type=int, default=4, help="Supersampling")
+    parser.add_argument(
+        "--aperture",
+        type=float,
+        default=100.0,
+        help="Half the aperture width [um]",
+    )
+    parser.add_argument(
+        "--supersampling", type=int, default=4, help="Supersampling"
+    )
     parser.add_argument(
         "--numerical-divisors",
         type=int,
@@ -162,7 +196,11 @@ def parse_args():
         "of pixels to produce aliased results to show the importance of proper "
         "sampling",
     )
-    parser.add_argument("--txt-output", type=str, help="File name where to store the data as text")
+    parser.add_argument(
+        "--txt-output",
+        type=str,
+        help="File name where to store the data as text",
+    )
 
     return parser.parse_args()
 

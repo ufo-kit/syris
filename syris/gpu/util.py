@@ -68,7 +68,9 @@ def init_programs():
         get_source(["vcomplex.cl", "physics.cl"])
     )
     cfg.OPENCL.programs["geometry"] = get_program(get_metaobjects_source())
-    cfg.OPENCL.programs["mesh"] = get_program(get_source(["heapsort.cl", "mesh.cl"]))
+    cfg.OPENCL.programs["mesh"] = get_program(
+        get_source(["heapsort.cl", "mesh.cl"])
+    )
     cfg.OPENCL.programs["varconv"] = get_program(get_all_varconvolutions())
 
 
@@ -94,7 +96,8 @@ def make_opencl_defaults(
             platform = get_cuda_platform()
     except LookupError:
         LOG.error(
-            "Platform %s not found, using first one which can be found", platform_name
+            "Platform %s not found, using first one which can be found",
+            platform_name,
         )
         platform = get_platform("")
     LOG.debug("Using platform '%s'", platform.name)
@@ -233,7 +236,12 @@ def get_varconvolution_source(
 
 
 def _get_varconvolve_2d_parametrized(
-    name, func_name, func_src, normalized=True, additional_init="", only_kernel=False
+    name,
+    func_name,
+    func_src,
+    normalized=True,
+    additional_init="",
+    only_kernel=False,
 ):
     """Make a variable convolution kernel named varconvolve_*name*[_normalized], if *normalized* is
     True. *func_name* is the function name, *func_str* is the function code, if *only_kernel* is
@@ -272,20 +280,30 @@ def _get_varconvolve_2d_parametrized(
     )
 
 
-def get_varconvolve_gauss(normalized=True, window_fwnm=1000, only_kernel=False):
+def get_varconvolve_gauss(
+    normalized=True, window_fwnm=1000, only_kernel=False
+):
     """Create variable Gaussian convolution. The kernel sum is 1 if *normalized* is True, window is
     computed automatically for every x, y position in the original image based on the sigma at x, y
     and *window_fwnm* as 2 * sqrt(2 * log(*window_fwnm*)) * sigma. If *only_kernel* is True only the
     kernel is returned.
     """
-    src = get_source(["varconvolution.in"], precision_sensitive=False).split("%nl")[2]
+    src = get_source(["varconvolution.in"], precision_sensitive=False).split(
+        "%nl"
+    )[2]
     # Make the kernel window size variable based on the
     fwnm_factor = 2 * np.sqrt(2 * np.log(window_fwnm))
     LOG.debug(
-        "Creating Gaussian convolution with window size FW(1/{})M".format(window_fwnm)
+        "Creating Gaussian convolution with window size FW(1/{})M".format(
+            window_fwnm
+        )
     )
-    additional_init = "window.x = (int) ({} * param.x + 0.5);".format(fwnm_factor)
-    additional_init += "window.y = (int) ({} * param.y + 0.5);".format(fwnm_factor)
+    additional_init = "window.x = (int) ({} * param.x + 0.5);".format(
+        fwnm_factor
+    )
+    additional_init += "window.y = (int) ({} * param.y + 0.5);".format(
+        fwnm_factor
+    )
     additional_init += "window.x += 1 - window.x % 2;"
     additional_init += "window.y += 1 - window.y % 2;"
 
@@ -338,7 +356,9 @@ def get_varconvolve_propagator(only_kernel=False):
     compute_outer = "p.y = (vfloat) (j - window.y / 2) * ps.y;"
     compute_inner = "p.x = (vfloat) (i - window.x / 2) * ps.x;"
     compute_inner += "weight = get_propagator (&p, lam, "
-    compute_inner += "read_imagef (distances, sampler, (int2)(imx, imy)).x, &sigma);"
+    compute_inner += (
+        "read_imagef (distances, sampler, (int2)(imx, imy)).x, &sigma);"
+    )
     compute_inner += "sum += weight;"
     after = "result = result / sqrt (sum.x * sum.x + sum.y * sum.y);"
     src = get_source(["varconvolution.in"], precision_sensitive=False)
@@ -360,13 +380,17 @@ def get_varconvolve_propagator(only_kernel=False):
 
 def get_all_varconvolutions():
     """Create all variable convolutions."""
-    src = get_source(["varconvolution.in"], precision_sensitive=False).split("%nl")
+    src = get_source(["varconvolution.in"], precision_sensitive=False).split(
+        "%nl"
+    )
     header = "".join([func + "\n" for func in src[2:]])
 
     k_src = get_varconvolve_gauss(normalized=False, only_kernel=True)
     k_src += get_varconvolve_gauss(normalized=True, only_kernel=True)
     for norm, smooth in itertools.product([False, True], [False, True]):
-        k_src += get_varconvolve_disk(normalized=norm, smooth=smooth, only_kernel=True)
+        k_src += get_varconvolve_disk(
+            normalized=norm, smooth=smooth, only_kernel=True
+        )
     k_src += get_varconvolve_propagator(only_kernel=True)
 
     top = get_precision_header()
@@ -445,7 +469,9 @@ def get_platform_by_device_type(device_type):
         if device.type == device_type:
             return platform
 
-    raise LookupError("There is no platform with device type '{}'", device_type)
+    raise LookupError(
+        "There is no platform with device type '{}'", device_type
+    )
 
 
 def get_gpu_platform():
@@ -513,7 +539,9 @@ def make_vcomplex(value):
     """Make complex value for OpenCL based on the set floating point
     precision.
     """
-    return getattr(sys.modules[__name__], "make_vfloat2")(value.real, value.imag)
+    return getattr(sys.modules[__name__], "make_vfloat2")(
+        value.real, value.imag
+    )
 
 
 def get_host(data, queue=None):
@@ -527,7 +555,9 @@ def get_host(data, queue=None):
         result = data
     elif isinstance(data, cl.Image):
         result = np.empty(data.shape[::-1], np.float32)
-        cl.enqueue_copy(queue, result, data, origin=(0, 0), region=result.shape[::-1])
+        cl.enqueue_copy(
+            queue, result, data, origin=(0, 0), region=result.shape[::-1]
+        )
         if result.dtype != cfg.PRECISION.np_float:
             result = result.astype(cfg.PRECISION.np_float)
     else:
@@ -549,15 +579,27 @@ def get_array(data, queue=None):
         if data.dtype.kind == "c":
             if data.dtype.itemsize != cfg.PRECISION.cl_cplx:
                 data = data.astype(cfg.PRECISION.np_cplx)
-            result = cl_array.to_device(queue, data.astype(cfg.PRECISION.np_cplx))
+            result = cl_array.to_device(
+                queue, data.astype(cfg.PRECISION.np_cplx)
+            )
         else:
-            if data.dtype.kind != "f" or data.dtype.itemsize != cfg.PRECISION.cl_float:
+            if (
+                data.dtype.kind != "f"
+                or data.dtype.itemsize != cfg.PRECISION.cl_float
+            ):
                 data = data.astype(cfg.PRECISION.np_float)
-            result = cl_array.to_device(queue, data.astype(cfg.PRECISION.np_float))
+            result = cl_array.to_device(
+                queue, data.astype(cfg.PRECISION.np_float)
+            )
     elif isinstance(data, cl.Image):
         result = cl_array.empty(queue, data.shape[::-1], np.float32)
         cl.enqueue_copy(
-            queue, result.data, data, offset=0, origin=(0, 0), region=result.shape[::-1]
+            queue,
+            result.data,
+            data,
+            offset=0,
+            origin=(0, 0),
+            region=result.shape[::-1],
         )
         if result.dtype.itemsize != cfg.PRECISION.cl_float:
             result = result.astype(cfg.PRECISION.np_float)
@@ -607,9 +649,16 @@ def get_image(data, access=cl.mem_flags.READ_ONLY, queue=None):
             raise TypeError("Unsupported data type {}".format(type(data)))
 
         if isinstance(data, cl_array.Array):
-            result = cl.Image(cfg.OPENCL.ctx, access, fmt, shape=data.shape[::-1])
+            result = cl.Image(
+                cfg.OPENCL.ctx, access, fmt, shape=data.shape[::-1]
+            )
             cl.enqueue_copy(
-                queue, result, data.data, offset=0, origin=(0, 0), region=result.shape
+                queue,
+                result,
+                data.data,
+                offset=0,
+                origin=(0, 0),
+                region=result.shape,
             )
         elif isinstance(data, np.ndarray):
             result = cl.Image(
@@ -668,7 +717,9 @@ def get_event_duration(
 ):
     """Get OpenCL event duration. *start* and *stop* define the OpenCL timer start and stop."""
     return (
-        (event.get_profiling_info(stop) - event.get_profiling_info(start)) * 1e-9 * q.s
+        (event.get_profiling_info(stop) - event.get_profiling_info(start))
+        * 1e-9
+        * q.s
     )
 
 

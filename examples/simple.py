@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Simple propagation example."""
+
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q

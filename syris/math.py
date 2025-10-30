@@ -42,7 +42,9 @@ def difference_root(x_0, tck, y_d):
     top = get_root()
     bottom = get_root(-1)
 
-    return top if top is not None and top < bottom or bottom is None else bottom
+    return (
+        top if top is not None and top < bottom or bottom is None else bottom
+    )
 
 
 def closest(values, min_value):

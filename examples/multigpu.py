@@ -18,6 +18,7 @@
 """Show multi-device speedup on a problem of size n x m^k, where n is the number of pixels to
 compute, m is the base number of operations per pixel powered to k.
 """
+
 import time
 import pyopencl as cl
 import matplotlib.pyplot as plt
@@ -49,8 +50,18 @@ def get_kernel():
 
 def parse_args():
     parser = get_default_parser(__doc__)
-    parser.add_argument("--n", type=int, default=512 ** 2, help="Number of pixels (default 512^2)")
-    parser.add_argument("--m", type=int, default=64, help="Number of pixel operations (default 64)")
+    parser.add_argument(
+        "--n",
+        type=int,
+        default=512**2,
+        help="Number of pixels (default 512^2)",
+    )
+    parser.add_argument(
+        "--m",
+        type=int,
+        default=64,
+        help="Number of pixel operations (default 64)",
+    )
     parser.add_argument(
         "--k",
         type=float,
@@ -64,11 +75,13 @@ def parse_args():
         "--runs",
         type=int,
         default=1,
-        help="Number of runs per one complexity. " "The result speedup is the mean.",
+        help="Number of runs per one complexity. The result speedup is the mean.",
     )
     parser.add_argument("--plot", action="store_true", help="Plot results")
     parser.add_argument(
-        "--verbose", action="store_true", help="Print infomation from individual runs"
+        "--verbose",
+        action="store_true",
+        help="Print infomation from individual runs",
     )
     parser.add_argument(
         "--output",
@@ -91,7 +104,7 @@ def run(n, m, complexity, prg, verbose=False):
     devices = cfg.OPENCL.devices
     queues = cfg.OPENCL.queues
 
-    stop = int(m ** complexity)
+    stop = int(m**complexity)
     complexity_fmt = "complexity: {} x {}^{}, pixel operations: {}"
     if verbose:
         print(complexity_fmt.format(n, m, complexity, stop))
@@ -125,7 +138,9 @@ def run(n, m, complexity, prg, verbose=False):
     speedup = all_duration / host_duration
     if verbose:
         print("-------------------------------")
-        print("    Mean duration: {:.2f} s".format(all_duration / len(devices)))
+        print(
+            "    Mean duration: {:.2f} s".format(all_duration / len(devices))
+        )
         print("-------------------------------")
         print("          Speedup: {:.2f} / {}".format(speedup, len(devices)))
         print("-------------------------------")
@@ -149,7 +164,9 @@ def main():
         runs = []
         for i in range(args.runs):
             print("Run {} / {}".format(i + 1, args.runs))
-            runs.append(run(args.n, args.m, complexity, prg, verbose=args.verbose))
+            runs.append(
+                run(args.n, args.m, complexity, prg, verbose=args.verbose)
+            )
         if args.output:
             np.save(args.output.format(complexity), runs)
         results.append(np.mean(runs))
@@ -157,7 +174,11 @@ def main():
     print()
     print("===============================")
     for i, result in enumerate(results):
-        print("Complexity: {:.2f}, speedup: {:.2f}".format(complexities[i], result))
+        print(
+            "Complexity: {:.2f}, speedup: {:.2f}".format(
+                complexities[i], result
+            )
+        )
     print("===============================")
 
     if args.plot:

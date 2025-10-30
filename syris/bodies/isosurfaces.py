@@ -42,7 +42,9 @@ class MetaBall(MovableBody):
     bodies.
     """
 
-    def __init__(self, trajectory, radius, material=None, orientation=geom.Y_AX):
+    def __init__(
+        self, trajectory, radius, material=None, orientation=geom.Y_AX
+    ):
         """Create a metaball with *radius*."""
         if radius <= 0:
             raise ValueError("Radius must be greater than zero.")
@@ -75,7 +77,9 @@ class MetaBall(MovableBody):
         # Transform by the current transformation matrix.
         transformed = []
         for point in points:
-            transformed.append(geom.transform_vector(self.transform_matrix, point))
+            transformed.append(
+                geom.transform_vector(self.transform_matrix, point)
+            )
 
         return BoundingBox(np.array(transformed) * q.m)
 
@@ -86,7 +90,13 @@ class MetaBall(MovableBody):
         block = kwargs.pop("block", False)
 
         return project_metaballs(
-            [self], shape, pixel_size, offset=offset, queue=queue, out=out, block=block
+            [self],
+            shape,
+            pixel_size,
+            offset=offset,
+            queue=queue,
+            out=out,
+            block=block,
         )
 
     def get_transform_const(self):
@@ -183,7 +193,13 @@ def get_format_string(string):
 
 
 def project_metaballs(
-    metaballs, shape, pixel_size, offset=None, queue=None, out=None, block=False
+    metaballs,
+    shape,
+    pixel_size,
+    offset=None,
+    queue=None,
+    out=None,
+    block=False,
 ):
     """Project a list of :class:`.MetaBall` on an image plane with *shape*, *pixel_size*.  *offset*
     is the physical spatial body offset as (y, x). Use OpenCL *queue* and *out* pyopencl Array
@@ -208,10 +224,14 @@ def project_metaballs(
         size=m * n * cfg.MAX_META_BODIES * 4 * 7,
     )
     left_mem = cl.Buffer(
-        cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE, size=m * n * 2 * cfg.MAX_META_BODIES
+        cfg.OPENCL.ctx,
+        cl.mem_flags.READ_WRITE,
+        size=m * n * 2 * cfg.MAX_META_BODIES,
     )
     right_mem = cl.Buffer(
-        cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE, size=m * n * 2 * cfg.MAX_META_BODIES
+        cfg.OPENCL.ctx,
+        cl.mem_flags.READ_WRITE,
+        size=m * n * 2 * cfg.MAX_META_BODIES,
     )
     offset = g_util.make_vfloat2(*offset.simplified.magnitude[::-1])
     if out is None:
@@ -259,7 +279,9 @@ def project_metaballs_naive(
         func = np.max if sgn > 0 else np.min
         x_ps = util.make_tuple(pixel_size)[1]
         res = [
-            (ball.position[2] + sgn * (2 * ball.radius + x_ps)).simplified.magnitude
+            (
+                ball.position[2] + sgn * (2 * ball.radius + x_ps)
+            ).simplified.magnitude
             for ball in metaballs
         ]
 

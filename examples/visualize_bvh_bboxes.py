@@ -179,7 +179,9 @@ def visualize_bvh(
         scalars="my_scalars",
         cmap=cmap,
         log_scale=log_scale,
-        scalar_bar_args={"title": scalar_bar_title} if show_scalar_bar else None,
+        scalar_bar_args={"title": scalar_bar_title}
+        if show_scalar_bar
+        else None,
         opacity=opacity_map,
         style="surface",
     )
@@ -215,7 +217,9 @@ def main():
         LOG.info(f"Loading mesh from file: {input}")
     else:
         input = pv.examples.download_dragon()
-        LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
+        LOG.info(
+            "No input file provided, loading default PyVista mesh (dragon)..."
+        )
 
     mesh = Mesh.from_file(
         input, tr, center=args.center, unit=mesh_units, use_normals=True
@@ -249,7 +253,10 @@ def main():
     if args.show_nested:
         LOG.info("Visualizing all nodes (nested view)...")
 
-        scalar_data_nested = {"ids": np.arange(total_valid_nodes), "depths": all_depths}
+        scalar_data_nested = {
+            "ids": np.arange(total_valid_nodes),
+            "depths": all_depths,
+        }
 
         visualize_bvh(
             bbMin=bbMin_all,
@@ -269,7 +276,10 @@ def main():
 
             bbMin_leaf = bbMin_all[0:nb_keys]
             bbMax_leaf = bbMax_all[0:nb_keys]
-            scalar_data_leaf = {"ids": leaf_keys, "depths": all_depths[0:nb_keys]}
+            scalar_data_leaf = {
+                "ids": leaf_keys,
+                "depths": all_depths[0:nb_keys],
+            }
 
             visualize_bvh(
                 bbMin=bbMin_leaf,
@@ -357,13 +367,22 @@ def parse_args():
 
     # --- Cmap arguments ---
     parser.add_argument(
-        "--leaf-cmap", type=str, default="Greens", help="Colormap for leaf nodes"
+        "--leaf-cmap",
+        type=str,
+        default="Greens",
+        help="Colormap for leaf nodes",
     )
     parser.add_argument(
-        "--node-cmap", type=str, default="Oranges", help="Colormap for inner nodes"
+        "--node-cmap",
+        type=str,
+        default="Oranges",
+        help="Colormap for inner nodes",
     )
     parser.add_argument(
-        "--nested-cmap", type=str, default="viridis", help="Colormap for nested view"
+        "--nested-cmap",
+        type=str,
+        default="viridis",
+        help="Colormap for nested view",
     )
 
     # --- opacity argument names ---

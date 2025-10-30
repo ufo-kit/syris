@@ -121,7 +121,11 @@ class MovableBody(Body):
     """Class representing a movable body."""
 
     def __init__(
-        self, trajectory, material=None, orientation=geom.Y_AX, cache_projection=True
+        self,
+        trajectory,
+        material=None,
+        orientation=geom.Y_AX,
+        cache_projection=True,
     ):
         """Create a body with a :class:`~syris.geometry.Trajectory` and *orientation*,
         which is an (x, y, z) vector specifying body's "up" vector. If *cache_projection* is True,
@@ -357,14 +361,18 @@ class MovableBody(Body):
         if np.allclose(v, w) and not np.allclose(
             v, 0
         ):  # Check if they are the same and not zero
-            LOG.warning("\n--- WARNING: Degenerate transform_matrix detected! ---")
+            LOG.warning(
+                "\n--- WARNING: Degenerate transform_matrix detected! ---"
+            )
             LOG.warning(
                 f"Up vector (v) and Forward vector (w) are identical: {v.round(3)}"
             )
             LOG.warning("Full Matrix:\n", new_matrix.round(3))
             LOG.warning("Setter was called from:")
             traceback.print_stack(limit=5)  # Show the last 5 calls
-            LOG.warning("----------------------------------------------------\n")
+            LOG.warning(
+                "----------------------------------------------------\n"
+            )
 
         self._transform_matrix = new_matrix
         self._state += 1
@@ -376,7 +384,9 @@ class MovableBody(Body):
         """
         trans_mat = np.copy(self.transform_matrix)
         for i in range(3):
-            trans_mat[i, 3] = coeff * Quantity(trans_mat[i, 3] * q.m).rescale(units)
+            trans_mat[i, 3] = coeff * Quantity(trans_mat[i, 3] * q.m).rescale(
+                units
+            )
 
         return trans_mat
 
@@ -430,7 +440,9 @@ class MovableBody(Body):
 
         d_0 = self.trajectory.get_direction(t_0, norm=False)
         d_1 = self.trajectory.get_direction(t_1, norm=False)
-        rot_displacement = geom.get_rotation_displacement(d_0, d_1, self.furthest_point)
+        rot_displacement = geom.get_rotation_displacement(
+            d_0, d_1, self.furthest_point
+        )
         total_displacement = trans_displacement + rot_displacement
 
         return max(total_displacement) > pixel_size
@@ -482,7 +494,9 @@ class MovableBody(Body):
 
     def translate(self, vec):
         """Translate the body by a vector *vec*."""
-        self.transform_matrix = np.dot(self.transform_matrix, geom.translate(vec))
+        self.transform_matrix = np.dot(
+            self.transform_matrix, geom.translate(vec)
+        )
 
     def rotate(self, angle, axis, shift=None):
         """Rotate the body by *angle* around vector *vec*, where *shift* is the translation which
@@ -501,7 +515,9 @@ class CompositeBody(MovableBody):
 
     def __init__(self, trajectory, orientation=geom.Y_AX, bodies=None):
         """*bodies* is a list of :py:class:`.MovableBody`."""
-        super(CompositeBody, self).__init__(trajectory, orientation=orientation)
+        super(CompositeBody, self).__init__(
+            trajectory, orientation=orientation
+        )
         if bodies is None:
             bodies = []
         self._bodies = []
@@ -687,7 +703,9 @@ class CompositeBody(MovableBody):
             ):
                 if body == self:
                     self._dt = None
-                fmt = "Binding trajectory to pixel size {} and furthest point {}"
+                fmt = (
+                    "Binding trajectory to pixel size {} and furthest point {}"
+                )
                 LOG.debug(fmt.format(pixel_size, body.furthest_point))
                 body.trajectory.bind(
                     pixel_size=pixel_size, furthest_point=body.furthest_point
@@ -704,7 +722,9 @@ class CompositeBody(MovableBody):
                 dts = []
             else:
                 dts = [
-                    MovableBody.get_maximum_dt(self, pixel_size / len(self.all_bodies))
+                    MovableBody.get_maximum_dt(
+                        self, pixel_size / len(self.all_bodies)
+                    )
                 ]
             dts += [
                 body.get_maximum_dt(pixel_size / len(self.all_bodies))
@@ -731,7 +751,9 @@ class CompositeBody(MovableBody):
             """
             t = t * q.s
             # scipy's bisection gets the root at 0, thus we need to shift by *pixel_size*
-            return (self.get_distance(t_0, t) - pixel_size).simplified.magnitude
+            return (
+                self.get_distance(t_0, t) - pixel_size
+            ).simplified.magnitude
 
         self.bind_trajectory(pixel_size)
         if self._dt is None:
@@ -798,7 +820,9 @@ class CompositeBody(MovableBody):
                 geom.get_rotation_displacement(
                     d_0[i],
                     d_1[i],
-                    self.primitive_bodies[i].furthest_point.simplified.magnitude,
+                    self.primitive_bodies[
+                        i
+                    ].furthest_point.simplified.magnitude,
                 )
             )
         rot = np.array(rot) * q.m
@@ -823,7 +847,9 @@ class CompositeBody(MovableBody):
             out = cl_array.zeros(queue, shape, dtype=cfg.PRECISION.np_float)
 
         for body in self.bodies:
-            out += body.project(shape, pixel_size, offset=offset, t=t, **kwargs)
+            out += body.project(
+                shape, pixel_size, offset=offset, t=t, **kwargs
+            )
 
         return out
 
@@ -842,7 +868,8 @@ class CompositeBody(MovableBody):
     ):
         """Transfer function implementation based on a refractive index."""
         queue = kwargs.get(
-            "queue", cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None
+            "queue",
+            cfg.BACKEND.queue if cfg.BACKEND.name == "opencl" else None,
         )
         out = kwargs.get("out")
 

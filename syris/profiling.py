@@ -194,7 +194,12 @@ class Profiler(Thread):
             self._get_string(event_state, event, event_id, func_name)
             for event_state in Profiler.states
         ]
-        string = "%s\n%s\n%s\n%s\n" % (strings[0], strings[1], strings[2], strings[3])
+        string = "%s\n%s\n%s\n%s\n" % (
+            strings[0],
+            strings[1],
+            strings[2],
+            strings[3],
+        )
 
         self._profile_file.write(string)
 
@@ -239,7 +244,14 @@ class ProfileReconstructor(object):
     :py:class:`Profiler`.
     """
 
-    attributes = ["EVENT_ID", "QUEUE_ID", "DEVICE_ID", "STATE", "FUNC_NAME", "TIME"]
+    attributes = [
+        "EVENT_ID",
+        "QUEUE_ID",
+        "DEVICE_ID",
+        "STATE",
+        "FUNC_NAME",
+        "TIME",
+    ]
     pattern = re.compile(
         r"(?P<%s>[0-9]+)\s*(?P<%s>[0-9]+)\s*(?P<%s>[0-9]+)"
         % (attributes[0], attributes[1], attributes[2])
@@ -436,9 +448,17 @@ def plot(
     for attr in data:
         y_limits.add(attr)
         for event in data[attr]:
-            start = q.Quantity(getattr(event, states[0]), file_units).rescale(out_units)
-            stop = q.Quantity(getattr(event, states[1]), file_units).rescale(out_units)
-            if start >= start_from and start <= stop_at and stop - start >= delta:
+            start = q.Quantity(getattr(event, states[0]), file_units).rescale(
+                out_units
+            )
+            stop = q.Quantity(getattr(event, states[1]), file_units).rescale(
+                out_units
+            )
+            if (
+                start >= start_from
+                and start <= stop_at
+                and stop - start >= delta
+            ):
                 if not only_averages:
                     events_infos.append(
                         (event.FUNC_NAME, stop - start, start, stop, out_units)
@@ -452,7 +472,9 @@ def plot(
                             color=func_colors[event.FUNC_NAME],
                         )
                     if event.FUNC_NAME not in func_colors:
-                        line = plt.plot([start, stop], [attr, attr], linewidth=5.0)[0]
+                        line = plt.plot(
+                            [start, stop], [attr, attr], linewidth=5.0
+                        )[0]
                         func_colors[event.FUNC_NAME] = line.get_color()
                 if max_func_name < len(event.FUNC_NAME):
                     max_func_name = len(event.FUNC_NAME)
@@ -578,7 +600,8 @@ if __name__ == "__main__":
         metavar="UNITS",
         default="ms",
         dest="units",
-        help="Time units. One of %s" % (list(ProfileReconstructor.str_to_qtime.keys()))
+        help="Time units. One of %s"
+        % (list(ProfileReconstructor.str_to_qtime.keys()))
         + ", (default: %default)",
     )
     PARSER.add_option(

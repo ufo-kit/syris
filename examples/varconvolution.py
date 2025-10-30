@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Example showing variable convolution."""
+
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
@@ -48,7 +49,9 @@ def main():
     # Compute a such that the disk diameter is exactly the period when distance from the middle is n
     # / 2
     a = m / (2 * (crop_n / 2.0) ** 2)
-    radii = (a * np.sqrt(x ** 2 + y ** 2) ** 2 + 1e-3).astype(cfg.PRECISION.np_float)
+    radii = (a * np.sqrt(x**2 + y**2) ** 2 + 1e-3).astype(
+        cfg.PRECISION.np_float
+    )
     x_param = radii
     y_param = radii
 
@@ -69,9 +72,13 @@ def main():
 def parse_args():
     parser = get_default_parser(__doc__)
 
-    parser.add_argument("--input", default="grid", choices=["grid", "lena"], help="Input image")
+    parser.add_argument(
+        "--input", default="grid", choices=["grid", "lena"], help="Input image"
+    )
     parser.add_argument("--output", type=str, help="Output file name")
-    parser.add_argument("--n", type=int, default=512, help="Number of pixels in one dimension")
+    parser.add_argument(
+        "--n", type=int, default=512, help="Number of pixels in one dimension"
+    )
 
     return parser.parse_args()
 

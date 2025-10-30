@@ -146,8 +146,12 @@ class Material(object):
         # To keep track which energies were used.
         self._energies = energies
         if len(self._energies) > 3:
-            self._tckr = interp.splrep(self._energies, self.refractive_indices.real)
-            self._tcki = interp.splrep(self._energies, self.refractive_indices.imag)
+            self._tckr = interp.splrep(
+                self._energies, self.refractive_indices.real
+            )
+            self._tcki = interp.splrep(
+                self._energies, self.refractive_indices.imag
+            )
             if self._f_1 is not None:
                 self._tckf_1 = interp.splrep(self._energies, f_1)
             if self._f_2 is not None:
@@ -207,12 +211,16 @@ class Material(object):
 
     def get_f_1(self, energy):
         if self._f_1 is None:
-            raise MaterialError("Scattering factor f_1 not specified in material")
+            raise MaterialError(
+                "Scattering factor f_1 not specified in material"
+            )
         return self._get_interpolated(self._tckf_1, energy)
 
     def get_f_2(self, energy):
         if self._f_2 is None:
-            raise MaterialError("Scattering factor f_2 not specified in material")
+            raise MaterialError(
+                "Scattering factor f_2 not specified in material"
+            )
         return self._get_interpolated(self._tckf_2, energy)
 
     def save(self, filename=None):
@@ -269,7 +277,9 @@ def make_pmasf(name, energies):
     out, err = pipe.communicate()
     if pipe.returncode != 0:
         raise RuntimeError(
-            "pmasf error (code: {0}, message: {1})".format(pipe.returncode, err)
+            "pmasf error (code: {0}, message: {1})".format(
+                pipe.returncode, err
+            )
         )
 
     # Parse the text output to obtain the refractive indices.
@@ -281,7 +291,9 @@ def make_pmasf(name, energies):
         if line != "":
             ref_ind = line.split("\t")[1]
             delta, beta = ref_ind.split(" ")
-            indices.append(cfg.PRECISION.np_cplx(float(delta) + float(beta) * 1j))
+            indices.append(
+                cfg.PRECISION.np_cplx(float(delta) + float(beta) * 1j)
+            )
 
     return Material(name, indices, energies)
 
@@ -299,7 +311,8 @@ def make_henke(name, energies, formula=None, density=None):
     if element in ELEMENTS:
         # Get the scattering factors
         response = urllib.request.urlopen(
-            "https://henke.lbl.gov/optical_constants" + "/sf/{}.nff".format(element)
+            "https://henke.lbl.gov/optical_constants"
+            + "/sf/{}.nff".format(element)
         )
         data = response.read().decode("utf-8")
         response.close()
@@ -327,7 +340,9 @@ def make_stepanov(name, energies, density=None, formula=None, crystal=None):
         mat = "&coway=0&code={}".format(crystal)
     else:
         if not density:
-            raise ValueError("'density' must be specified for formula-based lookup")
+            raise ValueError(
+                "'density' must be specified for formula-based lookup"
+            )
         if not formula:
             formula = name
         density = density.rescale(q.g / q.cm**3).magnitude
@@ -392,7 +407,9 @@ class _HenkeQuery(object):
             raise ValueError("Minimum acceptable energy is 30 eV")
         if energies[-1] > 30 * q.keV:
             raise ValueError("Maximum acceptable energy is 30 keV")
-        density = -1 if density is None else density.rescale(q.g / q.cm**3).magnitude
+        density = (
+            -1 if density is None else density.rescale(q.g / q.cm**3).magnitude
+        )
 
         self.energies = energies
         self.formula = formula
@@ -401,13 +418,17 @@ class _HenkeQuery(object):
         try:
             response = self._query_server(formula, density)
             if b"error" in response.lower():
-                raise MaterialError("Error looking up material `{}`".format(name))
+                raise MaterialError(
+                    "Error looking up material `{}`".format(name)
+                )
             parser.feed(response.decode("utf-8"))
             link = urljoin(self._URL, parser.link)
             # First two lines are description
             values = urllib.request.urlopen(link).readlines()[2:]
             energies_henke, indices = _parse_henke(values)
-            self.refractive_indices = self._interpolate(energies_henke, indices)
+            self.refractive_indices = self._interpolate(
+                energies_henke, indices
+            )
         except urllib.error.URLError:
             print(
                 "Cannot contact server, please check your Internet connection",

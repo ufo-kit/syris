@@ -20,6 +20,7 @@
 [1] Paganin, David, et al. "Simultaneous phase and amplitude extraction from a single defocused
 image of a homogeneous object." Journal of microscopy 206.1 (2002): 33-40.
 """
+
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
@@ -51,7 +52,9 @@ def compute_tie_kernel(n, pixel_size, distance, material, energy):
     ri = material.get_refractive_index(energy)
     delta = ri.real
     beta = ri.imag
-    mju = material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
+    mju = (
+        material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
+    )
     fmt = "                            mju: {}"
     print(fmt.format(mju))
     fmt = "                          delta: {}"
@@ -61,7 +64,7 @@ def compute_tie_kernel(n, pixel_size, distance, material, energy):
     fmt = "    Regularization rate for UFO: {}"
     print(fmt.format(np.log10(delta / beta)))
 
-    return mju / (distance * ri.real * (f ** 2 + g ** 2) + mju)
+    return mju / (distance * ri.real * (f**2 + g**2) + mju)
     # Alternative forms
     # lam = energy_to_wavelength(energy).rescale(q.m).magnitude
     # tmp = 4 * np.pi * lam * beta
@@ -92,10 +95,14 @@ def main():
     print(fmt.format(ps_hd.rescale(q.um)))
     fmt = "           Propagation distance: {}"
     print(fmt.format(d))
-    print("                  Field of view: {}".format(n * ps_hd.rescale(q.um)))
+    print(
+        "                  Field of view: {}".format(n * ps_hd.rescale(q.um))
+    )
     fmt = "                Sphere diameter: {}"
     print(fmt.format(2 * radius))
-    print(f"                  Fresnel number: {(ps ** 2 / (d * lam)).simplified.magnitude}")
+    print(
+        f"                  Fresnel number: {(ps**2 / (d * lam)).simplified.magnitude}"
+    )
 
     sample = make_sphere(n, radius, pixel_size=ps_hd, material=material)
     projection = sample.project((n, n), ps_hd).get() * 1e6
@@ -105,7 +112,9 @@ def main():
     ld = decimate(hd, (n_camera, n_camera), average=True).get()
 
     kernel = compute_tie_kernel(n_camera, ps, d, material, energy)
-    mju = material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
+    mju = (
+        material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
+    )
     f_ld = fft_2(ld)
     f_ld *= get_array(kernel.astype(cfg.PRECISION.np_float))
     retrieved = ifft_2(f_ld).get().real
@@ -146,12 +155,21 @@ def parse_args():
         default=1,
         help="Magnification",
     )
-    parser.add_argument("--output-projection", type=str,
-                        help="Output file name for X-ray projection")
-    parser.add_argument("--output-thickness", type=str,
-                        help="Output file name for projected thickness [um]")
-    parser.add_argument("--output-retrieved", type=str,
-                        help="Output file name for the retrieved projected thickness [um]")
+    parser.add_argument(
+        "--output-projection",
+        type=str,
+        help="Output file name for X-ray projection",
+    )
+    parser.add_argument(
+        "--output-thickness",
+        type=str,
+        help="Output file name for projected thickness [um]",
+    )
+    parser.add_argument(
+        "--output-retrieved",
+        type=str,
+        help="Output file name for the retrieved projected thickness [um]",
+    )
 
     return parser.parse_args()
 

@@ -35,7 +35,9 @@ class StaticBody(Body):
 
     def __init__(self, thickness, pixel_size, material=None, queue=None):
         super(StaticBody, self).__init__(material)
-        self.thickness = g_util.get_array(thickness.simplified.magnitude, queue=queue)
+        self.thickness = g_util.get_array(
+            thickness.simplified.magnitude, queue=queue
+        )
         self.pixel_size = make_tuple(pixel_size, num_dims=2)
 
     def get_next_time(self, t_0, distance):
@@ -50,9 +52,13 @@ class StaticBody(Body):
 
         orig_shape = self.thickness.shape
         orig_region = (0, 0) + orig_shape
-        end = ((offset + shape * pixel_size) / self.pixel_size).simplified.magnitude
+        end = (
+            (offset + shape * pixel_size) / self.pixel_size
+        ).simplified.magnitude
         end = np.round(end).astype(int)
-        start = np.round((offset / self.pixel_size).simplified.magnitude).astype(int)
+        start = np.round(
+            (offset / self.pixel_size).simplified.magnitude
+        ).astype(int)
         # numpy integers are not understood by pyopencl's rectangle copy
         end = [int(num) for num in end]
         start = [int(num) for num in start]
@@ -104,7 +110,9 @@ def make_grid(
         image[i::period, :] = 1
         image[:, i::period] = 1
 
-    return StaticBody(image * thickness, pixel_size, material=material, queue=queue)
+    return StaticBody(
+        image * thickness, pixel_size, material=material, queue=queue
+    )
 
 
 def make_sphere(n, radius, pixel_size=1 * q.m, material=None, queue=None):

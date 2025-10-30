@@ -26,7 +26,8 @@ from syris.materials import make_fromfile
 def get_default_parser(description):
     """Default argument parser with *description*"""
     return argparse.ArgumentParser(
-        description=description, formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        description=description,
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
 

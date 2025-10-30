@@ -99,13 +99,17 @@ class BvhCupyAccelerator(AcceleratorBase):
         try:
             # Create and transfer vertex data to the GPU in a single operation
             vertices = self.xp.zeros((nb_vertices, 4), dtype=self.float_dtype)
-            vertices[:, :3] = self.xp.array(host_vertices, dtype=self.float_dtype)
+            vertices[:, :3] = self.xp.array(
+                host_vertices, dtype=self.float_dtype
+            )
 
             # Create and transfer normal data to the GPU if it exists
             normals = None
             if host_normals is not None:
                 normals = self.xp.zeros((nb_keys, 4), dtype=self.float_dtype)
-                normals[:, :3] = self.xp.array(host_normals, dtype=self.float_dtype)
+                normals[:, :3] = self.xp.array(
+                    host_normals, dtype=self.float_dtype
+                )
 
             keys = self.xp.zeros(nb_keys, dtype=self.xp.uint64)
             rope = self.xp.full(2 * nb_keys, -1, dtype=self.xp.int32)
@@ -215,13 +219,18 @@ class BvhCupyAccelerator(AcceleratorBase):
 
         # --- Prepare Kernel Launch ---
         image = (
-            self.xp.ones(camera.shape[0] * camera.shape[1], dtype=self.float_dtype) * -1
+            self.xp.ones(
+                camera.shape[0] * camera.shape[1], dtype=self.float_dtype
+            )
+            * -1
         )
         global_counter = self.xp.zeros(1, dtype=self.xp.uint32)
 
         block_size = (256, 1, 1)
         grid_size = (
-            int(self.xp.ceil(camera.shape[0] * camera.shape[1] / block_size[0])),
+            int(
+                self.xp.ceil(camera.shape[0] * camera.shape[1] / block_size[0])
+            ),
             1,
             1,
         )
@@ -234,7 +243,9 @@ class BvhCupyAccelerator(AcceleratorBase):
             (self.tree["vertices"] * scale).view(self.float4_view),
         ]
         if use_normals:
-            base_args.append((self.tree["normals"] * scale).view(self.float4_view))
+            base_args.append(
+                (self.tree["normals"] * scale).view(self.float4_view)
+            )
 
         camera_args = [
             camera.kernel_shape_xy.view(self.uint2_view),
@@ -246,7 +257,9 @@ class BvhCupyAccelerator(AcceleratorBase):
         ]
 
         if not parallel:
-            camera_args.append((camera.source_point * scale).view(self.float4_view))
+            camera_args.append(
+                (camera.source_point * scale).view(self.float4_view)
+            )
 
         tree_args = [
             self.tree["rope"],
@@ -258,7 +271,11 @@ class BvhCupyAccelerator(AcceleratorBase):
             (self.tree["sceneMax"] * scale).view(self.float4_view),
         ]
 
-        sampling_args = [float(abs_tolerance), float(rel_tolerance), int(iterations)]
+        sampling_args = [
+            float(abs_tolerance),
+            float(rel_tolerance),
+            int(iterations),
+        ]
 
         # --- Select Kernel Name ---
         mode = "parallel" if parallel else "conebeam"
@@ -329,7 +346,10 @@ class LegacyCpuAccelerator(AcceleratorBase):
         fov = offset + shape * pixel_size
         fov = (
             xp.concatenate(
-                (offset.simplified.magnitude[::-1], fov.simplified.magnitude[::-1])
+                (
+                    offset.simplified.magnitude[::-1],
+                    fov.simplified.magnitude[::-1],
+                )
             )
             .reshape(2, 2)
             .transpose()
@@ -353,7 +373,9 @@ class LegacyCpuAccelerator(AcceleratorBase):
             height = min(y_max_px - y_min_px, shape[0])
             compute_offset = cltypes.make_int2(x_min_px, y_min_px)
             v_1, v_2, v_3 = self.mesh._make_inputs(queue, pixel_size)
-            max_dx = self.mesh.max_triangle_x_diff.simplified.magnitude / psm[1]
+            max_dx = (
+                self.mesh.max_triangle_x_diff.simplified.magnitude / psm[1]
+            )
             # Use the same pixel size as for the x-axis, which will work for objects "not too far"
             # from the imaging plane
             min_z = self.mesh.extrema[2][0].simplified.magnitude / psm[1]
@@ -408,7 +430,7 @@ class LegacyCUDAAccelerator(AcceleratorBase):
         """Projection implementation."""
         xp = cfg.BACKEND.xp
 
-        offset = kwargs.pop("offset", (0,0))
+        offset = kwargs.pop("offset", (0, 0))
 
         block_size = (1, 1, 1)
         grid_size = (shape[0], shape[1], 1)
@@ -495,8 +517,13 @@ class LegacyCUDAAccelerator(AcceleratorBase):
             # The kernel needs the full image width for memory indexing
             full_image_width = shape[1]
 
-            max_dx = self.mesh.max_triangle_x_diff.rescale(cfg.UNIT).magnitude / psm[1]
-            min_z = self.mesh.extrema[2][0].rescale(cfg.UNIT).magnitude / psm[1]
+            max_dx = (
+                self.mesh.max_triangle_x_diff.rescale(cfg.UNIT).magnitude
+                / psm[1]
+            )
+            min_z = (
+                self.mesh.extrema[2][0].rescale(cfg.UNIT).magnitude / psm[1]
+            )
             kernel_mesh_offset = (offset / pixel_size).magnitude[::-1]
             kernel_mesh_offset = np.array(kernel_mesh_offset, dtype=float)
 

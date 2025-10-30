@@ -46,11 +46,15 @@ class GaussianFilter(OpticalElement):
         *center*, i.e. this is the highest transmitted intensity.
         """
         if len(energies) < 4:
-            raise ValueError("Number of energy points too low for interpolation")
+            raise ValueError(
+                "Number of energy points too low for interpolation"
+            )
         energies = energies.rescale(q.keV).magnitude
         center = center.rescale(q.keV).magnitude
         sigma = sigma.rescale(q.keV).magnitude
-        profile = get_gauss(energies, center, sigma) * peak_transmission * q.keV
+        profile = (
+            get_gauss(energies, center, sigma) * peak_transmission * q.keV
+        )
         self._tck = interp.splrep(energies, profile)
 
     def get_next_time(self, t_0, distance):
@@ -153,7 +157,9 @@ class Scintillator(MaterialFilter):
         self._lights_yields = light_yields
         self._energies = energies
         self._wavelengths = wavelengths
-        self._luminescence = luminescence / luminescence.sum() / self.d_wavelength
+        self._luminescence = (
+            luminescence / luminescence.sum() / self.d_wavelength
+        )
         self.opt_ref_index = optical_ref_index
 
         self._ly_tck = interp.splrep(
@@ -177,11 +183,16 @@ class Scintillator(MaterialFilter):
 
     def get_light_yield(self, energy):
         """Get light yield at *energy* [1 / keV]."""
-        return interp.splev(energy.rescale(q.keV).magnitude, self._ly_tck) / q.keV
+        return (
+            interp.splev(energy.rescale(q.keV).magnitude, self._ly_tck) / q.keV
+        )
 
     def get_luminescence(self, wavelength):
         """Get luminescence at *wavelength* [1 / nm]."""
-        return interp.splev(wavelength.rescale(q.nm).magnitude, self._lum_tck) / q.nm
+        return (
+            interp.splev(wavelength.rescale(q.nm).magnitude, self._lum_tck)
+            / q.nm
+        )
 
     def get_conversion_factor(self, energy):
         """Get the conversion factor to convert X-ray photons to visible light photons

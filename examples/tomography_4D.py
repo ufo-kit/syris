@@ -20,6 +20,7 @@ same time move along y-axis. The total vertical displacement between rotation st
 cube edge. This leads to an "incomplete" data set with increasingly more missing data in the
 sinogram space from top to bottom. There is exactly one complete sinogram, the middle one.
 """
+
 import imageio
 import os
 import matplotlib.pyplot as plt
@@ -38,7 +39,9 @@ def make_cube_body(n, ps, cube_edge, phase_shift=None):
     fov = n * ps
     triangles = make_cube().magnitude * cube_edge / 2
     # Rotation around the vertical axis
-    points = make_circle(axis="y", overall_angle=np.pi * q.rad, phase_shift=phase_shift).magnitude
+    points = make_circle(
+        axis="y", overall_angle=np.pi * q.rad, phase_shift=phase_shift
+    ).magnitude
     points = points * fov / 4 + [n // 2, 0, 0] * ps
     trajectory = geom.Trajectory(points, pixel_size=ps, velocity=ps / q.s)
     # *orientation* aligns the object with the trajectory derivative
@@ -64,7 +67,9 @@ def main():
     # Vertical motion component has such velocity that the cubes are displaced by their edge length
     # 1 pixel for making sure we have one "complete" sinogram
     velocity = (cube_edge - ps) / cube_0.trajectory.time
-    traj_y = geom.Trajectory(list(zip(y, x, z)) * ps, pixel_size=ps, velocity=velocity)
+    traj_y = geom.Trajectory(
+        list(zip(y, x, z)) * ps, pixel_size=ps, velocity=velocity
+    )
     composite = CompositeBody(traj_y, bodies=[cube_0, cube_1])
     # Total time is the rotation time because we want one tomographic data set
     total_time = cube_0.trajectory.time
@@ -94,13 +99,17 @@ def main():
     if args.create_animation:
         # Animate Projections
         writergif = animation.PillowWriter(fps=20)
-        projection_animation = animate_volume(projections, title="Projection: ", axis=0)
+        projection_animation = animate_volume(
+            projections, title="Projection: ", axis=0
+        )
         f = args.output + "projections.gif"
         projection_animation.save(f, writer=writergif)
         plt.close("all")
 
         # Animate Sinogram
-        sinogram_animation = animate_volume(projections, title="Sinogram: ", axis=1)
+        sinogram_animation = animate_volume(
+            projections, title="Sinogram: ", axis=1
+        )
         f = args.output + "sinogram.gif"
         sinogram_animation.save(f, writer=writergif)
 
@@ -109,23 +118,34 @@ def animate_volume(volume, title="Projection: ", axis=0):
     fig = plt.figure()
     ax = plt.gca()
     ax.set_title("")
-    im_1 = plt.imshow(np.take(volume, 0, axis=axis),
-                      vmin=np.min(volume), vmax=np.max(volume), cmap="Greys")
+    im_1 = plt.imshow(
+        np.take(volume, 0, axis=axis),
+        vmin=np.min(volume),
+        vmax=np.max(volume),
+        cmap="Greys",
+    )
     plt.colorbar()
 
     def update(i):
         im_1.set_data(np.take(volume, i, axis=axis))
         ax.set_title(title + str(i))
-        return im_1,
+        return (im_1,)
 
-    return animation.FuncAnimation(fig, update, blit=True, repeat=True, frames=volume.shape[axis])
+    return animation.FuncAnimation(
+        fig, update, blit=True, repeat=True, frames=volume.shape[axis]
+    )
 
 
 def parse_args():
     parser = get_default_parser(__doc__)
-    parser.add_argument("--output", type=str, help="Output directory for projections.")
-    parser.add_argument("--create_animation", action='store_true',
-                        help="Creates an animations of the projections and sinograms.")
+    parser.add_argument(
+        "--output", type=str, help="Output directory for projections."
+    )
+    parser.add_argument(
+        "--create_animation",
+        action="store_true",
+        help="Creates an animations of the projections and sinograms.",
+    )
     return parser.parse_args()
 
 

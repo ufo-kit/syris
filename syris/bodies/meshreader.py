@@ -76,7 +76,9 @@ class MeshReaderBase(abc.ABC):
 
         num_points = len(verts_magnitude)
         if num_points % 3 != 0:
-            raise ValueError("Vertex data does not represent a valid triangle mesh.")
+            raise ValueError(
+                "Vertex data does not represent a valid triangle mesh."
+            )
 
         num_triangles = num_points // 3
 
@@ -122,8 +124,7 @@ class PyvistaReader(MeshReaderBase):
             mesh = filename
         else:
             raise TypeError(
-                f"Expected a filename (str or Path) or a PyVista object, "
-                f"but got {type(filename)}."
+                f"Expected a filename (str or Path) or a PyVista object, but got {type(filename)}."
             )
 
         # Handle MultiBlock datasets
@@ -141,7 +142,10 @@ class PyvistaReader(MeshReaderBase):
         if compute_normals and mesh.cell_normals is None:
             LOG.debug("Computing cell normals...")
             mesh = mesh.compute_normals(
-                cell_normals=True, point_normals=False, inplace=False, progress_bar=True
+                cell_normals=True,
+                point_normals=False,
+                inplace=False,
+                progress_bar=True,
             )
 
         LOG.debug("Copying mesh data to contiguous NumPy arrays...")
@@ -164,15 +168,20 @@ class PyvistaReader(MeshReaderBase):
         if triangles.size > 0:
             triangle_verts = points[triangles]
             edge0_sq_len = np.sum(
-                (triangle_verts[:, 1, :] - triangle_verts[:, 0, :]) ** 2, axis=1
+                (triangle_verts[:, 1, :] - triangle_verts[:, 0, :]) ** 2,
+                axis=1,
             )
             edge1_sq_len = np.sum(
-                (triangle_verts[:, 2, :] - triangle_verts[:, 1, :]) ** 2, axis=1
+                (triangle_verts[:, 2, :] - triangle_verts[:, 1, :]) ** 2,
+                axis=1,
             )
             edge2_sq_len = np.sum(
-                (triangle_verts[:, 0, :] - triangle_verts[:, 2, :]) ** 2, axis=1
+                (triangle_verts[:, 0, :] - triangle_verts[:, 2, :]) ** 2,
+                axis=1,
             )
-            all_sq_lens = np.concatenate([edge0_sq_len, edge1_sq_len, edge2_sq_len])
+            all_sq_lens = np.concatenate(
+                [edge0_sq_len, edge1_sq_len, edge2_sq_len]
+            )
             non_zero_sq_lens = all_sq_lens[all_sq_lens > 0]
 
             if non_zero_sq_lens.size > 0:
@@ -181,7 +190,9 @@ class PyvistaReader(MeshReaderBase):
                 smallest_feature = np.sqrt(min_edge_length_sq)
                 largest_feature = np.sqrt(max_edge_length_sq)
             else:
-                LOG.debug("WARNING: Mesh appears to have no edges with a length > 0.")
+                LOG.debug(
+                    "WARNING: Mesh appears to have no edges with a length > 0."
+                )
                 smallest_feature = np.inf
                 largest_feature = np.inf
         else:
@@ -191,13 +202,17 @@ class PyvistaReader(MeshReaderBase):
         self._smallest_feature_size = smallest_feature.astype(dtype)
         self._largest_feature_size = largest_feature.astype(dtype)
         self.dynamic_range = 1
-        if self._smallest_feature_size > 0 and np.isfinite(self._smallest_feature_size):
+        if self._smallest_feature_size > 0 and np.isfinite(
+            self._smallest_feature_size
+        ):
             self.dynamic_range = (
                 self._largest_feature_size / self._smallest_feature_size
             )
             LOG.debug(f"Dynamic Range: {self.dynamic_range:.2f} : 1")
         else:
-            LOG.debug("Dynamic Range: N/A (smallest feature is zero or invalid)")
+            LOG.debug(
+                "Dynamic Range: N/A (smallest feature is zero or invalid)"
+            )
 
         # Store the final NumPy arrays
         self._vertices = triangle_vertices.T.copy().astype(dtype) * unit
@@ -225,7 +240,11 @@ class PyvistaReader(MeshReaderBase):
 class WavefrontAnimationReader(MeshReaderBase):
     def __init__(self, folder: str):
         self.filenames = sorted(
-            [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".obj")]
+            [
+                os.path.join(folder, f)
+                for f in os.listdir(folder)
+                if f.endswith(".obj")
+            ]
         )
         if not self.filenames:
             raise FileNotFoundError(f"No .obj files found in folder: {folder}")
@@ -238,19 +257,25 @@ class WavefrontAnimationReader(MeshReaderBase):
     @property
     def vertices(self):
         if self._vertices is None:
-            raise AttributeError("Vertices not loaded. Iterate over the reader first.")
+            raise AttributeError(
+                "Vertices not loaded. Iterate over the reader first."
+            )
         return self._vertices
 
     @property
     def normals(self):
         if self._normals is None:
-            raise AttributeError("Normals not loaded. Iterate over the reader first.")
+            raise AttributeError(
+                "Normals not loaded. Iterate over the reader first."
+            )
         return self._normals
 
     @property
     def bounds(self):
         if self._bounds is None:
-            raise AttributeError("Bounds not loaded. Iterate over the reader first.")
+            raise AttributeError(
+                "Bounds not loaded. Iterate over the reader first."
+            )
         return self._bounds
 
     def _read_file(self, filename):
@@ -262,7 +287,9 @@ class WavefrontAnimationReader(MeshReaderBase):
         # Extract and process data
         points_np = vtk_to_numpy(polydata.GetPoints().GetData())
         cells_np = (
-            vtk_to_numpy(polydata.GetPolys().GetData()).reshape(-1, 4)[:, 1:].flatten()
+            vtk_to_numpy(polydata.GetPolys().GetData())
+            .reshape(-1, 4)[:, 1:]
+            .flatten()
         )
 
         vertices = points_np[cells_np].astype(np.float32)
@@ -300,7 +327,9 @@ class WavefrontAnimationReader(MeshReaderBase):
 
 
 class RandomMeshReader(MeshReaderBase):
-    def __init__(self, n: int, eps: float, lengths: np.ndarray, origin: np.ndarray):
+    def __init__(
+        self, n: int, eps: float, lengths: np.ndarray, origin: np.ndarray
+    ):
         super().__init__()
 
         rng = np.random.default_rng()
