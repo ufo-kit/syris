@@ -41,7 +41,7 @@ class OpticalElement(object):
         out=None,
         check=True,
         block=False,
-        **kwargs
+        **kwargs,
     ):
         """Transfer function of the element in real space on an image plane of size *shape*, use
         *pixel_size*, *energy*, *offset* is the physical spatial offset of the element as (y, x),
@@ -70,16 +70,16 @@ class OpticalElement(object):
         )
 
     def transfer_fourier(
-            self,
-            shape,
-            pixel_size,
-            energy,
-            t=None,
-            queue=None,
-            out=None,
-            block=False,
-            **kwargs
-        ):
+        self,
+        shape,
+        pixel_size,
+        energy,
+        t=None,
+        queue=None,
+        out=None,
+        block=False,
+        **kwargs,
+    ):
         """Transfer function of the element in Fourier space of size *shape*, use *pixel_size*,
         *energy* and comput the function at time *t*. Use *queue* for OpenCL computations and *out*
         pyopencl array. If *block* is True, wait for the kernel to finish.

@@ -23,6 +23,7 @@ import numpy as np
 import quantities as q
 import scipy.interpolate as interp
 import syris.gpu.util as gutil
+import syris.geometry as geom
 from syris.geometry import Trajectory
 from syris.bodies.base import MovableBody
 from syris import config as cfg
@@ -201,7 +202,6 @@ class Camera(MovableBody):
     @property
     def source_point(self):
         """Calculates the source point based on the camera's position and orientation."""
-        # position property is inherited from MovableBody
         vec = self.position + self._source_detector_distance * self.w
         return self._to_cuda_vector(vec)
 
@@ -404,6 +404,66 @@ class Camera(MovableBody):
 
         # Apply quantization noise
         return counts.astype(self.dtype)
+
+    def rotate_around(self, angle, axis, pivot):
+        """
+        Rotates the body around an absolute world-space pivot point.
+        This is a 'global' or 'orbit' transformation.
+
+        :param angle: The angle of rotation (with units).
+        :param axis: The axis of rotation
+        :param pivot: The absolute world coordinate to orbit around.
+        """
+        # Create the global rotation matrix using the low-level function
+        # This matrix performs the T * R * T^-1 operation.
+        M_orbit = geom.rotate(angle, axis, shift=pivot)
+
+        # 2. Apply this matrix as a GLOBAL (pre-multiplication) transform
+        self.apply_transformation(M_orbit)
+
+    def look_at(self, target_point):
+        """
+        Rotates the camera to look at a specific target point in world space,
+        while keeping its current position.
+        ...
+        """
+        LOG.debug(f"Camera {self} looking at {target_point}")
+
+        # --- Get Vectors & Handle Units ---
+        current_pos = self.position.simplified
+        try:
+            target_pos = target_point.simplified
+        except AttributeError:
+            target_pos = np.asarray(target_point, dtype=cfg.PRECISION.np_float)
+
+        global_up = self._orientation
+
+        # --- Calculate New Axes (Unitless) ---
+
+        # W (Forward) vector: Points from camera to target
+        forward_vec = geom.normalize(target_pos - current_pos)
+
+        if np.linalg.norm(forward_vec) < 1e-9:
+            return  # At target, no change
+
+        # U (Right) vector
+        # (Handle edge case of looking straight up/down)
+        if abs(np.dot(global_up, forward_vec)) > 0.9999:
+            # We are looking along the global_up axis.
+            # Use X_AX as a temporary 'right' to find a 'down'.
+            down_vec = geom.normalize(np.cross(geom.X_AX, forward_vec))
+            right_vec = geom.normalize(np.cross(forward_vec, down_vec))
+        else:
+            right_vec = geom.normalize(np.cross(global_up, forward_vec))
+            # V (Down) vector: Must be U x W
+            down_vec = geom.normalize(np.cross(right_vec, forward_vec))
+
+        # --- Build New 4x4 Matrix ---
+        new_matrix = self.transform_matrix
+        new_matrix[:3, 0] = right_vec  # U
+        new_matrix[:3, 1] = down_vec  # V
+        new_matrix[:3, 2] = forward_vec  # W
+        self.transform_matrix = new_matrix
 
 
 def make_pco_dimax():

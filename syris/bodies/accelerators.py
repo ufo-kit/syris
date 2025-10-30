@@ -408,6 +408,8 @@ class LegacyCUDAAccelerator(AcceleratorBase):
         """Projection implementation."""
         xp = cfg.BACKEND.xp
 
+        offset = kwargs.pop("offset", (0,0))
+
         block_size = (1, 1, 1)
         grid_size = (shape[0], shape[1], 1)
 

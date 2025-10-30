@@ -61,7 +61,7 @@ def transfer(
     else:
         prep = thickness.simplified.magnitude.astype(cfg.PRECISION.np_float)
         thickness_mem = cl_array.to_device(queue, prep)
-    
+
     if out is None:
         out = cl_array.Array(queue, thickness_mem.shape, cfg.PRECISION.np_cplx)
 
@@ -431,7 +431,7 @@ def compute_aliasing_limit(
     if fov is None:
         fov = n * pixel_size
 
-    r = np.sqrt(propagation_distance ** 2 + (fov / 2) ** 2).simplified
+    r = np.sqrt(propagation_distance**2 + (fov / 2) ** 2).simplified
     kx = (fov / (2 * r)).simplified.magnitude
     lam_spatial = (wavelength / (kx * pixel_size)).simplified.magnitude
     ratio = lam_spatial / 2

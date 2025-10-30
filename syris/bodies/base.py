@@ -42,7 +42,19 @@ class Body(OpticalElement):
     def __init__(self, material=None):
         self.material = material
 
-    def project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, queue=None, out=None, block=False, **kwargs):
+    def project(
+        self,
+        shape=None,
+        pixel_size=None,
+        /,
+        *,
+        offset=None,
+        t=None,
+        queue=None,
+        out=None,
+        block=False,
+        **kwargs,
+    ):
         """Project thickness at time *t* to the image plane of size *shape* which is either 1D and
         is extended to (n, n) or is 2D as HxW. *pixel_size* is the point size, also either 1D or 2D.
         *offset* is the physical spatial body offset as (y, x). *queue* is an OpenCL command queue,
@@ -54,21 +66,22 @@ class Body(OpticalElement):
         if offset is None:
             offset = (0, 0) * q.m
 
-        return self._project(shape, pixel_size, offset=offset, t=t, queue=queue, out=None, block=block, **kwargs)
+        return self._project(
+            shape,
+            pixel_size,
+            offset=offset,
+            t=t,
+            queue=queue,
+            out=None,
+            block=block,
+            **kwargs,
+        )
 
     def _project(self, shape=None, pixel_size=None, /, **kwargs):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         raise NotImplementedError
 
-    def _transfer(
-        self,
-        shape,
-        pixel_size,
-        energy,
-        offset,
-        /,
-        **kwargs
-    ):
+    def _transfer(self, shape, pixel_size, energy, offset, /, **kwargs):
         """Transfer function implementation based on a refractive index."""
         ri = self.material.get_refractive_index(energy)
         lam = energy_to_wavelength(energy)
@@ -88,7 +101,7 @@ class Body(OpticalElement):
             queue=queue,
             out=out,
             block=block,
-            **kwargs
+            **kwargs,
         )
 
         return transfer(
@@ -100,7 +113,7 @@ class Body(OpticalElement):
             out=out,
             check=check,
             block=block,
-            **kwargs
+            **kwargs,
         )
 
 
@@ -138,7 +151,19 @@ class MovableBody(Body):
         self._cache_projection = cache_projection
         self.update_projection_cache()
 
-    def project(self, shape=None, pixel_size=None, /, *, offset=None, t=None, queue=None, out=None,  block=False, **kwargs):
+    def project(
+        self,
+        shape=None,
+        pixel_size=None,
+        /,
+        *,
+        offset=None,
+        t=None,
+        queue=None,
+        out=None,
+        block=False,
+        **kwargs,
+    ):
         """Project thickness at time *t* (if it is None no transformation is applied) to the image
         plane of size *shape* which is either 1D and is extended to (n, n) or is 2D as HxW.
         *pixel_size* is the point size, also either 1D or 2D. *offset* is the physical spatial body
@@ -183,7 +208,7 @@ class MovableBody(Body):
                     queue=queue,
                     out=None,
                     block=block,
-                    **kwargs
+                    **kwargs,
                 )
             projection = self._p_cache["projection"]
         else:
@@ -195,7 +220,7 @@ class MovableBody(Body):
                 queue=queue,
                 out=None,
                 block=block,
-                **kwargs
+                **kwargs,
             )
 
         return projection
@@ -787,7 +812,7 @@ class CompositeBody(MovableBody):
     def _project(self, shape=None, pixel_size=None, /, **kwargs):
         """Projection function implementation. *shape* and *pixel_size* are 2D."""
         offset = kwargs.pop("offset", None)
-        t = kwargs.pop("t", None) 
+        t = kwargs.pop("t", None)
         queue = kwargs.pop("queue", None)
         out = kwargs.pop("out", None)
 
@@ -799,7 +824,7 @@ class CompositeBody(MovableBody):
 
         for body in self.bodies:
             out += body.project(shape, pixel_size, offset=offset, t=t, **kwargs)
-            
+
         return out
 
     def _transfer(

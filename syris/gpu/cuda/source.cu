@@ -744,6 +744,39 @@ __device__ FP_T traceAndCache(
     return value;
 }
 
+__device__ FP_T traceAndCache_conebeam(
+    FP_T u, FP_T v, FP_T* value_cache, bool* is_cached,
+    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 source, // Note: 'source'
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
+    Tree &tree, FP_T4 *__restrict__ vertices, 
+    const EpsilonParams& epsilons,
+    unsigned int row, unsigned int col)
+{
+    int ix = round(u * (CACHE_DIM - 1));
+    int iy = round(v * (CACHE_DIM - 1));
+    int index = iy * CACHE_DIM + ix;
+
+    if (is_cached[index]) {
+        return value_cache[index];
+    }
+
+    FP_T4 sample_origin = base_pixel_origin + scaled_U * u + scaled_V * v;
+    
+    // (Source -> Pixel)
+    FP_T4 direction = sample_origin - source;
+    FP_T norm = rnorm3df(direction.x, direction.y, direction.z);
+    direction = direction * norm; // Normalize
+
+    FP_T value = traceSubPixel(
+        source, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col
+    );
+    
+    value_cache[index] = value;
+    is_cached[index] = true;
+
+    return value;
+}
+
 __device__ FP_T traceAndCache(
     FP_T u, FP_T v, FP_T* value_cache, bool* is_cached,
     FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
@@ -764,6 +797,38 @@ __device__ FP_T traceAndCache(
 
     FP_T value = traceSubPixel(
         sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col
+    );
+    
+    value_cache[index] = value;
+    is_cached[index] = true;
+
+    return value;
+}
+
+__device__ FP_T traceAndCache_conebeam(
+    FP_T u, FP_T v, FP_T* value_cache, bool* is_cached,
+    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 source, // Note: 'source'
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
+    Tree &tree, FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
+    const EpsilonParams& epsilons,
+    unsigned int row, unsigned int col)
+{
+    int ix = round(u * (CACHE_DIM - 1));
+    int iy = round(v * (CACHE_DIM - 1));
+    int index = iy * CACHE_DIM + ix;
+
+    if (is_cached[index]) {
+        return value_cache[index];
+    }
+
+    FP_T4 sample_origin = base_pixel_origin + scaled_U * u + scaled_V * v;
+
+    // (Source -> Pixel)
+    FP_T4 direction = sample_origin - source;
+    FP_T norm = rnorm3df(direction.x, direction.y, direction.z);
+    direction = direction * norm;
+    FP_T value = traceSubPixel(
+        source, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col
     );
     
     value_cache[index] = value;
@@ -809,8 +874,9 @@ __device__ FP_T tracePixelAdaptive(
             if (final_quads_count < MAX_QUADS_PER_PIXEL) {
                 FP_T spread_low  = values[2] - values[0];
                 FP_T spread_high = values[4] - values[2];
-                FP_T avg_value = (spread_low < spread_high) ? (values[0] + values[1] + values[2]) / 3.0 : (values[2] + values[3] + values[4]) / 3.0;
-                final_quads[final_quads_count++] = {avg_value, s * s};
+                // FP_T avg_value = (spread_low < spread_high) ? (values[0] + values[1] + values[2]) / 3.0 : (values[2] + values[3] + values[4]) / 3.0;
+                final_quads[final_quads_count++] = {values[2], s * s};
+                // final_quads[final_quads_count++] = {avg_value, s * s};
             }
         } else {
             int next_depth = current_quad.depth + 1;
@@ -856,8 +922,9 @@ __device__ FP_T tracePixelAdaptive(
             if (final_quads_count < MAX_QUADS_PER_PIXEL) {
                 FP_T spread_low  = values[2] - values[0];
                 FP_T spread_high = values[4] - values[2];
-                FP_T avg_value = (spread_low < spread_high) ? (values[0] + values[1] + values[2]) / 3.0 : (values[2] + values[3] + values[4]) / 3.0;
-                final_quads[final_quads_count++] = {avg_value, s * s};
+                // FP_T avg_value = (spread_low < spread_high) ? (values[0] + values[1] + values[2]) / 3.0 : (values[2] + values[3] + values[4]) / 3.0;
+                final_quads[final_quads_count++] = {values[2], s * s};
+                // final_quads[final_quads_count++] = {avg_value, s * s};
             }
         } else {
             int next_depth = current_quad.depth + 1;
@@ -870,6 +937,96 @@ __device__ FP_T tracePixelAdaptive(
     return (total_area > 0.0) ? (total_value / total_area) : 0.0;
 }
 
+__device__ FP_T tracePixelAdaptive_conebeam(
+    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 source, // Note: 'source'
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree, FP_T4 *__restrict__ vertices,
+    const EpsilonParams& epsilons,
+    const AdaptiveSamplingParams& sampling_params,
+    unsigned int row, unsigned int col)
+{
+    Quad quad_stack[MAX_QUADS_PER_PIXEL]; int stack_ptr = 0;
+    FinalQuad final_quads[MAX_QUADS_PER_PIXEL]; int final_quads_count = 0;
+    FP_T value_cache[CACHE_SIZE]; bool is_cached[CACHE_SIZE];
+    for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
+    quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};
+
+    while (stack_ptr > 0) {
+        Quad current_quad = quad_stack[--stack_ptr];
+        FP_T u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0;
+        
+        FP_T values[5];
+        values[0] = traceAndCache_conebeam(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[1] = traceAndCache_conebeam(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[2] = traceAndCache_conebeam(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[3] = traceAndCache_conebeam(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[4] = traceAndCache_conebeam(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        sort(values, 5);
+        FP_T min_val = values[0], max_val = values[4];
+        FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);
+        if ((max_val - min_val < threshold) || (current_quad.depth >= sampling_params.max_depth) || (stack_ptr + 4 > MAX_QUADS_PER_PIXEL)) {
+            if (final_quads_count < MAX_QUADS_PER_PIXEL) {
+                FP_T spread_low  = values[2] - values[0];
+                FP_T spread_high = values[4] - values[2];
+                // FP_T avg_value = (spread_low < spread_high) ? (values[0] + values[1] + values[2]) / 3.0 : (values[2] + values[3] + values[4]) / 3.0;
+                final_quads[final_quads_count++] = {values[2], s * s};
+                // final_quads[final_quads_count++] = {avg_value, s * s};
+            }
+        } else {
+            int next_depth = current_quad.depth + 1;
+            quad_stack[stack_ptr++] = {u, v, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v, hs, next_depth};
+            quad_stack[stack_ptr++] = {u, v + hs, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v + hs, hs, next_depth};
+        }
+    }
+    FP_T total_value = 0.0, total_area = 0.0;
+    for (int i = 0; i < final_quads_count; ++i) { total_value += final_quads[i].value * final_quads[i].area; total_area  += final_quads[i].area; }
+    return (total_area > 0.0) ? (total_value / total_area) : 0.0;
+}
+
+__device__ FP_T tracePixelAdaptive_conebeam(
+    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 source,
+    FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree,
+    FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
+    const EpsilonParams& epsilons,
+    const AdaptiveSamplingParams& sampling_params,
+    unsigned int row, unsigned int col)
+{
+    Quad quad_stack[MAX_QUADS_PER_PIXEL]; int stack_ptr = 0;
+    FinalQuad final_quads[MAX_QUADS_PER_PIXEL]; int final_quads_count = 0;
+    FP_T value_cache[CACHE_SIZE]; bool is_cached[CACHE_SIZE];
+    for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
+    quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};
+
+    while (stack_ptr > 0) {
+        Quad current_quad = quad_stack[--stack_ptr];
+        FP_T u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0;
+        
+        FP_T values[5];
+        values[0] = traceAndCache_conebeam(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[1] = traceAndCache_conebeam(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[2] = traceAndCache_conebeam(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[3] = traceAndCache_conebeam(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[4] = traceAndCache_conebeam(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        sort(values, 5);
+        FP_T min_val = values[0], max_val = values[4];
+        FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);
+        if ((max_val - min_val < threshold) || (current_quad.depth >= sampling_params.max_depth) || (stack_ptr + 4 > MAX_QUADS_PER_PIXEL)) {
+            if (final_quads_count < MAX_QUADS_PER_PIXEL) {
+                FP_T spread_low  = values[2] - values[0];
+                FP_T spread_high = values[4] - values[2];
+                // FP_T avg_value = (spread_low < spread_high) ? (values[0] + values[1] + values[2]) / 3.0 : (values[2] + values[3] + values[4]) / 3.0;
+                final_quads[final_quads_count++] = {values[2], s * s};
+                // final_quads[final_quads_count++] = {avg_value, s * s};
+            }
+        } else {
+            int next_depth = current_quad.depth + 1;
+            quad_stack[stack_ptr++] = {u, v, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v, hs, next_depth};
+            quad_stack[stack_ptr++] = {u, v + hs, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v + hs, hs, next_depth};
+        }
+    }
+    FP_T total_value = 0.0, total_area = 0.0;
+    for (int i = 0; i < final_quads_count; ++i) { total_value += final_quads[i].value * final_quads[i].area; total_area  += final_quads[i].area; }
+    return (total_area > 0.0) ? (total_value / total_area) : 0.0;
+}
 
 // =========================================================================
 // KERNELS
@@ -1097,11 +1254,10 @@ extern "C" __global__ void project_conebeam_kernel(
         FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
 
         if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
-            image[index] = tracePixelAdaptive(
+            image[index] = tracePixelAdaptive_conebeam(
                 base_pixel_origin, scaled_U, scaled_V, source,
                 scene_bbMin, scene_bbMax, tree, vertices,
-                epsilons, sampling_params,
-                row, col
+                epsilons, sampling_params, row, col
             );
         } else {
             FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
@@ -1110,7 +1266,7 @@ extern "C" __global__ void project_conebeam_kernel(
             direction = direction * norm;
             
             image[index] = traceSubPixel(
-                sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col
+                source, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col
             );
         }
     }
@@ -1186,19 +1342,19 @@ extern "C" __global__ void project_conebeam_normals_kernel(
         FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
 
         if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
-            image[index] = tracePixelAdaptive(
+            image[index] = tracePixelAdaptive_conebeam(
                 base_pixel_origin, scaled_U, scaled_V, source,
-                scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, sampling_params,
-                row, col
+                scene_bbMin, scene_bbMax, tree, vertices, normals,
+                epsilons, sampling_params, row, col
             );
         } else {
             FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
-            FP_T4 direction = source - sample_origin;
+            FP_T4 direction = sample_origin - source;
             FP_T norm = rnorm3df(direction.x, direction.y, direction.z);
             direction = direction * norm;
 
             image[index] = traceSubPixel(
-                sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col
+                source, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col
             );
 
             #ifdef DEBUG

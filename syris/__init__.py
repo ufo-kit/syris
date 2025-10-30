@@ -38,7 +38,7 @@ def init(
     import syris.config as cfg
     import pkg_resources
     import os
-    from syris.backend import ComputeBackend
+    from syris.backend import ComputeBackend, HAS_OPENCL
     from syris.gpu.cuda_utils import CudaPipeline
     from syris.gpu.util import make_opencl_defaults, init_programs
     from quantities import Quantity
@@ -89,7 +89,7 @@ def init(
         except Exception as e:
             LOG.error(f"Failed to get kernel: {e}")
 
-    if cfg.BACKEND.name == cfg.BACKEND.OPENCL:
+    if HAS_OPENCL:
         cfg.OPENCL = cfg.OpenCL()
         make_opencl_defaults(
             platform_name=platform_name,
@@ -101,7 +101,7 @@ def init(
         init_programs()
 
     if profiling:
-        if cfg.BACKEND.name == cfg.BACKEND.OPENCL:
+        if HAS_OPENCL:
             from syris import profiling as prf
             from syris.gpu.util import _wrap_opencl
 

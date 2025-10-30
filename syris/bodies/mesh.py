@@ -59,7 +59,6 @@ class Mesh(MovableBody):
         normals=None,
         epsilon=np.inf,
         use_normals=False,
-        visualize_bvh=False,
         dynamic_range=1,
     ):
         """Constructor."""
@@ -118,7 +117,6 @@ class Mesh(MovableBody):
             self._bounds = bounds
 
         self._epsilon = epsilon * normalize_factor
-        self.visualize_bvh = visualize_bvh
         self.dynamic_range = dynamic_range
 
         super(Mesh, self).__init__(
@@ -133,10 +131,9 @@ class Mesh(MovableBody):
         material=None,
         orientation=geom.Y_AX,
         iterations=1,
-        center="bbox",
+        center=None,
         unit=q.um,
         use_normals=False,
-        visualize_bvh=False,
     ):
         """
         Alternative constructor to create a Mesh by loading a file or PyVista object.
@@ -170,7 +167,6 @@ class Mesh(MovableBody):
             bounds=reader.bounds,
             epsilon=reader.epsilon,
             use_normals=use_normals,
-            visualize_bvh=visualize_bvh,
             dynamic_range=reader.dynamic_range,
         )
 
@@ -311,7 +307,7 @@ class Mesh(MovableBody):
         if self._accelerator is not None:
             return self._accelerator.tree
         else:
-            return None 
+            return None
 
     def sort(self):
         """Sort triangles based on the greatest x-coordinate in an ascending order. Also sort
@@ -385,14 +381,15 @@ class Mesh(MovableBody):
         """
         Lazy-initializes and rebuilds the accelerator only if the mesh state has changed.
         """
-        if self._accelerator is None or self._accelerator._built_for_state != self._state:
+        if (
+            self._accelerator is None
+            or self._accelerator._built_for_state != self._state
+        ):
             self._accelerator = cfg.BACKEND.get_accelerator_for_mesh(self)
-            self._accelerator.build(visualize_bvh=self.visualize_bvh)
+            self._accelerator.build()
         return self._accelerator
 
-    def _project(
-        self, shape=None, pixel_size=None, /, **kwargs
-    ):
+    def _project(self, shape=None, pixel_size=None, /, **kwargs):
         # This method now correctly gets a cached or rebuilt accelerator
         accel = self.build_accelerator()
         return accel.project(shape, pixel_size, **kwargs)

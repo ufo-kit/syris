@@ -42,9 +42,7 @@ class StaticBody(Body):
         """A simple body doesn't move, this function returns infinity."""
         return np.inf * q.s
 
-    def _project(
-        self, shape=None, pixel_size=None, /, **kwargs
-    ):
+    def _project(self, shape=None, pixel_size=None, /, **kwargs):
         """Project thickness."""
 
         offset = kwargs.pop("offset", None)
