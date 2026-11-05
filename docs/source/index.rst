@@ -39,6 +39,7 @@ Usage
 
    usage/profiling
    usage/examples
+   usage/cuda-projection
 
 
 Indices and tables

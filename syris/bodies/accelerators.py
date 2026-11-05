@@ -77,12 +77,15 @@ class BvhCupyAccelerator(AcceleratorBase):
 
         host_normals = self.mesh.normals if self.mesh._use_normals else None
 
-        bounds = self.mesh.bounds
+        if nb_keys == 0:
+            raise ValueError("Cannot build a BVH for an empty mesh")
+        # Bounds must describe the transformed vertices, not the original file.
+        lo, hi = host_vertices.min(axis=1), host_vertices.max(axis=1)
         sceneMin = np.array(
-            [bounds[0], bounds[2], bounds[4], 0], dtype=self.float_dtype
+            [*lo, 0], dtype=self.float_dtype
         )
         sceneMax = np.array(
-            [bounds[1], bounds[3], bounds[5], 0], dtype=self.float_dtype
+            [*hi, 0], dtype=self.float_dtype
         )
         t_epsilon = self.mesh.epsilon
 
@@ -139,7 +142,9 @@ class BvhCupyAccelerator(AcceleratorBase):
             # Sort the keys
             sorted_keys = self.xp.argsort(keys)
             keys = keys[sorted_keys]
-            permutation = sorted_keys
+            permutation = sorted_keys.astype(self.xp.uint32)
+            bbMin[:nb_keys] = bbMin[sorted_keys]
+            bbMax[:nb_keys] = bbMax[sorted_keys]
 
             # Grow the tree
             grow_args = (
@@ -204,6 +209,14 @@ class BvhCupyAccelerator(AcceleratorBase):
         if camera is None:
             raise ValueError("Missing required keyword argument: 'camera'")
 
+        max_depth = 2 if self.float_dtype is np.float64 else 3
+        if int(iterations) != iterations or not 0 <= iterations <= max_depth:
+            raise ValueError(f"iterations must be an integer between 0 and {max_depth}")
+        if not np.isfinite(abs_tolerance) or abs_tolerance < 0:
+            raise ValueError("abs_tolerance must be finite and nonnegative")
+        if not np.isfinite(rel_tolerance) or rel_tolerance < 0:
+            raise ValueError("rel_tolerance must be finite and nonnegative")
+
         parallel = kwargs.get("parallel", True)
 
         nb_keys = self.tree["keys"].shape[0]
@@ -244,7 +257,7 @@ class BvhCupyAccelerator(AcceleratorBase):
         ]
         if use_normals:
             base_args.append(
-                (self.tree["normals"] * scale).view(self.float4_view)
+                self.tree["normals"].view(self.float4_view)
             )
 
         camera_args = [
@@ -272,8 +285,8 @@ class BvhCupyAccelerator(AcceleratorBase):
         ]
 
         sampling_args = [
-            float(abs_tolerance),
-            float(rel_tolerance),
+            self.float_dtype(abs_tolerance * scale),
+            self.float_dtype(rel_tolerance),
             int(iterations),
         ]
 
@@ -302,7 +315,7 @@ class BvhCupyAccelerator(AcceleratorBase):
         img = image.reshape(camera.shape)
 
         # Rescale image values back to original world coordinates
-        return img * max_bound
+        return img / scale
 
 
 class LegacyCpuAccelerator(AcceleratorBase):

@@ -74,6 +74,29 @@ dependencies by ``pip install -r requirements-examples.txt`` and then you can
 run them from the top-level directory of syris repository by e.g. ``python -m
 examples.simple``.
 
+Optional mesh repair
+********************
+
+Install libigl and the PyVista loader from this checkout::
+
+    uv pip install -e '.[mesh-repair]'
+
+Use ``Mesh.from_file(..., repair=True)`` to resolve self-intersections and
+overlaps within one material. The input must be closed and oriented out of
+material, including into cavities. Correctly oriented cavities and small
+disconnected components are retained. Open boundaries and invalid repaired
+results raise ``ValueError``.
+
+For the CUDA dragon example::
+
+    uv run python -m examples.mesh_cuda --repair-mesh --double-precision
+
+Repair runs on the CPU in Float64 and validates the result after conversion to
+the selected precision. Double precision avoids losing newly created fine
+features during loading. The optional CGAL Boolean implementation uses libigl's
+copyleft module; see its `licenses
+<https://github.com/libigl/libigl-python-bindings>`_.
+
 
 Citation
 --------

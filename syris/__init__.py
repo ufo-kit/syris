@@ -62,7 +62,7 @@ def init(
             kernel_dir,
         ]
 
-        options = ["-D__FP_T_D__", "-G"] if double_precision else []
+        options = ["-D__FP_T_D__"] if double_precision else []
         cfg.BACKEND.pipeline = CudaPipeline(
             headers=cuda_headers, options=options
         )

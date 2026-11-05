@@ -18,7 +18,6 @@
 """Bodies made from mesh."""
 
 import itertools
-from functools import cached_property
 import re
 import numpy as np
 import pyopencl.array as cl_array
@@ -136,6 +135,7 @@ class Mesh(MovableBody):
         center=None,
         unit=q.um,
         use_normals=False,
+        repair=False,
     ):
         """
         Alternative constructor to create a Mesh by loading a file or PyVista object.
@@ -143,16 +143,22 @@ class Mesh(MovableBody):
 
         Args:
             source (str, pathlib.Path, or pv.DataSet): Path to the mesh file or a
-                                                        pre-loaded PyVista object. # <-- Updated docstring
+                pre-loaded PyVista object.
             trajectory (Trajectory): The trajectory for the mesh.
             material: material used to define the refractive index.
             orientation: the "up" direction of the mesh.
             center: the center reference point of the mesh, used for transformations.
+            repair: opt in to libigl self-union of a closed, oriented material
+                boundary. Keeps positive-winding regions, including correctly
+                oriented cavities and islands. Requires the mesh-repair extra.
+                Invalid results in the configured precision raise ValueError.
 
         Returns:
             Mesh: A fully initialized Mesh object.
         """
-        reader = PyvistaReader(filename=source, unit=unit)
+        reader = PyvistaReader(
+            filename=source, unit=unit, dtype=cfg.PRECISION.np_float, repair=repair
+        )
 
         normals = None
         if use_normals:
@@ -267,16 +273,19 @@ class Mesh(MovableBody):
 
         return np.sqrt(np.sum(cross * cross, axis=1)) / 2 * cfg.UNIT**2
 
-    @cached_property
+    @property
     def normals(self):
         """
         Returns the triangle normals.
 
-        If normals were provided during initialization, returns those.
-        Otherwise, computes them from the triangle vectors and caches the result.
+        Supplied normals are transformed from the original mesh frame using
+        the inverse transpose. Otherwise, compute them from current vertices.
         """
         if self._normals is not None:
-            return self._normals
+            linear = self.transform_matrix[:3, :3]
+            # PyVista supplies Quantity arrays; dot preserves their units,
+            # whereas Quantity does not implement the matmul ufunc used by @.
+            return np.dot(self._normals, np.linalg.inv(linear))
         v_0, v_1 = self.vectors
         return np.cross(v_0, v_1) * cfg.UNIT
 

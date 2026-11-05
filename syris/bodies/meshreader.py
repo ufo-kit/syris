@@ -103,6 +103,7 @@ class PyvistaReader(MeshReaderBase):
         unit: pq.Quantity = pq.m,
         dtype=np.float32,
         compute_normals=False,
+        repair=False,
         **kwargs,
     ):
         """
@@ -113,6 +114,9 @@ class PyvistaReader(MeshReaderBase):
         filename : str
             The path to the mesh file.
         unit : pq.Quantity, optional"
+        repair : bool, optional
+            Resolve self-intersections of a closed, oriented material boundary
+            with the optional libigl dependency. Preserve cavity orientation.
         """
         super().__init__()
 
@@ -136,6 +140,22 @@ class PyvistaReader(MeshReaderBase):
             mesh = mesh.triangulate(inplace=False, progress_bar=True)
         else:
             LOG.debug("Mesh is already all triangles.")
+
+        if repair:
+            from .meshrepair import repair_mesh
+
+            points, triangles = repair_mesh(
+                mesh.points, np.asarray(mesh.faces).reshape(-1, 4)[:, 1:], dtype=dtype
+            )
+            faces = np.column_stack((np.full(len(triangles), 3), triangles))
+            mesh = pv.PolyData(points, faces)
+            # Recompute from repaired face winding. Auto-orientation of separate
+            # components would reverse inward-facing cavity boundaries.
+            verts = points[triangles].astype(np.float64)
+            normals = np.cross(verts[:, 1] - verts[:, 0], verts[:, 2] - verts[:, 0])
+            normals /= np.linalg.norm(normals, axis=1)[:, None]
+            mesh.cell_data["Normals"] = normals.astype(dtype)
+            mesh.cell_data.active_normals_name = "Normals"
 
         self.polydata = mesh
 

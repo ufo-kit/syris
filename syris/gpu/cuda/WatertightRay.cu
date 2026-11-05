@@ -1,38 +1,56 @@
 #include "WatertightRay.cuh"
 #include "Commons.cuh"
 
-// Returns the next floating-point number towards +infinity.
-__device__ float roundUp_bitwise(float val) {
-    if (isinf(val) || isnan(val)) return val;
-    int i = __float_as_int(val);
-    
-    // For positive numbers (and +0.0), incrementing the integer moves away from zero.
-    // For negative numbers, the integer representation is inverted, so we decrement to move away from zero.
-    if (val >= 0.0f) {
-        i++;
-    } else { // val < 0.0f
-        i--;
-    }
-    return __int_as_float(i);
+// One representable step in the selected precision, including signed zero.
+__device__ FP_T RoundUp(FP_T a) {
+#ifdef __FP_T_D__
+    return nextafter(a, double(POS_INFINITY));
+#else
+    return nextafterf(a, POS_INFINITY);
+#endif
+}
+__device__ FP_T RoundDown(FP_T a) {
+#ifdef __FP_T_D__
+    return nextafter(a, double(NEG_INFINITY));
+#else
+    return nextafterf(a, NEG_INFINITY);
+#endif
+}
+__device__ FP_T reciprocalNear(FP_T a) {
+    return copysign(RoundDown(RoundDown(fabs(a))), a);
+}
+__device__ FP_T reciprocalFar(FP_T a) {
+    return copysign(RoundUp(RoundUp(fabs(a))), a);
 }
 
-__device__ float roundDown_bitwise(float val) {
-    if (isinf(val) || isnan(val)) return val;
-    int i = __float_as_int(val);
-    // For positive numbers, we decrement to move towards zero.
-    // For negative numbers AND zero, we increment to move towards negative infinity.
-    if (val > 0.0f) {
-        i--;
-    } else { // val <= 0.0f
-        i++;
-    }
-    return __int_as_float(i);
+__device__ FP_T subtractDown(FP_T a, FP_T b) {
+#ifdef __FP_T_D__
+    return __dsub_rd(a, b);
+#else
+    return __fsub_rd(a, b);
+#endif
 }
-__device__ FP_T RoundUp(FP_T a) { return a; }
-// __device__ FP_T RoundUp(FP_T a) { return roundUp_bitwise(a); }
-__device__ FP_T RoundDown(FP_T a) { return a; }
-// __device__ FP_T RoundDown(FP_T a) { return roundDown_bitwise(a); }
-
+__device__ FP_T subtractUp(FP_T a, FP_T b) {
+#ifdef __FP_T_D__
+    return __dsub_ru(a, b);
+#else
+    return __fsub_ru(a, b);
+#endif
+}
+__device__ FP_T multiplyDown(FP_T a, FP_T b) {
+#ifdef __FP_T_D__
+    return __dmul_rd(a, b);
+#else
+    return __fmul_rd(a, b);
+#endif
+}
+__device__ FP_T multiplyUp(FP_T a, FP_T b) {
+#ifdef __FP_T_D__
+    return __dmul_ru(a, b);
+#else
+    return __fmul_ru(a, b);
+#endif
+}
 
 // --- WatertightRay Constructor Implementation ---
 __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_T4& scene_min, const FP_T4& scene_max, const EpsilonParams& epsilons) : m_epsilons(epsilons)
@@ -66,8 +84,8 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     }
 
     this->Sz = (1.0) / D[this->Kz];
-    this->Sx = D[this->Kx] * this->Sz;
-    this->Sy = D[this->Ky] * this->Sz;
+    this->Sx = D[this->Kx] / D[this->Kz];
+    this->Sy = D[this->Ky] / D[this->Kz];
 
     // Pre-calculate sorted plane indices based on ray direction
     const int near_p[3] = {0, 1, 2}; // Indices for min planes
@@ -80,15 +98,16 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
     if (D[this->Kz] < 0.0f) swap(this->near_kz_idx, this->far_kz_idx);
 
     // Pre-calculate conservatively rounded reciprocal directions
-    this->r_near_kx = RoundDown(RoundDown(invD[this->Kx])); this->r_far_kx = RoundUp(RoundUp(invD[this->Kx]));
-    this->r_near_ky = RoundDown(RoundDown(invD[this->Ky])); this->r_far_ky = RoundUp(RoundUp(invD[this->Ky]));
-    this->r_near_kz = RoundDown(RoundDown(invD[this->Kz])); this->r_far_kz = RoundUp(RoundUp(invD[this->Kz]));
+    this->r_near_kx = reciprocalNear(invD[this->Kx]); this->r_far_kx = reciprocalFar(invD[this->Kx]);
+    this->r_near_ky = reciprocalNear(invD[this->Ky]); this->r_far_ky = reciprocalFar(invD[this->Ky]);
+    this->r_near_kz = reciprocalNear(invD[this->Kz]); this->r_far_kz = reciprocalFar(invD[this->Kz]);
     
     // Calculate error bounds and corrected origins
-    FP_T ROBUST_EPSILON = m_epsilons.ray_box_epsilon;
+    FP_T ROBUST_EPSILON = fmax(m_epsilons.ray_box_epsilon,
+        FP_T(2.5) * ::cuda::std::numeric_limits<FP_T>::epsilon());
 
-    const FP_T L[3] = { fabsf(O[0] - bbMin[0]), fabsf(O[1] - bbMin[1]), fabsf(O[2] - bbMin[2]) };
-    const FP_T U[3] = { fabsf(O[0] - bbMax[0]), fabsf(O[1] - bbMax[1]), fabsf(O[2] - bbMax[2]) };
+    const FP_T L[3] = { RoundUp(fabs(O[0] - bbMin[0])), RoundUp(fabs(O[1] - bbMin[1])), RoundUp(fabs(O[2] - bbMin[2])) };
+    const FP_T U[3] = { RoundUp(fabs(O[0] - bbMax[0])), RoundUp(fabs(O[1] - bbMax[1])), RoundUp(fabs(O[2] - bbMax[2])) };
     
     const FP_T max_dist[3] = {
         RoundUp(device_fmax<FP_T>(L[0], U[0])),
@@ -98,14 +117,8 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
 
     const FP_T Z_max = max_dist[this->Kz];
 
-    const FP_T err_kx = ROBUST_EPSILON * RoundUp(max_dist[this->Kx] + Z_max);
-    const FP_T err_ky = ROBUST_EPSILON * RoundUp(max_dist[this->Ky] + Z_max);
-
-    // E_p is error bias for positive-going faces (min planes), E_n for negative-going (max planes)
-    const FP_T E_p_kx = ROBUST_EPSILON * RoundUp(L[this->Kx] + Z_max);
-    const FP_T E_n_kx = ROBUST_EPSILON * RoundUp(U[this->Kx] + Z_max);
-    const FP_T E_p_ky = ROBUST_EPSILON * RoundUp(L[this->Ky] + Z_max);
-    const FP_T E_n_ky = ROBUST_EPSILON * RoundUp(U[this->Ky] + Z_max);
+    const FP_T err_kx = RoundUp(ROBUST_EPSILON * RoundUp(max_dist[this->Kx] + Z_max));
+    const FP_T err_ky = RoundUp(ROBUST_EPSILON * RoundUp(max_dist[this->Ky] + Z_max));
 
     // Directly calculate final member variables for the corrected origins
     this->o_near_kx = RoundUp(O[this->Kx] + err_kx);
@@ -126,67 +139,37 @@ __device__ WatertightRay::WatertightRay(FP_T4 origin, FP_T4 direction, const FP_
 }
 
 
-__device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box_max, FP_T tmin, FP_T tmax) const
+__device__ bool intersectSlab(FP_T near_plane, FP_T far_plane,
+                              FP_T origin_near, FP_T origin_far,
+                              FP_T reciprocal_near, FP_T reciprocal_far,
+                              FP_T direction, FP_T &entry, FP_T &exit)
 {
-    // Unpack box into a flattened array for indexed access
-    const FP_T B[6] = { box_min.x, box_min.y, box_min.z, box_max.x, box_max.y, box_max.z };
-
-    // Use tmin and tmax as the running interval for the intersection
-    FP_T t_entry = tmin;
-    FP_T t_exit  = tmax;
-
-    // --- Kx Slab ---
-    float tNearX = (B[this->near_kx_idx] - this->o_near_kx) * this->r_near_kx;
-    float tFarX  = (B[this->far_kx_idx]  - this->o_far_kx)  * this->r_far_kx;
-    t_entry = device_fmax<FP_T>(t_entry, tNearX);
-    t_exit  = device_fmin<FP_T>(t_exit,  tFarX);
-
-    // --- Ky Slab ---
-    float tNearY = (B[this->near_ky_idx] - this->o_near_ky) * this->r_near_ky;
-    float tFarY  = (B[this->far_ky_idx]  - this->o_far_ky)  * this->r_far_ky;
-    t_entry = device_fmax<FP_T>(t_entry, tNearY);
-    t_exit  = device_fmin<FP_T>(t_exit,  tFarY);
-
-    // --- Kz Slab ---
-    float tNearZ = (B[this->near_kz_idx] - this->o_near_kz) * this->r_near_kz;
-    float tFarZ  = (B[this->far_kz_idx]  - this->o_far_kz)  * this->r_far_kz;
-    t_entry = device_fmax<FP_T>(t_entry, tNearZ);
-    t_exit  = device_fmin<FP_T>(t_exit,  tFarZ);
-    
-    // Final check for a valid, overlapping interval
-    return t_entry <= t_exit;
+    // Avoid 0 * infinity on a box face. Both signs of zero are parallel.
+    if (direction == 0) return near_plane <= origin_near && far_plane >= origin_far;
+    FP_T near_delta = direction > 0 ? subtractDown(near_plane, origin_near)
+                                   : subtractUp(near_plane, origin_near);
+    FP_T far_delta = direction > 0 ? subtractUp(far_plane, origin_far)
+                                  : subtractDown(far_plane, origin_far);
+    entry = fmax(entry, multiplyDown(near_delta, reciprocal_near));
+    exit = fmin(exit, multiplyUp(far_delta, reciprocal_far));
+    return entry <= exit;
 }
 
-// __device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box_max, FP_T tmin, FP_T tmax) const
-// {
-//     FP_T4 bounds[2];
-//     bounds[0] = box_min;
-//     bounds[1] = box_max;
-
-//     FP_T t_lower, t_upper;
-
-//     // X Slab
-//     t_lower = (bounds[this->sign[0]].x - this->tail.x) * this->invDirection.x;
-//     t_upper = (bounds[1 - this->sign[0]].x - this->tail.x) * this->invDirection.x;
-//     tmin = (device_fmax<FP_T>)(tmin, t_lower);
-//     tmax = (device_fmin<FP_T>)(tmax, t_upper);
-
-//     // Y Slab
-//     t_lower = (bounds[this->sign[1]].y - this->tail.y) * this->invDirection.y;
-//     t_upper = (bounds[1 - this->sign[1]].y - this->tail.y) * this->invDirection.y;
-//     tmin = (device_fmax<FP_T>)(tmin, t_lower);
-//     tmax = (device_fmin<FP_T>)(tmax, t_upper);
-
-//     // Z Slab
-//     t_lower = (bounds[this->sign[2]].z - this->tail.z) * this->invDirection.z;
-//     t_upper = (bounds[1 - this->sign[2]].z - this->tail.z) * this->invDirection.z;
-//     tmin = (device_fmax<FP_T>)(tmin, t_lower);
-//     tmax = (device_fmin<FP_T>)(tmax, t_upper);
-//     return tmax >= tmin;
-// }
+__device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box_max,
+                                         FP_T tmin, FP_T tmax) const
+{
+    const FP_T b[6] = {box_min.x, box_min.y, box_min.z, box_max.x, box_max.y, box_max.z};
+    const FP_T d[3] = {direction.x, direction.y, direction.z};
+    return intersectSlab(b[near_kx_idx], b[far_kx_idx], o_near_kx, o_far_kx,
+                         r_near_kx, r_far_kx, d[Kx], tmin, tmax)
+        && intersectSlab(b[near_ky_idx], b[far_ky_idx], o_near_ky, o_far_ky,
+                         r_near_ky, r_far_ky, d[Ky], tmin, tmax)
+        && intersectSlab(b[near_kz_idx], b[far_kz_idx], o_near_kz, o_far_kz,
+                         r_near_kz, r_far_kz, d[Kz], tmin, tmax);
+}
 
 __device__ FP_T WatertightRay::point_2_parametric (FP_T4 const &point) const {
-    return dot((point - this->tail), this->invDirection);
+    return dot(point - tail, direction) / dot(direction, direction);
 }
 
 __device__ bool WatertightRay::intersects(FP_T4 const &minBbox, FP_T4 const &maxBbox) const
@@ -195,153 +178,77 @@ __device__ bool WatertightRay::intersects(FP_T4 const &minBbox, FP_T4 const &max
     FP_T t_far  = POS_INFINITY;
     return this->intersects(minBbox, maxBbox, t_near, t_far);
 }
-__device__ bool WatertightRay::intersects(FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t, unsigned col, unsigned row) const { 
-    #ifdef DEBUG
-    const bool is_debug = (col == debug_col) && (row == debug_row);
-    #endif
+// Keep both products rounded separately. An asymmetric FMA can give the same
+// nonzero sign to an edge and its reversal, opening a crack between triangles.
+__device__ FP_T edge_difference(FP_T a, FP_T b, FP_T c, FP_T d)
+{
+#ifdef __FP_T_D__
+    return __dsub_rn(__dmul_rn(a, b), __dmul_rn(c, d));
+#else
+    return __fsub_rn(__fmul_rn(a, b), __fmul_rn(c, d));
+#endif
+}
 
-    const FP_T epsilon = m_epsilons.tri_abs_min_error;
+__device__ double edge_difference_double(double a, double b, double c, double d)
+{
+    return __dsub_rn(__dmul_rn(a, b), __dmul_rn(c, d));
+}
 
-    // Calculate vertices relative to ray origin
-    const FP_T4 A_t4 = V1 - this->tail;
-    const FP_T4 B_t4 = V2 - this->tail;
-    const FP_T4 C_t4 = V3 - this->tail;
+// Shared edges must also report the same distance, independently of the third
+// vertex and triangle winding. This lets the thickness pass identify duplicate
+// boundary hits without merging nearby, physically distinct surfaces.
+__device__ double boundary_distance(const FP_T *x, const FP_T *y, const FP_T *z,
+                                    int a, int b, FP_T sz)
+{
+    if (x[a] > x[b] || (x[a] == x[b] && (y[a] > y[b] ||
+        (y[a] == y[b] && z[a] > z[b])))) swap(a, b);
+    double dx = double(x[b]) - double(x[a]);
+    double dy = double(y[b]) - double(y[a]);
+    double fraction = fabs(dx) >= fabs(dy) ? -double(x[a]) / dx : -double(y[a]) / dy;
+    fraction = fmin(1.0, fmax(0.0, fraction));
+    return fma(fraction, double(z[b]) - double(z[a]), double(z[a])) * double(sz);
+}
 
-    const FP_T A[3] = {A_t4.x, A_t4.y, A_t4.z};
-    const FP_T B[3] = {B_t4.x, B_t4.y, B_t4.z};
-    const FP_T C[3] = {C_t4.x, C_t4.y, C_t4.z};
-    const FP_T Ax = (fma)(-Sx, A[Kz], A[Kx]);
-    const FP_T Ay = (fma)(-Sy, A[Kz], A[Ky]);
-    const FP_T Bx = (fma)(-Sx, B[Kz], B[Kx]);
-    const FP_T By = (fma)(-Sy, B[Kz], B[Ky]);
-    const FP_T Cx = (fma)(-Sx, C[Kz], C[Kx]);
-    const FP_T Cy = (fma)(-Sy, C[Kz], C[Ky]);
-    FP_T U = (fma)(Cx, By, -Cy * Bx);
-    FP_T V = (fma)(Ax, Cy, -Ay * Cx);
-    FP_T W = (fma)(Bx, Ay, -By * Ax);
-    const FP_T det = U + V + W;
-
-    // Hybrid relative/absolute error bound for the determinant ---
-    const FP_T gamma_factor = m_epsilons.tri_gamma_multiplier * epsilon;
-    const FP_T absolute_min_error = m_epsilons.tri_abs_min_error;
-    const FP_T relative_error_bound = gamma_factor * (fabs(U) + fabs(V) + fabs(W));
-    
-    // The final bound is the max of the relative bound AND a fixed minimum.
-    const FP_T final_error_bound = device_fmax<FP_T>(relative_error_bound, absolute_min_error);
-
-    // Double Precision Fallback for Degenerate Cases
-    if ((fabs)(det) <= final_error_bound) {
-        #ifdef __FP_T_D__
-        return false;
-        #else
-        const double d_Sx = (double)Sx, d_Sy = (double)Sy, d_Sz = (double)Sz;
-        const double d_Ax = fma(-d_Sx, (double)A[Kz], (double)A[Kx]);
-        const double d_Ay = fma(-d_Sy, (double)A[Kz], (double)A[Ky]);
-        const double d_Bx = fma(-d_Sx, (double)B[Kz], (double)B[Kx]);
-        const double d_By = fma(-d_Sy, (double)B[Kz], (double)B[Ky]);
-        const double d_Cx = fma(-d_Sx, (double)C[Kz], (double)C[Kx]);
-        const double d_Cy = fma(-d_Sy, (double)C[Kz], (double)C[Ky]);
-
-        const double d_U = fma(d_Cx, d_By, -d_Cy * d_Bx);
-        const double d_V = fma(d_Ax, d_Cy, -d_Ay * d_Cx);
-        const double d_W = fma(d_Bx, d_Ay, -d_By * d_Ax);
-        const double d_det = d_U + d_V + d_W;
-
-        constexpr FP_T d_epsilon = ::cuda::std::numeric_limits<double>::epsilon();
-        const double d_gamma_factor = m_epsilons.tri_d_gamma_multiplier * d_epsilon;
-        const double d_relative_error_bound = d_gamma_factor * (fabs(d_U) + fabs(d_V) + fabs(d_W));
-        const double d_error_bound = device_fmax<double>(d_relative_error_bound, m_epsilons.tri_d_abs_min_error);
-        if (fabs(d_det) <= d_error_bound) {
-            #ifdef DEBUG
-            if (is_debug){
-                printf("Exit 0\n");
-            }
-            #endif
-            return false;
-        }
-
-        bool signs_differ = (d_det > 0.0)
-                   ? (d_U < -d_error_bound || d_V < -d_error_bound || d_W < -d_error_bound)
-                   : (d_U > d_error_bound || d_V > d_error_bound || d_W > d_error_bound);
-
-        if (signs_differ) {
-            #ifdef DEBUG
-            if (is_debug){
-                printf("Exit 1\n");
-            }
-            #endif
-            return false;
-        }
-
-        const double d_Az = d_Sz * (double)A[Kz];
-        const double d_Bz = d_Sz * (double)B[Kz];
-        const double d_Cz = d_Sz * (double)C[Kz];
-        const double t_numerator = fma(d_U, d_Az, fma(d_V, d_Bz, d_W * d_Cz));
-
-        if (copysign(1.0, t_numerator) != copysign(1.0, d_det)){
-            return false;
-        }
-
-        t = (FP_T)(t_numerator / d_det);
-        #endif
-    } else {
-        bool signs_differ = (det > 0.0f)
-                   ? (U < -final_error_bound || V < -final_error_bound || W < -final_error_bound)
-                   : (U > final_error_bound || V > final_error_bound || W > final_error_bound);
-
-        if (signs_differ) {
-            #ifdef DEBUG
-            // if (is_debug){
-            //     printf("Exit 3\n"
-            //            "  tail: (%.8g, %.8g, %.8g)\n"
-            //            "  direction: (%.8g, %.8g, %.8g)\n"
-            //            "  V1: (%.8g, %.8g, %.8g)\n"
-            //            "  V2: (%.8g, %.8g, %.8g)\n"
-            //            "  V3: (%.8g, %.8g, %.8g)\n"
-            //            "  det: %.8g\n"
-            //            "  U: %.8g, V: %.8g, W: %.8g\n"
-            //            "  Sheared Vertices:\n"
-            //            "    Ax: %.8g, Ay: %.8g\n"
-            //            "    Bx: %.8g, By: %.8g\n"
-            //            "    Cx: %.8g, Cy: %.8g\n",
-            //            this->tail.x, this->tail.y, this->tail.z,
-            //            this->direction.x, this->direction.y, this->direction.z,
-            //            V1.x, V1.y, V1.z,
-            //            V2.x, V2.y, V2.z,
-            //            V3.x, V3.y, V3.z,
-            //            det, U, V, W,
-            //            Ax, Ay, Bx, By, Cx, Cy);
-            // }
-            #endif
-            return false;
-        }
-
-
-        const FP_T Az = Sz * A[Kz];
-        const FP_T Bz = Sz * B[Kz];
-        const FP_T Cz = Sz * C[Kz];
-        const FP_T t_numerator = fma(U, Az, fma(V, Bz, W * Cz));
-
-        if (copysign((1.0), t_numerator) != copysign((1.0), det)){
-            #ifdef DEBUG
-            printf("Exit 4\n");
-            #endif
-            return false;
-        }
-
-        t = t_numerator / det;
+__device__ bool WatertightRay::intersects(
+    FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3,
+    FP_T &t, unsigned col, unsigned row) const
+{
+    const FP_T4 relative[3] = {V1 - tail, V2 - tail, V3 - tail};
+    FP_T x[3], y[3], z[3];
+    for (int i = 0; i < 3; ++i) {
+        const FP_T v[3] = {relative[i].x, relative[i].y, relative[i].z};
+        x[i] = fma(-Sx, v[Kz], v[Kx]);
+        y[i] = fma(-Sy, v[Kz], v[Ky]);
+        z[i] = v[Kz];
     }
 
-    // Final check for valid intersection range
-    if (t > m_epsilons.tri_ray_tmin) {
-        return true;
+    double u = edge_difference(x[2], y[1], y[2], x[1]);
+    double v = edge_difference(x[0], y[2], y[0], x[2]);
+    double w = edge_difference(x[1], y[0], y[1], x[0]);
+#ifndef __FP_T_D__
+    // Woop, Benthin & Wald, JCGT 2(1), 2013, Appendix A. Reuse the
+    // SAME sheared coordinates: a triangle-dependent transform would break
+    // the common edge geometry. Products of two floats are exact in double.
+    if (u == 0.0 || v == 0.0 || w == 0.0) {
+        u = edge_difference_double(x[2], y[1], y[2], x[1]);
+        v = edge_difference_double(x[0], y[2], y[0], x[2]);
+        w = edge_difference_double(x[1], y[0], y[1], x[0]);
     }
+#endif
+    if ((u < 0.0 || v < 0.0 || w < 0.0) &&
+        (u > 0.0 || v > 0.0 || w > 0.0)) return false;
+    const double det = (u + v) + w;
+    if (det == 0.0 || !isfinite(det)) return false;
 
-    #ifdef DEBUG
-    if (is_debug && t <= epsilon){
-        printf("Exit 5 (Hit too close, t=%.8g, epsilon=%.8g)\n", t, epsilon);
-    }
-    #endif
+    double distance;
+    if (u == 0.0 && v == 0.0) distance = double(z[2]) * double(Sz);
+    else if (u == 0.0 && w == 0.0) distance = double(z[1]) * double(Sz);
+    else if (v == 0.0 && w == 0.0) distance = double(z[0]) * double(Sz);
+    else if (u == 0.0) distance = boundary_distance(x, y, z, 1, 2, Sz);
+    else if (v == 0.0) distance = boundary_distance(x, y, z, 0, 2, Sz);
+    else if (w == 0.0) distance = boundary_distance(x, y, z, 0, 1, Sz);
+    else distance = (fma(u, double(z[0]), fma(v, double(z[1]), w * double(z[2]))) / det) * double(Sz);
 
-    return false;
+    t = FP_T(distance);
+    return isfinite(t) && t > m_epsilons.tri_ray_tmin;
 }

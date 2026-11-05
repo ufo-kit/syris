@@ -50,4 +50,7 @@ setup(
         "matplotlib",
         "tqdm",
     ],
+    extras_require={
+        "mesh-repair": ["libigl>=2.6.3,<3", "pyvista>=0.46.3"],
+    },
 )

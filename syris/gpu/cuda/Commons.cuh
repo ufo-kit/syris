@@ -8,16 +8,16 @@
     using FP_T = double;
 
     #define MAX_DEPTH 2
-    #define CACHE_DIM 5 // 1 << 2 + 1
+    #define CACHE_DIM ((1 << (MAX_DEPTH + 1)) + 1)
     #define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
-    #define MAX_QUADS_PER_PIXEL 16
+    #define MAX_QUADS_PER_PIXEL (1 + 3 * MAX_DEPTH)
 #else
     using FP_T = float;
 
     #define MAX_DEPTH 3
-    #define CACHE_DIM 9 // 1 << 3 + 1
+    #define CACHE_DIM ((1 << (MAX_DEPTH + 1)) + 1)
     #define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
-    #define MAX_QUADS_PER_PIXEL 32
+    #define MAX_QUADS_PER_PIXEL (1 + 3 * MAX_DEPTH)
 #endif
 
 // #define DEBUG
@@ -45,11 +45,8 @@ struct Quad {
     int depth; // Current subdivision depth
 };
 
-// A struct to store the final, converged quads
-struct FinalQuad {
-    FP_T value;
-    FP_T area;
-};
+// The cache includes centers at the deepest level. Only pending regions need
+// storage: a depth-first quadtree has at most 1 + 3 * MAX_DEPTH of them.
 
 struct HitRecord {
     FP_T t;
@@ -64,13 +61,15 @@ struct HitRecord {
 struct EpsilonParams {
     FP_T ray_box_epsilon;       // For WatertightRay constructor error bounds
     FP_T tri_ray_tmin;          // For WatertightRay::intersects(triangle) t_min check
-    FP_T tri_gamma_multiplier;  // Multiplier for float epsilon (e.g., 128.0)
-    FP_T tri_abs_min_error;     // Absolute floor for float determinant (e.g., 1e-10)
-    double tri_d_gamma_multiplier; // Multiplier for double epsilon (e.g., 128.0)
-    double tri_d_abs_min_error;  // Absolute floor for double determinant (e.g., 1e-100)
-    FP_T group_abs_epsilon;     // For match_pairs t-grouping
-    FP_T group_rel_epsilon;     // For match_pairs t-grouping
-    FP_T unique_abs_epsilon;    // For unique_from_sorted_with_epsilon
+    // Legacy slots retained for raw-kernel argument compatibility. Consistent
+    // edge arithmetic and canonical boundary distances replace these cutoffs.
+    FP_T tri_gamma_multiplier;
+    FP_T tri_abs_min_error;
+    double tri_d_gamma_multiplier;
+    double tri_d_abs_min_error;
+    FP_T group_abs_epsilon;
+    FP_T group_rel_epsilon;
+    FP_T unique_abs_epsilon;
 
     // __device__ constructor for in-kernel initialization
     __device__ EpsilonParams(
@@ -128,6 +127,14 @@ struct Types<double> {
 using FP_T2 = typename Types<FP_T>::Vec2;
 using FP_T3 = typename Types<FP_T>::Vec3;
 using FP_T4 = typename Types<FP_T>::Vec4;
+
+__device__ inline FP_T inverse_length(FP_T x, FP_T y, FP_T z) {
+#ifdef __FP_T_D__
+    return rnorm3d(x, y, z);
+#else
+    return rnorm3df(x, y, z);
+#endif
+}
 
 
 // --- 3. Define `make_*` Helpers (Macro Required for C-style Structs) ---
@@ -560,9 +567,9 @@ __forceinline__ __device__ FP_T4 normalize(FP_T4 point, FP_T4 boundingBoxMin,
                                             FP_T4 boundingBoxMax)
 {
     FP_T4 normalized;
-    normalized.x = (point.x - boundingBoxMin.x) / (boundingBoxMax.x - boundingBoxMin.x);
-    normalized.y = (point.y - boundingBoxMin.y) / (boundingBoxMax.y - boundingBoxMin.y);
-    normalized.z = (point.z - boundingBoxMin.z) / (boundingBoxMax.z - boundingBoxMin.z);
+    normalized.x = boundingBoxMax.x > boundingBoxMin.x ? (point.x - boundingBoxMin.x) / (boundingBoxMax.x - boundingBoxMin.x) : FP_T(0.5);
+    normalized.y = boundingBoxMax.y > boundingBoxMin.y ? (point.y - boundingBoxMin.y) / (boundingBoxMax.y - boundingBoxMin.y) : FP_T(0.5);
+    normalized.z = boundingBoxMax.z > boundingBoxMin.z ? (point.z - boundingBoxMin.z) / (boundingBoxMax.z - boundingBoxMin.z) : FP_T(0.5);
     return normalized;
 }
 
