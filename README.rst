@@ -91,11 +91,42 @@ For the CUDA dragon example::
 
     uv run python -m examples.mesh_cuda --repair-mesh --double-precision
 
+The same repair and precision flags are available in ``examples.mesh_scan_cuda``,
+``examples.visualize_bvh_tree`` and ``examples.visualize_bvh_bboxes``. For example::
+
+    uv run python -m examples.visualize_bvh_bboxes --input mesh.ply --show-nodes --repair-mesh --double-precision
+
 Repair runs on the CPU in Float64 and validates the result after conversion to
 the selected precision. Double precision avoids losing newly created fine
 features during loading. The optional CGAL Boolean implementation uses libigl's
 copyleft module; see its `licenses
 <https://github.com/libigl/libigl-python-bindings>`_.
+
+To try Float32 storage and BVH traversal with Float64 triangle arithmetic::
+
+    uv run python -m examples.mesh_cuda --repair-mesh --float32-rounding --mixed-precision
+
+The equivalent Python options are ``syris.init(compute_backend="cuda",
+mixed_precision=True)`` and ``Mesh.from_file(..., repair=True,
+float32_rounding=True)``. Both options are experimental and independent;
+omit ``--mixed-precision`` to compare the usual Float32 intersection path.
+``--double-precision`` selects the Float64 reference and cannot be combined
+with either of these options.
+
+Bounded rounding tries the two Float32 values bracketing affected coordinates
+without changing the repaired connectivity. It checks for merged vertices,
+collapsed or flipped triangles, closure and self-intersections. It raises
+``ValueError`` if geometry collapses or the bounded search cannot find a valid
+result. Search limits are 64 movable vertices, 2048 nearby triangles and 2048
+candidate evaluations. No faces or small components are discarded to force
+Float32 output.
+
+Validation covers the returned mesh coordinates. Later vertex transformations,
+including rotations and unit conversions, can introduce new rounding defects.
+For rigid scans, keep the mesh fixed and rotate the camera, as this example
+does. Mixed triangle arithmetic improves intersection accuracy but is not an
+exact predicate or a guarantee that every thickness ray is valid; unresolved
+crossings can still produce NaN. Defaults remain unchanged.
 
 
 Citation

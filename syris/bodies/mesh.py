@@ -136,6 +136,7 @@ class Mesh(MovableBody):
         unit=q.um,
         use_normals=False,
         repair=False,
+        float32_rounding=False,
     ):
         """
         Alternative constructor to create a Mesh by loading a file or PyVista object.
@@ -152,12 +153,17 @@ class Mesh(MovableBody):
                 boundary. Keeps positive-winding regions, including correctly
                 oriented cavities and islands. Requires the mesh-repair extra.
                 Invalid results in the configured precision raise ValueError.
+            float32_rounding: experimental bounded rounding after repair.
+                Requires repair=True and Float32 precision. Tries neighboring
+                representable coordinates; raises if no valid result is found.
+                Later transforms or unit conversions can invalidate the result.
 
         Returns:
             Mesh: A fully initialized Mesh object.
         """
         reader = PyvistaReader(
-            filename=source, unit=unit, dtype=cfg.PRECISION.np_float, repair=repair
+            filename=source, unit=unit, dtype=cfg.PRECISION.np_float, repair=repair,
+            float32_rounding=float32_rounding,
         )
 
         normals = None

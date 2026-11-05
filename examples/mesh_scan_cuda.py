@@ -28,7 +28,9 @@ from functools import partial
 from multiprocessing import Lock, Pool
 from syris.geometry import X_AX, Y_AX, Z_AX
 from syris.devices.cameras import Camera
-from .util import get_default_parser
+from .util import (
+    add_cuda_mesh_options, get_default_parser, validate_cuda_mesh_options,
+)
 import pyvista as pv
 
 LOCK = Lock()
@@ -243,6 +245,7 @@ def process(args, device_index):
         device_index=device_index,
         logfile=args.logfile,
         double_precision=args.double_precision,
+        mixed_precision=args.mixed_precision,
         compute_backend="cuda",
     )
 
@@ -257,7 +260,10 @@ def process(args, device_index):
             "No input file provided, loading default PyVista mesh (dragon)..."
         )
 
-    mesh = Mesh.from_file(input, tr, center=None, unit=q.um, use_normals=True)
+    mesh = Mesh.from_file(
+        input, tr, center=None, unit=q.um, use_normals=True,
+        repair=args.repair_mesh, float32_rounding=args.float32_rounding,
+    )
 
     if args.n:
         n = args.n
@@ -295,11 +301,15 @@ def process(args, device_index):
             LOG.info("--- Args info ---")
             log_attributes(args)
 
-        return scan(camera, mesh, args, orig_shape=orig_shape)
+        tic = time.time()
+        ret = scan(camera, mesh, args, orig_shape=orig_shape)
+        LOG.info(f"Total wall-clock time: {time.time() - tic:.5f}s")
+        return ret
 
 
 def parse_args():
     parser = get_default_parser(__doc__)
+    add_cuda_mesh_options(parser)
     parser.add_argument(
         "--input", type=str, default=None, help="Input filename of a mesh."
     )
@@ -373,9 +383,6 @@ def parse_args():
         nargs="+",
         help="Supersampling computes with n-times more pixels than usual",
     )
-    parser.add_argument(
-        "--double-precision", action="store_true", help="Use double precision"
-    )
     # Ground truth related
     parser.add_argument(
         "--z-chunk",
@@ -394,7 +401,9 @@ def parse_args():
         help="Skip the faulty pixel check (re-projection) logic.",
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    validate_cuda_mesh_options(parser, args)
+    return args
 
 
 def main():

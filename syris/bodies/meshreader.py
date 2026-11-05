@@ -104,6 +104,7 @@ class PyvistaReader(MeshReaderBase):
         dtype=np.float32,
         compute_normals=False,
         repair=False,
+        float32_rounding=False,
         **kwargs,
     ):
         """
@@ -117,8 +118,13 @@ class PyvistaReader(MeshReaderBase):
         repair : bool, optional
             Resolve self-intersections of a closed, oriented material boundary
             with the optional libigl dependency. Preserve cavity orientation.
+        float32_rounding : bool, optional
+            Experimental bounded rounding of repaired coordinates to Float32.
+            Requires repair=True and dtype=np.float32; see repair_mesh.
         """
         super().__init__()
+        if float32_rounding and (not repair or np.dtype(dtype) != np.dtype(np.float32)):
+            raise ValueError("float32_rounding requires repair=True and dtype=np.float32.")
 
         if isinstance(filename, (str, pathlib.Path)):
             self.filename = str(filename)
@@ -145,7 +151,8 @@ class PyvistaReader(MeshReaderBase):
             from .meshrepair import repair_mesh
 
             points, triangles = repair_mesh(
-                mesh.points, np.asarray(mesh.faces).reshape(-1, 4)[:, 1:], dtype=dtype
+                mesh.points, np.asarray(mesh.faces).reshape(-1, 4)[:, 1:], dtype=dtype,
+                float32_rounding=float32_rounding,
             )
             faces = np.column_stack((np.full(len(triangles), 3), triangles))
             mesh = pv.PolyData(points, faces)

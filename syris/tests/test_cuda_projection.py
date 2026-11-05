@@ -12,9 +12,11 @@ from .cuda_projection_util import ProjectionHarness, box
 
 
 class ProjectionCases:
+    mixed_precision = False
+
     @classmethod
     def setUpClass(cls):
-        cls.gpu = ProjectionHarness(cls.double)
+        cls.gpu = ProjectionHarness(cls.double, mixed_precision=cls.mixed_precision)
 
     @property
     def rtol(self):
@@ -256,3 +258,35 @@ class TestCudaProjectionFloat32(ProjectionCases, unittest.TestCase):
 
 class TestCudaProjectionFloat64(ProjectionCases, unittest.TestCase):
     double = True
+
+
+class TestCudaProjectionMixed(ProjectionCases, unittest.TestCase):
+    double = False
+    mixed_precision = True
+
+    def test_triangle_coordinates_are_promoted_before_subtracting_ray_origin(self):
+        # All inputs are exactly representable in Float32. Subtracting the
+        # distant origin in Float32 first collapses the projected triangle;
+        # the ray itself passes through its interior at t = distance.
+        size, distance = 2**-8, 2**20
+        triangle = np.array([[-size, -size, 0], [size, -size, 0], [0, size, 0]])
+        triangles = np.array([triangle, triangle[::-1], triangle])
+        flags, distances = self.gpu.triangles(
+            [[distance, 0, -distance], [distance, 0, -distance],
+             [distance, 4 * size, -distance]], [[-1, 0, 1]] * 3, triangles,
+        )
+        np.testing.assert_array_equal(flags[:, 0], [1, 1, 0])
+        np.testing.assert_array_equal(distances[:2], distance)
+        self.assertEqual(distances.dtype, np.float32)
+
+
+class TestMixedPrecisionConfiguration(unittest.TestCase):
+    def test_incompatible_modes_are_rejected(self):
+        import syris
+
+        for kwargs in ({"compute_backend": "opencl"},
+                       {"compute_backend": "cuda", "double_precision": True}):
+            with self.subTest(kwargs=kwargs), self.assertRaisesRegex(
+                ValueError, "mixed_precision requires"
+            ):
+                syris.init(mixed_precision=True, **kwargs)

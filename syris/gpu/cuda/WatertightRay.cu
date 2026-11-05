@@ -197,8 +197,9 @@ __device__ double edge_difference_double(double a, double b, double c, double d)
 // Shared edges must also report the same distance, independently of the third
 // vertex and triangle winding. This lets the thickness pass identify duplicate
 // boundary hits without merging nearby, physically distinct surfaces.
-__device__ double boundary_distance(const FP_T *x, const FP_T *y, const FP_T *z,
-                                    int a, int b, FP_T sz)
+template <typename T>
+__device__ double boundary_distance(const T *x, const T *y, const T *z,
+                                    int a, int b, T sz)
 {
     if (x[a] > x[b] || (x[a] == x[b] && (y[a] > y[b] ||
         (y[a] == y[b] && z[a] > z[b])))) swap(a, b);
@@ -213,7 +214,28 @@ __device__ bool WatertightRay::intersects(
     FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3,
     FP_T &t, unsigned col, unsigned row) const
 {
+#ifdef SYRIS_MIXED_PRECISION
+    // Promote BEFORE subtracting or shearing: promoting rounded Float32
+    // coordinates afterwards cannot recover a lost intersection. Geometry,
+    // rays, BVH traversal and the returned distance still use FP_T storage.
+    const FP_T4 vertices[3] = {V1, V2, V3};
+    const double d[3] = {direction.x, direction.y, direction.z};
+    const double sx = d[Kx] / d[Kz], sy = d[Ky] / d[Kz], sz = 1.0 / d[Kz];
+    double x[3], y[3], z[3];
+    for (int i = 0; i < 3; ++i) {
+        const double v[3] = {double(vertices[i].x) - double(tail.x),
+                             double(vertices[i].y) - double(tail.y),
+                             double(vertices[i].z) - double(tail.z)};
+        x[i] = fma(-sx, v[Kz], v[Kx]);
+        y[i] = fma(-sy, v[Kz], v[Ky]);
+        z[i] = v[Kz];
+    }
+    double u = edge_difference_double(x[2], y[1], y[2], x[1]);
+    double v = edge_difference_double(x[0], y[2], y[0], x[2]);
+    double w = edge_difference_double(x[1], y[0], y[1], x[0]);
+#else
     const FP_T4 relative[3] = {V1 - tail, V2 - tail, V3 - tail};
+    const FP_T sz = Sz;
     FP_T x[3], y[3], z[3];
     for (int i = 0; i < 3; ++i) {
         const FP_T v[3] = {relative[i].x, relative[i].y, relative[i].z};
@@ -235,19 +257,20 @@ __device__ bool WatertightRay::intersects(
         w = edge_difference_double(x[1], y[0], y[1], x[0]);
     }
 #endif
+#endif
     if ((u < 0.0 || v < 0.0 || w < 0.0) &&
         (u > 0.0 || v > 0.0 || w > 0.0)) return false;
     const double det = (u + v) + w;
     if (det == 0.0 || !isfinite(det)) return false;
 
     double distance;
-    if (u == 0.0 && v == 0.0) distance = double(z[2]) * double(Sz);
-    else if (u == 0.0 && w == 0.0) distance = double(z[1]) * double(Sz);
-    else if (v == 0.0 && w == 0.0) distance = double(z[0]) * double(Sz);
-    else if (u == 0.0) distance = boundary_distance(x, y, z, 1, 2, Sz);
-    else if (v == 0.0) distance = boundary_distance(x, y, z, 0, 2, Sz);
-    else if (w == 0.0) distance = boundary_distance(x, y, z, 0, 1, Sz);
-    else distance = (fma(u, double(z[0]), fma(v, double(z[1]), w * double(z[2]))) / det) * double(Sz);
+    if (u == 0.0 && v == 0.0) distance = double(z[2]) * double(sz);
+    else if (u == 0.0 && w == 0.0) distance = double(z[1]) * double(sz);
+    else if (v == 0.0 && w == 0.0) distance = double(z[0]) * double(sz);
+    else if (u == 0.0) distance = boundary_distance(x, y, z, 1, 2, sz);
+    else if (v == 0.0) distance = boundary_distance(x, y, z, 0, 2, sz);
+    else if (w == 0.0) distance = boundary_distance(x, y, z, 0, 1, sz);
+    else distance = (fma(u, double(z[0]), fma(v, double(z[1]), w * double(z[2]))) / det) * double(sz);
 
     t = FP_T(distance);
     return isfinite(t) && t > m_epsilons.tri_ray_tmin;

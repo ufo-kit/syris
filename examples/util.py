@@ -31,6 +31,33 @@ def get_default_parser(description):
     )
 
 
+def add_cuda_mesh_options(parser):
+    """Add the shared precision and optional mesh-repair switches."""
+    parser.add_argument(
+        "--repair-mesh", action="store_true",
+        help="Repair a closed, oriented mesh with libigl (install .[mesh-repair]); "
+             "double precision is recommended",
+    )
+    parser.add_argument(
+        "--float32-rounding", action="store_true",
+        help="Try bounded Float32 rounding after repair (experimental; requires --repair-mesh)",
+    )
+    precision = parser.add_mutually_exclusive_group()
+    precision.add_argument(
+        "--double-precision", action="store_true", help="Use double precision"
+    )
+    precision.add_argument(
+        "--mixed-precision", action="store_true",
+        help="CUDA Float32 storage/BVH with Float64 ray/triangle arithmetic (experimental)",
+    )
+
+
+def validate_cuda_mesh_options(parser, args):
+    """Reject incompatible precision and repair options before loading a mesh."""
+    if args.float32_rounding and (not args.repair_mesh or args.double_precision):
+        parser.error("--float32-rounding requires --repair-mesh without --double-precision")
+
+
 def show(image, title="", **kwargs):
     """Show *image* with *title* on its own figure. *kwargs* are passed to imshow."""
     plt.figure()

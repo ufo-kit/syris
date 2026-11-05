@@ -28,7 +28,9 @@ import syris.geometry as geom
 from syris.devices.cameras import Camera
 import tqdm
 from syris.bodies.mesh import Mesh
-from .util import get_default_parser, show
+from .util import (
+    add_cuda_mesh_options, get_default_parser, show, validate_cuda_mesh_options,
+)
 import pyvista as pv
 
 LOG = logging.getLogger(__name__)
@@ -56,6 +58,7 @@ def main():
     syris.init(
         loglevel=logging.INFO,
         double_precision=args.double_precision,
+        mixed_precision=args.mixed_precision,
         compute_backend="cuda",
     )
 
@@ -73,6 +76,7 @@ def main():
     mesh = Mesh.from_file(
         input, tr, center=args.center, unit=mesh_units, use_normals=True,
         repair=args.repair_mesh,
+        float32_rounding=args.float32_rounding,
     )
 
     LOG.info(f"Number of triangles: {mesh.num_triangles}")
@@ -185,14 +189,10 @@ def main():
 def parse_args():
     """Parse command line arguments."""
     parser = get_default_parser(__doc__)
+    add_cuda_mesh_options(parser)
 
     # --- Mesh Arguments ---
     parser.add_argument("--input", type=str, help="Input .obj file")
-    parser.add_argument(
-        "--repair-mesh", action="store_true",
-        help="Repair a closed, oriented mesh with libigl (install .[mesh-repair]); "
-             "double precision is recommended",
-    )
     parser.add_argument(
         "--mesh-units",
         type=str,
@@ -264,9 +264,6 @@ def parse_args():
         help="Save projection to this filename prefix",
     )
     parser.add_argument(
-        "--double-precision", action="store_true", help="Use double precision"
-    )
-    parser.add_argument(
         "--conebeam", action="store_true", help="Use conebeam geometry"
     )
     parser.add_argument("--sod", type=float, help="Source to object distance")
@@ -275,6 +272,7 @@ def parse_args():
     )
 
     args = parser.parse_args()
+    validate_cuda_mesh_options(parser, args)
 
     if args.pixel_size is not None:
         args.pixel_size = args.pixel_size * q.Quantity(

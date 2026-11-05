@@ -25,7 +25,9 @@ import vtk
 import syris
 import syris.geometry as geom
 from syris.bodies.mesh import Mesh
-from .util import get_default_parser
+from .util import (
+    add_cuda_mesh_options, get_default_parser, validate_cuda_mesh_options,
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -207,6 +209,7 @@ def main():
     syris.init(
         loglevel=logging.INFO,
         double_precision=args.double_precision,
+        mixed_precision=args.mixed_precision,
         compute_backend="cuda",
     )
 
@@ -222,7 +225,8 @@ def main():
         )
 
     mesh = Mesh.from_file(
-        input, tr, center=args.center, unit=mesh_units, use_normals=True
+        input, tr, center=args.center, unit=mesh_units, use_normals=True,
+        repair=args.repair_mesh, float32_rounding=args.float32_rounding,
     )
 
     mesh.build_accelerator()
@@ -322,6 +326,7 @@ def main():
 
 def parse_args():
     parser = get_default_parser(__doc__)
+    add_cuda_mesh_options(parser)
 
     # --- Viz Arguments ---
     parser.add_argument("--input", type=str, help="Input .obj file")
@@ -333,9 +338,6 @@ def parse_args():
     )
     parser.add_argument(
         "--center", type=str, default="bbox", help="Mesh centering on creation"
-    )
-    parser.add_argument(
-        "--double-precision", action="store_true", help="Use double precision"
     )
 
     # --- Flags to select what to show ---
@@ -407,6 +409,7 @@ def parse_args():
     )
 
     args = parser.parse_args()
+    validate_cuda_mesh_options(parser, args)
     return args
 
 

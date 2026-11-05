@@ -31,8 +31,18 @@ def init(
     logfile=None,
     double_precision=False,
     unit="um",
+    mixed_precision=False,
 ):
-    """Initialize syris with the best available compute backend."""
+    """Initialize syris with the best available compute backend.
+
+    ``mixed_precision=True`` is experimental and CUDA-only: keep Float32
+    storage and BVH traversal, but evaluate ray/triangle intersections in
+    Float64. It is mutually exclusive with ``double_precision=True`` and
+    does not fix geometry already damaged by Float32 conversion.
+    """
+    if mixed_precision and (double_precision or compute_backend != "cuda"):
+        raise ValueError("mixed_precision requires compute_backend='cuda' "
+                         "and double_precision=False.")
     import atexit
     import logging
     import syris.config as cfg
@@ -51,6 +61,8 @@ def init(
     )
     cfg.PRECISION = cfg.Precision(double_precision)
     cfg.BACKEND = ComputeBackend(compute_backend=compute_backend)
+    if mixed_precision and getattr(cfg.BACKEND, "name", None) != cfg.BACKEND.CUDA:
+        raise ValueError("mixed_precision requires an available CUDA backend.")
     cfg.UNIT = Quantity(1, unit)
 
     if cfg.BACKEND.name == cfg.BACKEND.CUDA:
@@ -63,6 +75,10 @@ def init(
         ]
 
         options = ["-D__FP_T_D__"] if double_precision else []
+        if mixed_precision:
+            options.append("-DSYRIS_MIXED_PRECISION")
+            LOG.info("Experimental mixed precision: Float32 storage/BVH, "
+                     "Float64 ray/triangle arithmetic.")
         cfg.BACKEND.pipeline = CudaPipeline(
             headers=cuda_headers, options=options
         )

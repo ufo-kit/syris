@@ -35,7 +35,9 @@ def box(x0=-0.5, x1=0.5, y0=-0.5, y1=0.5, z0=0.0, z1=1.0):
 
 
 class ProjectionHarness:
-    def __init__(self, double=False):
+    def __init__(self, double=False, mixed_precision=False):
+        if double and mixed_precision:
+            raise ValueError("Choose double or mixed precision, not both.")
         self.cp = cuda_or_skip()
         from syris import config as cfg
         from syris.gpu.cuda_utils import CudaPipeline
@@ -44,6 +46,8 @@ class ProjectionHarness:
         self.dtype = self.precision.np_float
         kernel_dir = Path(__file__).resolve().parents[1] / "gpu" / "cuda"
         options = ["-D__FP_T_D__"] if double else []
+        if mixed_precision:
+            options.append("-DSYRIS_MIXED_PRECISION")
         self.pipeline = CudaPipeline([str(kernel_dir)], options)
         sources = [kernel_dir / f for f in
                    ("WatertightRay.cu", "Ray.cu", "source.cu", "Legacy.cu")]
