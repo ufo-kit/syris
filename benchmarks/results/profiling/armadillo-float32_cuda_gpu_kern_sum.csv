@@ -1,0 +1,5 @@
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Name
+99.0,239846027,6,39974337.8,39989938.0,6410850,73446274,36340647.1,project_parallel_normals_kernel
+0.9,2260406,24,94183.6,105391.5,12672,157344,52016.4,cupy_multiply__float32_float_float32
+0.1,211742,6,35290.3,37968.0,24799,40448,6075.9,cupy_true_divide__float32_float_float32
+0.0,63680,6,10613.3,10592.0,10400,10816,156.3,cupy_fill

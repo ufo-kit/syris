@@ -1,0 +1,415 @@
+metric,file,line,value,metric_total,percent_of_metric,source
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,161,776567,3609277,21.51586037868526,"const FP_T b[6] = {box_min.x, box_min.y, box_min.z, box_max.x, box_max.y, box_max.z};"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,204,740229,3609277,20.50906594312379,while (node != SENTINEL) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,163,304203,3609277,8.42836390778541,"return intersectSlab(b[near_kx_idx], b[far_kx_idx], o_near_kx, o_far_kx,"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,165,287269,3609277,7.959184069274816,"&& intersectSlab(b[near_ky_idx], b[far_ky_idx], o_near_ky, o_far_ky,"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,167,205149,3609277,5.683936145660197,"&& intersectSlab(b[near_kz_idx], b[far_kz_idx], o_near_kz, o_far_kz,"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,206,171290,3609277,4.745825826058792,"if (!ray.intersects(getBBMin(tree, current), getBBMax(tree, current))) {"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,149,75526,3609277,2.092552054054039,"FP_T near_delta = direction > 0 ? subtractDown(near_plane, origin_near)"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,201,72969,3609277,2.0217068404558587,result.x = a.x - b.x;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,148,64485,3609277,1.7866459127409728,if (direction == 0) return near_plane <= origin_near && far_plane >= origin_far;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,208,55715,3609277,1.5436609603530014,"} else if (isLeaf(tree, current)) {"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,87,52569,3609277,1.456496688949061,return tree.rope[index];
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,153,44844,3609277,1.242464903635825,"entry = fmax(entry, multiplyDown(near_delta, reciprocal_near));"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,166,43755,3609277,1.2122926558421534,"r_near_ky, r_far_ky, d[Ky], tmin, tmax)"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,212,41880,3609277,1.1603431933874846,"node = getLeftChild(tree, current);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,77,41223,3609277,1.1421401017433686,return tree.bboxMin[index];
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,155,38477,3609277,1.0660583823297574,return entry <= exit;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,82,30683,3609277,0.8501148567981898,return tree.bboxMax[index];
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,275,28970,3609277,0.8026538278996043,auto result = a.x * b.x + a.y * b.y;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,273,25208,3609277,0.6984224264305566,"else distance = (fma(u, double(z[0]), fma(v, double(z[1]), w * double(z[2]))) / det) * double(sz);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,367,23109,3609277,0.6402667348613033,unsigned base = 3 * triangle;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,9,22688,3609277,0.6286023488914816,"return nextafterf(a, POS_INFINITY);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,154,18022,3609277,0.4993243799242895,"exit = fmin(exit, multiplyUp(far_delta, reciprocal_far));"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,467,17805,3609277,0.49331209546953586,if (child <= end && (heap[root].t < heap[child].t || isnan(heap[child].t))) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,168,15048,3609277,0.4169256058761907,"r_near_kz, r_far_kz, d[Kz], tmin, tmax);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,365,14907,3609277,0.4130190062995996,"while ((leaf = nextLeaf(tree, ray, node)) != SENTINEL) {"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,162,14721,3609277,0.40786561962409645,"const FP_T d[3] = {direction.x, direction.y, direction.z};"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,118,13985,3609277,0.38747372396189045,const FP_T Z_max = max_dist[this->Kz];
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,164,13945,3609277,0.3863654687628575,"r_near_kx, r_far_kx, d[Kx], tmin, tmax)"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,209,13196,3609277,0.3656133901609658,"node = getRope(tree, current);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,23,13047,3609277,0.36148513954456807,"return copysign(RoundUp(RoundUp(fabs(a))), a);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,262,12544,3609277,0.3475488304167289,(u > 0.0 || v > 0.0 || w > 0.0)) return false;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,20,11760,3609277,0.32582702851568335,"return copysign(RoundDown(RoundDown(fabs(a))), a);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,266,11474,3609277,0.31790300384259784,if (previous > 0 && inside == 0) total += double(t) - double(entry);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,370,11398,3609277,0.31579731896443525,"if (!hits.push_back(HitRecord(t, triangle))) {"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,16,11020,3609277,0.305324307333574,"return nextafterf(a, NEG_INFINITY);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,242,10241,3609277,0.2837410373324076,"x[i] = fma(-Sx, v[Kz], v[Kx]);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,376,9671,3609277,0.2679484007461882,"sort_hit(hits.values, hits.size());"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,150,9499,3609277,0.2631829033903466,": subtractUp(near_plane, origin_near);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,264,9390,3609277,0.26016290797298186,if (det == 0.0 || !isfinite(det)) return false;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,234,7281,3609277,0.20173015260397026,"entry = fmax(entry, (near_plane - o[axis]) / d[axis]);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,261,6371,3609277,0.17651734682597095,if ((u < 0.0 || v < 0.0 || w < 0.0) &&
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,822,5821,3609277,0.16127883783926808,for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,690,5671,3609277,0.15712288084289458,if (is_cached[index]) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,152,5608,3609277,0.1553773789044177,": subtractDown(far_plane, origin_far);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,151,5504,3609277,0.15249591538693205,"FP_T far_delta = direction > 0 ? subtractUp(far_plane, origin_far)"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,275,5408,3609277,0.149836102909253,t = FP_T(distance);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,385,5398,3609277,0.14955903910949478,} while (i < hits.size() && hits.values[i].t == t);
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,462,5295,3609277,0.14670528197198496,if (child + 1 <= end && (heap[child].t < heap[child + 1].t ||
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,383,5082,3609277,0.1408038230371346,"orientation += hitOrientation<WithNormals>(ray, normals, hits.values[i].triangle_idx);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,379,5013,3609277,0.13889208281880278,while (i < hits.size()) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,491,4493,3609277,0.1244847652313746,"if (!input_ray.intersects(getBBMin(tree, treeRoot(tree)), getBBMax(tree, treeRoot(tree)))) return 0;"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,263,4456,3609277,0.12345962917226913,const double det = (u + v) + w;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,207,4283,3609277,0.11866642543645167,"node = getRope(tree, current);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,210,4277,3609277,0.11850018715659674,return current;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,267,4211,3609277,0.11667156607819239,if (u == 0.0 && v == 0.0) distance = double(z[2]) * double(sz);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,355,4152,3609277,0.11503688965961881,return sum.result();
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,109,4138,3609277,0.11464900033995729,"const FP_T L[3] = { RoundUp(fabs(O[0] - bbMin[0])), RoundUp(fabs(O[1] - bbMin[1])), RoundUp(fabs(O[2] - bbMin[2])) };"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,128,4035,3609277,0.11179524320244746,this->o_near_ky = RoundUp(O[this->Ky] + err_ky);
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,124,4034,3609277,0.11176753682247165,this->o_near_kx = RoundUp(O[this->Kx] + err_kx);
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,243,3837,3609277,0.10630937996723444,"y[i] = fma(-Sy, v[Kz], v[Ky]);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,268,3668,3609277,0.10162700175132028,else if (u == 0.0 && w == 0.0) distance = double(z[1]) * double(sz);
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,459,3535,3609277,0.09794205321453577,while (root*2 + 1 <= end) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,121,3331,3609277,0.09228995169946778,const FP_T err_ky = RoundUp(ROBUST_EPSILON * RoundUp(max_dist[this->Ky] + Z_max));
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,113,3237,3609277,0.08968555198174039,"RoundUp(device_fmax<FP_T>(L[0], U[0])),"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,369,3190,3609277,0.0883833521228767,"if (ray.intersects(vertices[base], vertices[base+1], vertices[base+2], t, col, row)) {"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,115,3171,3609277,0.08785693090333604,"RoundUp(device_fmax<FP_T>(L[2], U[2]))"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,114,3165,3609277,0.0876906926234811,"RoundUp(device_fmax<FP_T>(L[1], U[1])),"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,490,3067,3609277,0.0849754673858504,if (tree.nb_keys == 0) return 0;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,110,3063,3609277,0.08486464186594711,"const FP_T U[3] = { RoundUp(fabs(O[0] - bbMax[0])), RoundUp(fabs(O[1] - bbMax[1])), RoundUp(fabs(O[2] - bbMax[2])) };"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,102,3028,3609277,0.08389491856679329,this->r_near_ky = reciprocalNear(invD[this->Ky]); this->r_far_ky = reciprocalFar(invD[this->Ky]);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,492,2953,3609277,0.08181694006860654,"RayType ray = rebaseRay(input_ray, tree);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,390,2878,3609277,0.07973896157041978,return sum.result();
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,300,2852,3609277,0.07901859569104837,values[count++] = value;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,120,2670,3609277,0.07397603453544851,const FP_T err_kx = RoundUp(ROBUST_EPSILON * RoundUp(max_dist[this->Kx] + Z_max));
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,487,2592,3609277,0.07181493689733429,while (end > 0) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,277,2572,3609277,0.07126080929781782,return isfinite(t) && t > m_epsilons.tri_ray_tmin;
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,512,2352,3609277,0.06516540570313667,if (child <= end && (heap[root] < heap[child] || isnan(heap[child]))) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,269,2339,3609277,0.06480522276345096,else if (v == 0.0 && w == 0.0) distance = double(z[0]) * double(sz);
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,508,2328,3609277,0.06450045258371691,if (child + 1 <= end && (heap[child] < heap[child + 1] ||
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,270,2327,3609277,0.06447274620374108,"else if (u == 0.0) distance = boundary_distance(x, y, z, 1, 2, sz);"
+smsp__pcsamp_sample_count,/usr/local/cuda/include/device_atomic_functions.hpp,112,2197,3609277,0.060870916806884036,"return __uAtomicAdd(address, val);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,388,2187,3609277,0.0605938530071258,"sum.event(t, orientation);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,231,2109,3609277,0.05843275536901158,"extent = fmax(extent, upper[axis] - lower[axis]);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,452,2109,3609277,0.05843275536901158,array[i] = array[j];
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,101,1992,3609277,0.05519110891184024,this->r_near_kx = reciprocalNear(invD[this->Kx]); this->r_far_kx = reciprocalFar(invD[this->Kx]);
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,256,1933,3609277,0.05355643249326666,"v = edge_difference_double(x[0], y[2], y[0], x[2]);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,241,1879,3609277,0.05206028797457219,"const FP_T v[3] = {relative[i].x, relative[i].y, relative[i].z};"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,103,1852,3609277,0.051312215715224964,this->r_near_kz = reciprocalNear(invD[this->Kz]); this->r_far_kz = reciprocalFar(invD[this->Kz]);
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,86,1839,3609277,0.05095203277553926,this->Sz = (1.0) / D[this->Kz];
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,237,1779,3609277,0.04928964997698985,"const FP_T4 relative[3] = {V1 - tail, V2 - tail, V3 - tail};"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,463,1776,3609277,0.04920653083706238,isnan(heap[child + 1].t))) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,859,1689,3609277,0.046796075779165745,return (total_area > 0.0) ? (total_value / total_area) : 0.0;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,125,1620,3609277,0.044884335560833925,this->o_far_kx  = RoundDown(O[this->Kx] - err_kx);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,264,1620,3609277,0.044884335560833925,if (inside < 0) valid = false;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,129,1612,3609277,0.04466268452102734,this->o_far_ky  = RoundDown(O[this->Ky] - err_ky);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,293,1587,3609277,0.043970025021631755,return (product < 0) - (product > 0);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,366,1418,3609277,0.0392876468057176,unsigned triangle = tree.indices[leaf];
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,380,1399,3609277,0.03876122558617696,FP_T t = hits.values[i].t;
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,478,1333,3609277,0.03693260450777261,while (start >= 0) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,479,1223,3609277,0.033884902710432034,"_sift_down_hit(array, start, size - 1);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,248,1181,3609277,0.03272123475144745,"double v = edge_difference(x[0], y[2], y[0], x[2]);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,240,1052,3609277,0.02914711173456623,"FP_T4 origin = MAKE_FP_T4(FP_T(fma(shift, d[0], o[0])),"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,503,952,3609277,0.026376473736983888,"return traceEvents<WithNormals>(ray, tree, vertices, normals, row, col);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,88,868,3609277,0.024049137819014722,this->Sy = D[this->Ky] / D[this->Kz];
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,489,838,3609277,0.02321794641974002,"_sift_down_hit(array, 0, end - 1);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,254,799,3609277,0.022137397600682906,if (u == 0.0 || v == 0.0 || w == 0.0) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,188,753,3609277,0.02086290412179503,"return __fsub_rn(__fmul_rn(a, b), __fmul_rn(c, d));"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,81,733,3609277,0.02030877652227856,if (D[this->Kz] < (0.0))
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,237,731,3609277,0.020253363762326913,"const double guard = fmax(32.0 * ::cuda::std::numeric_limits<FP_T>::epsilon() * extent,"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,686,719,3609277,0.019920887202617032,int ix = round(u * (CACHE_DIM - 1));
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,239,700,3609277,0.019394465983076387,"double shift = fmax(0.0, entry - guard);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,256,692,3609277,0.019172814943269802,if (first && orientation < 0) inside = 1; // Ray starts in material.
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,832,588,3609277,0.016291351425784167,"values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,247,582,3609277,0.016125113145929227,"double u = edge_difference(x[2], y[1], y[2], x[1]);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,260,576,3609277,0.015958874866074287,if (inside == 0) entry = t;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,92,545,3609277,0.01509997708682376,"const int far_p[3]  = {3, 4, 5}; // Indices for max planes"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,97,527,3609277,0.01460126224725894,"if (D[this->Ky] < 0.0f) swap(this->near_ky_idx, this->far_ky_idx);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,249,516,3609277,0.01429649206752488,"double w = edge_difference(x[1], y[0], y[1], x[0]);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,228,505,3609277,0.013991721887790824,"double lower[3] = {lo.x, lo.y, lo.z}, upper[3] = {hi.x, hi.y, hi.z};"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,67,481,3609277,0.013326768768371062,"const FP_T D[3] = { direction.x, direction.y, direction.z };"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,500,476,3609277,0.013188236868491944,if (!overflow) return value;
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,506,460,3609277,0.01274493478887877,while (root*2 + 1 <= end) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,259,452,3609277,0.012523283749072182,if (orientation > 0) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1107,447,3609277,0.012384751849193066,if (work >= totalPixels) break;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,244,439,3609277,0.012163100809386478,z[i] = v[Kz];
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,87,429,3609277,0.011886037009628245,this->Sx = D[this->Kx] / D[this->Kz];
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,272,428,3609277,0.01185833062965242,"else if (w == 0.0) distance = boundary_distance(x, y, z, 0, 1, sz);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,833,419,3609277,0.01160897320987001,"values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,468,416,3609277,0.01152585406994254,"_swap_hit(heap, root, child);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,69,409,3609277,0.011331909410111776,"const FP_T bbMin[3] = { scene_min.x, scene_min.y, scene_min.z };"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,94,398,3609277,0.011027139230377719,this->near_ky_idx = near_p[this->Ky]; this->far_ky_idx = far_p[this->Ky];
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,477,386,3609277,0.010694662670667838,int start = (size - 2) / 2;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,95,373,3609277,0.010334479730982133,this->near_kz_idx = near_p[this->Kz]; this->far_kz_idx = far_p[this->Kz];
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,499,373,3609277,0.010334479730982133,array[j] = tmp;
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,276,368,3609277,0.010195947831103017,if constexpr (has_z<VecT>::value) { result += a.z * b.z; }
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,294,357,3609277,0.009891177651368958,struct List {
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,96,344,3609277,0.009530994711683253,"if (D[this->Kx] < 0.0f) swap(this->near_kx_idx, this->far_kx_idx);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,453,343,3609277,0.009503288331707431,array[j] = tmp;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,851,336,3609277,0.009309343671876667,total_value += double(midpoint_value) * double(s * s);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,688,321,3609277,0.008893747972239316,int index = iy * CACHE_DIM + ix;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,255,321,3609277,0.008893747972239316,"u = edge_difference_double(x[2], y[1], y[2], x[1]);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,93,319,3609277,0.00883833521228767,this->near_kx_idx = near_p[this->Kx]; this->far_kx_idx = far_p[this->Kx];
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,701,306,3609277,0.008478152272601965,is_cached[index] = true;
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,536,300,3609277,0.008311913992747024,"_sift_down(array, 0, end - 1);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,66,279,3609277,0.007730080013254732,"const FP_T O[3] = { origin.x, origin.y, origin.z };"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,233,279,3609277,0.007730080013254732,double near_plane = d[axis] > 0.0 ? lower[axis] : upper[axis];
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1112,274,3609277,0.007591548113375615,unsigned int col = index % N.x;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,609,274,3609277,0.007591548113375615,"WatertightRay ray = WatertightRay(sample_origin, direction, scene_bbMin, scene_bbMax, epsilons);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,834,265,3609277,0.007342190693593205,"values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,460,248,3609277,0.006871182234004207,child = root*2 + 1;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1087,246,3609277,0.0068157694740525595,tree.nb_keys = nb_keys; tree.rope = rope; tree.left = left; tree.indices = permutation; tree.bboxMin = bboxMin; tree.bboxMax = bboxMax;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,70,237,3609277,0.006566412054270149,"const FP_T bbMax[3] = { scene_max.x, scene_max.y, scene_max.z };"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,78,229,3609277,0.006344761014463561,if (this->Ky == 3)
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,824,228,3609277,0.006317054634487738,"quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,192,224,3609277,0.006206229114584444,result.y = a.y + b.y;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,687,222,3609277,0.006150816354632798,int iy = round(v * (CACHE_DIM - 1));
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,202,218,3609277,0.006039990834729504,result.y = a.y - b.y;
+smsp__pcsamp_sample_count,/usr/include/c++/13/cmath,235,210,3609277,0.005818339794922917,{ return __builtin_fabsf(__x); }
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,831,207,3609277,0.005735220654995447,"values[0] = traceAndCache(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,261,204,3609277,0.005652101515067977,++inside;
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,203,198,3609277,0.005485863235213035,if constexpr (has_z<VecT>::value) { result.z = a.z - b.z; }
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,856,190,3609277,0.005264212195406449,"quad_stack[stack_ptr++] = {u, v + hs, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v + hs, hs, next_depth};"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,843,189,3609277,0.005236505815430625,if (!isfinite(values[j])) return FP_T(NAN);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1124,187,3609277,0.0051810930554789785,image[index] = tracePixelAdaptive(
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,271,187,3609277,0.0051810930554789785,"else if (v == 0.0) distance = boundary_distance(x, y, z, 0, 2, sz);"
+smsp__pcsamp_sample_count,/usr/include/c++/13/cmath,2205,184,3609277,0.005097973915551508,"{ return __builtin_fmaxf(__x, __y); }"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,498,181,3609277,0.005014854775624038,array[i] = array[j];
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,835,179,3609277,0.004959442015672391,"values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,263,177,3609277,0.004904029255720744,--inside;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,91,168,3609277,0.004654671835938333,"const int near_p[3] = {0, 1, 2}; // Indices for min planes"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,545,166,3609277,0.004599259075986686,return (v.y > v.z) ? 1 : 2;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,68,162,3609277,0.004488433556083393,"const FP_T invD[3] = { invDirection.x, invDirection.y, invDirection.z };"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,98,154,3609277,0.004266782516276805,"if (D[this->Kz] < 0.0f) swap(this->near_kz_idx, this->far_kz_idx);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,700,151,3609277,0.004183663376349335,value_cache[index] = value;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,610,151,3609277,0.004183663376349335,"return traceRay<WatertightRay>(ray, tree, vertices, normals, row, col);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,226,149,3609277,0.004128250616397689,"double o[3] = {ray.tail.x, ray.tail.y, ray.tail.z};"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,126,140,3609277,0.003878893196615278,"if (D[this->Kx] < 0.0f) swap(this->o_near_kx, this->o_far_kx);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,507,139,3609277,0.0038511868166394543,child = root*2 + 1;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,77,136,3609277,0.003768067676711984,this->Ky = this->Kx + 1;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,694,123,3609277,0.0034078847370262798,FP_T4 sample_origin = base_pixel_origin + scaled_U * u + scaled_V * v;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,232,116,3609277,0.003213940077195516,if (d[axis] != 0.0) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,509,116,3609277,0.003213940077195516,isnan(heap[child + 1]))) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,827,110,3609277,0.0030477017973405754,Quad current_quad = quad_stack[--stack_ptr];
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,543,110,3609277,0.0030477017973405754,return (v.x > v.z) ? 0 : 2;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,848,101,3609277,0.0027983443775581648,if ((max_val - min_val < threshold) || (current_quad.depth >= sampling_params.max_depth) || (stack_ptr + 4 > MAX_QUADS_PER_PIXEL)) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,847,98,3609277,0.0027152252376306946,"FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,826,98,3609277,0.0027152252376306946,while (stack_ptr > 0) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1047,96,3609277,0.0026598124776790475,"extern ""C"" __global__ void project_parallel_normals_kernel("
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,384,93,3609277,0.0025766933377515773,++i;
+smsp__pcsamp_sample_count,/usr/include/c++/13/cmath,2103,92,3609277,0.002548986957775754,"{ return __builtin_copysignf(__x, __y); }"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,480,87,3609277,0.002410455057896637,start--;
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,193,83,3609277,0.002299629537993343,if constexpr (has_z<VecT>::value) { result.z = a.z + b.z; }
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,488,81,3609277,0.0022442167780416964,"_swap_hit(array, 0, end);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,130,75,3609277,0.002077978498186756,"if (D[this->Ky] < 0.0f) swap(this->o_near_ky, this->o_far_ky);"
+smsp__pcsamp_sample_count,/usr/include/c++/13/cmath,2483,74,3609277,0.0020502721182109325,{ return __builtin_roundf(__x); }
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,133,73,3609277,0.002022565738235109,this->o_near_kz = O[this->Kz];
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,498,73,3609277,0.002022565738235109,"FP_T value = traceCollected<WithNormals, SYRIS_HIT_CAPACITY>("
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,691,67,3609277,0.0018563274583801687,return value_cache[index];
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,846,61,3609277,0.0016900891785252281,"FP_T min_val = values[0], max_val = values[4];"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,513,59,3609277,0.0016346764185735814,"_swap(heap, root, child);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1102,53,3609277,0.0014684381387186408,"unsigned int work = atomicAdd(globalCounter, 1);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,363,44,3609277,0.0012190807189362302,"List<HitRecord, Capacity> hits;"
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,75,42,3609277,0.0011636679589845833,if (this->Kx == 3)
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,106,41,3609277,0.00113596157900876,"FP_T ROBUST_EPSILON = fmax(m_epsilons.ray_box_epsilon,"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,191,36,3609277,0.000997429679129643,result.x = a.x + b.x;
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,74,35,3609277,0.0009697232991538195,this->Kx = this->Kz + 1;
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,104,34,3609277,0.000942016919177996,"tri_d_gamma_multiplier((double)p_tri_d_gamma_multiplier),"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,196,29,3609277,0.000803485019298879,return tree.nb_keys == 1 ? 0 : int(tree.nb_keys);
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,105,24,3609277,0.0006649531194197619,"tri_d_abs_min_error((double)p_tri_d_abs_min_error),"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1121,23,3609277,0.0006372467394439385,FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,696,23,3609277,0.0006372467394439385,FP_T value = traceSubPixel(
+smsp__pcsamp_sample_count,syris/gpu/cuda/WatertightRay.cu,73,20,3609277,0.0005541275995164682,this->Kz = max_dim_index(abs(this->direction));
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,535,17,3609277,0.000471008459588998,"_swap(array, 0, end);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,852,15,3609277,0.0004155956996373512,total_area += double(s * s);
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1123,14,3609277,0.00038788931966152776,if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1099,10,3609277,0.0002770637997582341,unsigned totalPixels = N.x * N.y;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,845,7,3609277,0.00019394465983076388,"sort(values, 5);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1132,5,3609277,0.00013853189987911706,image[index] = traceSubPixel(
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,243,2,3609277,5.541275995164682e-05,"return RayType(origin, ray.direction, lo, hi, ray.m_epsilons);"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,855,2,3609277,5.541275995164682e-05,"quad_stack[stack_ptr++] = {u, v, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v, hs, next_depth};"
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,305,2,3609277,5.541275995164682e-05,"__device__ __noinline__ FP_T traceEvents(const RayType &ray, const Tree &tree,"
+smsp__pcsamp_sample_count,syris/gpu/cuda/Commons.cuh,213,1,3609277,2.770637997582341e-05,if constexpr (has_z<VecT>::value) { result.z = v.z * s; }
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,854,1,3609277,2.770637997582341e-05,int next_depth = current_quad.depth + 1;
+smsp__pcsamp_sample_count,syris/gpu/cuda/source.cu,1143,1,3609277,2.770637997582341e-05,}
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,161,734565,1845440,39.80432850702272,"const FP_T b[6] = {box_min.x, box_min.y, box_min.z, box_max.x, box_max.y, box_max.z};"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,204,626629,1845440,33.95553363967401,while (node != SENTINEL) {
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,163,113745,1845440,6.163570747355644,"return intersectSlab(b[near_kx_idx], b[far_kx_idx], o_near_kx, o_far_kx,"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,167,80817,1845440,4.379280821917808,"&& intersectSlab(b[near_kz_idx], b[far_kz_idx], o_near_kz, o_far_kz,"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,201,71330,1845440,3.8652028784463326,result.x = a.x - b.x;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,165,68055,1845440,3.687738425524536,"&& intersectSlab(b[near_ky_idx], b[far_ky_idx], o_near_ky, o_far_ky,"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,275,28534,1845440,1.5461895266169585,auto result = a.x * b.x + a.y * b.y;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,367,22939,1845440,1.2430097971215537,unsigned base = 3 * triangle;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,467,13950,1845440,0.7559172880180336,if (child <= end && (heap[root].t < heap[child].t || isnan(heap[child].t))) {
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,370,10120,1845440,0.5483787064331541,"if (!hits.push_back(HitRecord(t, triangle))) {"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,82,8535,1845440,0.46249132998092596,return tree.bboxMax[index];
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,376,7504,1845440,0.40662389457256803,"sort_hit(hits.values, hits.size());"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,242,6567,1845440,0.35585009537020984,"x[i] = fma(-Sx, v[Kz], v[Kx]);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,690,5246,1845440,0.28426825039015086,if (is_cached[index]) {
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,491,3759,1845440,0.20369126062077336,"if (!input_ray.intersects(getBBMin(tree, treeRoot(tree)), getBBMax(tree, treeRoot(tree)))) return 0;"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,77,3728,1845440,0.20201144442517774,return tree.bboxMin[index];
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,150,3530,1845440,0.1912822958210508,": subtractUp(near_plane, origin_near);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,462,3145,1845440,0.17042006242413732,if (child + 1 <= end && (heap[child].t < heap[child + 1].t ||
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,383,2950,1845440,0.15985347667764868,"orientation += hitOrientation<WithNormals>(ray, normals, hits.values[i].triangle_idx);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,490,2647,1845440,0.14343462805618173,if (tree.nb_keys == 0) return 0;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,148,2550,1845440,0.1381784289925438,if (direction == 0) return near_plane <= origin_near && far_plane >= origin_far;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,385,2119,1845440,0.11482356511184325,} while (i < hits.size() && hits.values[i].t == t);
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,492,2065,1845440,0.11189743367435408,"RayType ray = rebaseRay(input_ray, tree);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,508,1996,1845440,0.10815848794867348,if (child + 1 <= end && (heap[child] < heap[child + 1] ||
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,243,1812,1845440,0.09818796601352522,"y[i] = fma(-Sy, v[Kz], v[Ky]);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,/usr/local/cuda/include/device_atomic_functions.hpp,112,1729,1845440,0.09369039361886596,"return __uAtomicAdd(address, val);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,124,1650,1845440,0.08940957170105775,this->o_near_kx = RoundUp(O[this->Kx] + err_kx);
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,128,1602,1845440,0.08680856597884515,this->o_near_ky = RoundUp(O[this->Ky] + err_ky);
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,452,1570,1845440,0.08507456216403676,array[i] = array[j];
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,379,1462,1845440,0.07922229928905844,while (i < hits.size()) {
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,20,1449,1845440,0.07851786023929253,"return copysign(RoundDown(RoundDown(fabs(a))), a);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,512,1362,1845440,0.07380353736778221,if (child <= end && (heap[root] < heap[child] || isnan(heap[child]))) {
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,121,717,1845440,0.038852522975550544,const FP_T err_ky = RoundUp(ROBUST_EPSILON * RoundUp(max_dist[this->Ky] + Z_max));
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,120,703,1845440,0.038093896306571874,const FP_T err_kx = RoundUp(ROBUST_EPSILON * RoundUp(max_dist[this->Kx] + Z_max));
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,686,651,1845440,0.035276140107508236,int ix = round(u * (CACHE_DIM - 1));
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,88,392,1845440,0.02124154673140281,this->Sy = D[this->Ky] / D[this->Kz];
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,81,323,1845440,0.017502601005722214,if (D[this->Kz] < (0.0))
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,832,312,1845440,0.01690653719438183,"values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,833,270,1845440,0.014630657187445812,"values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,97,264,1845440,0.01430553147216924,"if (D[this->Ky] < 0.0f) swap(this->near_ky_idx, this->far_ky_idx);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,834,254,1845440,0.013763655280041616,"values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,499,249,1845440,0.013492717183977805,array[j] = tmp;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,294,203,1845440,0.01100008670019074,struct List {
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,459,195,1845440,0.010566585746488642,while (root*2 + 1 <= end) {
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,/usr/include/c++/13/cmath,235,183,1845440,0.009916334315935495,{ return __builtin_fabsf(__x); }
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,489,173,1845440,0.009374458123807872,"_sift_down_hit(array, 0, end - 1);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,831,136,1845440,0.007369516212935669,"values[0] = traceAndCache(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,536,127,1845440,0.006881827640020808,"_sift_down(array, 0, end - 1);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,9,90,1845440,0.004876885729148604,"return nextafterf(a, POS_INFINITY);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,101,88,1845440,0.0047685104907230795,this->r_near_kx = reciprocalNear(invD[this->Kx]); this->r_far_kx = reciprocalFar(invD[this->Kx]);
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,847,78,1845440,0.004226634298595457,"FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,96,56,1845440,0.003034506675914687,"if (D[this->Kx] < 0.0f) swap(this->near_kx_idx, this->far_kx_idx);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,98,47,1845440,0.0025468181029998267,"if (D[this->Kz] < 0.0f) swap(this->near_kz_idx, this->far_kz_idx);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,545,37,1845440,0.0020049419108722037,return (v.y > v.z) ? 1 : 2;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,498,35,1845440,0.0018965666724466794,array[i] = array[j];
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,114,30,1845440,0.0016256285763828681,"RoundUp(device_fmax<FP_T>(L[1], U[1])),"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,256,21,1845440,0.0011379400034680076,"v = edge_difference_double(x[0], y[2], y[0], x[2]);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,506,19,1845440,0.001029564765042483,while (root*2 + 1 <= end) {
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,237,18,1845440,0.0009753771458297208,"const FP_T4 relative[3] = {V1 - tail, V2 - tail, V3 - tail};"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,115,17,1845440,0.0009211895266169586,"RoundUp(device_fmax<FP_T>(L[2], U[2]))"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,113,16,1845440,0.0008670019074041963,"RoundUp(device_fmax<FP_T>(L[0], U[0])),"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,453,15,1845440,0.0008128142881914341,array[j] = tmp;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,110,10,1845440,0.0005418761921276227,"const FP_T U[3] = { RoundUp(fabs(O[0] - bbMax[0])), RoundUp(fabs(O[1] - bbMax[1])), RoundUp(fabs(O[2] - bbMax[2])) };"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,149,9,1845440,0.0004876885729148604,"FP_T near_delta = direction > 0 ? subtractDown(near_plane, origin_near)"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,688,8,1845440,0.00043350095370209816,int index = iy * CACHE_DIM + ix;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/Commons.cuh,192,8,1845440,0.00043350095370209816,result.y = a.y + b.y;
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,843,6,1845440,0.0003251257152765736,if (!isfinite(values[j])) return FP_T(NAN);
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,835,5,1845440,0.00027093809606381134,"values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,365,4,1845440,0.00021675047685104908,"while ((leaf = nextLeaf(tree, ray, node)) != SENTINEL) {"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/source.cu,366,4,1845440,0.00021675047685104908,unsigned triangle = tree.indices[leaf];
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,109,4,1845440,0.00021675047685104908,"const FP_T L[3] = { RoundUp(fabs(O[0] - bbMin[0])), RoundUp(fabs(O[1] - bbMin[1])), RoundUp(fabs(O[2] - bbMin[2])) };"
+smsp__pcsamp_warps_issue_stalled_long_scoreboard,syris/gpu/cuda/WatertightRay.cu,91,2,1845440,0.00010837523842552454,"const int near_p[3] = {0, 1, 2}; // Indices for min planes"
+derived__memory_l2_theoretical_sectors_global_excessive,syris/gpu/cuda/source.cu,82,177820251,451278366,39.40367285410708,return tree.bboxMax[index];
+derived__memory_l2_theoretical_sectors_global_excessive,syris/gpu/cuda/source.cu,77,177820251,451278366,39.40367285410708,return tree.bboxMin[index];
+derived__memory_l2_theoretical_sectors_global_excessive,syris/gpu/cuda/source.cu,87,38355134,451278366,8.499218418106043,return tree.rope[index];
+derived__memory_l2_theoretical_sectors_global_excessive,syris/gpu/cuda/source.cu,212,36910237,451278366,8.179039763674378,"node = getLeftChild(tree, current);"
+derived__memory_l2_theoretical_sectors_global_excessive,syris/gpu/cuda/Commons.cuh,201,5625470,451278366,1.2465631911102957,result.x = a.x - b.x;
+derived__memory_l2_theoretical_sectors_global_excessive,syris/gpu/cuda/source.cu,366,5499049,451278366,1.2185492180230062,unsigned triangle = tree.indices[leaf];
+derived__memory_l2_theoretical_sectors_global_excessive,syris/gpu/cuda/WatertightRay.cu,237,5298232,451278366,1.1740496330373613,"const FP_T4 relative[3] = {V1 - tail, V2 - tail, V3 - tail};"
+derived__memory_l2_theoretical_sectors_global_excessive,syris/gpu/cuda/source.cu,209,3166885,451278366,0.7017586568729953,"node = getRope(tree, current);"
+derived__memory_l2_theoretical_sectors_global_excessive,syris/gpu/cuda/source.cu,383,782857,451278366,0.1734754109617566,"orientation += hitOrientation<WithNormals>(ray, normals, hits.values[i].triangle_idx);"
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/source.cu,82,299216262,785178413,38.108060161353414,return tree.bboxMax[index];
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/source.cu,77,299216262,785178413,38.108060161353414,return tree.bboxMin[index];
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/source.cu,87,71120173,785178413,9.057836005483763,return tree.rope[index];
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/source.cu,212,70389296,785178413,8.964751811127543,"node = getLeftChild(tree, current);"
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/Commons.cuh,201,13591905,785178413,1.7310594350229545,result.x = a.x - b.x;
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/WatertightRay.cu,237,12783879,785178413,1.6281495757321591,"const FP_T4 relative[3] = {V1 - tail, V2 - tail, V3 - tail};"
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/source.cu,209,8929553,785178413,1.1372642003595175,"node = getRope(tree, current);"
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/source.cu,366,7278770,785178413,0.9270211558911007,unsigned triangle = tree.indices[leaf];
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/source.cu,383,2455705,785178413,0.31275757959484296,"orientation += hitOrientation<WithNormals>(ray, normals, hits.values[i].triangle_idx);"
+memory_l2_theoretical_sectors_global,syris/gpu/cuda/source.cu,1124,131072,785178413,0.016693276054190246,image[index] = tracePixelAdaptive(
+memory_l2_theoretical_sectors_global,/usr/local/cuda/include/device_atomic_functions.hpp,112,65536,785178413,0.008346638027095123,"return __uAtomicAdd(address, val);"
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/source.cu,82,121396011,333900047,36.35699128847382,return tree.bboxMax[index];
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/source.cu,77,121396011,333900047,36.35699128847382,return tree.bboxMin[index];
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/source.cu,212,33479059,333900047,10.026670945631823,"node = getLeftChild(tree, current);"
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/source.cu,87,32765039,333900047,9.812828507927703,return tree.rope[index];
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/Commons.cuh,201,7966435,333900047,2.385874177490008,result.x = a.x - b.x;
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/WatertightRay.cu,237,7485647,333900047,2.2418825835026013,"const FP_T4 relative[3] = {V1 - tail, V2 - tail, V3 - tail};"
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/source.cu,209,5762668,333900047,1.7258661841398304,"node = getRope(tree, current);"
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/source.cu,366,1779721,333900047,0.5330101076625485,unsigned triangle = tree.indices[leaf];
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/source.cu,383,1672848,333900047,0.5010026248963062,"orientation += hitOrientation<WithNormals>(ray, normals, hits.values[i].triangle_idx);"
+memory_l2_theoretical_sectors_global_ideal,syris/gpu/cuda/source.cu,1124,131072,333900047,0.03925486120102283,image[index] = tracePixelAdaptive(
+memory_l2_theoretical_sectors_global_ideal,/usr/local/cuda/include/device_atomic_functions.hpp,112,65536,333900047,0.019627430600511416,"return __uAtomicAdd(address, val);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,161,467520216,1574772304,29.688115215925208,"const FP_T b[6] = {box_min.x, box_min.y, box_min.z, box_max.x, box_max.y, box_max.z};"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,163,155840072,1574772304,9.896038405308403,"return intersectSlab(b[near_kx_idx], b[far_kx_idx], o_near_kx, o_far_kx,"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,165,155521354,1574772304,9.875799415888126,"&& intersectSlab(b[near_ky_idx], b[far_ky_idx], o_near_ky, o_far_ky,"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,206,149072313,1574772304,9.46627729109465,"if (!ray.intersects(getBBMin(tree, current), getBBMax(tree, current))) {"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,167,129741806,1574772304,8.238766053381138,"&& intersectSlab(b[near_kz_idx], b[far_kz_idx], o_near_kz, o_far_kz,"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,162,82463979,1574772304,5.236565234893793,"const FP_T d[3] = {direction.x, direction.y, direction.z};"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,164,77920036,1574772304,4.948019202654201,"r_near_kx, r_far_kx, d[Kx], tmin, tmax)"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,166,77760677,1574772304,4.937899707944063,"r_near_ky, r_far_ky, d[Ky], tmin, tmax)"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,168,64870903,1574772304,4.119383026690569,"r_near_kz, r_far_kz, d[Kz], tmin, tmax);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,822,37879808,1574772304,2.4054149227658757,for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,241,19253484,1574772304,1.2226201814125885,"const FP_T v[3] = {relative[i].x, relative[i].y, relative[i].z};"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,242,19253484,1574772304,1.2226201814125885,"x[i] = fma(-Sx, v[Kz], v[Kx]);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,492,18085038,1574772304,1.148422407103751,"RayType ray = rebaseRay(input_ray, tree);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,243,12835656,1574772304,0.8150801209417257,"y[i] = fma(-Sy, v[Kz], v[Ky]);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,244,6417828,1574772304,0.40754006047086283,z[i] = v[Kz];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,467,5269514,1574772304,0.33462069320213295,if (child <= end && (heap[root].t < heap[child].t || isnan(heap[child].t))) {
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,92,5265415,1574772304,0.3343604016038118,"const int far_p[3]  = {3, 4, 5}; // Indices for max planes"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,491,5188904,1574772304,0.3295018579397114,"if (!input_ray.intersects(getBBMin(tree, treeRoot(tree)), getBBMax(tree, treeRoot(tree)))) return 0;"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,69,4835954,1574772304,0.30708909394179945,"const FP_T bbMin[3] = { scene_min.x, scene_min.y, scene_min.z };"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,453,4445626,1574772304,0.2823027804532686,array[j] = tmp;
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,300,3978421,1574772304,0.25263468184540794,values[count++] = value;
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,452,3702448,1574772304,0.2351100530912055,array[i] = array[j];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,67,3159249,1574772304,0.20061624096228708,"const FP_T D[3] = { direction.x, direction.y, direction.z };"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,66,3159249,1574772304,0.20061624096228708,"const FP_T O[3] = { origin.x, origin.y, origin.z };"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,109,3159249,1574772304,0.20061624096228708,"const FP_T L[3] = { RoundUp(fabs(O[0] - bbMin[0])), RoundUp(fabs(O[1] - bbMin[1])), RoundUp(fabs(O[2] - bbMin[2])) };"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,110,3159249,1574772304,0.20061624096228708,"const FP_T U[3] = { RoundUp(fabs(O[0] - bbMax[0])), RoundUp(fabs(O[1] - bbMax[1])), RoundUp(fabs(O[2] - bbMax[2])) };"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,70,3047377,1574772304,0.19351222981630492,"const FP_T bbMax[3] = { scene_max.x, scene_max.y, scene_max.z };"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,468,2579024,1574772304,0.16377123178056605,"_swap_hit(heap, root, child);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,95,2106166,1574772304,0.13374416064152472,this->near_kz_idx = near_p[this->Kz]; this->far_kz_idx = far_p[this->Kz];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,93,2106166,1574772304,0.13374416064152472,this->near_kx_idx = near_p[this->Kx]; this->far_kx_idx = far_p[this->Kx];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,94,2106166,1574772304,0.13374416064152472,this->near_ky_idx = near_p[this->Ky]; this->far_ky_idx = far_p[this->Ky];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,488,1840900,1574772304,0.11689943970464951,"_swap_hit(array, 0, end);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,380,1493554,1574772304,0.09484253667697219,FP_T t = hits.values[i].t;
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,383,1493554,1574772304,0.09484253667697219,"orientation += hitOrientation<WithNormals>(ray, normals, hits.values[i].triangle_idx);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,68,1482544,1574772304,0.09414338798277469,"const FP_T invD[3] = { invDirection.x, invDirection.y, invDirection.z };"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,1087,1441792,1574772304,0.09155558529558697,tree.nb_keys = nb_keys; tree.rope = rope; tree.left = left; tree.indices = permutation; tree.bboxMin = bboxMin; tree.bboxMax = bboxMax;
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,498,1342482,1574772304,0.08524927677417421,"FP_T value = traceCollected<WithNormals, SYRIS_HIT_CAPACITY>("
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,370,1214153,1574772304,0.07710022565903597,"if (!hits.push_back(HitRecord(t, triangle))) {"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,512,1209829,1574772304,0.07682564628086068,if (child <= end && (heap[root] < heap[child] || isnan(heap[child]))) {
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,508,1109146,1574772304,0.07043215055171557,if (child + 1 <= end && (heap[child] < heap[child + 1] ||
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,81,1053083,1574772304,0.06687208032076236,if (D[this->Kz] < (0.0))
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,91,1053083,1574772304,0.06687208032076236,"const int near_p[3] = {0, 1, 2}; // Indices for min planes"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,101,1053083,1574772304,0.06687208032076236,this->r_near_kx = reciprocalNear(invD[this->Kx]); this->r_far_kx = reciprocalFar(invD[this->Kx]);
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,102,1053083,1574772304,0.06687208032076236,this->r_near_ky = reciprocalNear(invD[this->Ky]); this->r_far_ky = reciprocalFar(invD[this->Ky]);
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,103,1053083,1574772304,0.06687208032076236,this->r_near_kz = reciprocalNear(invD[this->Kz]); this->r_far_kz = reciprocalFar(invD[this->Kz]);
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,113,1053083,1574772304,0.06687208032076236,"RoundUp(device_fmax<FP_T>(L[0], U[0])),"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,114,1053083,1574772304,0.06687208032076236,"RoundUp(device_fmax<FP_T>(L[1], U[1])),"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,115,1053083,1574772304,0.06687208032076236,"RoundUp(device_fmax<FP_T>(L[2], U[2]))"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,120,1053083,1574772304,0.06687208032076236,const FP_T err_kx = RoundUp(ROBUST_EPSILON * RoundUp(max_dist[this->Kx] + Z_max));
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,118,1053083,1574772304,0.06687208032076236,const FP_T Z_max = max_dist[this->Kz];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,121,1053083,1574772304,0.06687208032076236,const FP_T err_ky = RoundUp(ROBUST_EPSILON * RoundUp(max_dist[this->Ky] + Z_max));
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,124,1053083,1574772304,0.06687208032076236,this->o_near_kx = RoundUp(O[this->Kx] + err_kx);
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,128,1053083,1574772304,0.06687208032076236,this->o_near_ky = RoundUp(O[this->Ky] + err_ky);
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,133,1053083,1574772304,0.06687208032076236,this->o_near_kz = O[this->Kz];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,498,1046228,1574772304,0.06643677929453858,array[i] = array[j];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,499,1015892,1574772304,0.06451040556273334,array[j] = tmp;
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,385,920450,1574772304,0.05844971985232476,} while (i < hits.size() && hits.values[i].t == t);
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,363,880640,1574772304,0.05592173533679317,"List<HitRecord, Capacity> hits;"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,690,870140,1574772304,0.05525497227693179,if (is_cached[index]) {
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,462,839606,1574772304,0.05331602529885489,if (child + 1 <= end && (heap[child].t < heap[child + 1].t ||
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,376,750691,1574772304,0.0476698122067049,"sort_hit(hits.values, hits.size());"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,379,750691,1574772304,0.0476698122067049,while (i < hits.size()) {
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,96,741272,1574772304,0.047071693991387345,"if (D[this->Kx] < 0.0f) swap(this->near_kx_idx, this->far_kx_idx);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,97,741272,1574772304,0.047071693991387345,"if (D[this->Ky] < 0.0f) swap(this->near_ky_idx, this->far_ky_idx);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,700,741272,1574772304,0.047071693991387345,value_cache[index] = value;
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,701,741272,1574772304,0.047071693991387345,is_cached[index] = true;
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,827,696112,1574772304,0.044203977821545434,Quad current_quad = quad_stack[--stack_ptr];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,506,696112,1574772304,0.044203977821545434,while (root*2 + 1 <= end) {
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,824,524288,1574772304,0.033292940107486166,"quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,490,446911,1574772304,0.028379404366258146,if (tree.nb_keys == 0) return 0;
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,536,348056,1574772304,0.022101988910772717,"_sift_down(array, 0, end - 1);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,88,311811,1574772304,0.019800386329375017,this->Sy = D[this->Ky] / D[this->Kz];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/WatertightRay.cu,87,311811,1574772304,0.019800386329375017,this->Sx = D[this->Kx] / D[this->Kz];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,294,311811,1574772304,0.019800386329375017,struct List {
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,610,294361,1574772304,0.018692289625129196,"return traceRay<WatertightRay>(ray, tree, vertices, normals, row, col);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,831,174028,1574772304,0.011050994455386359,"values[0] = traceAndCache(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,832,174028,1574772304,0.011050994455386359,"values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,833,174028,1574772304,0.011050994455386359,"values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,834,174028,1574772304,0.011050994455386359,"values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,835,174028,1574772304,0.011050994455386359,"values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,535,174028,1574772304,0.011050994455386359,"_swap(array, 0, end);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,846,174028,1574772304,0.011050994455386359,"FP_T min_val = values[0], max_val = values[4];"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,691,128868,1574772304,0.008183278285544448,return value_cache[index];
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,243,111872,1574772304,0.0071040111459821555,"return RayType(origin, ray.direction, lo, hi, ray.m_epsilons);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/Commons.cuh,513,106376,1574772304,0.006755008310077569,"_swap(heap, root, child);"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,856,85912,1574772304,0.005455518857029632,"quad_stack[stack_ptr++] = {u, v + hs, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v + hs, hs, next_depth};"
+memory_l2_theoretical_sectors_local,syris/gpu/cuda/source.cu,855,64434,1574772304,0.004091639142772224,"quad_stack[stack_ptr++] = {u, v, hs, next_depth}; quad_stack[stack_ptr++] = {u + hs, v, hs, next_depth};"

@@ -1,0 +1,58 @@
+{
+  "gpu": "NVIDIA RTX 2000 Ada Generation",
+  "cupy": "13.6.0",
+  "cuda_runtime": 13000,
+  "mesh": "/home/lt0649/.cache/pyvista_3/Armadillo.ply",
+  "mesh_sha256": "102ccc712069c91d471fd003373bdb2c83c7f037bd85ca75b160f69c35cdd282",
+  "triangles": 345944,
+  "size": 1024,
+  "precision": "float32",
+  "camera": "parallel",
+  "angle": 37,
+  "depths": [
+    1
+  ],
+  "warmup": 2,
+  "repeats": 1,
+  "line_info": true,
+  "source_sha256": {
+    "Commons.cuh": "1d3de9c93cc0a497a5cc20828507b06a95c6083d0df696e8edf77e0afc5616d5",
+    "CudaPipeline.py": "768bb2757817f51f56dbf7b871bffd2a83fd3029f9cf84c48c44b45f7af0c043",
+    "CudaTimer.py": "4f84b948c621f5422e27cf3ac799627d8a6a040062e54ea8cf180642d26a8c85",
+    "Legacy.cu": "fb1a033925941a2db8fd959fd163e1580b9b5e592db87d605d6b8b31f90b6fcc",
+    "Ray.cu": "41a9f50b21228a121aad1628affba51a261491635c0db80b70f9b4eafb6da1b7",
+    "Ray.cuh": "6c61ce29b7b07def94a4cf3261be068014362f9b9a574abed9e1ac833fb6e195",
+    "WatertightRay.cu": "0d20739586185aee39753b32f793346a638ec2957cab7cbd19093c8a9499db84",
+    "WatertightRay.cuh": "ecfdaa1753e62416696858659547211f2366f3bb423e8c60525b173825ee09da",
+    "sort.cu": "f5a0b5f12227e27258cfef8eb2b0ecf9a5894b95b57a80de1d2b5cd1e7eca815",
+    "source.cu": "71476deb1f72833a136e2bf73ecb1a4e0bd59b59d197155d01064b074848fa6d",
+    "source.cuh": "4c0c3e6398bed4392c1297cdce10efb407775c8263fdd5a7bc43c41a410ef189",
+    "staged.cuh": "15cfdb608f70cfa198109d96b77ebb06beef0fd728ca105f2c7be076b22b1c29"
+  },
+  "timing_note": "Instrumented wall times, not performance benchmarks. Capture excludes setup and output download.",
+  "timings": [
+    {
+      "depth": 1,
+      "repeat": 0,
+      "instrumented_wall_ms": 14801.236768005765
+    }
+  ],
+  "comparisons": {
+    "1": {
+      "nonfinite": 0,
+      "changed_pixels": 0
+    }
+  },
+  "kernel_attributes": {
+    "max_threads_per_block": 512,
+    "shared_size_bytes": 0,
+    "const_size_bytes": 72,
+    "local_size_bytes": 5328,
+    "num_regs": 128,
+    "ptx_version": 89,
+    "binary_version": 89,
+    "cache_mode_ca": 0,
+    "max_dynamic_shared_size_bytes": 49152,
+    "preferred_shared_memory_carveout": -1
+  }
+}

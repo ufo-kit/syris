@@ -1,0 +1,70 @@
+Signed accumulation study: final validation, 2026-11-06
+GPU: NVIDIA RTX 2000 Ada Generation
+
+Tests used SYRIS_REQUIRE_CUDA=1 and the CUDA/CuPy environment at
+/home/lt0649/Dev/syris_cuda/.venv/bin/python. Compilation time is included in
+test durations below, but excluded from benchmark projection timings.
+
+python -m unittest syris.tests.test_cuda_projection_variants -v
+Ran 15 tests in 349.802s
+OK
+
+python -m unittest syris.tests.test_cuda_projection \
+    syris.tests.test_cuda_signed_projection syris.tests.test_mesh_normals \
+    syris.tests.test_mesh_repair -v
+Ran 204 tests in 160.487s
+OK
+
+Total: 219 focused tests passed across Float32, Float64, and mixed precision.
+This is the focused projection/mesh suite, not a claim about the entire project.
+The unchanged camera-constructor issue is recorded in the first-round
+validation.txt file.
+
+compute-sanitizer --tool memcheck --error-exitcode 99: 5 tests
+  TestProjectionVariantsFloat32.test_deferred_empty_partial_and_full_retry_queues
+  TestProjectionVariantsFloat32.test_deferred_cavity_matches_at_every_supported_depth
+  TestProjectionVariantsFloat64.test_deferred_invalid_crossings_remain_nan
+  TestSignedFloat32.test_event_batches_keep_complete_duplicate_groups
+  TestSignedMixed.test_many_disjoint_thin_layers_match_ordered_reference
+Ran 5 tests in 14.436s
+OK
+ERROR SUMMARY: 0 errors
+
+compute-sanitizer --tool initcheck --error-exitcode 99: 3 tests
+  TestProjectionVariantsFloat32.test_deferred_empty_partial_and_full_retry_queues
+  TestProjectionVariantsFloat64.test_deferred_cavity_matches_at_every_supported_depth
+  TestSignedFloat32.test_many_disjoint_thin_layers_match_ordered_reference
+Ran 3 tests in 7.181s
+OK
+ERROR SUMMARY: 0 errors
+
+Completed benchmark audits:
+  rtx2000ada-signed-float32.json: 90 variant/view cases, 7 repeats.
+  rtx2000ada-signed-float64.json: 72 variant/view cases, 5 repeats.
+  rtx2000ada-signed-mixed.json: 72 variant/view cases, 5 repeats.
+  rtx2000ada-signed-deferred-mixed1024.json: 24 variant/view cases, 7 repeats.
+All four reports match the final CUDA source hashes, contain every planned
+view and repeat, and have no nonfinite outputs or finite-mask changes.
+
+Float32 and mixed outputs are exactly equal to their optimized ordered
+references in all completed comparisons. Float64 preserves zero/finite masks
+but changes some last bits: maximum relative difference 4.746013145744484e-16,
+maximum absolute difference 2.842170943040401e-14. Its acceptance threshold is
+atol=0, rtol=1.7763568394002505e-15 (eight Float64 machine epsilons), matching
+the image-level regression tolerance. This tolerance only evaluates results;
+it does not modify projection or adaptive sampling arithmetic.
+
+rtx2000ada-signed-float64-exact-attempt.json preserves the initial strict
+comparison failure at the first view. It is not a completed benchmark run.
+Earlier Float32 ablation/depth reports retain their original source hashes.
+The benchmark rejects nonfinite results even if both variants produce them.
+
+git diff --check: passed.
+Python source syntax and benchmark --help: passed.
+RST heading lengths checked; a full Sphinx build was not run because Sphinx
+and Docutils are not installed in this environment.
+
+The signed mode assumes closed, consistently oriented 0/1 material boundaries.
+The explicit overlap test demonstrates that balanced entry/exit counts do not
+validate this assumption. These checks are not an arbitrary-scene accuracy or
+pixel-integration certificate. Ordinary initialization keeps the ordered mode.

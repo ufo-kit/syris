@@ -1,0 +1,85 @@
+{
+  "cupy": "13.6.0",
+  "gpu": "NVIDIA RTX 2000 Ada Generation",
+  "note": "Static instructions in the named projector only; not executed traffic or stall counters.",
+  "variants": {
+    "indexed": {
+      "kernel": "project_parallel_normals_kernel",
+      "compile_options": [
+        "-I /home/lt0649/.codex/worktrees/a6ee/syris_cuda/syris/gpu/cuda ",
+        "-DSYRIS_BOX_SCALAR_SELECTION=0",
+        "-DSYRIS_WARP_TILE_WIDTH=0"
+      ],
+      "cache_file": "/tmp/syris-performance-cupy/0fc3892c00df439dd7988017a4a59374c95db70a.cubin",
+      "cubin_sha256": "5288e0171d743d5d584a5c1aff1fe3d937671b5561816ea182eb27e8241f5419",
+      "source_sha256": "58df556bd88d5e024fcc537344a267a860b9eb832e2e871ab5f26e15d5a76b7d",
+      "attributes": {
+        "max_threads_per_block": 512,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 5328,
+        "num_regs": 128,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "static_local_load_instructions": 655,
+      "static_local_store_instructions": 885,
+      "sass": "/tmp/syris-scheduling-codegen/indexed-sass.txt"
+    },
+    "scalar_axes": {
+      "kernel": "project_parallel_normals_kernel",
+      "compile_options": [
+        "-I /home/lt0649/.codex/worktrees/a6ee/syris_cuda/syris/gpu/cuda ",
+        "-DSYRIS_BOX_SCALAR_SELECTION=2",
+        "-DSYRIS_WARP_TILE_WIDTH=0"
+      ],
+      "cache_file": "/tmp/syris-performance-cupy/21c6c55937c943d8a515798f1db309dab8872039.cubin",
+      "cubin_sha256": "c8f9d23e3a359e116a362d6c740f7deedf35a598ebe03d155c22cb4da0c08a57",
+      "source_sha256": "58df556bd88d5e024fcc537344a267a860b9eb832e2e871ab5f26e15d5a76b7d",
+      "attributes": {
+        "max_threads_per_block": 512,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 5296,
+        "num_regs": 124,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "static_local_load_instructions": 545,
+      "static_local_store_instructions": 806,
+      "sass": "/tmp/syris-scheduling-codegen/scalar_axes-sass.txt"
+    },
+    "tile4_axes": {
+      "kernel": "project_parallel_normals_kernel",
+      "compile_options": [
+        "-I /home/lt0649/.codex/worktrees/a6ee/syris_cuda/syris/gpu/cuda ",
+        "-DSYRIS_BOX_SCALAR_SELECTION=2",
+        "-DSYRIS_WARP_TILE_WIDTH=4"
+      ],
+      "cache_file": "/tmp/syris-performance-cupy/fed824df6f09271056dd9dd37acd2e5ca6844057.cubin",
+      "cubin_sha256": "0fbe6b6e67351c2744c3d834b62fdbb54b1ba7805bd6f86a19527613f5e79bc7",
+      "source_sha256": "58df556bd88d5e024fcc537344a267a860b9eb832e2e871ab5f26e15d5a76b7d",
+      "attributes": {
+        "max_threads_per_block": 512,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 4400,
+        "num_regs": 122,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "static_local_load_instructions": 544,
+      "static_local_store_instructions": 836,
+      "sass": "/tmp/syris-scheduling-codegen/tile4_axes-sass.txt"
+    }
+  }
+}

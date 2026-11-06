@@ -1,0 +1,7 @@
+Time (%),Total Time (ns),Instances,Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Style,Range
+29.9,74488751,1,74488751.0,74488751.0,74488751,74488751,0.0,PushPop,:projection/float32/parallel/depth=1/repeat=2
+29.7,74037350,1,74037350.0,74037350.0,74037350,74037350,0.0,PushPop,:projection/float32/parallel/depth=1/repeat=1
+29.7,74005953,1,74005953.0,74005953.0,74005953,74005953,0.0,PushPop,:projection/float32/parallel/depth=1/repeat=0
+4.6,11595092,1,11595092.0,11595092.0,11595092,11595092,0.0,PushPop,:projection/float32/parallel/depth=0/repeat=0
+3.2,7929905,1,7929905.0,7929905.0,7929905,7929905,0.0,PushPop,:projection/float32/parallel/depth=0/repeat=2
+3.0,7465034,1,7465034.0,7465034.0,7465034,7465034,0.0,PushPop,:projection/float32/parallel/depth=0/repeat=1

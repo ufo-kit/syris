@@ -1,0 +1,48 @@
+First-round validation, 2026-11-05. Source-hash statements below refer to
+the checkout at that time, before the later signed-sum experiments.
+
+/tmp/syris-performance-tests.log
+----------------------------------------------------------------------
+Ran 120 tests in 7.194s
+
+OK
+
+/tmp/syris-performance-memcheck.log
+----------------------------------------------------------------------
+Ran 5 tests in 7.957s
+
+OK
+========= ERROR SUMMARY: 0 errors
+
+/tmp/syris-performance-initcheck.log
+----------------------------------------------------------------------
+Ran 2 tests in 2.040s
+
+OK
+========= ERROR SUMMARY: 0 errors
+
+/tmp/syris-performance-cameras.log
+======================================================================
+ERROR: test_constructor (syris.tests.test_cameras.TestCamera.test_constructor)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/syris/tests/test_cameras.py", line 44, in test_constructor
+    Camera(1 * q.um, 0.1, 10, 1, 12, None)
+  File "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/syris/devices/cameras.py", line 110, in __init__
+    self.update_viewport_dimensions()
+  File "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/syris/devices/cameras.py", line 157, in update_viewport_dimensions
+    self._viewport_dimensions = self._pixel_size * self._shape
+                                ~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+TypeError: unsupported operand type(s) for *: 'float' and 'NoneType'
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.098s
+
+FAILED (errors=1)
+
+Baseline camera check: executing Camera from git f75c9af with the same missing-shape arguments reproduces the identical TypeError.
+
+Final benchmark audit:
+rtx2000ada-float32.json: 30 completed cases; all source hashes match this worktree; zero changed pixels, finite masks, or finite absolute differences.
+rtx2000ada-float64.json: 30 completed cases; all source hashes match this worktree; zero changed pixels, finite masks, or finite absolute differences.
+rtx2000ada-mixed.json: 30 completed cases; all source hashes match this worktree; zero changed pixels, finite masks, or finite absolute differences.

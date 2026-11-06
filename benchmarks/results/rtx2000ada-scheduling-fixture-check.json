@@ -1,0 +1,49 @@
+[
+  {
+    "extent": 0.5,
+    "depth": 0,
+    "indexed_equals_scalar": true,
+    "prechange_snapshot_equals_scalar": true,
+    "nonfinite": 1,
+    "nonfinite_indices": [
+      [
+        0,
+        1
+      ]
+    ],
+    "minimum_finite": 0.04052468383590424
+  },
+  {
+    "extent": 0.5,
+    "depth": 1,
+    "indexed_equals_scalar": true,
+    "prechange_snapshot_equals_scalar": true,
+    "nonfinite": 1,
+    "nonfinite_indices": [
+      [
+        0,
+        1
+      ]
+    ],
+    "minimum_finite": 0.12127061680390683
+  },
+  {
+    "extent": 2.0,
+    "depth": 0,
+    "indexed_equals_scalar": true,
+    "prechange_snapshot_equals_scalar": true,
+    "nonfinite": 0,
+    "nonfinite_indices": [],
+    "minimum_finite": 1.4001093707278693,
+    "max_relative_analytic_error": 8.484745818897145e-15
+  },
+  {
+    "extent": 2.0,
+    "depth": 1,
+    "indexed_equals_scalar": true,
+    "prechange_snapshot_equals_scalar": true,
+    "nonfinite": 0,
+    "nonfinite_indices": [],
+    "minimum_finite": 1.4001093707278693
+  }
+]

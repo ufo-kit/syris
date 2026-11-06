@@ -1,0 +1,40 @@
+{
+  "status": "passed",
+  "benchmarks": {
+    "float32": {
+      "scenarios": 24,
+      "repeats": 7,
+      "exact_comparisons": true,
+      "report_sha256": "649a7388954e783982f25c429edb4344798e5f77adb4f362eef1b49759ff2980"
+    },
+    "float64": {
+      "scenarios": 24,
+      "repeats": 7,
+      "exact_comparisons": true,
+      "report_sha256": "405282b6046812f07cb0837e7e22e8ddaf9098782bb43ea23b43c948743d15a4"
+    },
+    "mixed": {
+      "scenarios": 24,
+      "repeats": 7,
+      "exact_comparisons": true,
+      "report_sha256": "abc67fcff05cbb4041442de180e9a6787861f1f37faa5bf1591e9743776d719a"
+    }
+  },
+  "validation": {
+    "tests_run": 217,
+    "memcheck": {
+      "tests": 2,
+      "errors": 0
+    },
+    "synccheck": {
+      "tests": 2,
+      "errors": 0
+    },
+    "profile_driver": "line-info and width 4; exact warmup agreement",
+    "existing_limitation": "One Float64 narrow-layer cone NaN also occurs in the pre-change snapshot; retained as an equality fixture.",
+    "codegen": "Float32 cached kernel attributes match measured variants",
+    "python_syntax": "passed",
+    "diff_check": "passed",
+    "documentation": "RST headings checked; Sphinx and Docutils unavailable"
+  }
+}

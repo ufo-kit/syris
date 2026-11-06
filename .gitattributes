@@ -1,0 +1,2 @@
+# Keep captured validation logs byte-for-byte, including console whitespace.
+benchmarks/results/*.log -whitespace

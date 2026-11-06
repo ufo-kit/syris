@@ -1,0 +1,344 @@
+{
+  "baseline_ref": "f75c9afb71c3ed25a820307d85f5d98ac0d6e9c1",
+  "gpu": "NVIDIA RTX 2000 Ada Generation",
+  "cupy": "13.6.0",
+  "cuda_runtime": 13000,
+  "precision": "float64",
+  "repeats": 5,
+  "reference_variant": "optimized",
+  "atol": 0,
+  "rtol": 0,
+  "assumed_material_boundary": true,
+  "timing": "warmed; wall includes preparation and output scaling, excludes download; kernel_ms sums CUDA events on the launch stream",
+  "source_sha256": {
+    "syris/gpu/cuda/Commons.cuh": "1d3de9c93cc0a497a5cc20828507b06a95c6083d0df696e8edf77e0afc5616d5",
+    "syris/gpu/cuda/CudaPipeline.py": "768bb2757817f51f56dbf7b871bffd2a83fd3029f9cf84c48c44b45f7af0c043",
+    "syris/gpu/cuda/CudaTimer.py": "4f84b948c621f5422e27cf3ac799627d8a6a040062e54ea8cf180642d26a8c85",
+    "syris/gpu/cuda/Legacy.cu": "fb1a033925941a2db8fd959fd163e1580b9b5e592db87d605d6b8b31f90b6fcc",
+    "syris/gpu/cuda/Ray.cu": "41a9f50b21228a121aad1628affba51a261491635c0db80b70f9b4eafb6da1b7",
+    "syris/gpu/cuda/Ray.cuh": "6c61ce29b7b07def94a4cf3261be068014362f9b9a574abed9e1ac833fb6e195",
+    "syris/gpu/cuda/WatertightRay.cu": "0d20739586185aee39753b32f793346a638ec2957cab7cbd19093c8a9499db84",
+    "syris/gpu/cuda/WatertightRay.cuh": "ecfdaa1753e62416696858659547211f2366f3bb423e8c60525b173825ee09da",
+    "syris/gpu/cuda/sort.cu": "f5a0b5f12227e27258cfef8eb2b0ecf9a5894b95b57a80de1d2b5cd1e7eca815",
+    "syris/gpu/cuda/source.cu": "71476deb1f72833a136e2bf73ecb1a4e0bd59b59d197155d01064b074848fa6d",
+    "syris/gpu/cuda/source.cuh": "4c0c3e6398bed4392c1297cdce10efb407775c8263fdd5a7bc43c41a410ef189",
+    "syris/gpu/cuda/staged.cuh": "15cfdb608f70cfa198109d96b77ebb06beef0fd728ca105f2c7be076b22b1c29"
+  },
+  "attributes": {
+    "optimized": {
+      "project_parallel_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 10000,
+        "num_regs": 164,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "project_parallel_normals_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 9968,
+        "num_regs": 168,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "project_conebeam_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 10000,
+        "num_regs": 166,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "project_conebeam_normals_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 9968,
+        "num_regs": 166,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      }
+    },
+    "signed": {
+      "project_parallel_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 10000,
+        "num_regs": 164,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "project_parallel_normals_kernel": {
+        "max_threads_per_block": 256,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 6640,
+        "num_regs": 178,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "project_conebeam_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 10000,
+        "num_regs": 166,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "project_conebeam_normals_kernel": {
+        "max_threads_per_block": 256,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 6640,
+        "num_regs": 178,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      }
+    },
+    "signed_deferred": {
+      "project_parallel_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 10000,
+        "num_regs": 164,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "project_parallel_normals_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 1280,
+        "num_regs": 144,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "project_conebeam_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 10000,
+        "num_regs": 166,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      },
+      "project_conebeam_normals_kernel": {
+        "max_threads_per_block": 384,
+        "shared_size_bytes": 0,
+        "const_size_bytes": 72,
+        "local_size_bytes": 1280,
+        "num_regs": 144,
+        "ptx_version": 89,
+        "binary_version": 89,
+        "cache_mode_ca": 0,
+        "max_dynamic_shared_size_bytes": 49152,
+        "preferred_shared_memory_carveout": -1
+      }
+    }
+  },
+  "pipeline_prepare_seconds": {
+    "optimized": 4.1095991036854684e-05,
+    "signed": 37.28330416699464,
+    "signed_deferred": 0.46720608600298874
+  },
+  "datasets": [
+    {
+      "dataset": "Armadillo",
+      "triangles": 345944,
+      "size": 512,
+      "build_seconds": 0.07201535700005479,
+      "views": [
+        {
+          "parallel": true,
+          "angle": 0,
+          "depth": 0,
+          "variants": {
+            "optimized": {
+              "samples": [
+                {
+                  "wall_ms": 6.854670995380729,
+                  "kernel_ms": 5.396480083465576,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.396480083465576
+                  }
+                },
+                {
+                  "wall_ms": 6.85415200132411,
+                  "kernel_ms": 5.410111904144287,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.410111904144287
+                  }
+                },
+                {
+                  "wall_ms": 6.15135399857536,
+                  "kernel_ms": 5.006336212158203,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.006336212158203
+                  }
+                },
+                {
+                  "wall_ms": 6.300746012129821,
+                  "kernel_ms": 5.05241584777832,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.05241584777832
+                  }
+                },
+                {
+                  "wall_ms": 6.658573998720385,
+                  "kernel_ms": 5.534016132354736,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.534016132354736
+                  }
+                }
+              ],
+              "median_wall_ms": 6.658573998720385,
+              "median_kernel_ms": 5.396480083465576,
+              "nonfinite": 0,
+              "changed_finite_mask": 0,
+              "changed_pixels": 0,
+              "tolerance_exceeding_pixels": 0,
+              "max_abs_difference": 0.0
+            },
+            "signed": {
+              "samples": [
+                {
+                  "wall_ms": 6.864548005978577,
+                  "kernel_ms": 5.5951361656188965,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.5951361656188965
+                  }
+                },
+                {
+                  "wall_ms": 6.346286987536587,
+                  "kernel_ms": 5.062655925750732,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.062655925750732
+                  }
+                },
+                {
+                  "wall_ms": 6.273765990044922,
+                  "kernel_ms": 4.99235200881958,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 4.99235200881958
+                  }
+                },
+                {
+                  "wall_ms": 6.933101991307922,
+                  "kernel_ms": 5.61897611618042,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.61897611618042
+                  }
+                },
+                {
+                  "wall_ms": 6.189474996062927,
+                  "kernel_ms": 5.031936168670654,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.031936168670654
+                  }
+                }
+              ],
+              "median_wall_ms": 6.346286987536587,
+              "median_kernel_ms": 5.062655925750732,
+              "nonfinite": 0,
+              "changed_finite_mask": 0,
+              "changed_pixels": 40,
+              "tolerance_exceeding_pixels": 40,
+              "max_abs_difference": 1.4210854715202004e-14
+            },
+            "signed_deferred": {
+              "samples": [
+                {
+                  "wall_ms": 6.367615991621278,
+                  "kernel_ms": 5.149695873260498,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.149695873260498
+                  }
+                },
+                {
+                  "wall_ms": 6.891596000059508,
+                  "kernel_ms": 5.625855922698975,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.625855922698975
+                  }
+                },
+                {
+                  "wall_ms": 6.957297999178991,
+                  "kernel_ms": 5.711872100830078,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.711872100830078
+                  }
+                },
+                {
+                  "wall_ms": 6.6265429923078045,
+                  "kernel_ms": 5.468160152435303,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.468160152435303
+                  }
+                },
+                {
+                  "wall_ms": 7.071928994264454,
+                  "kernel_ms": 5.7630720138549805,
+                  "stages_ms": {
+                    "project_parallel_normals_kernel": 5.7630720138549805
+                  }
+                }
+              ],
+              "median_wall_ms": 6.891596000059508,
+              "median_kernel_ms": 5.625855922698975,
+              "nonfinite": 0,
+              "changed_finite_mask": 0,
+              "changed_pixels": 40,
+              "tolerance_exceeding_pixels": 40,
+              "max_abs_difference": 1.4210854715202004e-14,
+              "retried_pixels": 0
+            }
+          }
+        }
+      ],
+      "path": "/home/lt0649/.cache/pyvista_3/Armadillo.ply",
+      "sha256": "102ccc712069c91d471fd003373bdb2c83c7f037bd85ca75b160f69c35cdd282"
+    }
+  ],
+  "comparison_status": "failed",
+  "note": "Initial exact-equality comparison stopped at the first view. Retained as evidence of Float64 summation-order differences; not a completed performance run."
+}

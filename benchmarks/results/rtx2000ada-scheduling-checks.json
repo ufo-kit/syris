@@ -1,0 +1,97 @@
+{
+  "status": "passed",
+  "stages": [
+    {
+      "name": "regressions",
+      "command": [
+        "/home/lt0649/Dev/syris_cuda/.venv/bin/python",
+        "/tmp/syris-validate-scheduling.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 29.24677476201032,
+      "log": "/tmp/syris-scheduling-regressions.log",
+      "log_sha256": "dad636f2f18b8968117bdb77948c08df0006438f9fc3526df8034836eb6e704a"
+    },
+    {
+      "name": "codegen",
+      "command": [
+        "/home/lt0649/Dev/syris_cuda/.venv/bin/python",
+        "/tmp/syris-export-scheduling-cubins.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.595370720999199,
+      "log": "/tmp/syris-scheduling-codegen.log",
+      "log_sha256": "40138f83fcf67dd2503aa828b8c71b86b672c9415ce866606b6291e4dedd2ef4"
+    },
+    {
+      "name": "profile-driver",
+      "command": [
+        "/home/lt0649/Dev/syris_cuda/.venv/bin/python",
+        "-m",
+        "benchmarks.profile_cuda_projection",
+        "--mesh",
+        "/home/lt0649/.cache/pyvista_3/Armadillo.ply",
+        "--size",
+        "128",
+        "--depths",
+        "0",
+        "1",
+        "--repeats",
+        "1",
+        "--line-info",
+        "--warp-tile-width",
+        "4",
+        "--output",
+        "benchmarks/results/rtx2000ada-scheduling-profile-smoke.json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 38.24149451999983,
+      "log": "/tmp/syris-scheduling-profile-driver.log",
+      "log_sha256": "fc75025b100250e40364f5f3ff6a621131135c600f306298b65158040c4ce2a3"
+    },
+    {
+      "name": "memcheck",
+      "command": [
+        "/usr/local/cuda/bin/compute-sanitizer",
+        "--tool",
+        "memcheck",
+        "--error-exitcode",
+        "99",
+        "--log-file",
+        "/tmp/syris-scheduling-memcheck-tool.log",
+        "/home/lt0649/Dev/syris_cuda/.venv/bin/python",
+        "-m",
+        "unittest",
+        "syris.tests.test_cuda_scheduling.TestPixelSchedulerCoverage",
+        "syris.tests.test_cuda_scheduling.TestWarpTilesFloat32.test_partial_tiles_match_reference",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.822400409000693,
+      "log": "/tmp/syris-scheduling-memcheck.log",
+      "log_sha256": "27d37b752f13a7b0f44774fa0425e03ab3b925202ac646b231e905095944caea"
+    },
+    {
+      "name": "synccheck",
+      "command": [
+        "/usr/local/cuda/bin/compute-sanitizer",
+        "--tool",
+        "synccheck",
+        "--error-exitcode",
+        "99",
+        "--log-file",
+        "/tmp/syris-scheduling-synccheck-tool.log",
+        "/home/lt0649/Dev/syris_cuda/.venv/bin/python",
+        "-m",
+        "unittest",
+        "syris.tests.test_cuda_scheduling.TestPixelSchedulerCoverage",
+        "syris.tests.test_cuda_scheduling.TestWarpTilesFloat32.test_partial_tiles_match_reference",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.188482791010756,
+      "log": "/tmp/syris-scheduling-synccheck.log",
+      "log_sha256": "fb6c50c5ae02c01ef3d7854c3d6cfd71e4c4cfd136676562984d1204c0b9c2cb"
+    }
+  ]
+}

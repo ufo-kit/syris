@@ -1,0 +1,25 @@
+NVTX Range,Style,PID,TID,NVTX Inst,Kern Inst,Total Time (ns),Avg (ns),Med (ns),Min (ns),Max (ns),StdDev (ns),Kernel Name
+:projection/float32/parallel/depth=0/repeat=0,PushPop,2894376,2894376,1,1,6994495,6994495.0,6994495.0,6994495,6994495,0.0,project_parallel_normals_kernel
+:projection/float32/parallel/depth=0/repeat=0,PushPop,2894376,2894376,1,4,362782,90695.5,101071.5,13024,147615,56347.3,cupy_multiply__float32_float_float32
+:projection/float32/parallel/depth=0/repeat=0,PushPop,2894376,2894376,1,1,39360,39360.0,39360.0,39360,39360,0.0,cupy_true_divide__float32_float_float32
+:projection/float32/parallel/depth=0/repeat=0,PushPop,2894376,2894376,1,1,10752,10752.0,10752.0,10752,10752,0.0,cupy_fill
+:projection/float32/parallel/depth=0/repeat=1,PushPop,2894376,2894376,1,1,6410850,6410850.0,6410850.0,6410850,6410850,0.0,project_parallel_normals_kernel
+:projection/float32/parallel/depth=0/repeat=1,PushPop,2894376,2894376,1,4,378718,94679.5,107327.5,12704,151359,58480.4,cupy_multiply__float32_float_float32
+:projection/float32/parallel/depth=0/repeat=1,PushPop,2894376,2894376,1,1,24799,24799.0,24799.0,24799,24799,0.0,cupy_true_divide__float32_float_float32
+:projection/float32/parallel/depth=0/repeat=1,PushPop,2894376,2894376,1,1,10528,10528.0,10528.0,10528,10528,0.0,cupy_fill
+:projection/float32/parallel/depth=0/repeat=2,PushPop,2894376,2894376,1,1,6997439,6997439.0,6997439.0,6997439,6997439,0.0,project_parallel_normals_kernel
+:projection/float32/parallel/depth=0/repeat=2,PushPop,2894376,2894376,1,4,373310,93327.5,103983.5,12672,152671,58468.6,cupy_multiply__float32_float_float32
+:projection/float32/parallel/depth=0/repeat=2,PushPop,2894376,2894376,1,1,40448,40448.0,40448.0,40448,40448,0.0,cupy_true_divide__float32_float_float32
+:projection/float32/parallel/depth=0/repeat=2,PushPop,2894376,2894376,1,1,10816,10816.0,10816.0,10816,10816,0.0,cupy_fill
+:projection/float32/parallel/depth=1/repeat=0,PushPop,2894376,2894376,1,1,72982437,72982437.0,72982437.0,72982437,72982437,0.0,project_parallel_normals_kernel
+:projection/float32/parallel/depth=1/repeat=0,PushPop,2894376,2894376,1,4,381662,95415.5,106623.5,13184,155231,59447.6,cupy_multiply__float32_float_float32
+:projection/float32/parallel/depth=1/repeat=0,PushPop,2894376,2894376,1,1,37600,37600.0,37600.0,37600,37600,0.0,cupy_true_divide__float32_float_float32
+:projection/float32/parallel/depth=1/repeat=0,PushPop,2894376,2894376,1,1,10656,10656.0,10656.0,10656,10656,0.0,cupy_fill
+:projection/float32/parallel/depth=1/repeat=1,PushPop,2894376,2894376,1,1,73014532,73014532.0,73014532.0,73014532,73014532,0.0,project_parallel_normals_kernel
+:projection/float32/parallel/depth=1/repeat=1,PushPop,2894376,2894376,1,4,381791,95447.8,105791.5,12864,157344,60193.4,cupy_multiply__float32_float_float32
+:projection/float32/parallel/depth=1/repeat=1,PushPop,2894376,2894376,1,1,31199,31199.0,31199.0,31199,31199,0.0,cupy_true_divide__float32_float_float32
+:projection/float32/parallel/depth=1/repeat=1,PushPop,2894376,2894376,1,1,10400,10400.0,10400.0,10400,10400,0.0,cupy_fill
+:projection/float32/parallel/depth=1/repeat=2,PushPop,2894376,2894376,1,1,73446274,73446274.0,73446274.0,73446274,73446274,0.0,project_parallel_normals_kernel
+:projection/float32/parallel/depth=1/repeat=2,PushPop,2894376,2894376,1,4,382143,95535.8,107376.0,12704,154687,59571.9,cupy_multiply__float32_float_float32
+:projection/float32/parallel/depth=1/repeat=2,PushPop,2894376,2894376,1,1,38336,38336.0,38336.0,38336,38336,0.0,cupy_true_divide__float32_float_float32
+:projection/float32/parallel/depth=1/repeat=2,PushPop,2894376,2894376,1,1,10528,10528.0,10528.0,10528,10528,0.0,cupy_fill

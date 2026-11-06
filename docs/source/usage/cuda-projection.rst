@@ -35,8 +35,10 @@ hit-grouping tolerance arguments remain in the raw kernel interface for
 compatibility and no longer control these predicates.
 
 The local hit buffer is a fast path. Rays exceeding its capacity use repeated
-BVH traversals to enumerate every crossing. Dense rays can therefore be slower;
-they are no longer silently truncated.
+BVH traversals to collect the next 32 distinct events at a time. All duplicate
+hits at each retained distance are combined before integration. The number of
+passes is unbounded, so dense rays are never silently truncated. Unused hit
+records are not initialized; only the written prefix is read.
 
 Optional mesh repair
 --------------------
@@ -92,3 +94,74 @@ These tolerances are refinement heuristics, not bounds on the pixel integration
 error: a feature missed by all sampled points can remain undetected. The tests
 verify the implemented sampling and analytic examples, not arbitrary-scene
 accuracy or watertightness for every representable input.
+
+Pixel scheduling
+----------------
+
+CUDA box intersections use scalar component selection instead of temporary
+runtime-indexed arrays. The conservative arithmetic and intersection decisions
+are retained. Pixel scheduling remains per thread by default.
+
+To assign a compact 4-column by 8-row detector tile to each warp::
+
+    syris.init(compute_backend="cuda", warp_tile_width=4)
+
+Widths 1, 2, 4, 8, 16, and 32 are supported; each tile contains 32 pixels.
+Zero selects the ordinary per-thread scheduler. This option is CUDA-only.
+Each lane evaluates its own pixel with the original ray coordinates and
+adaptive sampling. Completed warps fetch another tile dynamically. Partial
+edge tiles are masked without dropping lanes from warp synchronization.
+Raw launches with incomplete warps or multidimensional blocks use the ordinary
+scheduler. Deferred signed retry queues also retain per-thread assignment.
+The experimental staged sampler retains its own work queues.
+
+Tiling is optional because its performance depends on the scene, detector
+size, and sampling. It can improve locality while increasing time spent waiting
+for the slowest pixel in a warp. See :doc:`cuda-performance-ledger` for measured
+cases. The focused scheduling checks are::
+
+    SYRIS_REQUIRE_CUDA=1 python -m unittest syris.tests.test_cuda_scheduling -v
+
+Performance prototypes
+----------------------
+
+The default retains the 256-hit list and the local adaptive sampler. An
+experimental staged sampler is available with::
+
+    mesh.project(camera=camera, iterations=1, sampling_mode="staged")
+
+It traces shared root corners and pixel centers, repairs corners whose computed
+coordinates differ from the original pixel calculation, then refines a compact
+pixel queue. It preserves the selected depth, midpoint quadrature, tolerance
+checks, and NaN propagation. Deeper levels still use the local cache. It needs
+approximately 28 additional bytes per pixel in Float32 or 52 in Float64 and
+additional launches, and can be slower. ``iterations=0`` uses the usual center
+ray in either mode.
+
+A compile-time ``-DSYRIS_HIT_CAPACITY=32`` option experiments with a small common
+list and an out-of-line 256-hit retry before event batching. It is not the default:
+frequent retries can outweigh the smaller common list. The benchmark compiles
+this variant separately without changing the installed configuration.
+
+The signed-length prototype is available through the benchmark's ``signed``
+and ``signed_deferred`` variants, with ``--assume-material-boundary`` required.
+For a unit ray direction and outward material normals, it evaluates
+``sum(exit distances) - sum(entry distances)`` without sorting. Distances are
+rebased close to the scene and summed with compensated Float64 arithmetic.
+The triangle predicate, geometry storage, and pixel sampling remain unchanged.
+
+This requires a closed, consistently oriented boundary with material occupancy
+zero or one. Cavities and disconnected components are permitted. Overlapping
+or duplicate shells are not: the sum counts their multiplicity, even when the
+entry and exit counts balance. The flag asserts this contract; it does not
+validate a mesh. Ordinary library initialization does not enable this mode.
+
+Exact edge/vertex hits, uncertain normal signs, and inconsistent endpoint counts
+use the ordered fallback. ``signed`` falls back within the tracing kernel;
+``signed_deferred`` queues affected pixels and repeats their complete sampling
+in a separate ordered kernel. The latter supports only the local sampler.
+Neither mode assumes that balanced endpoint counts prove valid geometry.
+
+See :doc:`cuda-performance` for the measurements, tradeoffs, and reproduction
+commands. These are projection benchmarks; unchanged output on tested scenes
+is not a general certificate of geometric or pixel-integration accuracy.

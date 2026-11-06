@@ -1,0 +1,43 @@
+{
+  "modules": [
+    "syris.tests.test_cuda_projection",
+    "syris.tests.test_cuda_signed_projection",
+    "syris.tests.test_cuda_projection_variants",
+    "syris.tests.test_cuda_scheduling"
+  ],
+  "require_cuda": true,
+  "tests_run": 217,
+  "failures": [],
+  "errors": [],
+  "skips": [],
+  "elapsed_seconds": 28.749957218999043,
+  "source_sha256": {
+    "syris/gpu/cuda/Ray.cuh": "6c61ce29b7b07def94a4cf3261be068014362f9b9a574abed9e1ac833fb6e195",
+    "syris/gpu/cuda/CudaPipeline.py": "768bb2757817f51f56dbf7b871bffd2a83fd3029f9cf84c48c44b45f7af0c043",
+    "syris/gpu/cuda/CudaTimer.py": "4f84b948c621f5422e27cf3ac799627d8a6a040062e54ea8cf180642d26a8c85",
+    "syris/gpu/cuda/Ray.cu": "41a9f50b21228a121aad1628affba51a261491635c0db80b70f9b4eafb6da1b7",
+    "syris/gpu/cuda/sort.cu": "f5a0b5f12227e27258cfef8eb2b0ecf9a5894b95b57a80de1d2b5cd1e7eca815",
+    "syris/gpu/cuda/source.cu": "0c91d867cba856578a768da6a2ab26d503b1a850d41f688da57bfc154fc611da",
+    "syris/gpu/cuda/PixelScheduler.cuh": "f124e86564bc96befab95fa31ca73fc08f0dedef32dc7a9ac89ddbca1dc84dc8",
+    "syris/gpu/cuda/source.cuh": "4c0c3e6398bed4392c1297cdce10efb407775c8263fdd5a7bc43c41a410ef189",
+    "syris/gpu/cuda/staged.cuh": "15cfdb608f70cfa198109d96b77ebb06beef0fd728ca105f2c7be076b22b1c29",
+    "syris/gpu/cuda/Legacy.cu": "fb1a033925941a2db8fd959fd163e1580b9b5e592db87d605d6b8b31f90b6fcc",
+    "syris/gpu/cuda/Commons.cuh": "1d3de9c93cc0a497a5cc20828507b06a95c6083d0df696e8edf77e0afc5616d5",
+    "syris/gpu/cuda/WatertightRay.cuh": "ecfdaa1753e62416696858659547211f2366f3bb423e8c60525b173825ee09da",
+    "syris/gpu/cuda/WatertightRay.cu": "fa669597810ad490ee6535b70625e50f028b38cf0a793f01cc3e45a702952251"
+  },
+  "test_sha256": {
+    "syris/tests/test_cuda_projection.py": "a72c67c471f639e5615fd78af56a7074474ceba3722302e65aebcee74e6d7e0e",
+    "syris/tests/test_cuda_signed_projection.py": "409e36e13eac74b0ae0c919f5af5598991d4348507b16e601613841eec5160e9",
+    "syris/tests/test_cuda_projection_variants.py": "c7fbf9293d8233710f78cf407b32367295854c728fcd34fdb3c60f2ae516b159",
+    "syris/tests/test_cuda_scheduling.py": "a8d2211004fa60bf7cdb77dc8b90744df26e0e4e69a6cf00b7a1fde9f94ea5f5",
+    "syris/tests/cuda_projection_util.py": "d4f26945e8fd1ee4a37c0da0063c87a1ed82859d673589a70f17aefafba254df",
+    "syris/tests/cuda/projection_probe.cu": "edd7fdd497d8aa8b24d0e6f1fad64482caf113ec54432b576218d80595356d9a"
+  },
+  "python_sha256": {
+    "syris/__init__.py": "435dd6968540e555fcdc68c1a5a72222f5d66ae6424aecd970ce4b9c5ab15e5d",
+    "syris/bodies/accelerators.py": "a99bf6bf95fa2264ea989be8c9a76387f9ca47031f41e35deb4c5093a4379383",
+    "syris/gpu/cuda_utils.py": "37ae0a1e60017a92dacfac68c50b1c55d9ee0a75417df7bd701c96402da6d28b",
+    "benchmarks/cuda_projection.py": "364c81737ed07ff4688fb2383a4326c24ac8e0bca3106263f66d3e8a36a2670d"
+  }
+}

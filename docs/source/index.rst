@@ -40,6 +40,8 @@ Usage
    usage/profiling
    usage/examples
    usage/cuda-projection
+   usage/cuda-performance
+   usage/cuda-performance-ledger
 
 
 Indices and tables

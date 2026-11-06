@@ -1,0 +1,58 @@
+Scalar selection and warp scheduling: final validation, 2026-11-06
+GPU: NVIDIA RTX 2000 Ada Generation; CuPy 13.6.0; CUDA runtime 13.0.
+
+SYRIS_REQUIRE_CUDA=1 python -m unittest \
+    syris.tests.test_cuda_projection syris.tests.test_cuda_signed_projection \
+    syris.tests.test_cuda_projection_variants syris.tests.test_cuda_scheduling -v
+
+217 tests passed, zero failures, errors, or skips; final warmed run 28.750 s.
+The initial run also compiled the separate CUDA variants.
+The scheduling module covers 491,520 exact box decisions, 210 scheduler
+coverage combinations, four tile shapes, all three precisions, both cameras,
+normals/even-odd crossings, deepest adaptive sampling, and overflow/NaNs.
+The source, Python, and test hashes are in rtx2000ada-scheduling-validation.json.
+
+SYRIS_REQUIRE_CUDA=1 compute-sanitizer --tool memcheck --error-exitcode 99 \
+    python -m unittest \
+    syris.tests.test_cuda_scheduling.TestPixelSchedulerCoverage \
+    syris.tests.test_cuda_scheduling.TestWarpTilesFloat32.test_partial_tiles_match_reference -v
+
+The same command with --tool synccheck also passed.
+Each run: 2 tests passed; ERROR SUMMARY: 0 errors.
+Logs: scheduling-memcheck.log and scheduling-synccheck.log.
+The full commands and stage log hashes are in rtx2000ada-scheduling-checks.json.
+
+The profiling driver ran a 128-square Armadillo projection at depths 0 and 1,
+with --line-info --warp-tile-width 4. Captured images matched warmup exactly.
+This checks the driver; no new Nsight hardware-counter capture was collected.
+
+All three final benchmark files use indexed / scalar_axes / tile4_axes,
+seven interleaved warmed repeats, two meshes at 1024 square, and 20/140-layer
+scenes at 64 square, three views, and depths 0/1. All 72 cases have exact final
+image agreement and unchanged finite/zero masks. The indexed reference includes
+the previous hit-storage and overflow improvements; it is not f75c9af.
+Source hashes match the final checkout. See rtx2000ada-scheduling-audit.json.
+
+Fixture correction and known limitation:
+The first suite run failed two finite-output assertions in one Float64 cone
+overflow test. The narrow layers allow side exits and do not ensure every ray
+crosses all 140 layers. One pixel is NaN at both depths in the indexed kernel,
+all new variants, and a separately compiled pre-change CUDA snapshot.
+That original fixture remains an equality check. Wider layers now guarantee
+280 entry/exit crossings per center ray and check finite, analytic thickness;
+the independent Float64 center-ray check had maximum relative error 8.49e-15.
+The existing narrow-layer NaN is not fixed or hidden by these optimizations.
+The initial failures and diagnosis are preserved in the first-attempt reports,
+scheduling-regressions-first-attempt.log, and scheduling-fixture-check.json
+(JSON filenames have the rtx2000ada- prefix).
+
+Static cached Float32 parallel normals kernel inspection:
+                       registers    local bytes    LDL instructions    STL instructions
+indexed                128          5328           655                 885
+scalar_axes            124          5296           545                 806
+tile4_axes             122          4400           544                 836
+Static counts describe this kernel, not dynamically executed traffic or callees.
+The cached cubin hashes and compiler options are in the codegen report.
+
+Python syntax, new-file whitespace, RST heading lengths, and git diff --check
+passed. A full Sphinx build was not run: Sphinx and Docutils are not installed.

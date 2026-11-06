@@ -1,0 +1,37 @@
+{
+  "report": "/tmp/syris-ncu-armadillo-float32-d1-lineinfo.ncu-rep",
+  "report_sha256": "1c846ec2f6c326ccbe1c49296c2c97ac03afbe74e540f883d889087f593fef1f",
+  "compiled_source": "/tmp/syris-profile-admin-cupy/495963f99d72c535d85284f12369d91db81928b3.cubin.cu",
+  "compiled_source_sha256": "d3a2bd5043a68d824015e95a689860d58fdbec927cdcd264e47befc887aa1497",
+  "source_hashes_verified": true,
+  "source_offsets": [
+    {
+      "file": "WatertightRay.cu",
+      "preceding_lines": 5
+    },
+    {
+      "file": "Ray.cu",
+      "preceding_lines": 284
+    },
+    {
+      "file": "source.cu",
+      "preceding_lines": 522
+    },
+    {
+      "file": "Legacy.cu",
+      "preceding_lines": 1866
+    }
+  ],
+  "local_theoretical_sectors_at_box_arrays_percent": 76.9405862626855,
+  "excess_global_sectors_at_bbox_loads_percent": 78.80734570821416,
+  "excess_global_sectors_at_bvh_node_fields_percent": 96.18736254686758,
+  "long_scoreboard_samples_at_box_array_lines_percent": 54.034918501820705,
+  "all_warp_samples_at_box_predicate_percent": 53.26889568187756,
+  "all_warp_samples_at_next_leaf_percent": 28.561675925677083,
+  "interpretation": [
+    "Source-correlated samples are not exclusive execution times or predicted speedups.",
+    "The leading stall at box-array construction waits on incoming global bounding-box loads; it cannot all be charged to local arrays.",
+    "Theoretical sectors describe access patterns and do not measure post-cache physical L2 traffic.",
+    "One warmed kernel, 25 replay passes, cache-control none and clock-control none."
+  ]
+}
