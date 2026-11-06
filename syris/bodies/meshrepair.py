@@ -303,8 +303,15 @@ def repair_mesh(vertices, faces, dtype=np.float64, *, float32_rounding=False):
                 _check_float32_geometry(vertices, converted.astype(np.float64), faces)
                 _validate_result(cgal, converted.astype(np.float64), faces)
         except ValueError as exc:
+            rounding_hint = (
+                "Try experimental float32_rounding=True (--float32-rounding) "
+                "to search for a valid Float32 conversion. "
+                if not float32_rounding
+                else ""
+            )
             raise ValueError(
                 f"The repaired mesh is invalid after conversion to float32: {exc} "
+                f"{rounding_hint}"
                 "Use syris.init(double_precision=True), or --double-precision "
                 "in examples.mesh_cuda."
             ) from exc
