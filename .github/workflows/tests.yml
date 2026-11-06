@@ -14,31 +14,43 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10']
+        include:
+        - python-version: '3.10'
+          repair-extra: '--extra mesh-repair'
+        - python-version: '3.12'
+          repair-extra: '--extra mesh-repair'
+        # libigl 2.6.3 provides wheels through Python 3.12.
+        - python-version: '3.14'
+          repair-extra: ''
       fail-fast: false
     steps:
-    - uses: actions/checkout@v3
-    - name: Display Ubuntu version
-      run: lsb_release -d
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+    - name: Set up uv and Python ${{ matrix.python-version }}
+      uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
       with:
+        version: "0.10.12"
         python-version: ${{ matrix.python-version }}
-    - name: Display python version
-      run: python --version
+        enable-cache: true
     - name: Install dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -qq python3-pyopencl
-        python -m pip install --upgrade pip
-        pip install flake8 pytest coverage
-        pip install -r requirements.txt
+        sudo apt-get install -qq pocl-opencl-icd
+        uv sync --locked --extra examples ${{ matrix.repair-extra }}
+    - name: Build and validate distributions
+      run: |
+        uv build
+        uv run --no-sync twine check --strict dist/*
+        uv venv --python ${{ matrix.python-version }} /tmp/syris-wheel-check
+        uv pip install --python /tmp/syris-wheel-check/bin/python dist/syris-*.whl
+        /tmp/syris-wheel-check/bin/python -I syris/tests/test_package_resources.py
     - name: Run tests with coverage
       run: |
-        coverage run -m --source=syris unittest discover -v
+        uv run --no-sync coverage run -m unittest discover -v
+        uv run --no-sync coverage xml
     - name: Upload coverage to Codecov
-      if: matrix.python-version == 3.8
-      uses: codecov/codecov-action@v2
+      if: matrix.python-version == '3.12'
+      uses: codecov/codecov-action@v5
       with:
         fail_ci_if_error: true
         verbose: true
+        token: ${{ secrets.CODECOV_TOKEN }}

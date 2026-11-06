@@ -1,5 +1,2 @@
-hydra-core
-omegaconf
-imageio
-matplotlib
-tqdm
+# Compatibility with pip -r; prefer uv sync --extra examples.
+-e .[examples]

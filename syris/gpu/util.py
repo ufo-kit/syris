@@ -20,7 +20,7 @@ Utility functions concerning GPU programming.
 """
 
 import itertools
-import pkg_resources
+from importlib.resources import files
 import queue
 import sys
 import numpy as np
@@ -134,9 +134,7 @@ def get_source(file_names, precision_sensitive=True):
     """
     string = ""
     for file_name in file_names:
-        string += pkg_resources.resource_string(
-            __name__, "opencl/{}".format(file_name)
-        ).decode()
+        string += files("syris.gpu").joinpath("opencl", file_name).read_text(encoding="utf-8")
 
     if precision_sensitive:
         string = get_precision_header() + string

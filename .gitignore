@@ -8,4 +8,9 @@ docs/build/
 *.log
 build/
 install_manifest.txt
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
 *.swp

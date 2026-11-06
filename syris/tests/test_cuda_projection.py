@@ -377,9 +377,9 @@ class TestCudaModuleCache(unittest.TestCase):
         from pathlib import Path
         import tempfile
         from .cuda_projection_util import cuda_or_skip
-        from syris.gpu.cuda_utils import CudaPipeline
 
         cp = cuda_or_skip()
+        from syris.gpu.cuda_utils import CudaPipeline
         with tempfile.TemporaryDirectory() as directory:
             header = Path(directory) / "value.cuh"
             source = Path(directory) / "value.cu"

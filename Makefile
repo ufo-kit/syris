@@ -1,31 +1,22 @@
-PYTHON = python
-SETUP = $(PYTHON) setup.py
-RUNTEST = nosetests syris
+UV ?= uv
+CUDA_EXTRA ?= cuda13
 
-.PHONY: build clean check check-fast dist init install
+.PHONY: all build dist install init check check-cuda docs
 
 all: build
 
-install: clean build
-	$(SETUP) install --record install_manifest.txt
+build dist:
+	$(UV) build
 
-uninstall:
-	cat install_manifest.txt | xargs rm -rf
-
-build:
-	$(SETUP) build
-
-dist:
-	$(SETUP) sdist
-
-clean:
-	$(SETUP) clean --all
+install init:
+	$(UV) sync
 
 check:
-	$(RUNTEST)
+	$(UV) run python -m unittest discover -v
 
-check-fast:
-	$(RUNTEST) -a '!slow'
+check-cuda:
+	SYRIS_REQUIRE_CUDA=1 $(UV) run --extra $(CUDA_EXTRA) python -m unittest \
+		syris.tests.test_cuda_projection syris.tests.test_cuda_scheduling -v
 
-init:
-	pip install -r ./requirements.txt
+docs:
+	$(UV) run --group docs sphinx-build -b html docs/source docs/build/html

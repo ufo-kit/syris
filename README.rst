@@ -1,8 +1,8 @@
 Syris
 =====
 
-.. image:: https://img.shields.io/badge/Python-3.6+-blue
-    :target: https://www.python.org/downloads/release/python-360
+.. image:: https://img.shields.io/badge/Python-3.10+-blue
+    :target: https://www.python.org/downloads/
 
 .. image:: https://badge.fury.io/py/syris.png
     :target: http://badge.fury.io/py/syris
@@ -27,11 +27,46 @@ by the Angular spectrum method, which enables one to include various optical
 elements in the simulation, e.g. gratings and X-ray lenses.
 
 Compute-intensive algorithms like Fourier transforms, sample shape creation and
-free-space propagation are implemented by using OpenCL, which enables one to
-execute the code on graphic cards.
+free-space propagation use OpenCL. Mesh projection also supports CUDA through
+CuPy.
 
 There are numerous examples of how to use *syris* described below which ship
 directly with the code. Enjoy!
+
+
+Installation
+------------
+
+From this checkout, install with `uv <https://docs.astral.sh/uv/>`_::
+
+    uv sync
+
+This creates ``.venv`` and installs the project in editable mode using
+``uv.lock``. Python 3.10 or newer is required; ``.python-version`` selects
+Python 3.12 for development. OpenCL execution needs a working vendor OpenCL
+runtime in addition to the Python packages.
+
+For CUDA 13 mesh projection and the examples::
+
+    uv sync --extra cuda13 --extra examples
+    uv run --extra cuda13 --extra examples python -m examples.mesh_cuda
+
+Use ``cuda12`` instead for CUDA 12. Install only one CUDA extra. The CUDA
+projector compiles kernels with ``nvcc``, so a matching CUDA toolkit and an
+NVIDIA driver are required; the extra installs the CuPy wheel. The BVH tree
+viewer also requires the Graphviz ``dot`` executable.
+
+Development commands::
+
+    uv run python -m unittest discover -v
+    uv run --group docs sphinx-build -b html docs/source docs/build/html
+    uv build
+
+The test suite needs an OpenCL runtime; CUDA-specific tests skip when CUDA is
+unavailable. Set ``SYRIS_REQUIRE_CUDA=1`` when CUDA tests must run. Use
+``uv sync --locked`` to check an existing lockfile, and ``uv lock --upgrade``
+when intentionally updating dependencies. Standard ``pip install .`` and
+``pip install '.[cuda13]'`` also work.
 
 
 Usage
@@ -69,17 +104,18 @@ For more detailed information please see the `reference <https://syris.readthedo
 Examples
 ********
 
-Are stored in the **examples** directory. Make sure you install their
-dependencies by ``pip install -r requirements-examples.txt`` and then you can
-run them from the top-level directory of syris repository by e.g. ``python -m
-examples.simple``.
+Are stored in the **examples** directory. Run them from the checkout with,
+for example, ``uv run --extra examples python -m examples.simple``.
 
 Optional mesh repair
 ********************
 
 Install libigl and the PyVista loader from this checkout::
 
-    uv pip install -e '.[mesh-repair]'
+    uv sync --extra cuda13 --extra examples --extra mesh-repair
+
+The pinned Python 3.12 environment has prebuilt libigl wheels. On newer Python
+versions, libigl 2.6.3 may require a source build.
 
 Use ``Mesh.from_file(..., repair=True)`` to resolve self-intersections and
 overlaps within one material. The input must be closed and oriented out of
@@ -89,12 +125,15 @@ results raise ``ValueError``.
 
 For the CUDA dragon example::
 
-    uv run python -m examples.mesh_cuda --repair-mesh --double-precision
+    uv run --extra cuda13 --extra examples --extra mesh-repair \
+        python -m examples.mesh_cuda --repair-mesh --double-precision
 
 The same repair and precision flags are available in ``examples.mesh_scan_cuda``,
 ``examples.visualize_bvh_tree`` and ``examples.visualize_bvh_bboxes``. For example::
 
-    uv run python -m examples.visualize_bvh_bboxes --input mesh.ply --show-nodes --repair-mesh --double-precision
+    uv run --extra cuda13 --extra examples --extra mesh-repair \
+        python -m examples.visualize_bvh_bboxes --input mesh.ply \
+        --show-nodes --repair-mesh --double-precision
 
 Repair runs on the CPU in Float64 and validates the result after conversion to
 the selected precision. Double precision avoids losing newly created fine
@@ -104,7 +143,8 @@ copyleft module; see its `licenses
 
 To try Float32 storage and BVH traversal with Float64 triangle arithmetic::
 
-    uv run python -m examples.mesh_cuda --repair-mesh --float32-rounding --mixed-precision
+    uv run --extra cuda13 --extra examples --extra mesh-repair \
+        python -m examples.mesh_cuda --repair-mesh --float32-rounding --mixed-precision
 
 The equivalent Python options are ``syris.init(compute_backend="cuda",
 mixed_precision=True)`` and ``Mesh.from_file(..., repair=True,

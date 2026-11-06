@@ -18,7 +18,7 @@
 """Cameras used by experiments."""
 
 import logging
-import pkg_resources
+from importlib.resources import files
 import numpy as np
 import quantities as q
 import scipy.interpolate as interp
@@ -488,11 +488,8 @@ class Camera(MovableBody):
 
 def make_pco_dimax():
     """Make a pco.dimax camera."""
-    lam, qe = np.load(
-        pkg_resources.resource_filename(
-            __name__, "data/dimax_quantum_efficiencies.npy"
-        )
-    )
+    with files("syris.devices").joinpath("data", "dimax_quantum_efficiencies.npy").open("rb") as data:
+        lam, qe = np.load(data)
     lam = lam * q.m
 
     # Use a power of two padded value so that it's easier to use with FFT

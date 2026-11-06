@@ -18,7 +18,7 @@
 import os
 import numpy as np
 import quantities as q
-from distutils.spawn import find_executable
+from shutil import which
 from syris import config as cfg
 from syris.materials import Material, MaterialError, make_pmasf, make_henke, make_fromfile
 from syris.tests import default_syris_init, SyrisTest
@@ -79,17 +79,17 @@ class TestPMASFMaterial(SyrisTest):
         self.refractive_indices = np.array([i + i * 1j for i in range(1, len(self.energies) + 1)])
 
     def test_multiple_energies(self):
-        if find_executable(cfg.PMASF_FILE):
+        if which(cfg.PMASF_FILE):
             energies = np.linspace(15, 25, 10) * q.keV
             material = make_pmasf("PMMA", energies)
             self.assertEqual(len(material.refractive_indices), 10)
 
     def test_wrong_energy(self):
-        if find_executable(cfg.PMASF_FILE):
+        if which(cfg.PMASF_FILE):
             self.assertRaises(RuntimeError, make_pmasf, "PMMA", [0] * q.keV)
 
     def test_wrong_material(self):
-        if find_executable(cfg.PMASF_FILE):
+        if which(cfg.PMASF_FILE):
             self.assertRaises(RuntimeError, make_pmasf, "asd", [0] * q.keV)
 
     def test_wrong_executable(self):

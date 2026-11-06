@@ -58,10 +58,9 @@ def init(
     import atexit
     import logging
     import syris.config as cfg
-    import pkg_resources
+    from pathlib import Path
     import os
     from syris.backend import ComputeBackend, HAS_OPENCL
-    from syris.gpu.cuda_utils import CudaPipeline
     from syris.gpu.util import make_opencl_defaults, init_programs
     from quantities import Quantity
 
@@ -80,7 +79,9 @@ def init(
     cfg.UNIT = Quantity(1, unit)
 
     if cfg.BACKEND.name == cfg.BACKEND.CUDA:
-        kernel_dir = pkg_resources.resource_filename("syris", "gpu/cuda/")
+        from syris.gpu.cuda_utils import CudaPipeline
+
+        kernel_dir = str(Path(__file__).resolve().parent / "gpu" / "cuda")
 
         source_files = ["WatertightRay.cu", "Ray.cu", "source.cu", "Legacy.cu"]
         abs_source_files = [os.path.join(kernel_dir, f) for f in source_files]

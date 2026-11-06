@@ -25,7 +25,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from distutils.spawn import find_executable
+from shutil import which
 from html.parser import HTMLParser
 from subprocess import Popen, PIPE
 from urllib.parse import urljoin
@@ -259,7 +259,7 @@ def make_pmasf(name, energies):
         executable = cfg.PMASF_FILE.split()[-1]
     else:
         executable = cfg.PMASF_FILE
-        if find_executable(executable) is None:
+        if which(executable) is None:
             raise RuntimeError("pmasf in '{}' not found".format(executable))
 
     cmd = "%s -C %s -E %f %f -p %d -+l%s -w Ed" % (
