@@ -155,9 +155,60 @@ __device__ bool intersectSlab(FP_T near_plane, FP_T far_plane,
     return entry <= exit;
 }
 
+#ifndef SYRIS_BOX_SCALAR_SELECTION
+#define SYRIS_BOX_SCALAR_SELECTION 2
+#endif
+static_assert(SYRIS_BOX_SCALAR_SELECTION >= 0 && SYRIS_BOX_SCALAR_SELECTION <= 2,
+              "Box selection must be indexed (0), plane-selected (1), or axis-selected (2)");
+
+// Runtime indexing of small local arrays can materialize them in device memory.
+// Select the identical component without changing its value or precision.
+__device__ __forceinline__ FP_T rayComponent(const FP_T4& value, int axis)
+{
+    return axis == 0 ? value.x : (axis == 1 ? value.y : value.z);
+}
+
+__device__ __forceinline__ FP_T boxPlane(const FP_T4& lower, const FP_T4& upper, int index)
+{
+    return index < 3 ? rayComponent(lower, index) : rayComponent(upper, index - 3);
+}
+
+__device__ __forceinline__ bool intersectSelectedSlab(
+    const FP_T4& lower, const FP_T4& upper, const FP_T4& direction,
+    int axis, int near_index, int far_index, FP_T origin_near, FP_T origin_far,
+    FP_T reciprocal_near, FP_T reciprocal_far, FP_T& entry, FP_T& exit)
+{
+    // Both planes use the same axis. Select their components once, then select
+    // which is near/far; the constructor fixes the indices to axis or axis+3.
+    const FP_T lo = rayComponent(lower, axis);
+    const FP_T hi = rayComponent(upper, axis);
+    return intersectSlab(near_index < 3 ? lo : hi, far_index < 3 ? lo : hi,
+                         origin_near, origin_far, reciprocal_near, reciprocal_far,
+                         rayComponent(direction, axis), entry, exit);
+}
+
 __device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box_max,
                                          FP_T tmin, FP_T tmax) const
 {
+#if SYRIS_BOX_SCALAR_SELECTION == 2
+    return intersectSelectedSlab(box_min, box_max, direction, Kx, near_kx_idx, far_kx_idx,
+                                 o_near_kx, o_far_kx, r_near_kx, r_far_kx, tmin, tmax)
+        && intersectSelectedSlab(box_min, box_max, direction, Ky, near_ky_idx, far_ky_idx,
+                                 o_near_ky, o_far_ky, r_near_ky, r_far_ky, tmin, tmax)
+        && intersectSelectedSlab(box_min, box_max, direction, Kz, near_kz_idx, far_kz_idx,
+                                 o_near_kz, o_far_kz, r_near_kz, r_far_kz, tmin, tmax);
+#elif SYRIS_BOX_SCALAR_SELECTION
+    return intersectSlab(boxPlane(box_min, box_max, near_kx_idx),
+                         boxPlane(box_min, box_max, far_kx_idx), o_near_kx, o_far_kx,
+                         r_near_kx, r_far_kx, rayComponent(direction, Kx), tmin, tmax)
+        && intersectSlab(boxPlane(box_min, box_max, near_ky_idx),
+                         boxPlane(box_min, box_max, far_ky_idx), o_near_ky, o_far_ky,
+                         r_near_ky, r_far_ky, rayComponent(direction, Ky), tmin, tmax)
+        && intersectSlab(boxPlane(box_min, box_max, near_kz_idx),
+                         boxPlane(box_min, box_max, far_kz_idx), o_near_kz, o_far_kz,
+                         r_near_kz, r_far_kz, rayComponent(direction, Kz), tmin, tmax);
+#else
+    // Retained for exact comparisons and performance ablations.
     const FP_T b[6] = {box_min.x, box_min.y, box_min.z, box_max.x, box_max.y, box_max.z};
     const FP_T d[3] = {direction.x, direction.y, direction.z};
     return intersectSlab(b[near_kx_idx], b[far_kx_idx], o_near_kx, o_far_kx,
@@ -166,6 +217,7 @@ __device__ bool WatertightRay::intersects(const FP_T4& box_min, const FP_T4& box
                          r_near_ky, r_far_ky, d[Ky], tmin, tmax)
         && intersectSlab(b[near_kz_idx], b[far_kz_idx], o_near_kz, o_far_kz,
                          r_near_kz, r_far_kz, d[Kz], tmin, tmax);
+#endif
 }
 
 __device__ FP_T WatertightRay::point_2_parametric (FP_T4 const &point) const {
@@ -212,7 +264,7 @@ __device__ double boundary_distance(const T *x, const T *y, const T *z,
 
 __device__ bool WatertightRay::intersects(
     FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3,
-    FP_T &t, unsigned col, unsigned row) const
+    FP_T &t, unsigned col, unsigned row, bool *boundary) const
 {
 #ifdef SYRIS_MIXED_PRECISION
     // Promote BEFORE subtracting or shearing: promoting rounded Float32
@@ -273,5 +325,6 @@ __device__ bool WatertightRay::intersects(
     else distance = (fma(u, double(z[0]), fma(v, double(z[1]), w * double(z[2]))) / det) * double(sz);
 
     t = FP_T(distance);
+    if (boundary) *boundary = u == 0.0 || v == 0.0 || w == 0.0;
     return isfinite(t) && t > m_epsilons.tri_ray_tmin;
 }

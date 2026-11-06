@@ -42,6 +42,7 @@ class BvhCupyAccelerator(AcceleratorBase):
             )
 
         self.xp = cfg.BACKEND.xp
+        self._projection_block_limit = 4 * self.xp.cuda.Device().attributes["MultiProcessorCount"]
 
         self.float_dtype = cfg.PRECISION.np_float
         self.float4_view = cfg.PRECISION.float4
@@ -200,6 +201,7 @@ class BvhCupyAccelerator(AcceleratorBase):
         iterations=0,
         abs_tolerance=1e-5,
         rel_tolerance=0.02,
+        sampling_mode="local",
         camera=None,
         **kwargs,
     ):
@@ -216,6 +218,8 @@ class BvhCupyAccelerator(AcceleratorBase):
             raise ValueError("abs_tolerance must be finite and nonnegative")
         if not np.isfinite(rel_tolerance) or rel_tolerance < 0:
             raise ValueError("rel_tolerance must be finite and nonnegative")
+        if sampling_mode not in ("local", "staged"):
+            raise ValueError("sampling_mode must be 'local' or 'staged'")
 
         parallel = kwargs.get("parallel", True)
 
@@ -240,13 +244,9 @@ class BvhCupyAccelerator(AcceleratorBase):
         global_counter = self.xp.zeros(1, dtype=self.xp.uint32)
 
         block_size = (256, 1, 1)
-        grid_size = (
-            int(
-                self.xp.ceil(camera.shape[0] * camera.shape[1] / block_size[0])
-            ),
-            1,
-            1,
-        )
+        pixel_grid_size = ((camera.shape[0] * camera.shape[1] + block_size[0] - 1)
+                           // block_size[0], 1, 1)
+        grid_size = pixel_grid_size
 
         # --- Build Kernel Arguments ---
         base_args = [
@@ -304,11 +304,40 @@ class BvhCupyAccelerator(AcceleratorBase):
             *self._epsilon_args,
         )
 
-        LOG.debug(f"Launching kernel: {kernel_name}")
-        time, _ = self.pipeline.launchKernel(
-            kernel_name, grid_size, block_size, all_args
-        )
-        LOG.debug(f"Projected mesh in {time} ms")
+        if sampling_mode == "staged" and iterations > 0:
+            rows, cols = camera.shape
+            # Stages pull tasks from counters; only classification uses a
+            # fixed pixel grid. In particular, refinement can have no work.
+            grid_size = (min(pixel_grid_size[0], self._projection_block_limit), 1, 1)
+            samples = self.xp.empty((rows + 1) * (cols + 1) + 5 * rows * cols,
+                                    dtype=self.float_dtype)
+            queue = self.xp.empty(rows * cols, dtype=self.xp.uint32)
+            queue_count = self.xp.zeros(1, dtype=self.xp.uint32)
+            eps = self.xp.asarray(self._epsilon_args, dtype=self.float_dtype)
+            source = (np.zeros(4, dtype=self.float_dtype) if parallel else
+                      camera.source_point * scale).view(self.float4_view)
+            staged_args = (
+                *base_args[:4],
+                base_args[4] if use_normals else np.uint64(0),
+                *camera_args[:6], source, np.int32(parallel), *tree_args,
+                *sampling_args, eps, samples, queue_count, queue,
+            )
+            self.pipeline.launchKernel("project_shared_samples_kernel",
+                                       grid_size, block_size, staged_args)
+            global_counter.fill(0)
+            self.pipeline.launchKernel("project_missing_samples_kernel",
+                                       grid_size, block_size, staged_args)
+            self.pipeline.launchKernel("classify_shared_samples_kernel",
+                                       pixel_grid_size, block_size, staged_args)
+            global_counter.fill(0)
+            self.pipeline.launchKernel("refine_shared_samples_kernel",
+                                       grid_size, block_size, staged_args)
+        else:
+            LOG.debug(f"Launching kernel: {kernel_name}")
+            time, _ = self.pipeline.launchKernel(
+                kernel_name, grid_size, block_size, all_args
+            )
+            LOG.debug(f"Projected mesh in {time} ms")
 
         self.pipeline.synchronize()
 

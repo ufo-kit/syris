@@ -35,7 +35,8 @@ def box(x0=-0.5, x1=0.5, y0=-0.5, y1=0.5, z0=0.0, z1=1.0):
 
 
 class ProjectionHarness:
-    def __init__(self, double=False, mixed_precision=False):
+    def __init__(self, double=False, mixed_precision=False, hit_capacity=None,
+                 signed_thickness=False, box_scalar_selection=None, warp_tile_width=None):
         if double and mixed_precision:
             raise ValueError("Choose double or mixed precision, not both.")
         self.cp = cuda_or_skip()
@@ -48,6 +49,14 @@ class ProjectionHarness:
         options = ["-D__FP_T_D__"] if double else []
         if mixed_precision:
             options.append("-DSYRIS_MIXED_PRECISION")
+        if hit_capacity is not None:
+            options.append(f"-DSYRIS_HIT_CAPACITY={hit_capacity}")
+        if signed_thickness:
+            options.append("-DSYRIS_SIGNED_THICKNESS")
+        if box_scalar_selection is not None:
+            options.append(f"-DSYRIS_BOX_SCALAR_SELECTION={int(box_scalar_selection)}")
+        if warp_tile_width is not None:
+            options.append(f"-DSYRIS_WARP_TILE_WIDTH={warp_tile_width}")
         self.pipeline = CudaPipeline([str(kernel_dir)], options)
         sources = [kernel_dir / f for f in
                    ("WatertightRay.cu", "Ray.cu", "source.cu", "Legacy.cu")]
@@ -56,7 +65,9 @@ class ProjectionHarness:
         names = ["test_triangles", "test_boxes", "test_trace", "projectTriangleCentroid",
                  "growTreeKernel", "project_parallel_kernel",
                  "project_parallel_normals_kernel", "project_conebeam_kernel",
-                 "project_conebeam_normals_kernel"]
+                 "project_conebeam_normals_kernel", "project_shared_samples_kernel",
+                 "project_missing_samples_kernel",
+                 "classify_shared_samples_kernel", "refine_shared_samples_kernel"]
         for name in names:
             self.pipeline.getKernelFromModule("tests", name)
         rc = cfg.RayCasting(double, 1)
@@ -133,16 +144,20 @@ class ProjectionHarness:
         ))
         return out.get()
 
-    def project(self, accel, *, parallel=True, depth=0, origin=(0, 0, -1),
-                pixel_size=(1, 1), source=(0.5, 0.5, -3), **kwargs):
+    def project(self, accel, **kwargs):
+        return float(self.project_image(accel, **kwargs)[0, 0])
+
+    def project_image(self, accel, *, parallel=True, depth=0, origin=(0, 0, -1),
+                      pixel_size=(1, 1), source=(0.5, 0.5, -3), shape=(1, 1),
+                      basis=((1, 0, 0), (0, 1, 0), (0, 0, 1)), **kwargs):
         def vec(x):
             return np.array([*x, 0], dtype=self.dtype)
         camera = SimpleNamespace(
-            shape=(1, 1), viewport_basis_vectors=(vec((1, 0, 0)), vec((0, 1, 0)), vec((0, 0, 1))),
-            kernel_shape_xy=np.array([1, 1], dtype=np.uint32),
+            shape=shape, viewport_basis_vectors=tuple(vec(axis) for axis in basis),
+            kernel_shape_xy=np.array(shape[::-1], dtype=np.uint32),
             p00_corner=vec(origin), kernel_pixel_size_xy=np.array(pixel_size, dtype=self.dtype),
             source_point=vec(source),
         )
         with self.configured():
-            return float(accel.project(camera=camera, parallel=parallel,
-                                       iterations=depth, **kwargs).get()[0, 0])
+            return accel.project(camera=camera, parallel=parallel,
+                                 iterations=depth, **kwargs).get()

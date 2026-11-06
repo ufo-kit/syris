@@ -6,19 +6,24 @@
 
 #ifdef __FP_T_D__
     using FP_T = double;
-
-    #define MAX_DEPTH 2
-    #define CACHE_DIM ((1 << (MAX_DEPTH + 1)) + 1)
-    #define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
-    #define MAX_QUADS_PER_PIXEL (1 + 3 * MAX_DEPTH)
+    #define SUPPORTED_MAX_DEPTH 2
 #else
     using FP_T = float;
-
-    #define MAX_DEPTH 3
-    #define CACHE_DIM ((1 << (MAX_DEPTH + 1)) + 1)
-    #define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
-    #define MAX_QUADS_PER_PIXEL (1 + 3 * MAX_DEPTH)
+    #define SUPPORTED_MAX_DEPTH 3
 #endif
+
+// A depth-specialized module must be dispatched only at its requested depth.
+// The ordinary module still handles every supported depth. Specialization
+// reduces cache/stack capacity; it does not reduce the requested sampling.
+#ifndef SYRIS_MAX_DEPTH
+#define SYRIS_MAX_DEPTH SUPPORTED_MAX_DEPTH
+#endif
+static_assert(SYRIS_MAX_DEPTH >= 0 && SYRIS_MAX_DEPTH <= SUPPORTED_MAX_DEPTH,
+              "Invalid sampling-depth specialization");
+#define MAX_DEPTH SYRIS_MAX_DEPTH
+#define CACHE_DIM ((1 << (MAX_DEPTH + 1)) + 1)
+#define CACHE_SIZE (CACHE_DIM * CACHE_DIM)
+#define MAX_QUADS_PER_PIXEL (1 + 3 * MAX_DEPTH)
 
 // #define DEBUG
 
@@ -34,6 +39,14 @@ constexpr int debug_row = 885;
 #define INVALID -1
 
 constexpr unsigned MAX_COLLISIONS = 256;
+
+// The default retains the original hit capacity. A smaller experimental
+// capacity retries at 256 hits before the unbounded event-batch fallback.
+#ifndef SYRIS_HIT_CAPACITY
+#define SYRIS_HIT_CAPACITY 256
+#endif
+static_assert(SYRIS_HIT_CAPACITY > 0 && SYRIS_HIT_CAPACITY <= MAX_COLLISIONS,
+              "SYRIS_HIT_CAPACITY must be between 1 and 256");
 
 typedef unsigned long long morton_t;
 typedef int long long delta_t;
@@ -52,8 +65,9 @@ struct HitRecord {
     FP_T t;
     unsigned int triangle_idx;
 
-    // Default constructor for List
-    __device__ HitRecord() : t(0.0), triangle_idx(0) {} 
+    // Only the written prefix of a List may be read. Initializing every unused
+    // record costs local-memory stores for every ray, including adaptive rays.
+    __device__ HitRecord() = default;
     
     __device__ HitRecord(FP_T t_val, unsigned int idx) : t(t_val), triangle_idx(idx) {}
 };
@@ -276,13 +290,13 @@ typedef struct
     FP_T4 *bboxMax;
 } Tree;
 
-template <typename T>
+template <typename T, unsigned Capacity = MAX_COLLISIONS>
 struct List {
-    T values[MAX_COLLISIONS];
+    T values[Capacity];
     unsigned count = 0;
 
     __device__ bool push_back(const T& value) {
-        if (count < MAX_COLLISIONS) {
+        if (count < Capacity) {
             values[count++] = value;
             return true;
         }
@@ -293,7 +307,7 @@ struct List {
 
     __device__ void push_back_atomic(const T& value) {
         unsigned index = atomicAdd(&count, 1);
-        if (index < MAX_COLLISIONS) {
+        if (index < Capacity) {
             values[index] = value;
         }
         else {
@@ -314,7 +328,7 @@ struct List {
     }
 
     __device__ void insert(unsigned index, const T& value) {
-        if (index > count || count >= MAX_COLLISIONS) return;
+        if (index > count || count >= Capacity) return;
         
         for (unsigned i = count; i > index; --i) {
             values[i] = values[i - 1];

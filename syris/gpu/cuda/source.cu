@@ -1,6 +1,7 @@
 #include "Commons.cuh"
 #include "Ray.cuh"
 #include "WatertightRay.cuh"
+#include "PixelScheduler.cuh"
 #include <cuda/atomic>
 
 
@@ -295,57 +296,82 @@ __device__ int hitOrientation(const RayType &ray, const FP_T4 *normals, unsigned
     return 0;
 }
 
-// Rare fallback for rays with more actual hits than fit in local memory.
-// Repeated BVH searches enumerate complete, ordered events using constant
-// storage. Runtime may increase, but the projection is never truncated.
+// Bounded nearest-event batches for rays exceeding the local hit capacity.
+// Each pass visits the complete BVH and retains the next BatchSize DISTINCT
+// distances, summing ALL orientations at retained distances. The cutoff only
+// decreases, so an evicted event cannot re-enter this batch. This guarantees
+// that duplicate groups are never split, even if a group exceeds the buffer.
+// Storage is bounded; the number of batches and geometric crossings is not.
 template<bool WithNormals, typename RayType>
-__device__ FP_T traceEvents(const RayType &ray, const Tree &tree,
-                           FP_T4 *vertices, FP_T4 *normals,
-                           unsigned row, unsigned col)
+__device__ __noinline__ FP_T traceEvents(const RayType &ray, const Tree &tree,
+                                        FP_T4 *vertices, FP_T4 *normals,
+                                        unsigned row, unsigned col)
 {
+    constexpr unsigned BatchSize = 32;
+    struct Event { FP_T t; int orientation; };
+    Event events[BatchSize];
     ThicknessSum<WithNormals> sum;
     FP_T previous = NEG_INFINITY;
     while (true) {
-        FP_T next = POS_INFINITY;
-        int orientation = 0, node = treeRoot(tree), leaf;
+        unsigned count = 0, furthest = 0;
+        int node = treeRoot(tree), leaf;
         while ((leaf = nextLeaf(tree, ray, node)) != SENTINEL) {
-            unsigned triangle = tree.indices[leaf];
-            unsigned base = 3 * triangle;
+            unsigned triangle = tree.indices[leaf], base = 3 * triangle;
             FP_T t;
-            if (ray.intersects(vertices[base], vertices[base+1], vertices[base+2], t, col, row)
-                && t > previous) {
-                if (t < next) {
-                    next = t;
-                    orientation = hitOrientation<WithNormals>(ray, normals, triangle);
-                } else if (t == next) {
-                    orientation += hitOrientation<WithNormals>(ray, normals, triangle);
-                }
+            if (!ray.intersects(vertices[base], vertices[base+1], vertices[base+2], t, col, row)
+                || t <= previous) continue;
+            if (count == BatchSize && t > events[furthest].t) continue;
+            int orientation = hitOrientation<WithNormals>(ray, normals, triangle);
+            unsigned i = 0;
+            while (i < count && events[i].t != t) ++i;
+            if (i < count) {
+                events[i].orientation += orientation;
+                continue;
+            }
+            if (count < BatchSize) {
+                events[count++] = {t, orientation};
+                if (t > events[furthest].t) furthest = count - 1;
+            } else {
+                events[furthest] = {t, orientation};
+                for (unsigned j = 0; j < count; ++j)
+                    if (events[j].t > events[furthest].t) furthest = j;
             }
         }
-        if (!isfinite(next)) break;
-        sum.event(next, orientation);
-        previous = next;
+        if (count == 0) break;
+        // Small, fixed-size batches: insertion sort avoids a second hit list.
+        for (unsigned i = 1; i < count; ++i) {
+            Event value = events[i];
+            unsigned j = i;
+            while (j > 0 && value.t < events[j-1].t) {
+                events[j] = events[j-1];
+                --j;
+            }
+            events[j] = value;
+        }
+        for (unsigned i = 0; i < count; ++i)
+            sum.event(events[i].t, events[i].orientation);
+        previous = events[count - 1].t;
+        if (count < BatchSize) break;
     }
     return sum.result();
 }
 
-template<bool WithNormals, typename RayType>
-__device__ FP_T traceThickness(const RayType &input_ray, const Tree &tree,
+template<bool WithNormals, unsigned Capacity, typename RayType>
+__device__ FP_T traceCollected(const RayType &ray, const Tree &tree,
                               FP_T4 *vertices, FP_T4 *normals,
-                              unsigned row, unsigned col)
+                              unsigned row, unsigned col, bool &overflow)
 {
-    if (tree.nb_keys == 0) return 0;
-    if (!input_ray.intersects(getBBMin(tree, treeRoot(tree)), getBBMax(tree, treeRoot(tree)))) return 0;
-    RayType ray = rebaseRay(input_ray, tree);
-    List<HitRecord> hits;
+    List<HitRecord, Capacity> hits;
     int node = treeRoot(tree), leaf;
     while ((leaf = nextLeaf(tree, ray, node)) != SENTINEL) {
         unsigned triangle = tree.indices[leaf];
         unsigned base = 3 * triangle;
         FP_T t;
         if (ray.intersects(vertices[base], vertices[base+1], vertices[base+2], t, col, row)) {
-            if (!hits.push_back(HitRecord(t, triangle)))
-                return traceEvents<WithNormals>(ray, tree, vertices, normals, row, col);
+            if (!hits.push_back(HitRecord(t, triangle))) {
+                overflow = true;
+                return 0;
+            }
         }
     }
     sort_hit(hits.values, hits.size());
@@ -363,6 +389,119 @@ __device__ FP_T traceThickness(const RayType &input_ray, const Tree &tree,
         sum.event(t, orientation);
     }
     return sum.result();
+}
+
+// Keep the large list out of the common path's stack frame. The retry uses the
+// SAME rebased ray and event rules, including duplicate boundaries and NaNs.
+template<bool WithNormals, typename RayType>
+__device__ __noinline__ FP_T traceLargeHits(const RayType &ray, const Tree &tree,
+                                          FP_T4 *vertices, FP_T4 *normals,
+                                          unsigned row, unsigned col)
+{
+    bool overflow = false;
+    FP_T value = traceCollected<WithNormals, MAX_COLLISIONS>(
+        ray, tree, vertices, normals, row, col, overflow);
+    return overflow ? traceEvents<WithNormals>(ray, tree, vertices, normals, row, col) : value;
+}
+
+#ifdef SYRIS_SIGNED_THICKNESS
+// Experimental contract: normals describe a closed, consistently oriented
+// boundary of material (winding number 0 or 1), with no duplicate/overlapping
+// shells. A balanced signed sum does NOT validate that contract. Keep this
+// disabled for general meshes, whose sorted crossing checks remain necessary.
+// On ambiguous rays, use the unchanged ordered-event semantics instead.
+template<typename RayType>
+__device__ __noinline__ FP_T traceSignedFallback(const RayType &ray, const Tree &tree,
+                                                FP_T4 *vertices, FP_T4 *normals,
+                                                unsigned row, unsigned col)
+{
+#ifdef SYRIS_SIGNED_DEFER_FALLBACK
+    // Thickness is nonnegative. This internal marker is consumed by the
+    // deferred pipeline, which retries the entire pixel with the sorted code.
+    return FP_T(NEG_INFINITY);
+#else
+    bool overflow = false;
+    FP_T value = traceCollected<true, MAX_COLLISIONS>(
+        ray, tree, vertices, normals, row, col, overflow);
+    return overflow ? traceEvents<true>(ray, tree, vertices, normals, row, col) : value;
+#endif
+}
+
+struct SignedLength {
+    double sum = 0.0, correction = 0.0;
+
+    __device__ void add(double value) {
+        // Neumaier compensation, with explicit rounding to preserve the error
+        // terms. Distances have already been rebased close to the scene.
+        double next = __dadd_rn(sum, value);
+        double error = fabs(sum) >= fabs(value)
+            ? __dadd_rn(__dsub_rn(sum, next), value)
+            : __dadd_rn(__dsub_rn(value, next), sum);
+        correction = __dadd_rn(correction, error);
+        sum = next;
+    }
+
+    __device__ double result() const { return __dadd_rn(sum, correction); }
+};
+
+template<typename RayType>
+__device__ FP_T traceSignedThickness(const RayType &ray, const Tree &tree,
+                                    FP_T4 *vertices, FP_T4 *normals,
+                                    unsigned row, unsigned col)
+{
+    SignedLength sum;
+    int balance = 0, first_orientation = 0;
+    FP_T first = POS_INFINITY;
+    int node = treeRoot(tree), leaf;
+    while ((leaf = nextLeaf(tree, ray, node)) != SENTINEL) {
+        unsigned triangle = tree.indices[leaf], base = 3 * triangle;
+        FP_T t;
+        bool boundary = false;
+        if (!ray.intersects(vertices[base], vertices[base+1], vertices[base+2],
+                            t, col, row, &boundary)) continue;
+        FP_T4 n = normals[triangle];
+        FP_T product = dot(ray.direction, n);
+        FP_T magnitude = fabs(ray.direction.x * n.x) + fabs(ray.direction.y * n.y)
+                       + fabs(ray.direction.z * n.z);
+        if (boundary || !isfinite(product) ||
+            fabs(product) <= FP_T(8) * ::cuda::std::numeric_limits<FP_T>::epsilon() * magnitude)
+            return traceSignedFallback(ray, tree, vertices, normals, row, col);
+        int orientation = (product < 0) - (product > 0);
+        if (t < first) { first = t; first_orientation = orientation; }
+        balance += orientation;
+        sum.add(-double(orientation) * double(t));
+    }
+    double value = sum.result();
+    // Catch inconsistent endpoint counts, leading exits on an outside ray,
+    // and nonphysical totals. These checks are necessary, NOT sufficient to
+    // infer validity of a general surface or replace mesh validation.
+    bool endpoints = (balance == 0 && first_orientation >= 0)
+                  || (balance == -1 && first_orientation < 0);
+    if (!endpoints || !isfinite(value) || value < 0)
+        return traceSignedFallback(ray, tree, vertices, normals, row, col);
+    return FP_T(value);
+}
+#endif
+
+template<bool WithNormals, typename RayType>
+__device__ FP_T traceThickness(const RayType &input_ray, const Tree &tree,
+                              FP_T4 *vertices, FP_T4 *normals,
+                              unsigned row, unsigned col)
+{
+    if (tree.nb_keys == 0) return 0;
+    if (!input_ray.intersects(getBBMin(tree, treeRoot(tree)), getBBMax(tree, treeRoot(tree)))) return 0;
+    RayType ray = rebaseRay(input_ray, tree);
+#ifdef SYRIS_SIGNED_THICKNESS
+    if constexpr (WithNormals)
+        return traceSignedThickness(ray, tree, vertices, normals, row, col);
+#endif
+    bool overflow = false;
+    FP_T value = traceCollected<WithNormals, SYRIS_HIT_CAPACITY>(
+        ray, tree, vertices, normals, row, col, overflow);
+    if (!overflow) return value;
+    if constexpr (SYRIS_HIT_CAPACITY < MAX_COLLISIONS)
+        return traceLargeHits<WithNormals>(ray, tree, vertices, normals, row, col);
+    return traceEvents<WithNormals>(ray, tree, vertices, normals, row, col);
 }
 
 template<typename RayType>
@@ -602,17 +741,35 @@ __device__ FP_T traceAndCache_conebeam(
 //  LEVEL 3: ADAPTIVE SAMPLING (One per projection type)
 // =========================================================================
 
+// Seed only samples whose ray coordinates match the local pixel calculation.
+// Unmatched corners are evaluated normally; adjacent pixel formulas can round
+// differently even when they describe the same mathematical grid point.
+__device__ void seedAdaptiveCache(FP_T *values, bool *cached,
+                                  const FP_T *roots, unsigned mask)
+{
+    const int indices[5] = {0, CACHE_DIM - 1, CACHE_DIM * (CACHE_DIM - 1),
+                            CACHE_SIZE - 1, CACHE_SIZE / 2};
+    for (int i = 0; i < 5; ++i) {
+        if (mask & (1u << i)) {
+            values[indices[i]] = roots[i];
+            cached[indices[i]] = true;
+        }
+    }
+}
+
 __device__ FP_T tracePixelAdaptive(
     FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree, FP_T4 *__restrict__ vertices,
     const EpsilonParams& epsilons,
     const AdaptiveSamplingParams& sampling_params,
-    unsigned int row, unsigned int col)
+    unsigned int row, unsigned int col,
+    const FP_T *root_values = nullptr, unsigned root_mask = 0)
 {
     Quad quad_stack[MAX_QUADS_PER_PIXEL]; int stack_ptr = 0;
     double total_value = 0.0, total_area = 0.0;
     FP_T value_cache[CACHE_SIZE]; bool is_cached[CACHE_SIZE];
     for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
+    seedAdaptiveCache(value_cache, is_cached, root_values, root_mask);
     quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};
 
     while (stack_ptr > 0) {
@@ -628,7 +785,12 @@ __device__ FP_T tracePixelAdaptive(
         
         // Decision
         FP_T midpoint_value = values[4];
-        for (int j = 0; j < 5; ++j) if (!isfinite(values[j])) return FP_T(NAN);
+        for (int j = 0; j < 5; ++j) {
+#ifdef SYRIS_SIGNED_DEFER_FALLBACK
+            if (values[j] == FP_T(NEG_INFINITY)) return FP_T(NEG_INFINITY);
+#endif
+            if (!isfinite(values[j])) return FP_T(NAN);
+        }
         sort(values, 5);
         FP_T min_val = values[0], max_val = values[4];
         FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);
@@ -652,12 +814,14 @@ __device__ FP_T tracePixelAdaptive(
     FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
     const EpsilonParams& epsilons,
     const AdaptiveSamplingParams& sampling_params,
-    unsigned int row, unsigned int col)
+    unsigned int row, unsigned int col,
+    const FP_T *root_values = nullptr, unsigned root_mask = 0)
 {
     Quad quad_stack[MAX_QUADS_PER_PIXEL]; int stack_ptr = 0;
     double total_value = 0.0, total_area = 0.0;
     FP_T value_cache[CACHE_SIZE]; bool is_cached[CACHE_SIZE];
     for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
+    seedAdaptiveCache(value_cache, is_cached, root_values, root_mask);
     quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};
 
     while (stack_ptr > 0) {
@@ -673,7 +837,12 @@ __device__ FP_T tracePixelAdaptive(
         
         // Decision
         FP_T midpoint_value = values[4];
-        for (int j = 0; j < 5; ++j) if (!isfinite(values[j])) return FP_T(NAN);
+        for (int j = 0; j < 5; ++j) {
+#ifdef SYRIS_SIGNED_DEFER_FALLBACK
+            if (values[j] == FP_T(NEG_INFINITY)) return FP_T(NEG_INFINITY);
+#endif
+            if (!isfinite(values[j])) return FP_T(NAN);
+        }
         sort(values, 5);
         FP_T min_val = values[0], max_val = values[4];
         FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);
@@ -696,12 +865,14 @@ __device__ FP_T tracePixelAdaptive_conebeam(
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree, FP_T4 *__restrict__ vertices,
     const EpsilonParams& epsilons,
     const AdaptiveSamplingParams& sampling_params,
-    unsigned int row, unsigned int col)
+    unsigned int row, unsigned int col,
+    const FP_T *root_values = nullptr, unsigned root_mask = 0)
 {
     Quad quad_stack[MAX_QUADS_PER_PIXEL]; int stack_ptr = 0;
     double total_value = 0.0, total_area = 0.0;
     FP_T value_cache[CACHE_SIZE]; bool is_cached[CACHE_SIZE];
     for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
+    seedAdaptiveCache(value_cache, is_cached, root_values, root_mask);
     quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};
 
     while (stack_ptr > 0) {
@@ -715,7 +886,12 @@ __device__ FP_T tracePixelAdaptive_conebeam(
         values[3] = traceAndCache_conebeam(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
         values[4] = traceAndCache_conebeam(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
         FP_T midpoint_value = values[4];
-        for (int j = 0; j < 5; ++j) if (!isfinite(values[j])) return FP_T(NAN);
+        for (int j = 0; j < 5; ++j) {
+#ifdef SYRIS_SIGNED_DEFER_FALLBACK
+            if (values[j] == FP_T(NEG_INFINITY)) return FP_T(NEG_INFINITY);
+#endif
+            if (!isfinite(values[j])) return FP_T(NAN);
+        }
         sort(values, 5);
         FP_T min_val = values[0], max_val = values[4];
         FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);
@@ -739,12 +915,14 @@ __device__ FP_T tracePixelAdaptive_conebeam(
     FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
     const EpsilonParams& epsilons,
     const AdaptiveSamplingParams& sampling_params,
-    unsigned int row, unsigned int col)
+    unsigned int row, unsigned int col,
+    const FP_T *root_values = nullptr, unsigned root_mask = 0)
 {
     Quad quad_stack[MAX_QUADS_PER_PIXEL]; int stack_ptr = 0;
     double total_value = 0.0, total_area = 0.0;
     FP_T value_cache[CACHE_SIZE]; bool is_cached[CACHE_SIZE];
     for(int i = 0; i < CACHE_SIZE; ++i) { is_cached[i] = false; }
+    seedAdaptiveCache(value_cache, is_cached, root_values, root_mask);
     quad_stack[stack_ptr++] = {0.0, 0.0, 1.0, 0};
 
     while (stack_ptr > 0) {
@@ -758,7 +936,12 @@ __device__ FP_T tracePixelAdaptive_conebeam(
         values[3] = traceAndCache_conebeam(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
         values[4] = traceAndCache_conebeam(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
         FP_T midpoint_value = values[4];
-        for (int j = 0; j < 5; ++j) if (!isfinite(values[j])) return FP_T(NAN);
+        for (int j = 0; j < 5; ++j) {
+#ifdef SYRIS_SIGNED_DEFER_FALLBACK
+            if (values[j] == FP_T(NEG_INFINITY)) return FP_T(NEG_INFINITY);
+#endif
+            if (!isfinite(values[j])) return FP_T(NAN);
+        }
         sort(values, 5);
         FP_T min_val = values[0], max_val = values[4];
         FP_T threshold = fmax(sampling_params.abs_tolerance, sampling_params.rel_tolerance * max_val);
@@ -814,6 +997,9 @@ extern "C" __global__ void project_parallel_kernel(
     FP_T p_group_abs_epsilon,
     FP_T p_group_rel_epsilon,
     FP_T p_unique_abs_epsilon
+#ifdef SYRIS_PROJECTION_RETRY
+    , const unsigned *retry_indices, const unsigned *retry_count
+#endif
 )
 {
     Tree tree; /* ... tree setup ... */
@@ -831,8 +1017,15 @@ extern "C" __global__ void project_parallel_kernel(
     unsigned int totalPixels = N.x * N.y;
 
     while (true) {
-        unsigned int index = atomicAdd(globalCounter, 1);
-        if (index >= totalPixels) break; 
+#ifdef SYRIS_PROJECTION_RETRY
+        unsigned int work = atomicAdd(globalCounter, 1);
+        if (work >= *retry_count) break;
+        unsigned int index = retry_indices[work];
+#else
+        unsigned int index;
+        if (!nextProjectionPixel(globalCounter, N, index)) break;
+        if (index >= totalPixels) continue;
+#endif
 
         unsigned int row = index / N.x; unsigned int col = index % N.x;
         FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
@@ -887,6 +1080,9 @@ extern "C" __global__ void project_parallel_normals_kernel(
     FP_T p_group_abs_epsilon,
     FP_T p_group_rel_epsilon,
     FP_T p_unique_abs_epsilon
+#ifdef SYRIS_PROJECTION_RETRY
+    , const unsigned *retry_indices, const unsigned *retry_count
+#endif
 )
 {
     Tree tree; /* ... tree setup ... */
@@ -905,8 +1101,15 @@ extern "C" __global__ void project_parallel_normals_kernel(
     unsigned totalPixels = N.x * N.y;
 
     while (true) {
-        unsigned int index = atomicAdd(globalCounter, 1);
-        if (index >= totalPixels) break; 
+#ifdef SYRIS_PROJECTION_RETRY
+        unsigned int work = atomicAdd(globalCounter, 1);
+        if (work >= *retry_count) break;
+        unsigned int index = retry_indices[work];
+#else
+        unsigned int index;
+        if (!nextProjectionPixel(globalCounter, N, index)) break;
+        if (index >= totalPixels) continue;
+#endif
 
         unsigned int row = index / N.x;
         unsigned int col = index % N.x;
@@ -978,6 +1181,9 @@ extern "C" __global__ void project_conebeam_kernel(
     FP_T p_group_abs_epsilon,
     FP_T p_group_rel_epsilon,
     FP_T p_unique_abs_epsilon
+#ifdef SYRIS_PROJECTION_RETRY
+    , const unsigned *retry_indices, const unsigned *retry_count
+#endif
 )
 {
     Tree tree; /* ... tree setup ... */
@@ -995,8 +1201,15 @@ extern "C" __global__ void project_conebeam_kernel(
     unsigned totalPixels = N.x * N.y;
 
     while (true) {
-        unsigned int index = atomicAdd(globalCounter, 1);
-        if (index >= totalPixels) break; 
+#ifdef SYRIS_PROJECTION_RETRY
+        unsigned int work = atomicAdd(globalCounter, 1);
+        if (work >= *retry_count) break;
+        unsigned int index = retry_indices[work];
+#else
+        unsigned int index;
+        if (!nextProjectionPixel(globalCounter, N, index)) break;
+        if (index >= totalPixels) continue;
+#endif
 
         unsigned int row = index / N.x; unsigned int col = index % N.x;
         FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
@@ -1056,6 +1269,9 @@ extern "C" __global__ void project_conebeam_normals_kernel(
     FP_T p_group_abs_epsilon,
     FP_T p_group_rel_epsilon,
     FP_T p_unique_abs_epsilon
+#ifdef SYRIS_PROJECTION_RETRY
+    , const unsigned *retry_indices, const unsigned *retry_count
+#endif
 )
 {
     Tree tree; /* ... tree setup ... */
@@ -1074,8 +1290,15 @@ extern "C" __global__ void project_conebeam_normals_kernel(
     unsigned totalPixels = N.x * N.y;
     
     while (true) {
-        unsigned int index = atomicAdd(globalCounter, 1);
-        if (index >= totalPixels) break; 
+#ifdef SYRIS_PROJECTION_RETRY
+        unsigned int work = atomicAdd(globalCounter, 1);
+        if (work >= *retry_count) break;
+        unsigned int index = retry_indices[work];
+#else
+        unsigned int index;
+        if (!nextProjectionPixel(globalCounter, N, index)) break;
+        if (index >= totalPixels) continue;
+#endif
 
         unsigned int row = index / N.x;
         unsigned int col = index % N.x;
@@ -1112,4 +1335,14 @@ extern "C" __global__ void project_conebeam_normals_kernel(
             #endif
         }
     }
+}
+
+#include "staged.cuh"
+
+// Marks only the internal deferred-sum sentinel. Genuine NaNs stay NaNs.
+extern "C" __global__ void queue_signed_fallbacks(const FP_T *image, unsigned n,
+                                                 unsigned *indices, unsigned *count)
+{
+    unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n && image[i] == FP_T(NEG_INFINITY)) indices[atomicAdd(count, 1)] = i;
 }

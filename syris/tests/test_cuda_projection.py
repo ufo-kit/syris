@@ -16,7 +16,8 @@ class ProjectionCases:
 
     @classmethod
     def setUpClass(cls):
-        cls.gpu = ProjectionHarness(cls.double, mixed_precision=cls.mixed_precision)
+        cls.gpu = ProjectionHarness(cls.double, mixed_precision=cls.mixed_precision,
+                                    hit_capacity=getattr(cls, "hit_capacity", None))
 
     @property
     def rtol(self):
@@ -124,6 +125,78 @@ class ProjectionCases:
                 result = self.gpu.trace(accel, [[0.1, 0.2, -1]], [[0, 0, 1]])
                 np.testing.assert_allclose(result, layers * 0.01, rtol=self.rtol)
 
+    def test_common_large_and_unbounded_hit_paths_agree_on_shared_edges(self):
+        # Four triangle hits per layer on the shared face diagonals. Exercise
+        # both sides of the 32- and 256-record limits, plus interior rays.
+        for layers in (8, 9, 16, 17, 64, 65, 140):
+            with self.subTest(layers=layers):
+                vertices = np.concatenate([box(z0=i * 0.02, z1=i * 0.02 + 0.01)
+                                           for i in range(layers)])
+                accel = self.gpu.build(vertices)
+                result = self.gpu.trace(accel, [[0, 0, -1], [0.1, 0.2, -1]],
+                                        [[0, 0, 1]] * 2)
+                np.testing.assert_allclose(result, layers * 0.01, rtol=self.rtol)
+
+    def test_event_batches_keep_complete_duplicate_groups(self):
+        # More than 256 hits but only two distinct distances. Duplicates must
+        # neither consume the event batch nor toggle parity repeatedly.
+        vertices = np.tile(box(), (150, 1, 1))
+        accel = self.gpu.build(vertices)
+        result = self.gpu.trace(accel, [[0, 0, -1], [0.1, 0.2, -1], [0.1, 0.2, 0.25]],
+                                [[0, 0, 1]] * 3)
+        np.testing.assert_allclose(result, [[1, 1], [1, 1], [0.75, 0.75]], rtol=self.rtol)
+
+    def test_event_batches_order_reversed_rays_and_shuffled_thin_layers(self):
+        rng = np.random.default_rng(731)
+        widths = rng.uniform(1e-5, 0.01, 160)
+        vertices = np.concatenate([box(z0=i * 0.02, z1=i * 0.02 + width)
+                                   for i, width in enumerate(widths)])
+        vertices = vertices[rng.permutation(len(vertices))]
+        accel = self.gpu.build(vertices)
+        result = self.gpu.trace(accel,
+                                [[0.1, 0.2, -1], [0.1, 0.2, 4],
+                                 [0.1, 0.2, widths[0] / 2]],
+                                [[0, 0, 1], [0, 0, -1], [0, 0, 1]])
+        expected = np.array([widths.sum(), widths.sum(), widths.sum() - widths[0] / 2])
+        np.testing.assert_allclose(result, np.repeat(expected[:, None], 2, axis=1), rtol=self.rtol)
+
+    def test_staged_sampling_preserves_local_rays_and_refinement(self):
+        vertices = np.concatenate([box(-0.7, 0.6, -0.8, 0.5, 0, 1.3),
+                                   box(-0.2, 0.3, -0.3, 0.2, 0.4, 0.8)[:, ::-1]])
+        rotation, _ = np.linalg.qr(np.random.default_rng(192).normal(size=(3, 3)))
+        if np.linalg.det(rotation) < 0:
+            rotation[:, 0] *= -1
+        for normals in (False, True):
+            accel = self.gpu.build(vertices, use_normals=normals)
+            for parallel in (False, True):
+                for basis in (np.eye(3), rotation):
+                    for shape in ((7, 11), (1, 9), (9, 1)):
+                        for depth, tolerance in ((1, 1e6), (1, 0.02),
+                                                 (2 if self.double else 3, 0)):
+                            with self.subTest(normals=normals, parallel=parallel,
+                                              shape=shape, depth=depth, tolerance=tolerance):
+                                kwargs = dict(parallel=parallel, depth=depth, shape=shape,
+                                              basis=basis, origin=(-0.9231, -0.8763, -1.3127),
+                                              pixel_size=(0.1731, 0.2117), source=(0, 0, -3),
+                                              abs_tolerance=0, rel_tolerance=tolerance)
+                                local = self.gpu.project_image(accel, **kwargs)
+                                staged = self.gpu.project_image(accel, sampling_mode="staged", **kwargs)
+                                np.testing.assert_array_equal(staged, local)
+
+    def test_staged_sampling_preserves_nonfinite_results(self):
+        # Outward orientation reversed: the invalid crossing sequence must not
+        # be accepted as a finite path length by the coarse classification.
+        accel = self.gpu.build(box()[:, ::-1])
+        for parallel in (False, True):
+            for tolerance in (0, 1e6):
+                kwargs = dict(depth=1, parallel=parallel, shape=(3, 5),
+                              origin=(-0.4, -0.3, -1), pixel_size=(0.15, 0.2),
+                              source=(0, 0, -3), rel_tolerance=tolerance)
+                local = self.gpu.project_image(accel, **kwargs)
+                self.assertTrue(np.isnan(local).any())
+                staged = self.gpu.project_image(accel, sampling_mode="staged", **kwargs)
+                np.testing.assert_array_equal(staged, local)
+
     def test_closed_cavity_preserves_empty_interval(self):
         vertices = np.concatenate([box(z1=3), box(-0.4, 0.4, -0.4, 0.4, 1, 2)[:, ::-1]])
         result = self.gpu.trace(self.gpu.build(vertices), [[0.1, 0.2, -1]], [[0, 0, 1]])
@@ -228,6 +301,8 @@ class ProjectionCases:
         for kwargs in ({"abs_tolerance": -1}, {"rel_tolerance": np.nan}):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 self.gpu.project(accel, **kwargs)
+        with self.assertRaises(ValueError):
+            self.gpu.project(accel, sampling_mode="unknown")
 
     def test_bvh_published_bounds_contain_both_children(self):
         rng = np.random.default_rng(491)
@@ -260,6 +335,11 @@ class TestCudaProjectionFloat64(ProjectionCases, unittest.TestCase):
     double = True
 
 
+class TestCudaProjectionSmallHitBuffer(ProjectionCases, unittest.TestCase):
+    double = False
+    hit_capacity = 32
+
+
 class TestCudaProjectionMixed(ProjectionCases, unittest.TestCase):
     double = False
     mixed_precision = True
@@ -290,3 +370,26 @@ class TestMixedPrecisionConfiguration(unittest.TestCase):
                 ValueError, "mixed_precision requires"
             ):
                 syris.init(mixed_precision=True, **kwargs)
+
+
+class TestCudaModuleCache(unittest.TestCase):
+    def test_changed_header_recompiles_the_module(self):
+        from pathlib import Path
+        import tempfile
+        from .cuda_projection_util import cuda_or_skip
+        from syris.gpu.cuda_utils import CudaPipeline
+
+        cp = cuda_or_skip()
+        with tempfile.TemporaryDirectory() as directory:
+            header = Path(directory) / "value.cuh"
+            source = Path(directory) / "value.cu"
+            source.write_text('#include "value.cuh"\n'
+                              'extern "C" __global__ void value(int *out) { *out = VALUE; }')
+            for expected in (17, 29):
+                header.write_text(f"#define VALUE {expected}\n")
+                pipeline = CudaPipeline([directory])
+                pipeline.readModuleFromFiles("cache_test", [source])
+                kernel = pipeline.getKernelFromModule("cache_test", "value")
+                out = cp.empty(1, dtype=np.int32)
+                kernel((1,), (1,), (out,))
+                self.assertEqual(int(out.get()[0]), expected)

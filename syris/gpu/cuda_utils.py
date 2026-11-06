@@ -1,5 +1,7 @@
 import cupy as cp
 from cupy.cuda import Event, Stream, get_elapsed_time
+from hashlib import sha256
+from pathlib import Path
 
 cp.clear_memo()
 
@@ -39,6 +41,7 @@ class CudaPipeline:
     def __init__(self, headers: list, options: list = None):
         self.modules = {}
         self.kernels = {}
+        self.headers = tuple(Path(header) for header in headers)
         self.opts = ["-I " + h + " " for h in headers]
         self._stream = cp.cuda.Stream()
         self.timer = CudaTimer(self._stream)
@@ -58,7 +61,7 @@ class CudaPipeline:
             raise Exception("Module already loaded")
 
         if options is None:
-            selected_options = self.opts
+            selected_options = self.opts.copy()
         else:
             selected_options = options + self.opts
 
@@ -79,6 +82,16 @@ class CudaPipeline:
             with open(fileName, "r") as f:
                 source = f.read()
                 code += source + "\n"
+
+        # CuPy's binary cache keys the source string, not the contents of local
+        # includes. Header-only kernel changes must invalidate cached binaries.
+        digest = sha256()
+        for directory in self.headers:
+            for header in sorted(directory.rglob("*")):
+                if header.suffix in (".cuh", ".h", ".hpp") and header.is_file():
+                    digest.update(str(header.relative_to(directory)).encode())
+                    digest.update(header.read_bytes())
+        code += "\n// Local header digest: " + digest.hexdigest() + "\n"
 
         self.modules[moduleName] = cp.RawModule(
             code=code,

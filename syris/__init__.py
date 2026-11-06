@@ -32,6 +32,7 @@ def init(
     double_precision=False,
     unit="um",
     mixed_precision=False,
+    warp_tile_width=0,
 ):
     """Initialize syris with the best available compute backend.
 
@@ -39,7 +40,18 @@ def init(
     storage and BVH traversal, but evaluate ray/triangle intersections in
     Float64. It is mutually exclusive with ``double_precision=True`` and
     does not fix geometry already damaged by Float32 conversion.
+
+    ``warp_tile_width`` is an optional CUDA pixel scheduler. A positive width
+    assigns each warp a width-by-(32/width) detector tile. Zero retains the
+    per-thread scheduler; the ray generation and sampling rules are identical.
     """
+    from numbers import Integral
+
+    if (isinstance(warp_tile_width, bool) or not isinstance(warp_tile_width, Integral)
+            or warp_tile_width not in (0, 1, 2, 4, 8, 16, 32)):
+        raise ValueError("warp_tile_width must be 0 or an integer divisor of 32.")
+    if warp_tile_width and compute_backend != "cuda":
+        raise ValueError("warp_tile_width requires compute_backend='cuda'.")
     if mixed_precision and (double_precision or compute_backend != "cuda"):
         raise ValueError("mixed_precision requires compute_backend='cuda' "
                          "and double_precision=False.")
@@ -63,6 +75,8 @@ def init(
     cfg.BACKEND = ComputeBackend(compute_backend=compute_backend)
     if mixed_precision and getattr(cfg.BACKEND, "name", None) != cfg.BACKEND.CUDA:
         raise ValueError("mixed_precision requires an available CUDA backend.")
+    if warp_tile_width and getattr(cfg.BACKEND, "name", None) != cfg.BACKEND.CUDA:
+        raise ValueError("warp_tile_width requires an available CUDA backend.")
     cfg.UNIT = Quantity(1, unit)
 
     if cfg.BACKEND.name == cfg.BACKEND.CUDA:
@@ -75,6 +89,8 @@ def init(
         ]
 
         options = ["-D__FP_T_D__"] if double_precision else []
+        if warp_tile_width:
+            options.append(f"-DSYRIS_WARP_TILE_WIDTH={int(warp_tile_width)}")
         if mixed_precision:
             options.append("-DSYRIS_MIXED_PRECISION")
             LOG.info("Experimental mixed precision: Float32 storage/BVH, "
@@ -100,6 +116,10 @@ def init(
             "project_conebeam_kernel",
             "project_parallel_normals_kernel",
             "project_conebeam_normals_kernel",
+            "project_shared_samples_kernel",
+            "project_missing_samples_kernel",
+            "classify_shared_samples_kernel",
+            "refine_shared_samples_kernel",
         ]
 
         try:
