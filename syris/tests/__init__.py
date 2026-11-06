@@ -16,10 +16,13 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 """Tests initialization."""
+
 import logging
-import pyopencl as cl
-import syris
 from unittest import TestCase
+
+import pyopencl as cl
+
+import syris
 
 
 class SyrisTest(TestCase):

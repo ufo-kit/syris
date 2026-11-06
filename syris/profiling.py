@@ -19,17 +19,18 @@
 Module for profiling OpenCL GPU code execution.
 """
 
-import pyopencl as cl
-from threading import Thread
-from queue import Queue, Empty
-import quantities as q
 import itertools
 import logging
-import time
+import os
 import re
 import sys
+import time
 from optparse import OptionParser
-import os
+from queue import Empty, Queue
+from threading import Thread
+
+import pyopencl as cl
+import quantities as q
 
 LOG = logging.getLogger(__name__)
 
@@ -123,13 +124,9 @@ class Profiler(Thread):
         self._profile_file.write("# device\tinitial_time\n")
         for device in starts:
             self._cldevices[device] = self._cldevice_next()
-            self._profile_file.write(
-                "%d\t%d\n" % (self._cldevices[device], starts[device])
-            )
+            self._profile_file.write("%d\t%d\n" % (self._cldevices[device], starts[device]))
         self._profile_file.write("# END_INIT_T0\n")
-        self._profile_file.write(
-            "# Relative device timing error\n%g\n" % d_t.rescale(q.ns)
-        )
+        self._profile_file.write("# Relative device timing error\n%g\n" % d_t.rescale(q.ns))
         self._profile_file.write("# END_INIT\n")
 
     def run(self):
@@ -180,9 +177,7 @@ class Profiler(Thread):
             self._clqueues[event.command_queue] = self._clqeue_next()
 
         if event.command_queue.device not in self._cldevices:
-            raise RuntimeError(
-                "%s not in devices list." % (str(event.command_queue.device))
-            )
+            raise RuntimeError("%s not in devices list." % (str(event.command_queue.device)))
 
         if func_name == "":
             func_name = "N/A"
@@ -255,7 +250,7 @@ class ProfileReconstructor(object):
     pattern = re.compile(
         r"(?P<%s>[0-9]+)\s*(?P<%s>[0-9]+)\s*(?P<%s>[0-9]+)"
         % (attributes[0], attributes[1], attributes[2])
-        + "\s*(?P<%s>[A-Z]+)\s*(?P<%s>\w*)\s*(?P<%s>[0-9]+)\n"
+        + "\\s*(?P<%s>[A-Z]+)\\s*(?P<%s>\\w*)\\s*(?P<%s>[0-9]+)\n"
         % (attributes[3], attributes[4], attributes[5])
     )
     cl_states = ["QUEUED", "SUBMIT", "START", "END"]
@@ -402,9 +397,7 @@ class ProfileReconstructor(object):
         for event_id in self._events:
             if getattr(self._events[event_id], attribute) not in prop:
                 prop[getattr(self._events[event_id], attribute)] = []
-            prop[getattr(self._events[event_id], attribute)].append(
-                self._events[event_id]
-            )
+            prop[getattr(self._events[event_id], attribute)].append(self._events[event_id])
 
         return prop
 
@@ -448,21 +441,11 @@ def plot(
     for attr in data:
         y_limits.add(attr)
         for event in data[attr]:
-            start = q.Quantity(getattr(event, states[0]), file_units).rescale(
-                out_units
-            )
-            stop = q.Quantity(getattr(event, states[1]), file_units).rescale(
-                out_units
-            )
-            if (
-                start >= start_from
-                and start <= stop_at
-                and stop - start >= delta
-            ):
+            start = q.Quantity(getattr(event, states[0]), file_units).rescale(out_units)
+            stop = q.Quantity(getattr(event, states[1]), file_units).rescale(out_units)
+            if start >= start_from and start <= stop_at and stop - start >= delta:
                 if not only_averages:
-                    events_infos.append(
-                        (event.FUNC_NAME, stop - start, start, stop, out_units)
-                    )
+                    events_infos.append((event.FUNC_NAME, stop - start, start, stop, out_units))
                     if event.FUNC_NAME in func_colors:
                         # assign color to the functions
                         plt.plot(
@@ -472,9 +455,7 @@ def plot(
                             color=func_colors[event.FUNC_NAME],
                         )
                     if event.FUNC_NAME not in func_colors:
-                        line = plt.plot(
-                            [start, stop], [attr, attr], linewidth=5.0
-                        )[0]
+                        line = plt.plot([start, stop], [attr, attr], linewidth=5.0)[0]
                         func_colors[event.FUNC_NAME] = line.get_color()
                 if max_func_name < len(event.FUNC_NAME):
                     max_func_name = len(event.FUNC_NAME)
@@ -495,9 +476,7 @@ def plot(
                     float(ev_info[1].magnitude),
                     float(ev_info[2].magnitude),
                 )
-                + "stop: {0:10.5f} {1}".format(
-                    float(ev_info[3].magnitude), ev_info[4].symbol
-                )
+                + "stop: {0:10.5f} {1}".format(float(ev_info[3].magnitude), ev_info[4].symbol)
             )
         print()
     print("Plot information:")
@@ -528,11 +507,7 @@ def plot(
         print()
         print("Legend:")
         for f_name in func_colors:
-            print(
-                "{0:>{1}}: {2}".format(
-                    f_name, max_func_name, COLORS[func_colors[f_name]]
-                )
-            )
+            print("{0:>{1}}: {2}".format(f_name, max_func_name, COLORS[func_colors[f_name]]))
         plt.ylim(min(y_limits) - 0.5, max(y_limits) + 0.5)
         plt.xlabel(out_units.symbol)
         plt.ylabel(attribute)
@@ -549,8 +524,7 @@ if __name__ == "__main__":
         dest="attribute",
         default=ProfileReconstructor.attributes[1],
         help="Attribute for which the events"
-        + " will be plotted. Can be one of the following: %s"
-        % ProfileReconstructor.attributes[:3],
+        + " will be plotted. Can be one of the following: %s" % ProfileReconstructor.attributes[:3],
     )
     PARSER.add_option(
         "-s",
@@ -579,8 +553,7 @@ if __name__ == "__main__":
         default="START",
         dest="entry",
         help="Event status which is considered "
-        + "an entry point for every plotted task. One of %s"
-        % str(ProfileReconstructor.cl_states)
+        + "an entry point for every plotted task. One of %s" % str(ProfileReconstructor.cl_states)
         + ", (default: %default)",
     )
     PARSER.add_option(
@@ -590,8 +563,7 @@ if __name__ == "__main__":
         default="END",
         dest="exit",
         help="Event status which is considered "
-        + "an exit point for every plotted task. One of %s"
-        % str(ProfileReconstructor.cl_states)
+        + "an exit point for every plotted task. One of %s" % str(ProfileReconstructor.cl_states)
         + ", (default: %default)",
     )
     PARSER.add_option(
@@ -600,8 +572,7 @@ if __name__ == "__main__":
         metavar="UNITS",
         default="ms",
         dest="units",
-        help="Time units. One of %s"
-        % (list(ProfileReconstructor.str_to_qtime.keys()))
+        help="Time units. One of %s" % (list(ProfileReconstructor.str_to_qtime.keys()))
         + ", (default: %default)",
     )
     PARSER.add_option(
@@ -637,24 +608,21 @@ if __name__ == "__main__":
 
     if OPTS.attribute.upper() not in ProfileReconstructor.attributes:
         print(
-            'Attribute "%s" not from %s.'
-            % (OPTS.attribute, ProfileReconstructor.attributes[:3]),
+            'Attribute "%s" not from %s.' % (OPTS.attribute, ProfileReconstructor.attributes[:3]),
             file=sys.stderr,
         )
         sys.exit(0)
 
     if OPTS.entry.upper() not in ProfileReconstructor.cl_states:
         print(
-            'Entry level "%s" not from %s.'
-            % (OPTS.entry, ProfileReconstructor.cl_states),
+            'Entry level "%s" not from %s.' % (OPTS.entry, ProfileReconstructor.cl_states),
             file=sys.stderr,
         )
         sys.exit(0)
 
     if OPTS.exit.upper() not in ProfileReconstructor.cl_states:
         print(
-            'Exit level "%s" not from %s.'
-            % (OPTS.entry, ProfileReconstructor.cl_states),
+            'Exit level "%s" not from %s.' % (OPTS.entry, ProfileReconstructor.cl_states),
             file=sys.stderr,
         )
         sys.exit(0)

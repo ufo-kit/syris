@@ -14,10 +14,12 @@ class ScalarSelectionCases:
 
     @classmethod
     def setUpClass(cls):
-        cls.scalar = ProjectionHarness(cls.double, mixed_precision=cls.mixed,
-                                       box_scalar_selection=2)
-        cls.indexed = ProjectionHarness(cls.double, mixed_precision=cls.mixed,
-                                        box_scalar_selection=False)
+        cls.scalar = ProjectionHarness(
+            cls.double, mixed_precision=cls.mixed, box_scalar_selection=2
+        )
+        cls.indexed = ProjectionHarness(
+            cls.double, mixed_precision=cls.mixed, box_scalar_selection=False
+        )
 
     def test_box_decisions_match_indexed_predicate(self):
         rng = np.random.default_rng(693571)
@@ -44,8 +46,13 @@ class ScalarSelectionCases:
         ranges[::13, 1] = 0
         for scale in (1e-30, 1e-9, 1, 1e9, 1e30):
             with self.subTest(scale=scale):
-                args = (origins * dtype(scale), directions, lower * dtype(scale),
-                        upper * dtype(scale), ranges * dtype(scale))
+                args = (
+                    origins * dtype(scale),
+                    directions,
+                    lower * dtype(scale),
+                    upper * dtype(scale),
+                    ranges * dtype(scale),
+                )
                 expected = self.indexed.boxes(*args)
                 actual = self.scalar.boxes(*args)
                 np.testing.assert_array_equal(actual, expected)
@@ -69,7 +76,7 @@ class TestPixelSchedulerCoverage(unittest.TestCase):
     def test_every_pixel_is_claimed_once_including_partial_warps_and_tiles(self):
         cp = cuda_or_skip()
         source = Path(__file__).resolve().parents[1] / "gpu" / "cuda"
-        code = r'''
+        code = r"""
         #include "PixelScheduler.cuh"
         extern "C" __global__ void visit(unsigned *counter, unsigned cols, unsigned rows,
                                         unsigned *visits) {
@@ -80,10 +87,13 @@ class TestPixelSchedulerCoverage(unittest.TestCase):
                 atomicAdd(visits + index, 1);
             }
         }
-        '''
+        """
         for width in (0, 1, 2, 4, 8, 16, 32):
-            module = cp.RawModule(code=code, backend="nvcc", options=(
-                f"-I{source}", f"-DSYRIS_WARP_TILE_WIDTH={width}", "--std=c++17"))
+            module = cp.RawModule(
+                code=code,
+                backend="nvcc",
+                options=(f"-I{source}", f"-DSYRIS_WARP_TILE_WIDTH={width}", "--std=c++17"),
+            )
             kernel = module.get_function("visit")
             for rows, cols in ((0, 0), (1, 1), (1, 37), (37, 1), (11, 19), (65, 67)):
                 for block in ((1, 1, 1), (17, 1, 1), (33, 1, 1), (128, 1, 1), (16, 2, 1)):
@@ -91,8 +101,11 @@ class TestPixelSchedulerCoverage(unittest.TestCase):
                         visits = cp.zeros(rows * cols + 2, cp.uint32)
                         visits[0] = visits[-1] = 0x12345678
                         counter = cp.zeros(1, cp.uint32)
-                        kernel((4, 1, 1), block, (counter, np.uint32(cols), np.uint32(rows),
-                                                 visits[1:-1]))
+                        kernel(
+                            (4, 1, 1),
+                            block,
+                            (counter, np.uint32(cols), np.uint32(rows), visits[1:-1]),
+                        )
                         result = visits.get()
                         np.testing.assert_array_equal(result[1:-1], 1)
                         self.assertEqual(int(result[0]), 0x12345678)
@@ -105,12 +118,17 @@ class WarpTileCases:
 
     @classmethod
     def setUpClass(cls):
-        cls.gpu = ProjectionHarness(cls.double, mixed_precision=cls.mixed,
-                                    box_scalar_selection=2, warp_tile_width=0)
+        cls.gpu = ProjectionHarness(
+            cls.double, mixed_precision=cls.mixed, box_scalar_selection=2, warp_tile_width=0
+        )
         from benchmarks.cuda_projection import experimental_pipeline
-        options = ["-D__FP_T_D__"] if cls.double else ["-DSYRIS_MIXED_PRECISION"] if cls.mixed else []
-        cls.tiles = {width: experimental_pipeline(options, f"tile{width}_axes")
-                     for width in (4, 8, 16, 32)}
+
+        options = (
+            ["-D__FP_T_D__"] if cls.double else ["-DSYRIS_MIXED_PRECISION"] if cls.mixed else []
+        )
+        cls.tiles = {
+            width: experimental_pipeline(options, f"tile{width}_axes") for width in (4, 8, 16, 32)
+        }
 
     def compare(self, accel, **kwargs):
         accel.pipeline = self.gpu.pipeline
@@ -130,37 +148,62 @@ class WarpTileCases:
             for parallel in (False, True):
                 for shape in ((1, 1), (1, 37), (37, 1), (11, 19)):
                     for depth in (0, 1):
-                        with self.subTest(normals=normals, parallel=parallel, shape=shape, depth=depth):
-                            self.compare(accel, parallel=parallel, shape=shape, depth=depth,
-                                         origin=(-0.5, -0.4, -1), pixel_size=(0.1731, 0.2117),
-                                         source=(0, 0, -3), abs_tolerance=0, rel_tolerance=0)
+                        with self.subTest(
+                            normals=normals, parallel=parallel, shape=shape, depth=depth
+                        ):
+                            self.compare(
+                                accel,
+                                parallel=parallel,
+                                shape=shape,
+                                depth=depth,
+                                origin=(-0.5, -0.4, -1),
+                                pixel_size=(0.1731, 0.2117),
+                                source=(0, 0, -3),
+                                abs_tolerance=0,
+                                rel_tolerance=0,
+                            )
 
     def test_deep_adaptive_cavity_keeps_sample_results(self):
         vertices = np.concatenate([box(z1=3), box(-0.4, 0.4, -0.4, 0.4, 1, 2)[:, ::-1]])
         accel = self.gpu.build(vertices)
         for parallel in (False, True):
             with self.subTest(parallel=parallel):
-                self.compare(accel, parallel=parallel, depth=2 if self.double else 3,
-                             shape=(7, 9), origin=(-0.5, -0.4, -1),
-                             pixel_size=(0.1731, 0.2117), source=(0, 0, -3),
-                             abs_tolerance=0, rel_tolerance=0)
+                self.compare(
+                    accel,
+                    parallel=parallel,
+                    depth=2 if self.double else 3,
+                    shape=(7, 9),
+                    origin=(-0.5, -0.4, -1),
+                    pixel_size=(0.1731, 0.2117),
+                    source=(0, 0, -3),
+                    abs_tolerance=0,
+                    rel_tolerance=0,
+                )
 
     def test_overflow_and_invalid_pixels_keep_their_values(self):
         # Wide layers keep every cone ray inside the lateral bounds through all
         # 140 layers. The narrow case also checks side exits, including any NaNs
         # already produced by the reference; it need not overflow for every ray.
-        layers = np.concatenate([box(-2, 2, -2, 2, i * 0.02, i * 0.02 + 0.01)
-                                 for i in range(140)])
+        layers = np.concatenate([box(-2, 2, -2, 2, i * 0.02, i * 0.02 + 0.01) for i in range(140)])
         narrow = np.concatenate([box(z0=i * 0.02, z1=i * 0.02 + 0.01) for i in range(140)])
-        for name, vertices in (("overflow", layers), ("side_exit", narrow),
-                               ("invalid", box()[:, ::-1])):
+        for name, vertices in (
+            ("overflow", layers),
+            ("side_exit", narrow),
+            ("invalid", box()[:, ::-1]),
+        ):
             accel = self.gpu.build(vertices)
             for parallel in (False, True):
                 for depth in (0, 1):
                     with self.subTest(scene=name, parallel=parallel, depth=depth):
-                        image = self.compare(accel, parallel=parallel, depth=depth,
-                                             shape=(3, 5), origin=(-0.4, -0.3, -1),
-                                             pixel_size=(0.15, 0.2), source=(0, 0, -3))
+                        image = self.compare(
+                            accel,
+                            parallel=parallel,
+                            depth=depth,
+                            shape=(3, 5),
+                            origin=(-0.4, -0.3, -1),
+                            pixel_size=(0.15, 0.2),
+                            source=(0, 0, -3),
+                        )
                         if name == "overflow":
                             self.assertTrue(np.isfinite(image).all())
                             if depth == 0:
@@ -169,9 +212,10 @@ class WarpTileCases:
                                     row, col = np.indices((3, 5))
                                     x = -0.4 + (col + 0.5) * 0.15
                                     y = -0.3 + (row + 0.5) * 0.2
-                                    expected *= np.sqrt(x*x + y*y + 4) / 2
+                                    expected *= np.sqrt(x * x + y * y + 4) / 2
                                 np.testing.assert_allclose(
-                                    image, expected, rtol=128*np.finfo(image.dtype).eps, atol=0)
+                                    image, expected, rtol=128 * np.finfo(image.dtype).eps, atol=0
+                                )
                         elif name == "invalid":
                             self.assertTrue(np.isnan(image).any())
 
@@ -200,6 +244,7 @@ class TestWarpTileConfiguration(unittest.TestCase):
 
     def test_public_init_uses_tiles_and_preserves_projection(self):
         import logging
+
         import syris
         from syris import config as cfg
 
@@ -209,8 +254,14 @@ class TestWarpTileConfiguration(unittest.TestCase):
         self.assertIn("-DSYRIS_WARP_TILE_WIDTH=4", production.opts)
         gpu = ProjectionHarness(box_scalar_selection=2, warp_tile_width=0)
         accel = gpu.build(box())
-        kwargs = dict(shape=(11, 19), depth=1, origin=(-0.6, -0.4, -1),
-                      pixel_size=(0.08, 0.11), abs_tolerance=0, rel_tolerance=0)
+        kwargs = dict(
+            shape=(11, 19),
+            depth=1,
+            origin=(-0.6, -0.4, -1),
+            pixel_size=(0.08, 0.11),
+            abs_tolerance=0,
+            rel_tolerance=0,
+        )
         expected = gpu.project_image(accel, **kwargs)
         accel.pipeline = production
         actual = gpu.project_image(accel, **kwargs)

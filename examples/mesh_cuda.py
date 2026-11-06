@@ -17,21 +17,27 @@
 
 """Rotate around and project a mesh in parallel or conebeams setups"""
 
-import imageio
 import logging
 import time
+
+import imageio
 import matplotlib.pyplot as plt
 import numpy as np
+import pyvista as pv
 import quantities as q
+import tqdm
+
 import syris
 import syris.geometry as geom
-from syris.devices.cameras import Camera
-import tqdm
 from syris.bodies.mesh import Mesh
+from syris.devices.cameras import Camera
+
 from .util import (
-    add_cuda_mesh_options, get_default_parser, show, validate_cuda_mesh_options,
+    add_cuda_mesh_options,
+    get_default_parser,
+    show,
+    validate_cuda_mesh_options,
 )
-import pyvista as pv
 
 LOG = logging.getLogger(__name__)
 
@@ -69,12 +75,14 @@ def main():
         LOG.info(f"Loading mesh from file: {input}")
     else:
         input = pv.examples.download_dragon()
-        LOG.info(
-            "No input file provided, loading default PyVista mesh (dragon)..."
-        )
+        LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
 
     mesh = Mesh.from_file(
-        input, tr, center=args.center, unit=mesh_units, use_normals=True,
+        input,
+        tr,
+        center=args.center,
+        unit=mesh_units,
+        use_normals=True,
         repair=args.repair_mesh,
         float32_rounding=args.float32_rounding,
     )
@@ -93,15 +101,11 @@ def main():
 
         if args.sod is None:
             args.sod = max_span * 2
-            LOG.info(
-                f"SOD not provided, defaulting to 2 * object span: {args.sod:.2f}"
-            )
+            LOG.info(f"SOD not provided, defaulting to 2 * object span: {args.sod:.2f}")
 
         if args.sdd is None:
             args.sdd = args.sod + max_span * 1.5
-            LOG.info(
-                f"SDD not provided, defaulting to SOD + 1.5 * object span: {args.sdd:.2f}"
-            )
+            LOG.info(f"SDD not provided, defaulting to SOD + 1.5 * object span: {args.sdd:.2f}")
 
         magnification = args.sdd / args.sod
         LOG.info(f"Magnification: {magnification.magnitude:.2f}x")
@@ -142,24 +146,16 @@ def main():
     camera.translate([0, 0, -camera_z_position.magnitude] * mesh_units)
 
     print("\n--- Simulation Setup ---")
-    LOG.info(
-        f"Projection Mode: {'Cone-Beam' if args.conebeam else 'Parallel-Beam'}"
-    )
+    LOG.info(f"Projection Mode: {'Cone-Beam' if args.conebeam else 'Parallel-Beam'}")
     LOG.info(f"Image Resolution: {shape[0]}x{shape[1]} pixels")
     LOG.info(f"Final Pixel Size: {args.pixel_size.rescale(pixel_units):.4f}")
     fov_rescaled = fov.rescale(mesh_units)
     LOG.info(f"Field of View (FOV): {fov_rescaled[0].magnitude:.4f}")
     if args.conebeam:
         LOG.info(f"SOD: {args.sod}, SDD: {args.sdd}")
-    LOG.info(
-        f"Mesh Bounding Box (min): {mesh.extrema[:, 0].rescale(mesh_units)}"
-    )
-    LOG.info(
-        f"Mesh Bounding Box (max): {mesh.extrema[:, 1].rescale(mesh_units)}"
-    )
-    LOG.info(
-        f"Initial Camera Position: {camera.position.rescale(mesh_units)}\n"
-    )
+    LOG.info(f"Mesh Bounding Box (min): {mesh.extrema[:, 0].rescale(mesh_units)}")
+    LOG.info(f"Mesh Bounding Box (max): {mesh.extrema[:, 1].rescale(mesh_units)}")
+    LOG.info(f"Initial Camera Position: {camera.position.rescale(mesh_units)}\n")
 
     origin = -camera.position
 
@@ -199,9 +195,7 @@ def parse_args():
         default="um",
         help="Physical units of the mesh file (e.g., 'm', 'cm', 'um')",
     )
-    parser.add_argument(
-        "--center", type=str, default=None, help="Mesh centering on creation"
-    )
+    parser.add_argument("--center", type=str, default=None, help="Mesh centering on creation")
 
     # --- Detector Arguments ---
     parser.add_argument(
@@ -263,21 +257,15 @@ def parse_args():
         type=str,
         help="Save projection to this filename prefix",
     )
-    parser.add_argument(
-        "--conebeam", action="store_true", help="Use conebeam geometry"
-    )
+    parser.add_argument("--conebeam", action="store_true", help="Use conebeam geometry")
     parser.add_argument("--sod", type=float, help="Source to object distance")
-    parser.add_argument(
-        "--sdd", type=float, help="Source to detector distance"
-    )
+    parser.add_argument("--sdd", type=float, help="Source to detector distance")
 
     args = parser.parse_args()
     validate_cuda_mesh_options(parser, args)
 
     if args.pixel_size is not None:
-        args.pixel_size = args.pixel_size * q.Quantity(
-            1, args.pixel_size_units
-        )
+        args.pixel_size = args.pixel_size * q.Quantity(1, args.pixel_size_units)
 
     args.x_rotate = args.x_rotate * q.deg
     args.y_rotate = args.y_rotate * q.deg

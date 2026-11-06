@@ -17,35 +17,36 @@
 
 """Laminography data set generation with mesh geometry."""
 
-import imageio
 import itertools
 import logging
 import os
 import time
-import numpy as np
-import quantities as q
 from functools import partial
 from multiprocessing import Lock, Pool
-from syris.geometry import X_AX, Y_AX, Z_AX
-from syris.devices.cameras import Camera
-from .util import (
-    add_cuda_mesh_options, get_default_parser, validate_cuda_mesh_options,
-)
+
+import imageio
+import numpy as np
 import pyvista as pv
+import quantities as q
+
+from syris.devices.cameras import Camera
+from syris.geometry import X_AX, Y_AX, Z_AX
+
+from .util import (
+    add_cuda_mesh_options,
+    get_default_parser,
+    validate_cuda_mesh_options,
+)
 
 LOCK = Lock()
 LOG = logging.getLogger(__name__)
 
 
-def make_projection(
-    mesh, camera, parallel=True, ss=1, orig_shape=None, subsampling=0
-):
+def make_projection(mesh, camera, parallel=True, ss=1, orig_shape=None, subsampling=0):
     from syris.imageprocessing import bin_image
 
     # t=None for trajectory override
-    projection = mesh.project(
-        camera=camera, parallel=parallel, iterations=subsampling
-    )
+    projection = mesh.project(camera=camera, parallel=parallel, iterations=subsampling)
     if ss > 1:
         projection = bin_image(projection, orig_shape, average=True)
 
@@ -64,9 +65,7 @@ def scan(camera, mesh, args, index=0, shift_coeff=1e4, orig_shape=None):
     if index == 0:
         LOG.info("Mesh shift: {}".format(point.rescale(q.um)))
         LOG.info(
-            "Mesh shift in pixels: {}".format(
-                (point / camera.pixel_size).simplified.magnitude
-            )
+            "Mesh shift in pixels: {}".format((point / camera.pixel_size).simplified.magnitude)
         )
 
     last = None
@@ -92,11 +91,7 @@ def scan(camera, mesh, args, index=0, shift_coeff=1e4, orig_shape=None):
 
     lamino_axis = X_AX
     tomo_axis = Y_AX if args.rotation_axis == "y" else Z_AX
-    num_projs = (
-        int(np.pi * args.n)
-        if args.num_projections is None
-        else args.num_projections
-    )
+    num_projs = int(np.pi * args.n) if args.num_projections is None else args.num_projections
     tomo_angle = args.rotation_angle / (num_projs - 1) * q.deg
 
     # Tilt the camera to give a lamigraphy angle
@@ -122,8 +117,7 @@ def scan(camera, mesh, args, index=0, shift_coeff=1e4, orig_shape=None):
 
         # 2. Check for faulty pixels (if not the first frame)
         if (
-            last is not None
-            and (max_vals[0] > 2 * last or np.isnan(max_vals[0]))
+            last is not None and (max_vals[0] > 2 * last or np.isnan(max_vals[0]))
         ) and not args.skip_pixel_testing:
             checked_indices.append(i)
             shift_val = psm / shift_coeff
@@ -171,17 +165,9 @@ def scan(camera, mesh, args, index=0, shift_coeff=1e4, orig_shape=None):
     # Log the summary
     with LOCK:
         LOG.info("Checked indices: {}".format(checked_indices))
-        LOG.info(
-            "Which map to files: {}".format(
-                [args.prefix.format(i) for i in checked_indices]
-            )
-        )
+        LOG.info("Which map to files: {}".format([args.prefix.format(i) for i in checked_indices]))
         LOG.info("Exceeding indices: {}".format(bad_indices))
-        LOG.info(
-            "Which map to files: {}".format(
-                [args.prefix.format(i) for i in bad_indices]
-            )
-        )
+        LOG.info("Which map to files: {}".format([args.prefix.format(i) for i in bad_indices]))
 
 
 def make_ground_truth(args, shape, mesh):
@@ -201,33 +187,23 @@ def make_ground_truth(args, shape, mesh):
     # Make sure the projections are computed with the same x- and y-offsets
     point = (shape[1] * psm / 2, shape[0] * psm / 2, shape[1] * psm / 2) * q.m
     LOG.info("Mesh shift: {}".format(point.rescale(q.um)))
-    LOG.info(
-        "Mesh shift in pixels: {}".format(
-            (point / args.pixel_size).simplified.magnitude
-        )
-    )
+    LOG.info("Mesh shift in pixels: {}".format((point / args.pixel_size).simplified.magnitude))
     mesh.translate(point)
     mesh.transform()
     mesh.sort()
 
-    z_stack = np.empty(
-        (args.supersampling,) + orig_shape, dtype=cfg.PRECISION.np_float
-    )
+    z_stack = np.empty((args.supersampling,) + orig_shape, dtype=cfg.PRECISION.np_float)
 
     for i in range(0, shape[0], args.z_chunk):
         end = min(i + args.z_chunk, shape[0])
         offset = (0, i * ps.rescale(q.um).magnitude, 0) * q.um
-        slices = mesh.compute_slices(
-            (end - i,) + shape, ps, offset=offset
-        ).get()
+        slices = mesh.compute_slices((end - i,) + shape, ps, offset=offset).get()
         LOG.info("Computing slices {}-{}".format(i, end))
         enumerated = list(enumerate(slices))[:: args.supersampling]
         for j, sl in enumerated:
             # Z-dimension downsampling
             for k in range(args.supersampling):
-                z_stack[k] = bin_image(
-                    slices[j + k], orig_shape, average=True, queue=queue
-                ).get()
+                z_stack[k] = bin_image(slices[j + k], orig_shape, average=True, queue=queue).get()
             # Sum only the slices which are present (last run might not go to the end)
             sl = np.mean(z_stack[: slices.shape[0]], axis=0)
             index = (i + j) // args.supersampling
@@ -238,8 +214,8 @@ def make_ground_truth(args, shape, mesh):
 
 def process(args, device_index):
     import syris
-    from syris.geometry import Trajectory
     from syris.bodies.mesh import Mesh
+    from syris.geometry import Trajectory
 
     syris.init(
         device_index=device_index,
@@ -256,13 +232,16 @@ def process(args, device_index):
         LOG.info(f"Loading mesh from file: {input}")
     else:
         input = pv.examples.download_dragon()
-        LOG.info(
-            "No input file provided, loading default PyVista mesh (dragon)..."
-        )
+        LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
 
     mesh = Mesh.from_file(
-        input, tr, center=None, unit=q.um, use_normals=True,
-        repair=args.repair_mesh, float32_rounding=args.float32_rounding,
+        input,
+        tr,
+        center=None,
+        unit=q.um,
+        use_normals=True,
+        repair=args.repair_mesh,
+        float32_rounding=args.float32_rounding,
     )
 
     if args.n:
@@ -293,9 +272,7 @@ def process(args, device_index):
     else:
         if device_index == 0:
             LOG.info("n: {}, ps: {}, FOV: {}".format(n, args.pixel_size, fov))
-            LOG.info(
-                "Total rotation angle: {} deg".format(args.rotation_angle)
-            )
+            LOG.info("Total rotation angle: {} deg".format(args.rotation_angle))
             LOG.info("--- Mesh info ---")
             log_attributes(mesh)
             LOG.info("--- Args info ---")
@@ -310,9 +287,7 @@ def process(args, device_index):
 def parse_args():
     parser = get_default_parser(__doc__)
     add_cuda_mesh_options(parser)
-    parser.add_argument(
-        "--input", type=str, default=None, help="Input filename of a mesh."
-    )
+    parser.add_argument("--input", type=str, default=None, help="Input filename of a mesh.")
     parser.add_argument("--n", type=int, help="Number of pixels")
     parser.add_argument(
         "--subsampling",
@@ -325,9 +300,7 @@ def parse_args():
         type=str,
         help="Data set name, if not specified guessed from input",
     )
-    parser.add_argument(
-        "--num-projections", type=int, help="Number of projections"
-    )
+    parser.add_argument("--num-projections", type=int, help="Number of projections")
     parser.add_argument(
         "--out-directory",
         type=str,
@@ -363,13 +336,9 @@ def parse_args():
         nargs="+",
         help="Rotation axis (y - up, z - beam direction)",
     )
-    parser.add_argument(
-        "--conebeam", action="store_true", help="Use conebeam geometry"
-    )
+    parser.add_argument("--conebeam", action="store_true", help="Use conebeam geometry")
     parser.add_argument("--sod", type=float, help="Source to object distance")
-    parser.add_argument(
-        "--sdd", type=float, help="Source to detector distance"
-    )
+    parser.add_argument("--sdd", type=float, help="Source to detector distance")
     parser.add_argument(
         "--num-devices",
         type=int,
@@ -443,9 +412,7 @@ def main():
             dset += "_ps_{:>04}_nm".format(int(pixel_size))
             dset += "_ss_{:>02}".format(ss)
 
-        args.prefix = os.path.join(
-            args.out_directory, dset, image_directory, file_prefix
-        )
+        args.prefix = os.path.join(args.out_directory, dset, image_directory, file_prefix)
         args.logfile = os.path.join(args.out_directory, dset, "simulation.log")
         directory = os.path.dirname(args.prefix)
         if not os.path.exists(directory):

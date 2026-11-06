@@ -25,13 +25,15 @@ import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
+from numpy.fft import fftfreq
+
 import syris
 import syris.config as cfg
-from numpy.fft import fftfreq
 from syris.bodies.simple import make_sphere
 from syris.gpu.util import get_array
 from syris.imageprocessing import decimate, fft_2, ifft_2
-from syris.physics import propagate, compute_propagator, energy_to_wavelength
+from syris.physics import compute_propagator, energy_to_wavelength, propagate
+
 from .util import get_default_parser, get_material, show
 
 
@@ -52,9 +54,7 @@ def compute_tie_kernel(n, pixel_size, distance, material, energy):
     ri = material.get_refractive_index(energy)
     delta = ri.real
     beta = ri.imag
-    mju = (
-        material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
-    )
+    mju = material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
     fmt = "                            mju: {}"
     print(fmt.format(mju))
     fmt = "                          delta: {}"
@@ -95,14 +95,10 @@ def main():
     print(fmt.format(ps_hd.rescale(q.um)))
     fmt = "           Propagation distance: {}"
     print(fmt.format(d))
-    print(
-        "                  Field of view: {}".format(n * ps_hd.rescale(q.um))
-    )
+    print("                  Field of view: {}".format(n * ps_hd.rescale(q.um)))
     fmt = "                Sphere diameter: {}"
     print(fmt.format(2 * radius))
-    print(
-        f"                  Fresnel number: {(ps**2 / (d * lam)).simplified.magnitude}"
-    )
+    print(f"                  Fresnel number: {(ps**2 / (d * lam)).simplified.magnitude}")
 
     sample = make_sphere(n, radius, pixel_size=ps_hd, material=material)
     projection = sample.project((n, n), ps_hd).get() * 1e6
@@ -112,9 +108,7 @@ def main():
     ld = decimate(hd, (n_camera, n_camera), average=True).get()
 
     kernel = compute_tie_kernel(n_camera, ps, d, material, energy)
-    mju = (
-        material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
-    )
+    mju = material.get_attenuation_coefficient(energy).rescale(1 / q.m).magnitude
     f_ld = fft_2(ld)
     f_ld *= get_array(kernel.astype(cfg.PRECISION.np_float))
     retrieved = ifft_2(f_ld).get().real

@@ -15,13 +15,15 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
-import imageio
 import logging
 import re
-from matplotlib import pyplot as plt
+
+import imageio
 import numpy as np
 import pyopencl as cl
 import quantities as q
+from matplotlib import pyplot as plt
+
 import syris
 from syris import config as cfg
 from syris.bodies.isosurfaces import (
@@ -31,8 +33,8 @@ from syris.bodies.isosurfaces import (
 )
 from syris.geometry import Trajectory
 from syris.util import make_tuple
-from .util import get_default_parser, show
 
+from .util import get_default_parser, show
 
 LOG = logging.getLogger(__name__)
 
@@ -42,9 +44,7 @@ def load_params(file_name):
     lines = string.split("\n")
     float_pattern = r"[-+]?(\d+(\.\d*)?|\.\d+)([eE][-+]?\d+)?"
     floats = 4 * [float_pattern]
-    pattern = re.compile(
-        r"\((?P<x>{})\, (?P<y>{})\, (?P<z>{})\, (?P<r>{})".format(*floats)
-    )
+    pattern = re.compile(r"\((?P<x>{})\, (?P<y>{})\, (?P<z>{})\, (?P<r>{})".format(*floats))
 
     params = []
     for line in lines:
@@ -80,9 +80,7 @@ def get_vfloat_mem_host(mem, size):
     return res
 
 
-def create_metaballs_random(
-    n, pixel_size, num, min_radius, max_radius, distance_from_center=None
-):
+def create_metaballs_random(n, pixel_size, num, min_radius, max_radius, distance_from_center=None):
     params = []
     center = n / 2
     center_distance = None
@@ -90,26 +88,15 @@ def create_metaballs_random(
     while len(params) < num:
         r = np.random.uniform(min_radius, max_radius)
         if distance_from_center is not None:
-            x = np.random.uniform(
-                center - distance_from_center, center + distance_from_center
-            )
-            y = np.random.uniform(
-                center - distance_from_center, center + distance_from_center
-            )
-            z = np.random.uniform(
-                center - distance_from_center, center + distance_from_center
-            )
-            center_distance = np.sqrt(
-                (x - center) ** 2 + (y - center) ** 2 + (z - center) ** 2
-            )
+            x = np.random.uniform(center - distance_from_center, center + distance_from_center)
+            y = np.random.uniform(center - distance_from_center, center + distance_from_center)
+            z = np.random.uniform(center - distance_from_center, center + distance_from_center)
+            center_distance = np.sqrt((x - center) ** 2 + (y - center) ** 2 + (z - center) ** 2)
         else:
             x = np.random.uniform(0, n)
             y = np.random.uniform(0, n)
             z = np.random.uniform(-2 * max_radius, 2 * max_radius)
-        if (
-            distance_from_center is None
-            or center_distance < distance_from_center
-        ):
+        if distance_from_center is None or center_distance < distance_from_center:
             params.append([x, y, z, r])
 
     return create_metaballs(params, pixel_size)
@@ -135,16 +122,10 @@ def create_metaball_buffers(n, thickness):
     if thickness:
         res = np.empty((n, n), dtype=cfg.PRECISION.np_float)
         result_mem_size = n**2 * cfg.PRECISION.cl_float
-        result_mem = cl.Buffer(
-            cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE, size=result_mem_size
-        )
+        result_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE, size=result_mem_size)
     else:
-        result_mem_size = (
-            n**2 * 2 * cfg.MAX_META_BODIES * cfg.PRECISION.cl_float
-        )
-        res = np.empty(
-            cfg.MAX_META_BODIES * 2 * n * n, dtype=cfg.PRECISION.np_float
-        )
+        result_mem_size = n**2 * 2 * cfg.MAX_META_BODIES * cfg.PRECISION.cl_float
+        res = np.empty(cfg.MAX_META_BODIES * 2 * n * n, dtype=cfg.PRECISION.np_float)
         res[:] = np.inf
         result_mem = cl.Buffer(
             cfg.OPENCL.ctx,
@@ -155,9 +136,7 @@ def create_metaball_buffers(n, thickness):
     return result_mem, res
 
 
-def intersections_to_slice(
-    n, height, intersections_mem, z_start, pixel_size, program
-):
+def intersections_to_slice(n, height, intersections_mem, z_start, pixel_size, program):
     slice_mem = cl.Buffer(cfg.OPENCL.ctx, cl.mem_flags.READ_WRITE, size=n**2)
     slice = np.empty((n, n), dtype=np.uint8)
 
@@ -180,9 +159,7 @@ def intersections_to_slice(
 
 def parse_args():
     parser = get_default_parser("Metaballs example")
-    parser.add_argument(
-        "--n", type=int, default=512, help="Number of image pixels"
-    )
+    parser.add_argument("--n", type=int, default=512, help="Number of image pixels")
     parser.add_argument(
         "--method",
         choices=["random", "fixed", "file"],
@@ -190,9 +167,7 @@ def parse_args():
         help="Use random number of metaballs, fixed metaballs or file with "
         "packed metaball structure",
     )
-    parser.add_argument(
-        "--num", type=int, default=50, help="Number of random metaballs"
-    )
+    parser.add_argument("--num", type=int, default=50, help="Number of random metaballs")
     parser.add_argument(
         "--distance-from-center",
         type=float,
@@ -215,9 +190,7 @@ def parse_args():
         default=25,
         help="Maximum radius of random metaballs in pixels",
     )
-    parser.add_argument(
-        "--input", type=str, help="Input file for packed metaballs"
-    )
+    parser.add_argument("--input", type=str, help="Input file for packed metaballs")
     parser.add_argument(
         "--output",
         type=str,
@@ -257,9 +230,7 @@ def main():
     elif args.method == "file":
         # 1e6 because packing converts to meters
         values = np.fromfile(args.input, dtype=np.float32) * 1e6
-        metaballs, objects_all = create_metaballs(
-            values.reshape(len(values) // 4, 4), pixel_size
-        )
+        metaballs, objects_all = create_metaballs(values.reshape(len(values) // 4, 4), pixel_size)
     else:
         distance = args.distance or args.n / 4
         positions = [
@@ -289,9 +260,7 @@ def main():
             "Z steps:",
             int(((z_max - z_min) / pixel_size).simplified.magnitude + 0.5),
         )
-        thickness = project_metaballs_naive(
-            metaballs, shape, make_tuple(pixel_size)
-        ).get()
+        thickness = project_metaballs_naive(metaballs, shape, make_tuple(pixel_size)).get()
 
     if args.output_thickness:
         imageio.imwrite(args.output_thickness, thickness)

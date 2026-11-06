@@ -15,14 +15,16 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
+import unittest
+
 import numpy as np
 import quantities as q
-import unittest
+
+import syris.imageprocessing as ip
 from syris.devices.sources import BendingMagnet, FixedSpectrumSource, Wiggler, XRaySourceError
 from syris.geometry import Trajectory
-import syris.imageprocessing as ip
 from syris.physics import energy_to_wavelength
-from syris.tests import are_images_supported, default_syris_init, SyrisTest
+from syris.tests import SyrisTest, are_images_supported, default_syris_init
 from syris.tests.util import get_gauss_2d
 
 
@@ -35,9 +37,9 @@ def make_phase(n, ps, d, energy, phase_profile):
     k = 2 * np.pi / lam
 
     if phase_profile == "parabola":
-        r = (x ** 2 + y ** 2) / (2 * d)
+        r = (x**2 + y**2) / (2 * d)
     elif phase_profile == "sphere":
-        r = np.sqrt(x ** 2 + y ** 2 + d ** 2)
+        r = np.sqrt(x**2 + y**2 + d**2)
     else:
         raise ValueError("Unknown phase profile '{}'".format(phase_profile))
 
@@ -223,7 +225,7 @@ class TestFixedSource(SyrisTest):
                 source.transfer(shape, self.ps / factor, self.energies[0], check=False)
             ).get()
             self.assertAlmostEqual(im.sum(), gauss.sum(), places=3)
-            hd = ip.rescale(gauss, shape).get() / factor ** 2
+            hd = ip.rescale(gauss, shape).get() / factor**2
             np.testing.assert_almost_equal(im, hd, decimal=5)
 
         gauss = np.fft.fftshift(get_gauss_2d((self.n, self.n), self.n / 10.0))

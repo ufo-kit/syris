@@ -46,14 +46,16 @@ their own trajectories.
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
+
 import syris
 import syris.geometry as geom
 from syris.bodies.base import CompositeBody
 from syris.bodies.isosurfaces import MetaBall
-from syris.bodies.mesh import make_cube, Mesh
+from syris.bodies.mesh import Mesh, make_cube
 from syris.geometry import Trajectory
-from .util import get_default_parser, show
+
 from .trajectory import make_circle
+from .util import get_default_parser, show
 
 
 def _make_metaballs(args):
@@ -68,9 +70,7 @@ def _make_metaballs(args):
             coeff = 0.5 + 0.5 / 8 * index
             current_radius = coeff * radius
             dy = j * 3 * radius
-            traj = Trajectory(
-                [(shift + dx, shift + dy, 0)] * args.ps, pixel_size=args.ps
-            )
+            traj = Trajectory([(shift + dx, shift + dy, 0)] * args.ps, pixel_size=args.ps)
             metaballs.append(MetaBall(traj, current_radius * args.ps))
 
     return metaballs
@@ -78,9 +78,7 @@ def _make_metaballs(args):
 
 def make_manual_sequence(args):
     metaballs = _make_metaballs(args)
-    traj = Trajectory(
-        [(args.n / 2.0, args.n / 2.0, 0)] * args.ps, pixel_size=args.ps
-    )
+    traj = Trajectory([(args.n / 2.0, args.n / 2.0, 0)] * args.ps, pixel_size=args.ps)
     composite = CompositeBody(traj, bodies=metaballs)
     # Move the sub-bodies relative to the composite body and also move the composite body to the
     # center of the image.
@@ -107,9 +105,7 @@ def make_manual_sequence(args):
 def make_trajectory_sequence(args):
     # Make a small circle (1 / 10 of the pixel size), so that the composite body only rotates and
     # does not translate. Put this circle in the middle of the image.
-    circle = (
-        args.n / 2 * args.ps + make_circle(n=1024).magnitude * args.ps / 10
-    )
+    circle = args.n / 2 * args.ps + make_circle(n=1024).magnitude * args.ps / 10
     traj = Trajectory(circle, velocity=args.ps / q.s, pixel_size=args.ps)
     metaballs = _make_metaballs(args)
     composite = CompositeBody(traj, bodies=metaballs)
@@ -118,9 +114,7 @@ def make_trajectory_sequence(args):
     d_angle = 10 * q.deg
     fmt = "Projection at rotation {:>9}"
     # Rotate around 360 deg
-    for i, t in enumerate(
-        np.linspace(0, traj.time.simplified.magnitude, 37) * q.s
-    ):
+    for i, t in enumerate(np.linspace(0, traj.time.simplified.magnitude, 37) * q.s):
         # Reset transformation matrices
         composite.clear_transformation()
         # Move to the desired position, i.e. around the circle and then each metaball moves relative
@@ -161,16 +155,10 @@ def make_complex_trajectory_sequence(args):
     )
     # Circular trajectory of the composite body rotates around the image center and with radius
     # n / 4 pixels.
-    circle = (
-        args.n / 2 * args.ps + make_circle().magnitude * args.n / 4 * args.ps
-    )
-    traj_circle = Trajectory(
-        circle, velocity=args.ps / q.s, pixel_size=args.ps
-    )
+    circle = args.n / 2 * args.ps + make_circle().magnitude * args.n / 4 * args.ps
+    traj_circle = Trajectory(circle, velocity=args.ps / q.s, pixel_size=args.ps)
     # Make the trajectory of the circle the same duration as the simple linear one.
-    traj_circle = Trajectory(
-        circle, velocity=traj_circle.length / traj_xy.length * args.ps / q.s
-    )
+    traj_circle = Trajectory(circle, velocity=traj_circle.length / traj_xy.length * args.ps / q.s)
     # three cubes in the same height and depth, shifted only along the x axis.
     traj_stationary = Trajectory([(0, 0, 0)] * args.ps)
     traj_stationary_1 = Trajectory([(-2 * edge, 0, 0)] * args.ps)
@@ -194,9 +182,7 @@ def make_complex_trajectory_sequence(args):
         mesh_stationary_1,
         mesh_stationary_2,
     ]
-    composite = CompositeBody(
-        traj_circle, bodies=bodies, orientation=geom.Y_AX
-    )
+    composite = CompositeBody(traj_circle, bodies=bodies, orientation=geom.Y_AX)
     composite.bind_trajectory(args.ps)
 
     total_time = composite.time
@@ -224,15 +210,9 @@ def make_complex_trajectory_sequence(args):
 
 def main():
     parser = get_default_parser(__doc__)
-    subparsers = parser.add_subparsers(
-        help="sub-command help", dest="sub-commands", required=True
-    )
-    manual = subparsers.add_parser(
-        "manual", help="Manual positioning via simple transformations"
-    )
-    trajectory = subparsers.add_parser(
-        "trajectory", help="Automatic positioning via trajectories"
-    )
+    subparsers = parser.add_subparsers(help="sub-command help", dest="sub-commands", required=True)
+    manual = subparsers.add_parser("manual", help="Manual positioning via simple transformations")
+    trajectory = subparsers.add_parser("trajectory", help="Automatic positioning via trajectories")
     subtrajectories = subparsers.add_parser(
         "subtrajectories",
         help="Automatic positioning with local sub-body trajectories",

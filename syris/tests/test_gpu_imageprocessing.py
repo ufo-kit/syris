@@ -15,16 +15,18 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
+import itertools
+import unittest
+
 import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
-import unittest
-from syris.gpu import util as gpu_util
+
 from syris import config as cfg
 from syris import imageprocessing as ip
+from syris.gpu import util as gpu_util
 from syris.math import fwnm_to_sigma
-import itertools
-from syris.tests import are_images_supported, default_syris_init, SyrisTest
+from syris.tests import SyrisTest, are_images_supported, default_syris_init
 from syris.tests.util import get_gauss_2d
 
 
@@ -103,7 +105,7 @@ class TestGPUImageProcessing(SyrisTest):
         sigma = fwnm_to_sigma(1)
         shape = (n // 2, n // 2)
 
-        image = np.arange(n * n).reshape(n, n).astype(cfg.PRECISION.np_float) // n ** 2
+        image = np.arange(n * n).reshape(n, n).astype(cfg.PRECISION.np_float) // n**2
         fltr = get_gauss_2d((n, n), sigma, fourier=True)
         filtered = np.fft.ifft2(np.fft.fft2(image) * fltr).real
         gt = bin_cpu(filtered, shape)
@@ -240,7 +242,7 @@ class TestGPUImageProcessing(SyrisTest):
         np.testing.assert_almost_equal(res, square)
 
         # Various odd/even combinations in the x, y directions
-        for (ss_y, ss_x) in itertools.product((2, 3), (2, 3)):
+        for ss_y, ss_x in itertools.product((2, 3), (2, 3)):
             hd_n = ss_x * n
             hd_m = ss_y * n
             res = ip.rescale(square, (hd_m, hd_n)).get()
@@ -259,7 +261,7 @@ class TestGPUImageProcessing(SyrisTest):
         np.testing.assert_almost_equal(res, square)
 
         # Various odd/even combinations in the x, y directions
-        for (ss_y, ss_x) in itertools.product((1.0 / 2, 1.0 / 3), (1.0 / 2, 1.0 / 3)):
+        for ss_y, ss_x in itertools.product((1.0 / 2, 1.0 / 3), (1.0 / 2, 1.0 / 3)):
             hd_n = int(ss_x * n)
             hd_m = int(ss_y * n)
             res = ip.rescale(square, (hd_m, hd_n)).get()

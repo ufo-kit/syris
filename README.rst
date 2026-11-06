@@ -58,9 +58,14 @@ viewer also requires the Graphviz ``dot`` executable.
 
 Development commands::
 
+    uv run ruff check .
+    uv run ruff format --check .
     uv run python -m unittest discover -v
     uv run --group docs sphinx-build -b html docs/source docs/build/html
     uv build
+
+Ruff handles linting, import sorting and formatting. Use ``make format`` to
+sort imports and format Python files, or ``make lint`` to check both.
 
 The test suite needs an OpenCL runtime; CUDA-specific tests skip when CUDA is
 unavailable. Set ``SYRIS_REQUIRE_CUDA=1`` when CUDA tests must run. Use

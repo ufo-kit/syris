@@ -1,12 +1,14 @@
 import abc
-import syris.config as cfg
-import quantities as q
-from syris.util import get_magnitude
-import pyopencl.cltypes as cltypes
-import pyopencl.array as cl_array
-import syris.gpu.util as gutil
-import numpy as np
 import logging
+
+import numpy as np
+import pyopencl.array as cl_array
+import pyopencl.cltypes as cltypes
+import quantities as q
+
+import syris.config as cfg
+import syris.gpu.util as gutil
+from syris.util import get_magnitude
 
 LOG = logging.getLogger(__name__)
 
@@ -37,9 +39,7 @@ class BvhCupyAccelerator(AcceleratorBase):
         super().__init__(mesh)
         self.pipeline = cfg.BACKEND.pipeline
         if self.pipeline is None:
-            raise RuntimeError(
-                "CUDA backend is active, but the CudaPipeline was not initialized."
-            )
+            raise RuntimeError("CUDA backend is active, but the CudaPipeline was not initialized.")
 
         self.xp = cfg.BACKEND.xp
         self._projection_block_limit = 4 * self.xp.cuda.Device().attributes["MultiProcessorCount"]
@@ -82,12 +82,8 @@ class BvhCupyAccelerator(AcceleratorBase):
             raise ValueError("Cannot build a BVH for an empty mesh")
         # Bounds must describe the transformed vertices, not the original file.
         lo, hi = host_vertices.min(axis=1), host_vertices.max(axis=1)
-        sceneMin = np.array(
-            [*lo, 0], dtype=self.float_dtype
-        )
-        sceneMax = np.array(
-            [*hi, 0], dtype=self.float_dtype
-        )
+        sceneMin = np.array([*lo, 0], dtype=self.float_dtype)
+        sceneMax = np.array([*hi, 0], dtype=self.float_dtype)
         t_epsilon = self.mesh.epsilon
 
         host_vertices = host_vertices.T
@@ -96,24 +92,18 @@ class BvhCupyAccelerator(AcceleratorBase):
             nb_vertices = len(host_vertices)
 
         if len(host_vertices.shape) != 2 or host_vertices.shape[1] != 3:
-            raise ValueError(
-                f"Vertices must have shape (N, 3), but got {host_vertices.shape}"
-            )
+            raise ValueError(f"Vertices must have shape (N, 3), but got {host_vertices.shape}")
 
         try:
             # Create and transfer vertex data to the GPU in a single operation
             vertices = self.xp.zeros((nb_vertices, 4), dtype=self.float_dtype)
-            vertices[:, :3] = self.xp.array(
-                host_vertices, dtype=self.float_dtype
-            )
+            vertices[:, :3] = self.xp.array(host_vertices, dtype=self.float_dtype)
 
             # Create and transfer normal data to the GPU if it exists
             normals = None
             if host_normals is not None:
                 normals = self.xp.zeros((nb_keys, 4), dtype=self.float_dtype)
-                normals[:, :3] = self.xp.array(
-                    host_normals, dtype=self.float_dtype
-                )
+                normals[:, :3] = self.xp.array(host_normals, dtype=self.float_dtype)
 
             keys = self.xp.zeros(nb_keys, dtype=self.xp.uint64)
             rope = self.xp.full(2 * nb_keys, -1, dtype=self.xp.int32)
@@ -235,17 +225,15 @@ class BvhCupyAccelerator(AcceleratorBase):
             scale = float(1.0 / max_bound)
 
         # --- Prepare Kernel Launch ---
-        image = (
-            self.xp.ones(
-                camera.shape[0] * camera.shape[1], dtype=self.float_dtype
-            )
-            * -1
-        )
+        image = self.xp.ones(camera.shape[0] * camera.shape[1], dtype=self.float_dtype) * -1
         global_counter = self.xp.zeros(1, dtype=self.xp.uint32)
 
         block_size = (256, 1, 1)
-        pixel_grid_size = ((camera.shape[0] * camera.shape[1] + block_size[0] - 1)
-                           // block_size[0], 1, 1)
+        pixel_grid_size = (
+            (camera.shape[0] * camera.shape[1] + block_size[0] - 1) // block_size[0],
+            1,
+            1,
+        )
         grid_size = pixel_grid_size
 
         # --- Build Kernel Arguments ---
@@ -256,9 +244,7 @@ class BvhCupyAccelerator(AcceleratorBase):
             (self.tree["vertices"] * scale).view(self.float4_view),
         ]
         if use_normals:
-            base_args.append(
-                self.tree["normals"].view(self.float4_view)
-            )
+            base_args.append(self.tree["normals"].view(self.float4_view))
 
         camera_args = [
             camera.kernel_shape_xy.view(self.uint2_view),
@@ -270,9 +256,7 @@ class BvhCupyAccelerator(AcceleratorBase):
         ]
 
         if not parallel:
-            camera_args.append(
-                (camera.source_point * scale).view(self.float4_view)
-            )
+            camera_args.append((camera.source_point * scale).view(self.float4_view))
 
         tree_args = [
             self.tree["rope"],
@@ -309,34 +293,45 @@ class BvhCupyAccelerator(AcceleratorBase):
             # Stages pull tasks from counters; only classification uses a
             # fixed pixel grid. In particular, refinement can have no work.
             grid_size = (min(pixel_grid_size[0], self._projection_block_limit), 1, 1)
-            samples = self.xp.empty((rows + 1) * (cols + 1) + 5 * rows * cols,
-                                    dtype=self.float_dtype)
+            samples = self.xp.empty(
+                (rows + 1) * (cols + 1) + 5 * rows * cols, dtype=self.float_dtype
+            )
             queue = self.xp.empty(rows * cols, dtype=self.xp.uint32)
             queue_count = self.xp.zeros(1, dtype=self.xp.uint32)
             eps = self.xp.asarray(self._epsilon_args, dtype=self.float_dtype)
-            source = (np.zeros(4, dtype=self.float_dtype) if parallel else
-                      camera.source_point * scale).view(self.float4_view)
+            source = (
+                np.zeros(4, dtype=self.float_dtype) if parallel else camera.source_point * scale
+            ).view(self.float4_view)
             staged_args = (
                 *base_args[:4],
                 base_args[4] if use_normals else np.uint64(0),
-                *camera_args[:6], source, np.int32(parallel), *tree_args,
-                *sampling_args, eps, samples, queue_count, queue,
+                *camera_args[:6],
+                source,
+                np.int32(parallel),
+                *tree_args,
+                *sampling_args,
+                eps,
+                samples,
+                queue_count,
+                queue,
             )
-            self.pipeline.launchKernel("project_shared_samples_kernel",
-                                       grid_size, block_size, staged_args)
+            self.pipeline.launchKernel(
+                "project_shared_samples_kernel", grid_size, block_size, staged_args
+            )
             global_counter.fill(0)
-            self.pipeline.launchKernel("project_missing_samples_kernel",
-                                       grid_size, block_size, staged_args)
-            self.pipeline.launchKernel("classify_shared_samples_kernel",
-                                       pixel_grid_size, block_size, staged_args)
+            self.pipeline.launchKernel(
+                "project_missing_samples_kernel", grid_size, block_size, staged_args
+            )
+            self.pipeline.launchKernel(
+                "classify_shared_samples_kernel", pixel_grid_size, block_size, staged_args
+            )
             global_counter.fill(0)
-            self.pipeline.launchKernel("refine_shared_samples_kernel",
-                                       grid_size, block_size, staged_args)
+            self.pipeline.launchKernel(
+                "refine_shared_samples_kernel", grid_size, block_size, staged_args
+            )
         else:
             LOG.debug(f"Launching kernel: {kernel_name}")
-            time, _ = self.pipeline.launchKernel(
-                kernel_name, grid_size, block_size, all_args
-            )
+            time, _ = self.pipeline.launchKernel(kernel_name, grid_size, block_size, all_args)
             LOG.debug(f"Projected mesh in {time} ms")
 
         self.pipeline.synchronize()
@@ -415,15 +410,11 @@ class LegacyCpuAccelerator(AcceleratorBase):
             height = min(y_max_px - y_min_px, shape[0])
             compute_offset = cltypes.make_int2(x_min_px, y_min_px)
             v_1, v_2, v_3 = self.mesh._make_inputs(queue, pixel_size)
-            max_dx = (
-                self.mesh.max_triangle_x_diff.simplified.magnitude / psm[1]
-            )
+            max_dx = self.mesh.max_triangle_x_diff.simplified.magnitude / psm[1]
             # Use the same pixel size as for the x-axis, which will work for objects "not too far"
             # from the imaging plane
             min_z = self.mesh.extrema[2][0].simplified.magnitude / psm[1]
-            offset = gutil.make_vfloat2(
-                *(offset / pixel_size).simplified.magnitude[::-1]
-            )
+            offset = gutil.make_vfloat2(*(offset / pixel_size).simplified.magnitude[::-1])
 
             ev = cfg.OPENCL.programs["mesh"].compute_thickness(
                 queue,
@@ -455,9 +446,7 @@ class LegacyCUDAAccelerator(AcceleratorBase):
         super().__init__(mesh)
         self.pipeline = cfg.BACKEND.pipeline
         if self.pipeline is None:
-            raise RuntimeError(
-                "CUDA backend is active, but the CudaPipeline was not initialized."
-            )
+            raise RuntimeError("CUDA backend is active, but the CudaPipeline was not initialized.")
         self.tree = None
 
     def build(self, **kwargs):
@@ -486,10 +475,7 @@ class LegacyCUDAAccelerator(AcceleratorBase):
         pixel_size = pixel_size.rescale(cfg.UNIT)
 
         def make_scaled_vertices(vertex_index, px_size):
-            verts = (
-                self.mesh._current[:-1, vertex_index::3]
-                / px_size.rescale(cfg.UNIT).magnitude
-            )
+            verts = self.mesh._current[:-1, vertex_index::3] / px_size.rescale(cfg.UNIT).magnitude
             return verts.transpose().flatten().astype(float)
 
         v1_host = make_scaled_vertices(0, pixel_size[1])
@@ -559,13 +545,8 @@ class LegacyCUDAAccelerator(AcceleratorBase):
             # The kernel needs the full image width for memory indexing
             full_image_width = shape[1]
 
-            max_dx = (
-                self.mesh.max_triangle_x_diff.rescale(cfg.UNIT).magnitude
-                / psm[1]
-            )
-            min_z = (
-                self.mesh.extrema[2][0].rescale(cfg.UNIT).magnitude / psm[1]
-            )
+            max_dx = self.mesh.max_triangle_x_diff.rescale(cfg.UNIT).magnitude / psm[1]
+            min_z = self.mesh.extrema[2][0].rescale(cfg.UNIT).magnitude / psm[1]
             kernel_mesh_offset = (offset / pixel_size).magnitude[::-1]
             kernel_mesh_offset = np.array(kernel_mesh_offset, dtype=float)
 

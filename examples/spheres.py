@@ -21,26 +21,28 @@ Creation of spheres in a capillary, their projection and X-ray simulation.
 
 import functools
 import glob
-import sys
-import imageio
 import multiprocessing
+import os
+import sys
+from multiprocessing.pool import Pool
+
+import imageio
 import numpy as np
 import pyopencl.array as cl_array
-import os
 import quantities as q
-import syris
 import tqdm
+
+import syris
 from syris.bodies.simple import StaticBody
-from syris.devices.sources import make_topotomo
 from syris.devices.cameras import Camera
+from syris.devices.sources import make_topotomo
 from syris.geometry import Trajectory
 from syris.gpu.util import get_host
 from syris.imageprocessing import decimate
 from syris.math import fwnm_to_sigma
-from syris.physics import propagate, energy_to_wavelength
-from multiprocessing.pool import Pool
-from .util import get_material
+from syris.physics import energy_to_wavelength, propagate
 
+from .util import get_material
 
 try:
     import hydra
@@ -73,9 +75,7 @@ def rotate_xy(angle, x, y):
 
 def make_projection(spheres_filename, n, ss, num_projections, index):
     output_directory = os.path.dirname(spheres_filename)
-    output_fmt = os.path.join(
-        output_directory, "projections-hd", "projection_{:>06}.tif"
-    )
+    output_fmt = os.path.join(output_directory, "projections-hd", "projection_{:>06}.tif")
     os.makedirs(os.path.dirname(output_fmt), exist_ok=True)
 
     spheres = np.load(spheres_filename).astype(float) * ss
@@ -130,9 +130,7 @@ def make_spheres(common):
     y_0 = 0
     y_1 = common.n
 
-    x = np.random.randint(
-        x_0 + args.r_max, high=x_1 - args.r_max, size=args.n_spheres
-    )
+    x = np.random.randint(x_0 + args.r_max, high=x_1 - args.r_max, size=args.n_spheres)
     z = np.random.randint(
         x_0 - common.n // 2 + args.r_max,
         high=x_1 - common.n // 2 - args.r_max,
@@ -156,9 +154,7 @@ def make_spheres(common):
         yc = y[vi]
         zc = z[vi]
         rc = r[vi]
-        dist_s = np.sqrt(
-            (x[i] - xc) ** 2 + (y[i] - yc) ** 2 + (z[i] - zc) ** 2
-        )
+        dist_s = np.sqrt((x[i] - xc) ** 2 + (y[i] - yc) ** 2 + (z[i] - zc) ** 2)
         dist_r = r[i] + rc
         iind = np.where(dist_s < dist_r)[0]
         valid[vi[iind]] = False
@@ -176,9 +172,7 @@ def make_spheres(common):
     iind = np.where(common.inner_cylinder_radius < dist)[0]
     valid[ind[iind]] = False
     ind = np.where(valid)[0]
-    print(
-        f"Number of non-overlapping spheres not reaching beyond max-dist: {len(ind)}"
-    )
+    print(f"Number of non-overlapping spheres not reaching beyond max-dist: {len(ind)}")
 
     # Check
     for i in tqdm.tqdm(range(len(ind))):
@@ -188,9 +182,7 @@ def make_spheres(common):
         yv = y[others]
         zv = z[others]
         rv = r[others]
-        dist_s = np.sqrt(
-            (x[ci] - xv) ** 2 + (y[ci] - yv) ** 2 + (z[ci] - zv) ** 2
-        )
+        dist_s = np.sqrt((x[ci] - xv) ** 2 + (y[ci] - yv) ** 2 + (z[ci] - zv) ** 2)
         dist_r = r[ci] + rv
 
         assert np.all(dist_s >= dist_r)
@@ -198,9 +190,7 @@ def make_spheres(common):
     if args.rho_min == args.rho_max:
         rho = np.ones(len(ind)) * args.rho_min
     else:
-        rho = np.random.uniform(
-            low=args.rho_min, high=args.rho_max, size=len(ind)
-        )
+        rho = np.random.uniform(low=args.rho_min, high=args.rho_max, size=len(ind))
     spheres = np.stack((x[ind], y[ind], z[ind], rho, r[ind])).T
 
     if not os.path.exists(args.output_directory):
@@ -294,9 +284,7 @@ def create_xray_projections(common):
     ps_hd = ps / supersampling
     material = get_material("synth-delta-1e-6-beta-1e-8.mat")
     ri = material.get_refractive_index(energy)
-    xray_gain = (
-        20  # number of emitted visible light photons / one X-ray photon
-    )
+    xray_gain = 20  # number of emitted visible light photons / one X-ray photon
 
     fmt = "Wavelength: {}"
     print(fmt.format(lam))
@@ -304,36 +292,22 @@ def create_xray_projections(common):
     print(fmt.format(ps_hd.rescale(q.um)))
     print("Field of view: {}".format(common.n * ps.rescale(q.um)))
     print("Supersampling: {}".format(supersampling))
-    print(
-        f"Material mu at {energy}: {material.get_attenuation_coefficient(energy)}"
-    )
-    print(
-        f"Regularization rate for water in UFO: {np.log10(ri.real / ri.imag)}"
-    )
-    n_kernel_half = int(
-        np.ceil(
-            (lam * propagation_distance / (2 * ps**2)).simplified.magnitude
-        )
-    )
+    print(f"Material mu at {energy}: {material.get_attenuation_coefficient(energy)}")
+    print(f"Regularization rate for water in UFO: {np.log10(ri.real / ri.imag)}")
+    n_kernel_half = int(np.ceil((lam * propagation_distance / (2 * ps**2)).simplified.magnitude))
     print("Propagator half-size in pixels:", n_kernel_half)
     y_cutoff = max(10, n_kernel_half)
 
     if not args.outer_cylinder_radius:
         args.outer_cylinder_radius = (common.n - 50) // 2
-    inner_cylinder = make_cylinder_profile(
-        n_hd, common.inner_cylinder_radius * supersampling
-    )
-    outer_cylinder = make_cylinder_profile(
-        n_hd, args.outer_cylinder_radius * supersampling
-    )
+    inner_cylinder = make_cylinder_profile(n_hd, common.inner_cylinder_radius * supersampling)
+    outer_cylinder = make_cylinder_profile(n_hd, args.outer_cylinder_radius * supersampling)
     capillary_thickness = (outer_cylinder - inner_cylinder) * ps_hd
     capillary = StaticBody(capillary_thickness, ps_hd, material=material)
     num_projections = len(projection_filenames)
     print(f"Number of projections: {num_projections}")
 
-    output_directory = os.path.dirname(
-        os.path.dirname(projection_filenames[0])
-    )
+    output_directory = os.path.dirname(os.path.dirname(projection_filenames[0]))
     projs_dir = os.path.join(output_directory, "projections")
     if args.output_suffix:
         args.output_suffix = "-" + args.output_suffix
@@ -359,34 +333,25 @@ def create_xray_projections(common):
     # the top and bottom wrt the middle
     source_ps = 20 * q.um
     n_times = 128
-    traj_param = np.linspace(
-        0, args.source.num_periods * 2 * np.pi, n_times, endpoint=False
-    )
+    traj_param = np.linspace(0, args.source.num_periods * 2 * np.pi, n_times, endpoint=False)
     tx = [common.n / 2] * n_times
     ty = np.sin(traj_param) * args.source.max_shift * common.n + common.n // 2
     tz = np.zeros(n_times)
     t_points = list(zip(tx, ty, tz)) * source_ps
-    source_traj = Trajectory(
-        t_points, pixel_size=source_ps, velocity=source_ps / q.s
-    )
+    source_traj = Trajectory(t_points, pixel_size=source_ps, velocity=source_ps / q.s)
     source = make_topotomo(trajectory=source_traj)
 
     # Flat and dark
-    flat = (
-        np.abs(
-            get_host(source.transfer((common.n, common.n), source_ps, energy))
-        )
-        ** 2
-    )
+    flat = np.abs(get_host(source.transfer((common.n, common.n), source_ps, energy))) ** 2
     flat = flat / flat.max() * args.max_absorbed_photons
     flats = []
 
     imageio.volwrite(
         os.path.join(output_directory, f"darks{args.output_suffix}.tif"),
         [
-            get_camera_image(
-                np.zeros_like(flat), camera, xray_gain, noise=args.noise
-            )[y_cutoff:-y_cutoff]
+            get_camera_image(np.zeros_like(flat), camera, xray_gain, noise=args.noise)[
+                y_cutoff:-y_cutoff
+            ]
             for i in range(args.num_darks)
         ],
     )
@@ -394,11 +359,7 @@ def create_xray_projections(common):
     # Scintillator spots
     spots_image = None
     if args.spots_filename:
-        spots_image = (
-            imageio.imread(args.spots_filename)
-            if args.spots_filename
-            else None
-        )
+        spots_image = imageio.imread(args.spots_filename) if args.spots_filename else None
 
     flats_done = False
     max_flat = None
@@ -411,26 +372,14 @@ def create_xray_projections(common):
                     (n_hd, n_hd),
                     source_ps / supersampling,
                     energy,
-                    t=i / num_projections * source_traj.time
-                    if args.source.drift
-                    else 0 * q.s,
+                    t=i / num_projections * source_traj.time if args.source.drift else 0 * q.s,
                 )
             )
             ** 2
         )
-        flat_hd = (
-            flat_hd
-            / cl_array.max(flat_hd)
-            * args.max_absorbed_photons
-            / supersampling**2
-        )
+        flat_hd = flat_hd / cl_array.max(flat_hd) * args.max_absorbed_photons / supersampling**2
         if max_flat is None:
-            max_flat = (
-                cl_array.max(flat_hd).get()
-                * xray_gain
-                * camera.gain
-                * supersampling**2
-            )
+            max_flat = cl_array.max(flat_hd).get() * xray_gain * camera.gain * supersampling**2
             print("Max flat value:", max_flat)
         if not flats_done:
             flat_ld = get_low_resolution_image(
@@ -446,9 +395,7 @@ def create_xray_projections(common):
                 flats.append(flat_ld[y_cutoff:-y_cutoff])
             else:
                 imageio.volwrite(
-                    os.path.join(
-                        output_directory, f"flats{args.output_suffix}.tif"
-                    ),
+                    os.path.join(output_directory, f"flats{args.output_suffix}.tif"),
                     flats,
                 )
                 flats_done = True
@@ -458,9 +405,7 @@ def create_xray_projections(common):
         projection = spheres * ps_hd
         sample = StaticBody(projection, ps_hd, material=material)
         # Propagation with a monochromatic plane incident wave
-        hd = propagate(
-            [capillary, sample], shape, [energy], propagation_distance, ps_hd
-        )
+        hd = propagate([capillary, sample], shape, [energy], propagation_distance, ps_hd)
         proj = get_low_resolution_image(
             flat_hd * hd,
             supersampling,

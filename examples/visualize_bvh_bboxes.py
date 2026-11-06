@@ -18,15 +18,20 @@
 """Visualization of the BVH bounding boxes"""
 
 import logging
+
 import numpy as np
-import quantities as q
 import pyvista as pv
+import quantities as q
 import vtk
+
 import syris
 import syris.geometry as geom
 from syris.bodies.mesh import Mesh
+
 from .util import (
-    add_cuda_mesh_options, get_default_parser, validate_cuda_mesh_options,
+    add_cuda_mesh_options,
+    get_default_parser,
+    validate_cuda_mesh_options,
 )
 
 LOG = logging.getLogger(__name__)
@@ -181,9 +186,7 @@ def visualize_bvh(
         scalars="my_scalars",
         cmap=cmap,
         log_scale=log_scale,
-        scalar_bar_args={"title": scalar_bar_title}
-        if show_scalar_bar
-        else None,
+        scalar_bar_args={"title": scalar_bar_title} if show_scalar_bar else None,
         opacity=opacity_map,
         style="surface",
     )
@@ -220,13 +223,16 @@ def main():
         LOG.info(f"Loading mesh from file: {input}")
     else:
         input = pv.examples.download_dragon()
-        LOG.info(
-            "No input file provided, loading default PyVista mesh (dragon)..."
-        )
+        LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
 
     mesh = Mesh.from_file(
-        input, tr, center=args.center, unit=mesh_units, use_normals=True,
-        repair=args.repair_mesh, float32_rounding=args.float32_rounding,
+        input,
+        tr,
+        center=args.center,
+        unit=mesh_units,
+        use_normals=True,
+        repair=args.repair_mesh,
+        float32_rounding=args.float32_rounding,
     )
 
     mesh.build_accelerator()
@@ -336,17 +342,11 @@ def parse_args():
         default="um",
         help="Physical units of the mesh file (e.g., 'm', 'cm', 'um')",
     )
-    parser.add_argument(
-        "--center", type=str, default="bbox", help="Mesh centering on creation"
-    )
+    parser.add_argument("--center", type=str, default="bbox", help="Mesh centering on creation")
 
     # --- Flags to select what to show ---
-    parser.add_argument(
-        "--show-leafs", action="store_true", help="Render the leaf nodes"
-    )
-    parser.add_argument(
-        "--show-nodes", action="store_true", help="Render the inner BVH nodes"
-    )
+    parser.add_argument("--show-leafs", action="store_true", help="Render the leaf nodes")
+    parser.add_argument("--show-nodes", action="store_true", help="Render the inner BVH nodes")
     parser.add_argument(
         "--show-nested",
         action="store_true",

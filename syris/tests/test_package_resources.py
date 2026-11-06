@@ -16,9 +16,18 @@ from syris.materials import Material
 class TestPackageResources(TestCase):
     def test_cuda_sources_and_transitive_headers_are_available(self):
         directory = files("syris").joinpath("gpu", "cuda")
-        for name in ("WatertightRay.cu", "Ray.cu", "source.cu", "Legacy.cu",
-                     "Commons.cuh", "WatertightRay.cuh", "Ray.cuh",
-                     "source.cuh", "PixelScheduler.cuh", "staged.cuh"):
+        for name in (
+            "WatertightRay.cu",
+            "Ray.cu",
+            "source.cu",
+            "Legacy.cu",
+            "Commons.cuh",
+            "WatertightRay.cuh",
+            "Ray.cuh",
+            "source.cuh",
+            "PixelScheduler.cuh",
+            "staged.cuh",
+        ):
             with self.subTest(name=name):
                 self.assertTrue(directory.joinpath(name).read_text(encoding="utf-8").strip())
 

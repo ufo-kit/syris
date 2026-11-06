@@ -47,22 +47,28 @@ def init(
     """
     from numbers import Integral
 
-    if (isinstance(warp_tile_width, bool) or not isinstance(warp_tile_width, Integral)
-            or warp_tile_width not in (0, 1, 2, 4, 8, 16, 32)):
+    if (
+        isinstance(warp_tile_width, bool)
+        or not isinstance(warp_tile_width, Integral)
+        or warp_tile_width not in (0, 1, 2, 4, 8, 16, 32)
+    ):
         raise ValueError("warp_tile_width must be 0 or an integer divisor of 32.")
     if warp_tile_width and compute_backend != "cuda":
         raise ValueError("warp_tile_width requires compute_backend='cuda'.")
     if mixed_precision and (double_precision or compute_backend != "cuda"):
-        raise ValueError("mixed_precision requires compute_backend='cuda' "
-                         "and double_precision=False.")
+        raise ValueError(
+            "mixed_precision requires compute_backend='cuda' and double_precision=False."
+        )
     import atexit
     import logging
-    import syris.config as cfg
-    from pathlib import Path
     import os
-    from syris.backend import ComputeBackend, HAS_OPENCL
-    from syris.gpu.util import make_opencl_defaults, init_programs
+    from pathlib import Path
+
     from quantities import Quantity
+
+    import syris.config as cfg
+    from syris.backend import HAS_OPENCL, ComputeBackend
+    from syris.gpu.util import init_programs, make_opencl_defaults
 
     LOG = logging.getLogger(__name__)
 
@@ -94,18 +100,16 @@ def init(
             options.append(f"-DSYRIS_WARP_TILE_WIDTH={int(warp_tile_width)}")
         if mixed_precision:
             options.append("-DSYRIS_MIXED_PRECISION")
-            LOG.info("Experimental mixed precision: Float32 storage/BVH, "
-                     "Float64 ray/triangle arithmetic.")
-        cfg.BACKEND.pipeline = CudaPipeline(
-            headers=cuda_headers, options=options
-        )
+            LOG.info(
+                "Experimental mixed precision: Float32 storage/BVH, "
+                "Float64 ray/triangle arithmetic."
+            )
+        cfg.BACKEND.pipeline = CudaPipeline(headers=cuda_headers, options=options)
 
         module_name = "bvh_kernels"
 
         try:
-            cfg.BACKEND.pipeline.readModuleFromFiles(
-                module_name, abs_source_files, jitify=False
-            )
+            cfg.BACKEND.pipeline.readModuleFromFiles(module_name, abs_source_files, jitify=False)
         except Exception as e:
             LOG.error(f"Failed to read modules: {e}")
 
@@ -125,9 +129,7 @@ def init(
 
         try:
             for kernel_name in kernel_names:
-                cfg.BACKEND.pipeline.getKernelFromModule(
-                    module_name, kernel_name
-                )
+                cfg.BACKEND.pipeline.getKernelFromModule(module_name, kernel_name)
         except Exception as e:
             LOG.error(f"Failed to get kernel: {e}")
 

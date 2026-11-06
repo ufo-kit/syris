@@ -20,6 +20,7 @@ Optical Elements are entities capable of producing wavefields as a function of t
 """
 
 import quantities as q
+
 import syris.config as cfg
 from syris.util import make_tuple
 

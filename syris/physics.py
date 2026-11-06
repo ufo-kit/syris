@@ -18,17 +18,18 @@
 """Physics on the light path."""
 
 import logging
+
 import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
 import quantities.constants.quantum as cq
 from pyopencl import clmath
-from syris.gpu import util as g_util
-from syris.imageprocessing import get_gauss_2d, fft_2, ifft_2, get_butterworth
-from syris.math import fwnm_to_sigma
-from syris import config as cfg
-from syris.util import make_tuple
 
+from syris import config as cfg
+from syris.gpu import util as g_util
+from syris.imageprocessing import fft_2, get_butterworth, get_gauss_2d, ifft_2
+from syris.math import fwnm_to_sigma
+from syris.util import make_tuple
 
 LOG = logging.getLogger(__name__)
 
@@ -66,9 +67,7 @@ def transfer(
         out = cl_array.Array(queue, thickness_mem.shape, cfg.PRECISION.np_cplx)
 
     if exponent or check:
-        wavenumber = cfg.PRECISION.np_float(
-            2 * np.pi / wavelength.simplified.magnitude
-        )
+        wavenumber = cfg.PRECISION.np_float(2 * np.pi / wavelength.simplified.magnitude)
         ev = cfg.OPENCL.programs["physics"].transmission_add(
             queue,
             thickness_mem.shape[::-1],
@@ -135,26 +134,18 @@ def compute_propagator(
     if queue is None:
         queue = cfg.OPENCL.queue
     pixel_size = make_tuple(pixel_size)
-    if (
-        mollified
-        and mollifier == "butterworth"
-        and pixel_size[0] != pixel_size[1]
-    ):
+    if mollified and mollifier == "butterworth" and pixel_size[0] != pixel_size[1]:
         raise RuntimeError("Butterworth requires identical pixel sizes")
 
     def check_cutoff(ps):
         # Check the sampling
-        r_cutoff = compute_aliasing_limit(
-            size, lam, ps, distance, fov=region, fourier=False
-        )
+        r_cutoff = compute_aliasing_limit(size, lam, ps, distance, fov=region, fourier=False)
         min_n = 4
         if r_cutoff < min_n:
             LOG.warning(
                 "Propagator too narrow, propagation distance too small or pixel size too large"
             )
-        f_cutoff = compute_aliasing_limit(
-            size, lam, ps, distance, fov=region, fourier=True
-        )
+        f_cutoff = compute_aliasing_limit(size, lam, ps, distance, fov=region, fourier=True)
         if f_cutoff < min_n:
             LOG.warning(
                 "Propagator too wide, propagation distance too large or pixel size too small"
@@ -165,9 +156,7 @@ def compute_propagator(
 
     out = cl_array.Array(queue, (size, size), cfg.PRECISION.np_cplx)
     if apply_phase_factor:
-        phase_factor = np.exp(
-            2 * np.pi * distance.simplified / lam.simplified * 1j
-        )
+        phase_factor = np.exp(2 * np.pi * distance.simplified / lam.simplified * 1j)
     else:
         phase_factor = 0 + 0j
 
@@ -189,9 +178,7 @@ def compute_propagator(
     if mollified:
 
         def compute_sigma_component(ps):
-            cutoff = compute_aliasing_limit(
-                size, lam, ps, distance, fourier=fourier
-            )
+            cutoff = compute_aliasing_limit(size, lam, ps, distance, fourier=fourier)
             if region is not None:
                 cutoff_region = compute_aliasing_limit(
                     size, lam, ps, distance, fov=region, fourier=fourier
@@ -208,13 +195,9 @@ def compute_propagator(
             compute_sigma_component(pixel_size[1]),
         )
         if mollifier == "gauss":
-            mollifier = get_gauss_2d(
-                size, cutoff, fourier=False, queue=queue, block=block
-            )
+            mollifier = get_gauss_2d(size, cutoff, fourier=False, queue=queue, block=block)
         else:
-            mollifier = get_butterworth(
-                size, cutoff[1] // 2, order=5, queue=queue, block=block
-            )
+            mollifier = get_butterworth(size, cutoff[1] // 2, order=5, queue=queue, block=block)
         out = out * mollifier
 
         if not fourier:
@@ -225,9 +208,7 @@ def compute_propagator(
     return out
 
 
-def is_wavefield_sampling_ok(
-    wavefield_exponent, queue=None, out=None, **kwargs
-):
+def is_wavefield_sampling_ok(wavefield_exponent, queue=None, out=None, **kwargs):
     """Check the sampling of the *wavefield_exponent*. Use OpenCL *queue* and *out* array. Return
     True if the sampling is OK, False otherwise.
     """
@@ -381,9 +362,7 @@ def propagate(
                         **kwargs,
                     )
                 except NotImplementedError:
-                    LOG.debug(
-                        "%s does not support fourier space transfer", sample
-                    )
+                    LOG.debug("%s does not support fourier space transfer", sample)
             u *= propagator
             ifft_2(u, queue=queue, block=block)
         if detector:
@@ -418,8 +397,8 @@ def ref_index_to_attenuation_coeff(ref_index, lam):
 
 def compute_collection(num_aperture, opt_ref_index):
     """Get the collection efficiency of the scintillator combined with a lens. The efficiency is
-    given by :math:`\eta = \\frac{1 - \\sqrt{1 - \\left( \\frac{N\!A}{n} \\right)^2}}{2}`, where
-    :math:`N\!A` is the numerical aperture *num_aperture* of the lens, :math:`n` is the optical
+    given by :math:`\\eta = \\frac{1 - \\sqrt{1 - \\left( \\frac{N\\!A}{n} \\right)^2}}{2}`, where
+    :math:`N\\!A` is the numerical aperture *num_aperture* of the lens, :math:`n` is the optical
     refractive index *opt_ref_index* given by the :class:`.Scintillator`."""
     return (1 - np.sqrt(1 - (num_aperture / opt_ref_index) ** 2)) / 2
 
@@ -434,9 +413,7 @@ def compute_diffraction_angle(diameter, propagation_distance):
     return np.arctan(diameter / (2 * distance))
 
 
-def compute_aliasing_limit(
-    n, wavelength, pixel_size, propagation_distance, fov=None, fourier=True
-):
+def compute_aliasing_limit(n, wavelength, pixel_size, propagation_distance, fov=None, fourier=True):
     """Get the non-aliased fraction of data points when propagating a wavefield to a region :math:`n
     \\times pixel\\_size` to *propagation_distance* using *wavelength*, *pixel_size* and field of
     view *fov* (if not specified computed as *n* * *pixel_size*). If *fourier* is True then the

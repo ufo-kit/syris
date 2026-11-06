@@ -17,18 +17,20 @@
 
 """Mesh projection and slice."""
 
-import imageio
 import logging
 import time
+
+import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
+import tqdm
+
 import syris
 import syris.geometry as geom
-import tqdm
 from syris.bodies.mesh import Mesh, make_cube, read_blender_obj
-from .util import get_default_parser, show
 
+from .util import get_default_parser, show
 
 LOG = logging.getLogger(__name__)
 
@@ -38,16 +40,10 @@ def main():
     args = parse_args()
     syris.init(loglevel=logging.INFO, double_precision=args.double_precision)
     units = q.Quantity(1, args.units)
-    triangles = (
-        make_cube().magnitude
-        if args.input is None
-        else read_blender_obj(args.input)
-    )
+    triangles = make_cube().magnitude if args.input is None else read_blender_obj(args.input)
     triangles = triangles * units
     tr = geom.Trajectory([(0, 0, 0)] * units)
-    mesh = Mesh(
-        triangles, tr, center=args.center, iterations=args.supersampling
-    )
+    mesh = Mesh(triangles, tr, center=args.center, iterations=args.supersampling)
     LOG.info("Number of triangles: {}".format(mesh.num_triangles))
 
     shape = (args.n, args.n)
@@ -81,9 +77,7 @@ def main():
     mesh.rotate(args.x_rotate, geom.X_AX)
 
     fmt = "n: {}, pixel size: {}, FOV: {}"
-    LOG.info(
-        fmt.format(args.n, args.pixel_size.rescale(q.um), fov.rescale(q.um))
-    )
+    LOG.info(fmt.format(args.n, args.pixel_size.rescale(q.um), fov.rescale(q.um)))
     st = time.time()
     for i in tqdm.tqdm(range(args.num_y_rotations)):
         proj = mesh.project(shape, args.pixel_size, t=None).get()
@@ -95,9 +89,7 @@ def main():
     offset = (0, translate[1].simplified, -(fov / 2.0).simplified) * q.m
 
     if args.compute_slice:
-        sl = mesh.compute_slices(
-            (1,) + shape, args.pixel_size, offset=offset
-        ).get()[0]
+        sl = mesh.compute_slices((1,) + shape, args.pixel_size, offset=offset).get()[0]
         if args.slice_filename is not None:
             imageio.imwrite(args.slice_filename, sl)
         show(sl, title="Slice at y = {}".format(args.n / 2))
@@ -111,9 +103,7 @@ def parse_args():
     parser = get_default_parser(__doc__)
 
     parser.add_argument("--input", type=str, help="Input .obj file")
-    parser.add_argument(
-        "--units", type=str, default="um", help="Mesh physical units"
-    )
+    parser.add_argument("--units", type=str, default="um", help="Mesh physical units")
     parser.add_argument("--n", type=int, default=256, help="Number of pixels")
     parser.add_argument(
         "--supersampling",
@@ -122,12 +112,8 @@ def parse_args():
         help="Supersampling for mesh computation",
     )
     parser.add_argument("--pixel-size", type=float, help="Pixel size in um")
-    parser.add_argument(
-        "--center", type=str, help="Mesh centering on creation"
-    )
-    parser.add_argument(
-        "--translate", type=float, nargs=2, help="Translation as (x, y) in um"
-    )
+    parser.add_argument("--center", type=str, help="Mesh centering on creation")
+    parser.add_argument("--translate", type=float, nargs=2, help="Translation as (x, y) in um")
     parser.add_argument(
         "--x-rotate",
         type=float,
@@ -157,15 +143,9 @@ def parse_args():
         type=str,
         help="Save projection to this filename prefix (.tif is appended)",
     )
-    parser.add_argument(
-        "--compute-slice", action="store_true", help="Compute also one slice"
-    )
-    parser.add_argument(
-        "--slice-filename", type=str, help="Save slice to this filename"
-    )
-    parser.add_argument(
-        "--double-precision", action="store_true", help="Use double precision"
-    )
+    parser.add_argument("--compute-slice", action="store_true", help="Compute also one slice")
+    parser.add_argument("--slice-filename", type=str, help="Save slice to this filename")
+    parser.add_argument("--double-precision", action="store_true", help="Use double precision")
 
     args = parser.parse_args()
     if args.pixel_size is not None:

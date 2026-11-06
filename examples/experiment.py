@@ -17,23 +17,26 @@
 
 """Experiment example."""
 
-import imageio
 import os
 import time
+
+import imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
+
 import syris
-from syris.bodies.mesh import make_cube, Mesh
+from syris.bodies.mesh import Mesh, make_cube
 from syris.devices.cameras import Camera, make_pco_dimax
 from syris.devices.detectors import Detector
-from syris.devices.lenses import Lens
 from syris.devices.filters import MaterialFilter, Scintillator
+from syris.devices.lenses import Lens
 from syris.devices.sources import make_topotomo
+from syris.experiments import Experiment
 from syris.geometry import Trajectory
 from syris.gpu.util import get_host
-from syris.experiments import Experiment
 from syris.math import fwnm_to_sigma
+
 from .trajectory import create_sample, make_circle
 from .util import get_default_parser, get_material, show
 
@@ -91,9 +94,7 @@ def make_devices(n, energies, camera=None, highspeed=True, scintillator=None):
     x = vis_wavelengths.rescale(q.nm).magnitude
     if scintillator == "lso" or not (scintillator or highspeed):
         sigma = fwnm_to_sigma(50)
-        emission = np.exp(-((x - 545) ** 2) / (2 * sigma**2)) / (
-            sigma * np.sqrt(2 * np.pi)
-        )
+        emission = np.exp(-((x - 545) ** 2) / (2 * sigma**2)) / (sigma * np.sqrt(2 * np.pi))
         lso = get_material("lso_5_30_kev.mat")
         scintillator = Scintillator(
             13 * q.um,
@@ -106,9 +107,7 @@ def make_devices(n, energies, camera=None, highspeed=True, scintillator=None):
         )
     elif scintillator == "luag" or (not scintillator and highspeed):
         sigma = fwnm_to_sigma(50)
-        emission = np.exp(-((x - 450) ** 2) / (2 * sigma**2)) / (
-            sigma * np.sqrt(2 * np.pi)
-        )
+        emission = np.exp(-((x - 450) ** 2) / (2 * sigma**2)) / (sigma * np.sqrt(2 * np.pi))
         luag = get_material("luag.mat")
         scintillator = Scintillator(
             50 * q.um,
@@ -135,9 +134,7 @@ def make_devices(n, energies, camera=None, highspeed=True, scintillator=None):
 
     detector = Detector(scintillator, lens, camera)
     source_trajectory = Trajectory([(n / 2, n / 2, 0)] * detector.pixel_size)
-    bm = make_topotomo(
-        dE=dE, trajectory=source_trajectory, pixel_size=detector.pixel_size
-    )
+    bm = make_topotomo(dE=dE, trajectory=source_trajectory, pixel_size=detector.pixel_size)
 
     return bm, detector
 
@@ -195,10 +192,7 @@ def make_motion(args):
     mb.material = get_material("pmma_5_30_kev.mat")
     mb_2.material = mb.material
 
-    cube = (
-        make_cube() / q.m * 30 * detector.pixel_size
-        + 0.1 * detector.pixel_size
-    )
+    cube = make_cube() / q.m * 30 * detector.pixel_size + 0.1 * detector.pixel_size
     fov = detector.pixel_size * n
     circle = make_circle().magnitude * fov / 30000 + fov / 2
     tr = Trajectory(circle, velocity=10 * q.um / q.s)
@@ -239,9 +233,7 @@ def make_motion(args):
                     plt.draw()
 
             if args.output:
-                path = os.path.join(
-                    args.output, "projection_{:>05}.png"
-                ).format(i)
+                path = os.path.join(args.output, "projection_{:>05}.png").format(i)
                 imageio.imwrite(path, image)
 
         print("Maximum intensity:", image.max())
@@ -253,31 +245,17 @@ def make_motion(args):
 def main():
     """Parse command line arguments and execute one of the experiments."""
     parser = get_default_parser(__doc__)
-    subparsers = parser.add_subparsers(
-        help="sub-command help", dest="sub-commands", required=True
-    )
+    subparsers = parser.add_subparsers(help="sub-command help", dest="sub-commands", required=True)
 
     motion = subparsers.add_parser("motion", help="An experiment with motion")
-    motion.add_argument(
-        "--output", type=str, help="Output directory for moving objects."
-    )
-    motion.add_argument(
-        "--show", action="store_true", help="Show images as they are produced"
-    )
-    motion.add_argument(
-        "--show-flat", action="store_true", help="Show a flat field image"
-    )
-    motion.add_argument(
-        "--conduct", action="store_true", help="Conduct the experiment"
-    )
-    motion.add_argument(
-        "--num-images", type=int, help="Number of images to produce"
-    )
+    motion.add_argument("--output", type=str, help="Output directory for moving objects.")
+    motion.add_argument("--show", action="store_true", help="Show images as they are produced")
+    motion.add_argument("--show-flat", action="store_true", help="Show a flat field image")
+    motion.add_argument("--conduct", action="store_true", help="Conduct the experiment")
+    motion.add_argument("--num-images", type=int, help="Number of images to produce")
     motion.set_defaults(_func=make_motion)
 
-    flat = subparsers.add_parser(
-        "flat", help="Quantitatively correct flat field computation"
-    )
+    flat = subparsers.add_parser("flat", help="Quantitatively correct flat field computation")
     flat.set_defaults(_func=make_topo_tomo_flat)
 
     args = parser.parse_args()

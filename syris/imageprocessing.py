@@ -19,17 +19,18 @@
 
 import itertools
 import logging
+
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
 import pyopencl.cltypes as cltypes
 from reikna.cluda import ocl_api
 from reikna.fft import FFT
+
 from syris import config as cfg
 from syris.gpu import util as g_util
 from syris.math import fwnm_to_sigma
 from syris.util import get_magnitude, make_tuple, next_power_of_two
-
 
 LOG = logging.getLogger(__name__)
 
@@ -63,13 +64,9 @@ def _fft_2(data, inverse=False, queue=None, block=True):
     if queue not in cfg.OPENCL.fft_plans:
         cfg.OPENCL.fft_plans[queue] = {}
     if data.shape not in cfg.OPENCL.fft_plans[queue]:
-        LOG.debug(
-            "Creating FFT Plan for {} and shape {}".format(queue, data.shape)
-        )
+        LOG.debug("Creating FFT Plan for {} and shape {}".format(queue, data.shape))
         _fft = FFT(data, axes=(0, 1))
-        cfg.OPENCL.fft_plans[queue][data.shape] = _fft.compile(
-            thread, fast_math=False
-        )
+        cfg.OPENCL.fft_plans[queue][data.shape] = _fft.compile(thread, fast_math=False)
     plan = cfg.OPENCL.fft_plans[queue][data.shape]
 
     LOG.debug("fft_2, shape: %s, inverse: %s", data.shape, inverse)
@@ -81,9 +78,7 @@ def _fft_2(data, inverse=False, queue=None, block=True):
     return data
 
 
-def get_gauss_2d(
-    shape, sigma, pixel_size=1, fourier=False, queue=None, block=False
-):
+def get_gauss_2d(shape, sigma, pixel_size=1, fourier=False, queue=None, block=False):
     """Get 2D Gaussian of *shape* with standard deviation *sigma* and *pixel_size*. If *fourier* is
     True the fourier transform of it is returned so it is faster for usage by convolution. Use
     command *queue* if specified. If *block* is True, wait for the kernel to finish.
@@ -172,10 +167,7 @@ def pad(image, region=None, out=None, value=0, queue=None, block=False):
     if queue is None:
         queue = cfg.OPENCL.queue
     if out is None:
-        out = (
-            cl_array.zeros(queue, (region[2], region[3]), dtype=image.dtype)
-            + value
-        )
+        out = cl_array.zeros(queue, (region[2], region[3]), dtype=image.dtype) + value
     image = g_util.get_array(image, queue=queue)
 
     n_bytes = image.dtype.itemsize
@@ -295,12 +287,7 @@ def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
     if image.shape != pow_shape:
         image = pad(image, region=(0, 0) + pow_shape, queue=queue)
     if sigma is None:
-        sigma = tuple(
-            [
-                fwnm_to_sigma(float(image.shape[i]) / shape[i], n=2)
-                for i in range(2)
-            ]
-        )
+        sigma = tuple([fwnm_to_sigma(float(image.shape[i]) / shape[i], n=2) for i in range(2)])
 
     LOG.debug(
         "decimate, shape: %s, final_shape: %s, sigma: %s, average: %s",
@@ -310,9 +297,7 @@ def decimate(image, shape, sigma=None, average=False, queue=None, block=False):
         average,
     )
 
-    fltr = get_gauss_2d(
-        image.shape, sigma, fourier=True, queue=queue, block=block
-    )
+    fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue, block=block)
     image = image.astype(cfg.PRECISION.np_cplx)
     fft_2(image, queue=queue, block=block)
     image *= fltr
@@ -326,9 +311,7 @@ def blur_with_gaussian(image, sigma, queue=None, block=False):
     """Blur *image* with a gaussian kernel, where *sigma* is the standard deviation. Use command
     *queue*, if *block* is True, wait for the copy to finish.
     """
-    fltr = get_gauss_2d(
-        image.shape, sigma, fourier=True, queue=queue, block=block
-    )
+    fltr = get_gauss_2d(image.shape, sigma, fourier=True, queue=queue, block=block)
     image = image.astype(cfg.PRECISION.np_cplx)
     image = fft_2(image, queue=queue, block=block)
     image *= fltr
@@ -386,9 +369,7 @@ def compute_intensity(wavefield, queue=None, out=None, block=False):
     if queue is None:
         queue = cfg.OPENCL.queue
     if out is None:
-        out = cl.array.Array(
-            queue, wavefield.shape, dtype=cfg.PRECISION.np_float
-        )
+        out = cl.array.Array(queue, wavefield.shape, dtype=cfg.PRECISION.np_float)
     wavefield = g_util.get_array(wavefield, queue=queue)
 
     ev = cfg.OPENCL.programs["improc"].compute_intensity(
@@ -427,9 +408,7 @@ def varconvolve(
         queue = cfg.OPENCL.queue
     LOG.debug("varconvolve, shape: %s, kernel: %s", shape, kernel_name)
 
-    ev = getattr(program, kernel_name)(
-        queue, shape[::-1], local_size, *kernel_args
-    )
+    ev = getattr(program, kernel_name)(queue, shape[::-1], local_size, *kernel_args)
 
     if block:
         ev.wait()
@@ -461,9 +440,7 @@ def _varconvolve_2d_parametrized(
             cl.filter_mode.NEAREST,
         )
     if not isinstance(parameters, cl_array.Array):
-        params_host = np.empty(
-            parameters[0].shape, dtype=cfg.PRECISION.vfloat2
-        )
+        params_host = np.empty(parameters[0].shape, dtype=cfg.PRECISION.vfloat2)
         params_host["y"] = g_util.get_host(parameters[0])
         params_host["x"] = g_util.get_host(parameters[1])
         parameters = cl_array.to_device(queue, params_host)
@@ -563,9 +540,7 @@ def _check_tiling(shape, tiles_count):
 class Tiler(object):
     """Class for breaking images into smaller tiles."""
 
-    def __init__(
-        self, shape, tiles_count, outlier=True, supersampling=1, cplx=False
-    ):
+    def __init__(self, shape, tiles_count, outlier=True, supersampling=1, cplx=False):
         """
         Create image tiler for a region of *shape* (y, x) to tiles with (y, x)
         *tiles_count*. If *outlier* is True we want to include outlier regions
@@ -598,12 +573,7 @@ class Tiler(object):
     @property
     def result_tile_shape(self):
         """Result tile shape without outlier and supersampling."""
-        return tuple(
-            [
-                dim // self.supersampling // self._outlier_coeff
-                for dim in self.tile_shape
-            ]
-        )
+        return tuple([dim // self.supersampling // self._outlier_coeff for dim in self.tile_shape])
 
     @property
     def outlier(self):
@@ -629,16 +599,10 @@ class Tiler(object):
         of a given tile in (y, x) fashion.
         """
         y_ind = np.array(
-            [
-                i * self.tile_shape[0] // self._outlier_coeff
-                for i in range(self.tiles_count[0])
-            ]
+            [i * self.tile_shape[0] // self._outlier_coeff for i in range(self.tiles_count[0])]
         )
         x_ind = np.array(
-            [
-                i * self.tile_shape[1] // self._outlier_coeff
-                for i in range(self.tiles_count[1])
-            ]
+            [i * self.tile_shape[1] // self._outlier_coeff for i in range(self.tiles_count[1])]
         )
 
         if self.outlier:
@@ -648,18 +612,14 @@ class Tiler(object):
             y_ind = y_ind - self.tile_shape[0] // 4
             x_ind = x_ind - self.tile_shape[1] // 4
 
-        return np.array(list(itertools.product(y_ind, x_ind))).reshape(
-            self.tiles_count + (2,)
-        )
+        return np.array(list(itertools.product(y_ind, x_ind))).reshape(self.tiles_count + (2,))
 
     def average(self, tile, out=None):
         """Average :class:`pyopencl.array.Array` *tile* based on supersampling and outlier specified
         for the tiler. If *out* is not None, it will be used for returning the sum.
         """
         summed_shape = self.result_tile_shape
-        offset = [
-            (self._outlier_coeff - 1) * dim // 4 for dim in self.tile_shape
-        ]
+        offset = [(self._outlier_coeff - 1) * dim // 4 for dim in self.tile_shape]
 
         return bin_image(tile, summed_shape, offset, average=True, out=out)
 
@@ -683,12 +643,8 @@ def make_tile_offsets(shape, tile_shape, outlier=(0, 0)):
     be cropped to (m / 2, n - n / 2) before it can be placed into the resulting image. This is
     convenient for convolution outlier treatment.
     """
-    y_starts = (
-        np.arange(0, shape[0], tile_shape[0] - outlier[0]) - outlier[0] // 2
-    )
-    x_starts = (
-        np.arange(0, shape[1], tile_shape[1] - outlier[1]) - outlier[1] // 2
-    )
+    y_starts = np.arange(0, shape[0], tile_shape[0] - outlier[0]) - outlier[0] // 2
+    x_starts = np.arange(0, shape[1], tile_shape[1] - outlier[1]) - outlier[1] // 2
 
     return list(itertools.product(y_starts, x_starts))
 
@@ -722,10 +678,7 @@ def make_tiles(
     else:
         # Use multiple comand queues
         return (
-            item
-            for item in g_util.qmap(
-                func, iterable, queues=queues, args=args, kwargs=kwargs
-            )
+            item for item in g_util.qmap(func, iterable, queues=queues, args=args, kwargs=kwargs)
         )
 
 
@@ -737,9 +690,7 @@ def merge_tiles(tiles, num_tiles=None, outlier=(0, 0)):
     n, m = get_num_tiles(tiles, num_tiles=num_tiles)
     tile_shape = tiles[0].shape
     crop_shape = (tile_shape[0] - outlier[0], tile_shape[1] - outlier[1])
-    result = np.zeros(
-        (n * crop_shape[0], m * crop_shape[1]), dtype=tiles[0].dtype
-    )
+    result = np.zeros((n * crop_shape[0], m * crop_shape[1]), dtype=tiles[0].dtype)
 
     for j in range(n):
         for i in range(m):

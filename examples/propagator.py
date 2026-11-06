@@ -21,8 +21,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
 from numpy.fft import fftfreq
+
 import syris
-from syris.physics import energy_to_wavelength, compute_propagator
+from syris.physics import compute_propagator, energy_to_wavelength
+
 from .util import show
 
 
@@ -43,18 +45,9 @@ def compute_fourier_propagator(n, lam, z, ps, fresnel=True):
     g /= ps[0]
 
     if fresnel:
-        result = np.exp(1j * 2 * np.pi / lam * z) * np.exp(
-            -1j * np.pi * lam * z * (f**2 + g**2)
-        )
+        result = np.exp(1j * 2 * np.pi / lam * z) * np.exp(-1j * np.pi * lam * z * (f**2 + g**2))
     else:
-        result = np.exp(
-            1j
-            * 2
-            * np.pi
-            / lam
-            * z
-            * np.sqrt(1 - (f * lam) ** 2 - (g * lam) ** 2)
-        )
+        result = np.exp(1j * 2 * np.pi / lam * z * np.sqrt(1 - (f * lam) ** 2 - (g * lam) ** 2))
 
     return result
 
@@ -75,13 +68,9 @@ def main():
     propagator = compute_propagator(
         n, distance, lam, ps, apply_phase_factor=True, mollified=False
     ).get()
-    full_propagator = compute_propagator(
-        n, distance, lam, ps, fresnel=False, mollified=False
-    ).get()
+    full_propagator = compute_propagator(n, distance, lam, ps, fresnel=False, mollified=False).get()
     np_propagator = compute_fourier_propagator(n, lam, distance, ps)
-    np_full_propagator = compute_fourier_propagator(
-        n, lam, distance, ps, fresnel=False
-    )
+    np_full_propagator = compute_fourier_propagator(n, lam, distance, ps, fresnel=False)
     diff = propagator - np_propagator
     full_diff = full_propagator - np_full_propagator
 
@@ -93,9 +82,7 @@ def main():
         np.fft.fftshift(np_propagator.real),
         "Numpy Fresnel propagator (Real Part)",
     )
-    show(
-        np.fft.fftshift(diff.real), "Fresnel Syris - Fresnel Numpy (Real Part)"
-    )
+    show(np.fft.fftshift(diff.real), "Fresnel Syris - Fresnel Numpy (Real Part)")
 
     show(
         np.fft.fftshift(full_propagator.real),
@@ -105,9 +92,7 @@ def main():
         np.fft.fftshift(np_full_propagator.real),
         "Numpy Full propagator (Real Part)",
     )
-    show(
-        np.fft.fftshift(full_diff.real), "Full Syris - Full Numpy (Real Part)"
-    )
+    show(np.fft.fftshift(full_diff.real), "Full Syris - Full Numpy (Real Part)")
     plt.show()
 
 

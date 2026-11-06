@@ -19,12 +19,14 @@
 
 import matplotlib.pyplot as plt
 import quantities as q
+
 import syris
 import syris.imageprocessing as ip
-from syris.geometry import Trajectory
 from syris.bodies.simple import make_sphere
 from syris.devices.sources import make_topotomo
+from syris.geometry import Trajectory
 from syris.physics import propagate
+
 from .util import get_default_parser, get_material, show
 
 
@@ -45,9 +47,7 @@ def main():
     )
 
     bm = make_topotomo(pixel_size=ps, trajectory=tr)
-    print(
-        "Source size FWHM (height x width): {}".format(bm.size.rescale(q.um))
-    )
+    print("Source size FWHM (height x width): {}".format(bm.size.rescale(q.um)))
 
     intensity = propagate([sample], shape, [energy], d, ps).get()
     incoh = bm.apply_blur(intensity, d, ps).get()

@@ -38,7 +38,7 @@ examples = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.3", "coverage[toml]>=7.6", "twine>=6.1"]
+dev = ["pytest>=8.3", "coverage[toml]>=7.6", "ruff>=0.14", "twine>=6.1"]
 docs = ["sphinx>=7.4"]
 
 [tool.setuptools]
@@ -58,6 +58,15 @@ syris = ["gpu/opencl/*.cl", "gpu/opencl/*.in", "gpu/cuda/*.cu", "gpu/cuda/*.cuh"
 
 [tool.pytest.ini_options]
 testpaths = ["syris/tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+# The formatter handles wrapping; long comments and strings may remain longer.
+ignore = ["E501"]
 
 [tool.coverage.run]
 source = ["syris"]

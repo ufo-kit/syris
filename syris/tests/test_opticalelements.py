@@ -18,12 +18,13 @@
 import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
+
 import syris.config as cfg
 from syris.bodies.simple import StaticBody
 from syris.materials import Material
 from syris.opticalelements import OpticalElement
 from syris.physics import energy_to_wavelength, transfer
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import SyrisTest, default_syris_init
 
 
 class DummyOpticalElement(OpticalElement):
@@ -65,7 +66,7 @@ class TestOpticalElement(SyrisTest):
         self.assertEqual(len(ps), 2)
 
     def test_transfer(self):
-        go = StaticBody(np.arange(4 ** 2).reshape(4, 4) * q.um, 1 * q.um, material=self.material)
+        go = StaticBody(np.arange(4**2).reshape(4, 4) * q.um, 1 * q.um, material=self.material)
         transferred = go.transfer((4, 4), 1 * q.um, self.energy).get()
         gt = transfer(
             go.thickness,

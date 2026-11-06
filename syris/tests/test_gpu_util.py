@@ -16,11 +16,13 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 import itertools
+
 import numpy as np
 import pyopencl as cl
+
 from syris import config as cfg
 from syris.gpu import util as gu
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import SyrisTest, default_syris_init
 
 
 def _has_platform_type(device_type):

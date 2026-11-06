@@ -18,15 +18,20 @@
 """Visualization of the BVH tree"""
 
 import logging
+
+import graphviz
+import pyvista as pv
 import quantities as q
+
 import syris
 import syris.geometry as geom
 from syris.bodies.mesh import Mesh
+
 from .util import (
-    add_cuda_mesh_options, get_default_parser, validate_cuda_mesh_options,
+    add_cuda_mesh_options,
+    get_default_parser,
+    validate_cuda_mesh_options,
 )
-import graphviz
-import pyvista as pv
 
 LOG = logging.getLogger(__name__)
 
@@ -63,14 +68,10 @@ def create_tree_visualization(nb_keys, left_all, rope_all, leaf_keys):
 
         if IS_LEAF(node):
             label = f"Leaf {node}\nKey: {leaf_keys[node]}"
-            g.node(
-                str(node), label=label, style="filled", color="#c8e6c9"
-            )  # Greenish
+            g.node(str(node), label=label, style="filled", color="#c8e6c9")  # Greenish
         else:
             label = f"Internal {node}"
-            g.node(
-                str(node), label=label, style="filled", color="#bbdefb"
-            )  # Bluish
+            g.node(str(node), label=label, style="filled", color="#bbdefb")  # Bluish
 
         if IS_LEAF(node):
             continue
@@ -108,13 +109,16 @@ def main():
         LOG.info(f"Loading mesh from file: {input}")
     else:
         input = pv.examples.download_dragon()
-        LOG.info(
-            "No input file provided, loading default PyVista mesh (dragon)..."
-        )
+        LOG.info("No input file provided, loading default PyVista mesh (dragon)...")
 
     mesh = Mesh.from_file(
-        input, tr, center=args.center, unit=mesh_units, use_normals=True,
-        repair=args.repair_mesh, float32_rounding=args.float32_rounding,
+        input,
+        tr,
+        center=args.center,
+        unit=mesh_units,
+        use_normals=True,
+        repair=args.repair_mesh,
+        float32_rounding=args.float32_rounding,
     )
 
     mesh.build_accelerator()
@@ -134,9 +138,7 @@ def main():
     try:
         # Render and save the graph
         output_file_with_ext = f"{args.output_graph}.png"
-        graph.render(
-            args.output_graph, format="png", view=args.view_graph, cleanup=True
-        )
+        graph.render(args.output_graph, format="png", view=args.view_graph, cleanup=True)
         LOG.info(f"Graph saved to {output_file_with_ext}")
     except Exception as e:
         LOG.error(
@@ -163,9 +165,7 @@ def parse_args():
         default="um",
         help="Physical units of the mesh file (e.g., 'm', 'cm', 'um')",
     )
-    parser.add_argument(
-        "--center", type=str, default=None, help="Mesh centering on creation"
-    )
+    parser.add_argument("--center", type=str, default=None, help="Mesh centering on creation")
     parser.add_argument(
         "--decimation",
         type=float,

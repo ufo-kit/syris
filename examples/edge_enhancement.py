@@ -24,16 +24,18 @@ results change.
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
+
 import syris
-from syris.geometry import Trajectory
 from syris.bodies.simple import make_sphere
 from syris.devices.cameras import Camera
 from syris.devices.detectors import Detector
 from syris.devices.filters import Scintillator
 from syris.devices.lenses import Lens
 from syris.devices.sources import make_topotomo
+from syris.geometry import Trajectory
 from syris.math import fwnm_to_sigma
-from syris.physics import propagate, compute_propagator, energy_to_wavelength
+from syris.physics import compute_propagator, energy_to_wavelength, propagate
+
 from .util import get_default_parser, get_material, show
 
 
@@ -78,9 +80,7 @@ def main():
     # Scintillator emits visible light into a region given by a Gaussian distribution
     x = camera.wavelengths.rescale(q.nm).magnitude
     sigma = fwnm_to_sigma(50)
-    emission = np.exp(-((x - 600) ** 2) / (2 * sigma**2)) / (
-        sigma * np.sqrt(2 * np.pi)
-    )
+    emission = np.exp(-((x - 600) ** 2) / (2 * sigma**2)) / (sigma * np.sqrt(2 * np.pi))
     # Scintillator 50 um thick, light yield 14 and refractive index 1.84
     luag = get_material("luag.mat")
     scintillator = Scintillator(
@@ -119,9 +119,7 @@ def main():
     ).get()
     coherent *= camera.exp_time.simplified.magnitude
     # Decimate to fit the effective pixel size of the detector system
-    coherent_ld = camera.get_image(
-        coherent, shot_noise=False, amplifier_noise=False
-    )
+    coherent_ld = camera.get_image(coherent, shot_noise=False, amplifier_noise=False)
 
     # Propagation which takes into account polychromaticity
     poly = propagate(
@@ -134,9 +132,7 @@ def main():
         detector=detector,
     ).get()
     poly *= camera.exp_time.simplified.magnitude
-    poly_ld = camera.get_image(
-        poly, shot_noise=args.noise, amplifier_noise=args.noise
-    )
+    poly_ld = camera.get_image(poly, shot_noise=args.noise, amplifier_noise=args.noise)
 
     # Compute and show some of the used propagators
     propagator_10 = get_propagator_psf(n, d, ps, 10 * q.keV)

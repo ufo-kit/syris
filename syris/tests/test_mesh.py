@@ -16,11 +16,13 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 import itertools
+
 import numpy as np
 import quantities as q
-from syris.geometry import Trajectory, X_AX, Y_AX
+
 from syris.bodies.mesh import Mesh, make_cube
-from syris.tests import default_syris_init, SyrisTest
+from syris.geometry import X_AX, Y_AX, Trajectory
+from syris.tests import SyrisTest, default_syris_init
 from syris.util import get_magnitude
 
 
@@ -81,7 +83,7 @@ class TestMesh(SyrisTest):
         np.testing.assert_almost_equal(ca_gt, ca)
 
     def test_areas(self):
-        np.testing.assert_almost_equal(2 * q.m ** 2, self.mesh.areas)
+        np.testing.assert_almost_equal(2 * q.m**2, self.mesh.areas)
 
     def test_normals(self):
         v_0, v_1 = self.mesh.vectors

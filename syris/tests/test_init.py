@@ -16,8 +16,10 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+
 import pyopencl as cl
 import pyopencl.cltypes as cltypes
+
 import syris
 import syris.physics
 import syris.profiling

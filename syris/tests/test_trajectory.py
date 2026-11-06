@@ -20,10 +20,12 @@ Created on Jul 3, 2013
 
 @author: farago
 """
+
 import numpy as np
 import quantities as q
 from scipy import interpolate as interp
-from syris.geometry import get_rotation_displacement, Trajectory
+
+from syris.geometry import Trajectory, get_rotation_displacement
 from syris.tests import SyrisTest
 
 
@@ -39,7 +41,7 @@ def make_circle(n=128):
 def make_square(n=128):
     t = np.linspace(0, 2 * np.pi, n)
     x = np.zeros(n)
-    y = t ** 2
+    y = t**2
     z = np.zeros(n)
 
     return list(zip(x, y, z)) * q.mm

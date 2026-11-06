@@ -17,12 +17,14 @@
 
 import numpy as np
 import quantities as q
-from syris import physics, config as cfg
+
+from syris import config as cfg
+from syris import physics
 from syris.bodies.simple import StaticBody
 from syris.devices.sources import BendingMagnet
 from syris.geometry import Trajectory
 from syris.materials import Material
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import SyrisTest, default_syris_init
 
 
 class TestPhysics(SyrisTest):
@@ -73,8 +75,8 @@ class TestPhysics(SyrisTest):
                     -np.pi
                     * self.lam.simplified
                     * self.distance.simplified
-                    * (i ** 2 + j ** 2)
-                    / self.pixel_size.simplified ** 2
+                    * (i**2 + j**2)
+                    / self.pixel_size.simplified**2
                     * 1j
                 )
             )

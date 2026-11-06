@@ -27,10 +27,12 @@ y), which is cos(-2 Pi / lambda x delta).
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
+
 import syris
 from syris.bodies.simple import StaticBody
 from syris.materials import Material
 from syris.physics import energy_to_wavelength
+
 from .util import get_default_parser, show
 
 
@@ -65,9 +67,7 @@ def main():
     u = compute_transmission_function(n, ps, 1, energy, material)
     # Supersampling helps resolve the transmission function
     print(fmt.format(n * args.supersampling, ps / args.supersampling))
-    u_s = compute_transmission_function(
-        n, ps, args.supersampling, energy, material
-    )
+    u_s = compute_transmission_function(n, ps, args.supersampling, energy, material)
 
     show(wedge.magnitude, title="Projected Object [um]")
     show(u.real, title="Re[T(x, y)]")

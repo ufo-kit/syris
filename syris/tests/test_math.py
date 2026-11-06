@@ -15,12 +15,14 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
+import math
+
 import numpy as np
 import quantities as q
+from scipy import interpolate as interp
+
 from syris import math as smath
 from syris.tests import SyrisTest
-from scipy import interpolate as interp
-import math
 
 
 class TestMath(SyrisTest):
@@ -28,10 +30,10 @@ class TestMath(SyrisTest):
         n = 6
         n_1 = 1000
         x_0 = np.linspace(-n // 2, n // 2, n) * q.m
-        y_0 = x_0 ** 2
+        y_0 = x_0**2
         x_1 = np.linspace(-n // 2, n // 2, n_1) * q.mm
         y_1 = smath.match_range(x_0, y_0, x_1)
-        y_1_def = x_1 ** 2
+        y_1_def = x_1**2
 
         self.assertEqual(y_0.units, y_1.units)
         self.assertAlmostEqual(np.sum(y_1 - y_1_def), 0 * y_1.units)

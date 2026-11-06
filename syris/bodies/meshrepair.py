@@ -5,7 +5,6 @@ import logging
 
 import numpy as np
 
-
 LOG = logging.getLogger(__name__)
 
 
@@ -24,8 +23,7 @@ def _cgal():
 def _nondegenerate(vertices, faces):
     triangles = vertices[faces]
     return np.any(
-        np.cross(triangles[:, 1] - triangles[:, 0],
-                 triangles[:, 2] - triangles[:, 0]) != 0,
+        np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0]) != 0,
         axis=1,
     )
 
@@ -55,8 +53,7 @@ def _validate_result(cgal, vertices, faces):
 
 def _face_normals(vertices, faces):
     triangles = vertices[faces]
-    return np.cross(triangles[:, 1] - triangles[:, 0],
-                    triangles[:, 2] - triangles[:, 0])
+    return np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
 
 
 def _check_float32_geometry(original, converted, faces):
@@ -65,14 +62,16 @@ def _check_float32_geometry(original, converted, faces):
     # CGAL may accept coincident opposite faces even though a gap disappeared.
     if len(np.unique(converted, axis=0)) < len(np.unique(original, axis=0)):
         raise ValueError("Distinct repaired vertices merged in float32.")
-    alignment = np.einsum("ij,ij->i", _face_normals(original, faces),
-                          _face_normals(converted, faces))
+    alignment = np.einsum(
+        "ij,ij->i", _face_normals(original, faces), _face_normals(converted, faces)
+    )
     if np.any(alignment <= 0):
         raise ValueError("Repaired triangles collapsed or flipped in float32.")
 
 
-def _round_float32(cgal, original, faces, *, max_vertices=64,
-                   max_patch_faces=2048, max_evaluations=2048):
+def _round_float32(
+    cgal, original, faces, *, max_vertices=64, max_patch_faces=2048, max_evaluations=2048
+):
     """Try neighboring Float32 coordinates without changing connectivity.
 
     This bounded, deterministic heuristic only addresses intersections created
@@ -96,14 +95,16 @@ def _round_float32(cgal, original, faces, *, max_vertices=64,
     toward = np.where(original[movable] > rounded[movable], np.inf, -np.inf)
     with np.errstate(over="ignore"):
         neighbor = np.nextafter(nearest, toward.astype(np.float32))
-    neighbor[original[movable] == rounded[movable]] = nearest[
-        original[movable] == rounded[movable]
-    ]
+    neighbor[original[movable] == rounded[movable]] = nearest[original[movable] == rounded[movable]]
     if not np.isfinite(neighbor).all():
         raise ValueError("No finite float32 bracket for repaired coordinates.")
-    choices = [np.asarray(list(itertools.product(*[
-        [a] if a == b else [a, b] for a, b in zip(start, other)
-    ])), dtype=np.float64) for start, other in zip(nearest, neighbor)]
+    choices = [
+        np.asarray(
+            list(itertools.product(*[[a] if a == b else [a, b] for a, b in zip(start, other)])),
+            dtype=np.float64,
+        )
+        for start, other in zip(nearest, neighbor)
+    ]
 
     # Enclose every possible position of every affected triangle. Include all
     # triangles overlapping that box, even if they did not initially intersect.
@@ -115,8 +116,9 @@ def _round_float32(cgal, original, faces, *, max_vertices=64,
     lo = lower[faces[incident]].min(axis=(0, 1))
     hi = upper[faces[incident]].max(axis=(0, 1))
     triangles = rounded[faces]
-    nearby = (np.all(triangles.max(axis=1) >= lo, axis=1)
-              & np.all(triangles.min(axis=1) <= hi, axis=1))
+    nearby = np.all(triangles.max(axis=1) >= lo, axis=1) & np.all(
+        triangles.min(axis=1) <= hi, axis=1
+    )
     if np.count_nonzero(nearby) > max_patch_faces:
         raise ValueError("Float32 rounding exceeds the local triangle search limit.")
     ids, inverse = np.unique(faces[nearby], return_inverse=True)
@@ -126,20 +128,23 @@ def _round_float32(cgal, original, faces, *, max_vertices=64,
     unique_count = len(np.unique(original[ids], axis=0))
 
     def score(vertices):
-        alignment = np.einsum("ij,ij->i", reference_normals,
-                              _face_normals(vertices, patch_faces))
-        invalid = (np.count_nonzero(alignment <= 0)
-                   + max(0, unique_count - len(np.unique(vertices, axis=0))))
+        alignment = np.einsum("ij,ij->i", reference_normals, _face_normals(vertices, patch_faces))
+        invalid = np.count_nonzero(alignment <= 0) + max(
+            0, unique_count - len(np.unique(vertices, axis=0))
+        )
         if invalid:
             # Do not pass degenerate triangles to CGAL. This penalty exceeds
             # the number of possible intersection pairs in the patch.
-            return len(patch_faces)**2 + invalid
-        return len(cgal.remesh_self_intersections(
-            vertices, patch_faces, detect_only=True
-        )[2])
+            return len(patch_faces) ** 2 + invalid
+        return len(cgal.remesh_self_intersections(vertices, patch_faces, detect_only=True)[2])
 
-    LOG.info("Trying bounded float32 rounding: %d intersections, %d movable "
-             "vertices, %d local triangles...", len(pairs), len(movable), len(patch_faces))
+    LOG.info(
+        "Trying bounded float32 rounding: %d intersections, %d movable "
+        "vertices, %d local triangles...",
+        len(pairs),
+        len(movable),
+        len(patch_faces),
+    )
     rng = np.random.default_rng(20261105)
     best = rounded[ids].copy()
     # All initial intersection pairs lie in this patch; geometry checks above
@@ -185,8 +190,10 @@ def _round_float32(cgal, original, faces, *, max_vertices=64,
         if not best_score or evaluations >= max_evaluations:
             break
     if best_score:
-        raise ValueError("Bounded float32 rounding found no valid configuration "
-                         f"after {evaluations} candidate evaluations.")
+        raise ValueError(
+            "Bounded float32 rounding found no valid configuration "
+            f"after {evaluations} candidate evaluations."
+        )
 
     result = rounded.copy()
     result[ids] = best
@@ -194,8 +201,13 @@ def _round_float32(cgal, original, faces, *, max_vertices=64,
     _validate_result(cgal, result, faces)
     changed = np.count_nonzero(np.any(result != rounded, axis=1))
     displacement = np.linalg.norm(result - original, axis=1).max()
-    LOG.info("Float32 rounding validated: %d vertices adjusted, %d evaluations, "
-             "maximum displacement %.6g in mesh units.", changed, evaluations, displacement)
+    LOG.info(
+        "Float32 rounding validated: %d vertices adjusted, %d evaluations, "
+        "maximum displacement %.6g in mesh units.",
+        changed,
+        evaluations,
+        displacement,
+    )
     return result.astype(np.float32)
 
 
@@ -231,12 +243,21 @@ def repair_mesh(vertices, faces, dtype=np.float64, *, float32_rounding=False):
         raise ValueError("float32_rounding requires dtype=np.float32.")
     vertices = np.asarray(vertices, dtype=np.float64)
     faces = np.asarray(faces)
-    if (vertices.ndim != 2 or vertices.shape[1] != 3 or not len(vertices)
-            or not np.isfinite(vertices).all()):
+    if (
+        vertices.ndim != 2
+        or vertices.shape[1] != 3
+        or not len(vertices)
+        or not np.isfinite(vertices).all()
+    ):
         raise ValueError("Expected a nonempty, finite (N, 3) vertex array.")
-    if (faces.ndim != 2 or faces.shape[1] != 3 or not len(faces)
-            or not np.issubdtype(faces.dtype, np.integer)
-            or faces.min() < 0 or faces.max() >= len(vertices)):
+    if (
+        faces.ndim != 2
+        or faces.shape[1] != 3
+        or not len(faces)
+        or not np.issubdtype(faces.dtype, np.integer)
+        or faces.min() < 0
+        or faces.max() >= len(vertices)
+    ):
         raise ValueError("Expected a nonempty (M, 3) array of valid integer vertex indices.")
 
     cgal = _cgal()
@@ -250,11 +271,15 @@ def repair_mesh(vertices, faces, dtype=np.float64, *, float32_rounding=False):
         raise ValueError("Mesh repair found no nondegenerate triangles.")
     _require_closed_oriented(faces)
 
-    LOG.info("Repairing %d triangles with libigl (%d zero-area faces removed)...",
-             original_count, original_count - len(faces))
+    LOG.info(
+        "Repairing %d triangles with libigl (%d zero-area faces removed)...",
+        original_count,
+        original_count - len(faces),
+    )
     try:
         vertices, faces, _ = cgal.mesh_boolean(
-            vertices, faces,
+            vertices,
+            faces,
             np.empty((0, 3), dtype=np.float64),
             np.empty((0, 3), dtype=np.int64),
             "union",

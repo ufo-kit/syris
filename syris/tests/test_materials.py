@@ -16,12 +16,14 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 import os
+from shutil import which
+
 import numpy as np
 import quantities as q
-from shutil import which
+
 from syris import config as cfg
-from syris.materials import Material, MaterialError, make_pmasf, make_henke, make_fromfile
-from syris.tests import default_syris_init, SyrisTest
+from syris.materials import Material, MaterialError, make_fromfile, make_henke, make_pmasf
+from syris.tests import SyrisTest, default_syris_init
 
 
 class TestMaterial(SyrisTest):
@@ -67,9 +69,9 @@ class TestMaterial(SyrisTest):
         m_0 = Material("PMMA", self.refractive_indices, self.energies)
         m_0.save()
         try:
-            make_fromfile('PMMA.mat')
+            make_fromfile("PMMA.mat")
         finally:
-            os.remove('PMMA.mat')
+            os.remove("PMMA.mat")
 
 
 class TestPMASFMaterial(SyrisTest):

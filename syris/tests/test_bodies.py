@@ -15,19 +15,21 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
+import itertools
+import unittest
+
 import numpy as np
 import quantities as q
+
 import syris.config as cfg
-import unittest
 from syris import geometry as geom
-from syris.geometry import Trajectory
 from syris.bodies.base import CompositeBody
 from syris.bodies.isosurfaces import MetaBall
-from syris.bodies.mesh import make_cube, Mesh
+from syris.bodies.mesh import Mesh, make_cube
 from syris.bodies.simple import StaticBody
+from syris.geometry import Trajectory
 from syris.imageprocessing import crop, pad, rescale
-from syris.tests import are_images_supported, default_syris_init, SyrisTest
-import itertools
+from syris.tests import SyrisTest, are_images_supported, default_syris_init
 from syris.tests.graphics_util import get_linear_points
 
 
@@ -50,7 +52,7 @@ class TestBodies(SyrisTest):
     def test_simple(self):
         n = 8
         ps = 1 * q.um
-        thickness = np.arange(n ** 2).reshape(n, n).astype(cfg.PRECISION.np_float) * q.m
+        thickness = np.arange(n**2).reshape(n, n).astype(cfg.PRECISION.np_float) * q.m
         go = StaticBody(thickness, ps)
 
         # Same
@@ -171,7 +173,12 @@ class TestBodies(SyrisTest):
     def test_composite_bounding_box(self):
         mb_0 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 0.5 * q.mm)
         mb_1 = MetaBall(Trajectory([(0, 0, 0)] * q.mm), 1.5 * q.mm)
-        composite = CompositeBody(Trajectory([(0, 0, 0)] * q.mm,), bodies=[mb_0, mb_1])
+        composite = CompositeBody(
+            Trajectory(
+                [(0, 0, 0)] * q.mm,
+            ),
+            bodies=[mb_0, mb_1],
+        )
 
         transformed_0 = self._get_moved_bounding_box(mb_0, 90 * q.deg)
         transformed_1 = self._get_moved_bounding_box(mb_1, -90 * q.deg)

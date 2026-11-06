@@ -16,6 +16,7 @@
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
 import quantities as q
+
 from syris.devices.cameras import Camera
 from syris.devices.detectors import Detector
 from syris.devices.lenses import Lens

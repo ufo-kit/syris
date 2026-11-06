@@ -20,20 +20,22 @@ aperture from Introduction to Fourier Optics by J. W. Goodmann, 2nd edition.
 """
 
 import logging
+
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
 import scipy.special
+
 import syris
 import syris.config as cfg
-from syris.imageprocessing import fft_2, ifft_2, crop
+from syris.imageprocessing import crop, fft_2, ifft_2
 from syris.physics import (
-    compute_propagator,
     compute_propagation_sampling,
+    compute_propagator,
     energy_to_wavelength,
 )
-from .util import get_default_parser
 
+from .util import get_default_parser
 
 LOG = logging.getLogger(__name__)
 
@@ -123,15 +125,11 @@ def main():
         n_current = n_proper // divisor
         if n_current < n * ss:
             raise ValueError("divisor too large, maximum is {}".format(ss))
-        numerical_results[n_current] = propagate_numerically(
-            n_current, w, ps, d, lam
-        )
+        numerical_results[n_current] = propagate_numerically(n_current, w, ps, d, lam)
 
     x_data = np.linspace(-2 * w.magnitude, 2 * w.magnitude, res_a.shape[0])
     aperture = np.zeros(res_a.shape[1])
-    aperture[res_a.shape[1] // 4 : 3 * res_a.shape[1] // 4] = res_a[
-        n // 4 // ss
-    ].max()
+    aperture[res_a.shape[1] // 4 : 3 * res_a.shape[1] // 4] = res_a[n // 4 // ss].max()
 
     if args.txt_output:
         txt_data = [x_data, aperture, res_a[n // 4 // ss]]
@@ -175,18 +173,14 @@ def parse_args():
     """Parse command line arguments."""
     parser = get_default_parser(__doc__)
     parser.add_argument("--fn", type=float, default=4.0, help="Fresnel number")
-    parser.add_argument(
-        "--energy", type=float, default=1.0, help="Energy [keV]"
-    )
+    parser.add_argument("--energy", type=float, default=1.0, help="Energy [keV]")
     parser.add_argument(
         "--aperture",
         type=float,
         default=100.0,
         help="Half the aperture width [um]",
     )
-    parser.add_argument(
-        "--supersampling", type=int, default=4, help="Supersampling"
-    )
+    parser.add_argument("--supersampling", type=int, default=4, help="Supersampling")
     parser.add_argument(
         "--numerical-divisors",
         type=int,

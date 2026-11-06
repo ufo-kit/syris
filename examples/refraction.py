@@ -19,16 +19,19 @@
 Show refraction effect by propagating an object behind a wedge.
 """
 
+import os
+
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 import quantities as q
-import syris
 from numpy.fft import fft2, ifft2
-from syris.bodies.simple import make_sphere, StaticBody
+
+import syris
+from syris.bodies.simple import StaticBody, make_sphere
 from syris.materials import Material
 from syris.physics import propagate
+
 from .util import get_default_parser, get_material, show
 
 
@@ -66,20 +69,14 @@ def main():
 
     c = ifft2(np.conj(fft2(im - 1)) * fft2(im_sample - 1)).real
     dy, dx = np.unravel_index(c.argmax(), c.shape)
-    print(
-        f"Desired shift: dx: {(shift / ps).simplified.magnitude} pixels, dy: 0 pixels"
-    )
+    print(f"Desired shift: dx: {(shift / ps).simplified.magnitude} pixels, dy: 0 pixels")
     print(f"Computed shift: dx: {dx} pixels, dy: {dy} pixels")
 
     if args.output_directory:
         if not os.path.exists(args.output_directory):
             os.makedirs(args.output_directory, exist_ok=True)
-        imageio.imwrite(
-            os.path.join(args.output_directory, "image.tif"), im_sample
-        )
-        imageio.imwrite(
-            os.path.join(args.output_directory, "image-wedge.tif"), im
-        )
+        imageio.imwrite(os.path.join(args.output_directory, "image.tif"), im_sample)
+        imageio.imwrite(os.path.join(args.output_directory, "image-wedge.tif"), im)
 
     show(
         im,

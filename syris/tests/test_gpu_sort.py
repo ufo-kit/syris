@@ -17,9 +17,10 @@
 
 import numpy as np
 import pyopencl as cl
+
 from syris import config as cfg
 from syris.gpu import util as g_util
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import SyrisTest, default_syris_init
 
 
 class TestGPUSorting(SyrisTest):

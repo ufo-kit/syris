@@ -31,15 +31,16 @@ easily obtain x = T^{-1}x'.
 """
 
 import collections.abc
-import numpy as np
-import quantities as q
-from scipy import interpolate as interp
 import itertools
 import logging
+
+import numpy as np
+import quantities as q
+from quantities.quantity import Quantity
+from scipy import interpolate as interp
+
 from syris import math as smath
 from syris.util import get_magnitude
-from quantities.quantity import Quantity
-
 
 X = 0
 Y = 1
@@ -105,9 +106,7 @@ class BoundingBox(object):
         z_min = min(self.get_min(Z), other.get_min(Z))
         z_max = max(self.get_max(Z), other.get_max(Z))
 
-        self._points = make_points(
-            [x_min, x_max] * q.m, [y_min, y_max] * q.m, [z_min, z_max] * q.m
-        )
+        self._points = make_points([x_min, x_max] * q.m, [y_min, y_max] * q.m, [z_min, z_max] * q.m)
 
     def overlaps(self, other):
         """
@@ -119,9 +118,7 @@ class BoundingBox(object):
         x_interval_1 = other.get_min(X), other.get_max(X)
         y_interval_1 = other.get_min(Y), other.get_max(Y)
 
-        return overlap(x_interval_0, x_interval_1) and overlap(
-            y_interval_0, y_interval_1
-        )
+        return overlap(x_interval_0, x_interval_1) and overlap(y_interval_0, y_interval_1)
 
     def __repr__(self):
         return "BoundingBox(%s)" % (str(self))
@@ -170,9 +167,7 @@ class Trajectory(object):
         self._num_points = num_points
 
         if time_dist is not None and velocity is not None:
-            raise ValueError(
-                "time_dist and velocity can't be specified at the same time."
-            )
+            raise ValueError("time_dist and velocity can't be specified at the same time.")
 
         self._tck = None
         self._u = None
@@ -196,11 +191,7 @@ class Trajectory(object):
             max_du = self.get_maximum_du()
             coeff = max(np.gradient(self.parameter)) / max_du
             # Use 4 times more points then approximated to try to fit the curve the best
-            n = (
-                4 * int(np.ceil(coeff * len(self.parameter)))
-                if coeff > 1
-                else len(self.parameter)
-            )
+            n = 4 * int(np.ceil(coeff * len(self.parameter))) if coeff > 1 else len(self.parameter)
         else:
             n = self._num_points
 
@@ -237,9 +228,7 @@ class Trajectory(object):
             d_units = time_dist[0][1].units
             t_0 = Quantity(t_0 * t_units).simplified.magnitude
             s_0 = Quantity(s_0 * d_units).simplified.magnitude
-            self._times, self._distances = interpolate_1d(
-                t_0, s_0, len(self.parameter)
-            )
+            self._times, self._distances = interpolate_1d(t_0, s_0, len(self.parameter))
             self._time_tck = interp.splrep(self._times, self._distances)
 
     def bind(self, pixel_size=None, furthest_point=None):
@@ -322,17 +311,11 @@ class Trajectory(object):
             abs_time = self.time
 
         if self.stationary:
-            result = (
-                np.array((0, 0, 0))
-                if der
-                else self._control_points[0].magnitude
-            )
+            result = np.array((0, 0, 0)) if der else self._control_points[0].magnitude
         else:
             if not self.bound:
                 raise TrajectoryError("Trajectory not bound")
-            result = interp.splev(
-                self.get_parameter(abs_time), self._tck, der=der
-            )
+            result = interp.splev(self.get_parameter(abs_time), self._tck, der=der)
 
         return result
 
@@ -373,9 +356,7 @@ class Trajectory(object):
             # Trajectory with no rotational displacement
             len_mag = self.length.simplified.magnitude
             der = np.array(interp.splev(u, self._tck, der=1)) / len_mag
-            initial_der = (
-                np.array(interp.splev(u_0, self._tck, der=1)) / len_mag
-            )
+            initial_der = np.array(interp.splev(u_0, self._tck, der=1)) / len_mag
             distances += get_rotation_displacement(
                 der, initial_der, self._furthest_point
             ).simplified.magnitude
@@ -413,9 +394,7 @@ class Trajectory(object):
         # Evaluate u'(t) = du / dt, but the time-distance spline yields ds / dt. Since the
         # trajectory spline is arc-length parametrized, ds = du * length, so
         # du / dt = ds / (length * dt)
-        du_dt = (
-            np.array(interp.splev(self._times, self._time_tck, der=1)) / length
-        )
+        du_dt = np.array(interp.splev(self._times, self._time_tck, der=1)) / length
         # (x(u(t)))' = x'(u(t)) * u'(t)
         max_f_der = np.max(np.abs(dx_ut * du_dt))
         # dt = *distance* / max|(x(u(t)))'|
@@ -440,9 +419,7 @@ class Trajectory(object):
         # doesn't move the body by more than *distance*
         distances = self.get_distances()
         tck = interp.splprep(distances, u=self.parameter, s=0)[0]
-        max_du = maximum_derivative_parameter(
-            tck, self.parameter, distance.simplified.magnitude
-        )
+        max_du = maximum_derivative_parameter(tck, self.parameter, distance.simplified.magnitude)
 
         return max_du
 
@@ -643,9 +620,7 @@ def rotate(phi, axis, shift=None):
 def scale(scale_vec):
     """Scale the object by scaling coefficients (kx, ky, kz) given by *sc_vec*."""
     if scale_vec[0] <= 0 or scale_vec[1] <= 0 or scale_vec[2] <= 0:
-        raise ValueError(
-            "All components of the scaling " + "must be greater than 0"
-        )
+        raise ValueError("All components of the scaling " + "must be greater than 0")
     trans_matrix = np.identity(4)
 
     trans_matrix[0][0] = scale_vec[0]
@@ -717,10 +692,7 @@ def derivative_fit(tck, u, max_distance):
 
 
 def get_constant_velocity(v_0, duration):
-    times = (
-        np.linspace(0 * duration.magnitude, duration.magnitude, 5)
-        * duration.units
-    )
+    times = np.linspace(0 * duration.magnitude, duration.magnitude, 5) * duration.units
     dist = v_0 * times
 
     return list(zip(times, dist))
@@ -762,7 +734,4 @@ def get_rotation_displacement(d_0, d_1, length):
 
 def make_points(x_ends, y_ends, z_ends):
     """Make 3D points out of minima and maxima given by *x_ends*, *y_ends* and *z_ends*."""
-    return (
-        np.array(list(itertools.product(x_ends, y_ends, z_ends)))
-        * x_ends.units
-    )
+    return np.array(list(itertools.product(x_ends, y_ends, z_ends))) * x_ends.units

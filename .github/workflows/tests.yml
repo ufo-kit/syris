@@ -36,6 +36,11 @@ jobs:
         sudo apt-get update
         sudo apt-get install -qq pocl-opencl-icd
         uv sync --locked --extra examples ${{ matrix.repair-extra }}
+    - name: Check Python style
+      if: matrix.python-version == '3.12'
+      run: |
+        uv run --no-sync ruff check .
+        uv run --no-sync ruff format --check .
     - name: Build and validate distributions
       run: |
         uv build

@@ -20,19 +20,20 @@ Utility functions concerning GPU programming.
 """
 
 import itertools
-from importlib.resources import files
+import logging
 import queue
 import sys
+from importlib.resources import files
+from multiprocessing.pool import ThreadPool
+
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
 import pyopencl.cltypes as cltypes
 import quantities as q
-from multiprocessing.pool import ThreadPool
-from syris import profiling as prf
-from syris import config as cfg
-import logging
 
+from syris import config as cfg
+from syris import profiling as prf
 
 LOG = logging.getLogger(__name__)
 
@@ -61,22 +62,14 @@ typedef double16 vfloat16;
 
 def init_programs():
     """Initialize all OpenCL kernels needed by syris."""
-    cfg.OPENCL.programs["improc"] = get_program(
-        get_source(["vcomplex.cl", "imageprocessing.cl"])
-    )
-    cfg.OPENCL.programs["physics"] = get_program(
-        get_source(["vcomplex.cl", "physics.cl"])
-    )
+    cfg.OPENCL.programs["improc"] = get_program(get_source(["vcomplex.cl", "imageprocessing.cl"]))
+    cfg.OPENCL.programs["physics"] = get_program(get_source(["vcomplex.cl", "physics.cl"]))
     cfg.OPENCL.programs["geometry"] = get_program(get_metaobjects_source())
-    cfg.OPENCL.programs["mesh"] = get_program(
-        get_source(["heapsort.cl", "mesh.cl"])
-    )
+    cfg.OPENCL.programs["mesh"] = get_program(get_source(["heapsort.cl", "mesh.cl"]))
     cfg.OPENCL.programs["varconv"] = get_program(get_all_varconvolutions())
 
 
-def make_opencl_defaults(
-    platform_name=None, device_type=None, device_index=None, profiling=True
-):
+def make_opencl_defaults(platform_name=None, device_type=None, device_index=None, profiling=True):
     """Create default OpenCL context from *platform_name* and a command queue based on
     *device_index* to the devices list. If None, all devices are used in the context. If
     *platform_name* is not specified and *device_type* is, get a platform which has devices of that
@@ -228,9 +221,7 @@ def get_varconvolution_source(
         if cplx:
             top += get_source(["vcomplex.cl"], precision_sensitive=False)
 
-    return top + kernel_src.format(
-        header, name, inputs, init, compute_outer, compute_inner, after
-    )
+    return top + kernel_src.format(header, name, inputs, init, compute_outer, compute_inner, after)
 
 
 def _get_varconvolve_2d_parametrized(
@@ -278,30 +269,18 @@ def _get_varconvolve_2d_parametrized(
     )
 
 
-def get_varconvolve_gauss(
-    normalized=True, window_fwnm=1000, only_kernel=False
-):
+def get_varconvolve_gauss(normalized=True, window_fwnm=1000, only_kernel=False):
     """Create variable Gaussian convolution. The kernel sum is 1 if *normalized* is True, window is
     computed automatically for every x, y position in the original image based on the sigma at x, y
     and *window_fwnm* as 2 * sqrt(2 * log(*window_fwnm*)) * sigma. If *only_kernel* is True only the
     kernel is returned.
     """
-    src = get_source(["varconvolution.in"], precision_sensitive=False).split(
-        "%nl"
-    )[2]
+    src = get_source(["varconvolution.in"], precision_sensitive=False).split("%nl")[2]
     # Make the kernel window size variable based on the
     fwnm_factor = 2 * np.sqrt(2 * np.log(window_fwnm))
-    LOG.debug(
-        "Creating Gaussian convolution with window size FW(1/{})M".format(
-            window_fwnm
-        )
-    )
-    additional_init = "window.x = (int) ({} * param.x + 0.5);".format(
-        fwnm_factor
-    )
-    additional_init += "window.y = (int) ({} * param.y + 0.5);".format(
-        fwnm_factor
-    )
+    LOG.debug("Creating Gaussian convolution with window size FW(1/{})M".format(window_fwnm))
+    additional_init = "window.x = (int) ({} * param.x + 0.5);".format(fwnm_factor)
+    additional_init += "window.y = (int) ({} * param.y + 0.5);".format(fwnm_factor)
     additional_init += "window.x += 1 - window.x % 2;"
     additional_init += "window.y += 1 - window.y % 2;"
 
@@ -354,9 +333,7 @@ def get_varconvolve_propagator(only_kernel=False):
     compute_outer = "p.y = (vfloat) (j - window.y / 2) * ps.y;"
     compute_inner = "p.x = (vfloat) (i - window.x / 2) * ps.x;"
     compute_inner += "weight = get_propagator (&p, lam, "
-    compute_inner += (
-        "read_imagef (distances, sampler, (int2)(imx, imy)).x, &sigma);"
-    )
+    compute_inner += "read_imagef (distances, sampler, (int2)(imx, imy)).x, &sigma);"
     compute_inner += "sum += weight;"
     after = "result = result / sqrt (sum.x * sum.x + sum.y * sum.y);"
     src = get_source(["varconvolution.in"], precision_sensitive=False)
@@ -378,17 +355,13 @@ def get_varconvolve_propagator(only_kernel=False):
 
 def get_all_varconvolutions():
     """Create all variable convolutions."""
-    src = get_source(["varconvolution.in"], precision_sensitive=False).split(
-        "%nl"
-    )
+    src = get_source(["varconvolution.in"], precision_sensitive=False).split("%nl")
     header = "".join([func + "\n" for func in src[2:]])
 
     k_src = get_varconvolve_gauss(normalized=False, only_kernel=True)
     k_src += get_varconvolve_gauss(normalized=True, only_kernel=True)
     for norm, smooth in itertools.product([False, True], [False, True]):
-        k_src += get_varconvolve_disk(
-            normalized=norm, smooth=smooth, only_kernel=True
-        )
+        k_src += get_varconvolve_disk(normalized=norm, smooth=smooth, only_kernel=True)
     k_src += get_varconvolve_propagator(only_kernel=True)
 
     top = get_precision_header()
@@ -467,9 +440,7 @@ def get_platform_by_device_type(device_type):
         if device.type == device_type:
             return platform
 
-    raise LookupError(
-        "There is no platform with device type '{}'", device_type
-    )
+    raise LookupError("There is no platform with device type '{}'", device_type)
 
 
 def get_gpu_platform():
@@ -537,9 +508,7 @@ def make_vcomplex(value):
     """Make complex value for OpenCL based on the set floating point
     precision.
     """
-    return getattr(sys.modules[__name__], "make_vfloat2")(
-        value.real, value.imag
-    )
+    return getattr(sys.modules[__name__], "make_vfloat2")(value.real, value.imag)
 
 
 def get_host(data, queue=None):
@@ -553,9 +522,7 @@ def get_host(data, queue=None):
         result = data
     elif isinstance(data, cl.Image):
         result = np.empty(data.shape[::-1], np.float32)
-        cl.enqueue_copy(
-            queue, result, data, origin=(0, 0), region=result.shape[::-1]
-        )
+        cl.enqueue_copy(queue, result, data, origin=(0, 0), region=result.shape[::-1])
         if result.dtype != cfg.PRECISION.np_float:
             result = result.astype(cfg.PRECISION.np_float)
     else:
@@ -577,18 +544,11 @@ def get_array(data, queue=None):
         if data.dtype.kind == "c":
             if data.dtype.itemsize != cfg.PRECISION.cl_cplx:
                 data = data.astype(cfg.PRECISION.np_cplx)
-            result = cl_array.to_device(
-                queue, data.astype(cfg.PRECISION.np_cplx)
-            )
+            result = cl_array.to_device(queue, data.astype(cfg.PRECISION.np_cplx))
         else:
-            if (
-                data.dtype.kind != "f"
-                or data.dtype.itemsize != cfg.PRECISION.cl_float
-            ):
+            if data.dtype.kind != "f" or data.dtype.itemsize != cfg.PRECISION.cl_float:
                 data = data.astype(cfg.PRECISION.np_float)
-            result = cl_array.to_device(
-                queue, data.astype(cfg.PRECISION.np_float)
-            )
+            result = cl_array.to_device(queue, data.astype(cfg.PRECISION.np_float))
     elif isinstance(data, cl.Image):
         result = cl_array.empty(queue, data.shape[::-1], np.float32)
         cl.enqueue_copy(
@@ -628,12 +588,8 @@ def get_image(data, access=cl.mem_flags.READ_ONLY, queue=None):
     fmt = cl.ImageFormat(cl.channel_order.INTENSITY, cl.channel_type.FLOAT)
     mf = cl.mem_flags
 
-    if fmt not in cl.get_supported_image_formats(
-        queue.context, access, cl.mem_object_type.IMAGE2D
-    ):
-        raise RuntimeError(
-            "INTENSITY|FLOAT image format not supported by this platform"
-        )
+    if fmt not in cl.get_supported_image_formats(queue.context, access, cl.mem_object_type.IMAGE2D):
+        raise RuntimeError("INTENSITY|FLOAT image format not supported by this platform")
 
     if isinstance(data, cl.Image):
         result = data
@@ -647,9 +603,7 @@ def get_image(data, access=cl.mem_flags.READ_ONLY, queue=None):
             raise TypeError("Unsupported data type {}".format(type(data)))
 
         if isinstance(data, cl_array.Array):
-            result = cl.Image(
-                cfg.OPENCL.ctx, access, fmt, shape=data.shape[::-1]
-            )
+            result = cl.Image(cfg.OPENCL.ctx, access, fmt, shape=data.shape[::-1])
             cl.enqueue_copy(
                 queue,
                 result,
@@ -693,9 +647,7 @@ def qmap(func, items, queues=None, args=(), kwargs=None):
     def process(item):
         queue = queue_of_queues.get()
         LOG.debug(
-            "Mapping '{}' to item {} and queue {}".format(
-                func.__name__, item, queues.index(queue)
-            )
+            "Mapping '{}' to item {} and queue {}".format(func.__name__, item, queues.index(queue))
         )
         result = func(item, queue, *args, **kwargs)
         queue_of_queues.task_done()
@@ -710,19 +662,14 @@ def qmap(func, items, queues=None, args=(), kwargs=None):
     return results
 
 
-def get_event_duration(
-    event, start=cl.profiling_info.START, stop=cl.profiling_info.END
-):
+def get_event_duration(event, start=cl.profiling_info.START, stop=cl.profiling_info.END):
     """Get OpenCL event duration. *start* and *stop* define the OpenCL timer start and stop."""
-    return (
-        (event.get_profiling_info(stop) - event.get_profiling_info(start))
-        * 1e-9
-        * q.s
-    )
+    return (event.get_profiling_info(stop) - event.get_profiling_info(start)) * 1e-9 * q.s
 
 
 def _wrap_opencl():
     import pyopencl as cl
+
     import syris.config as cfg
     from syris.gpu.util import execute_profiled
 

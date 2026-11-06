@@ -17,9 +17,11 @@
 
 """Example utility functions."""
 
-import os
 import argparse
+import os
+
 import matplotlib.pyplot as plt
+
 from syris.materials import make_fromfile
 
 
@@ -34,20 +36,21 @@ def get_default_parser(description):
 def add_cuda_mesh_options(parser):
     """Add the shared precision and optional mesh-repair switches."""
     parser.add_argument(
-        "--repair-mesh", action="store_true",
+        "--repair-mesh",
+        action="store_true",
         help="Repair a closed, oriented mesh with libigl (install .[mesh-repair]); "
-             "double precision is recommended",
+        "double precision is recommended",
     )
     parser.add_argument(
-        "--float32-rounding", action="store_true",
+        "--float32-rounding",
+        action="store_true",
         help="Try bounded Float32 rounding after repair (experimental; requires --repair-mesh)",
     )
     precision = parser.add_mutually_exclusive_group()
+    precision.add_argument("--double-precision", action="store_true", help="Use double precision")
     precision.add_argument(
-        "--double-precision", action="store_true", help="Use double precision"
-    )
-    precision.add_argument(
-        "--mixed-precision", action="store_true",
+        "--mixed-precision",
+        action="store_true",
         help="CUDA Float32 storage/BVH with Float64 ray/triangle arithmetic (experimental)",
     )
 

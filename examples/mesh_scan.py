@@ -17,26 +17,26 @@
 
 """Laminography data set generation with mesh geometry."""
 
-import imageio
 import itertools
 import logging
 import os
 import time
-import numpy as np
-import quantities as q
 from functools import partial
 from multiprocessing import Lock, Pool
-from syris.geometry import X_AX, Y_AX, Z_AX
-from .util import get_default_parser
 
+import imageio
+import numpy as np
+import quantities as q
+
+from syris.geometry import X_AX, Y_AX, Z_AX
+
+from .util import get_default_parser
 
 LOCK = Lock()
 LOG = logging.getLogger(__name__)
 
 
-def make_projection(
-    shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=1
-):
+def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=1):
     from syris.imageprocessing import bin_image
 
     if axis == "z":
@@ -83,11 +83,7 @@ def scan(
     point = (shape[1] * psm / 2, shape[0] * psm / 2, 0) * q.m
     if index == 0:
         LOG.info("Mesh shift: {}".format(point.rescale(q.um)))
-        LOG.info(
-            "Mesh shift in pixels: {}".format(
-                (point / ps).simplified.magnitude
-            )
-        )
+        LOG.info("Mesh shift in pixels: {}".format((point / ps).simplified.magnitude))
 
     # Compute this device portion of tomographic angles
     enumerated = list(enumerate(angles))
@@ -103,18 +99,10 @@ def scan(
     bad_indices = []
     for i, angle in mine:
         st = time.time()
-        projs = [
-            make_projection(
-                shape, ps, axis, mesh, point, lamino_angle, angle, ss=ss
-            )
-        ]
+        projs = [make_projection(shape, ps, axis, mesh, point, lamino_angle, angle, ss=ss)]
         max_vals = [projs[-1].max()]
         best = 0
-        if (
-            last is not None
-            and max_vals[0] > 2 * last
-            or np.isnan(max_vals[0])
-        ):
+        if last is not None and max_vals[0] > 2 * last or np.isnan(max_vals[0]):
             # Check for faulty pixels
             checked_indices.append(i)
             for shift in [-psm / shift_coeff, psm / shift_coeff]:
@@ -152,17 +140,9 @@ def scan(
 
     with LOCK:
         LOG.info("Checked indices: {}".format(checked_indices))
-        LOG.info(
-            "Which map to files: {}".format(
-                [prefix.format(i) for i in checked_indices]
-            )
-        )
+        LOG.info("Which map to files: {}".format([prefix.format(i) for i in checked_indices]))
         LOG.info("Exceeding indices: {}".format(bad_indices))
-        LOG.info(
-            "Which map to files: {}".format(
-                [prefix.format(i) for i in bad_indices]
-            )
-        )
+        LOG.info("Which map to files: {}".format([prefix.format(i) for i in bad_indices]))
 
     return projs[best]
 
@@ -184,33 +164,23 @@ def make_ground_truth(args, shape, mesh):
     # Make sure the projections are computed with the same x- and y-offsets
     point = (shape[1] * psm / 2, shape[0] * psm / 2, shape[1] * psm / 2) * q.m
     LOG.info("Mesh shift: {}".format(point.rescale(q.um)))
-    LOG.info(
-        "Mesh shift in pixels: {}".format(
-            (point / args.pixel_size).simplified.magnitude
-        )
-    )
+    LOG.info("Mesh shift in pixels: {}".format((point / args.pixel_size).simplified.magnitude))
     mesh.translate(point)
     mesh.transform()
     mesh.sort()
 
-    z_stack = np.empty(
-        (args.supersampling,) + orig_shape, dtype=cfg.PRECISION.np_float
-    )
+    z_stack = np.empty((args.supersampling,) + orig_shape, dtype=cfg.PRECISION.np_float)
 
     for i in range(0, shape[0], args.z_chunk):
         end = min(i + args.z_chunk, shape[0])
         offset = (0, i * ps.rescale(q.um).magnitude, 0) * q.um
-        slices = mesh.compute_slices(
-            (end - i,) + shape, ps, offset=offset
-        ).get()
+        slices = mesh.compute_slices((end - i,) + shape, ps, offset=offset).get()
         LOG.info("Computing slices {}-{}".format(i, end))
         enumerated = list(enumerate(slices))[:: args.supersampling]
         for j, sl in enumerated:
             # Z-dimension downsampling
             for k in range(args.supersampling):
-                z_stack[k] = bin_image(
-                    slices[j + k], orig_shape, average=True, queue=queue
-                ).get()
+                z_stack[k] = bin_image(slices[j + k], orig_shape, average=True, queue=queue).get()
             # Sum only the slices which are present (last run might not go to the end)
             sl = np.mean(z_stack[: slices.shape[0]], axis=0)
             index = (i + j) // args.supersampling
@@ -221,8 +191,8 @@ def make_ground_truth(args, shape, mesh):
 
 def process(args, device_index):
     import syris
-    from syris.geometry import Trajectory
     from syris.bodies.mesh import Mesh, read_blender_obj
+    from syris.geometry import Trajectory
 
     syris.init(
         device_index=device_index,
@@ -253,20 +223,11 @@ def process(args, device_index):
 
         return make_ground_truth(args, shape, mesh)
     else:
-        num_projs = (
-            int(np.pi * n)
-            if args.num_projections is None
-            else args.num_projections
-        )
-        angles = (
-            np.linspace(0, args.rotation_angle, num_projs, endpoint=False)
-            * q.deg
-        )
+        num_projs = int(np.pi * n) if args.num_projections is None else args.num_projections
+        angles = np.linspace(0, args.rotation_angle, num_projs, endpoint=False) * q.deg
         if device_index == 0:
             LOG.info("n: {}, ps: {}, FOV: {}".format(n, args.pixel_size, fov))
-            LOG.info(
-                "Total rotation angle: {} deg".format(args.rotation_angle)
-            )
+            LOG.info("Total rotation angle: {} deg".format(args.rotation_angle))
             LOG.info("Number of projections: {}".format(num_projs))
             LOG.info("--- Mesh info ---")
             log_attributes(mesh)
@@ -302,9 +263,7 @@ def parse_args():
         type=str,
         help="Data set name, if not specified guessed from input",
     )
-    parser.add_argument(
-        "--num-projections", type=int, help="Number of projections"
-    )
+    parser.add_argument("--num-projections", type=int, help="Number of projections")
     parser.add_argument(
         "--out-directory",
         type=str,
@@ -353,9 +312,7 @@ def parse_args():
         nargs="+",
         help="Supersampling computes with n-times more pixels than usual",
     )
-    parser.add_argument(
-        "--double-precision", action="store_true", help="Use double precision"
-    )
+    parser.add_argument("--double-precision", action="store_true", help="Use double precision")
     # Ground truth related
     parser.add_argument(
         "--z-chunk",
@@ -406,9 +363,7 @@ def main():
             dset += "_ps_{:>04}_nm".format(int(pixel_size))
             dset += "_ss_{:>02}".format(ss)
 
-        args.prefix = os.path.join(
-            args.out_directory, dset, image_directory, file_prefix
-        )
+        args.prefix = os.path.join(args.out_directory, dset, image_directory, file_prefix)
         args.logfile = os.path.join(args.out_directory, dset, "simulation.log")
         directory = os.path.dirname(args.prefix)
         if not os.path.exists(directory):

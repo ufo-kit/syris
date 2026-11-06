@@ -17,6 +17,7 @@
 
 import numpy as np
 import pyopencl.array as cl_array
+
 from syris import config as cfg
 from syris.imageprocessing import Tiler
 from syris.tests import SyrisTest, default_syris_init

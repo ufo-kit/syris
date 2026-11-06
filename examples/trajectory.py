@@ -18,13 +18,16 @@
 """Trajectory and motion example."""
 
 import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
-import syris
 import scipy.misc
-from syris.geometry import Trajectory
+
+import syris
 from syris.bodies.isosurfaces import MetaBall
+from syris.geometry import Trajectory
+
 from .util import get_default_parser
 
 
@@ -105,14 +108,7 @@ def get_diffs(obj, ps, units=q.um, do_plot=True):
 
     times = times * q.s
     points = np.array(
-        list(
-            zip(
-                *[
-                    obj.trajectory.get_point(tt).rescale(q.um).magnitude
-                    for tt in times
-                ]
-            )
-        )
+        list(zip(*[obj.trajectory.get_point(tt).rescale(q.um).magnitude for tt in times]))
     )
     dt = np.gradient(times)
 
@@ -200,9 +196,7 @@ def main():
 def parse_args():
     """Parse command line arguments."""
     parser = get_default_parser(__doc__)
-    parser.add_argument(
-        "--output", type=str, help="Output directory for moving objects."
-    )
+    parser.add_argument("--output", type=str, help="Output directory for moving objects.")
 
     return parser.parse_args()
 

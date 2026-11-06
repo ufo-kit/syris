@@ -22,10 +22,10 @@ here and caching policy for data as well.
 """
 
 import logging
+
 import numpy as np
 import pyopencl as cl
 import pyopencl.cltypes as cltypes
-
 
 LOG = logging.getLogger()
 MAX_META_BODIES = 30
@@ -98,9 +98,7 @@ class Precision(object):
 
         dtype_base = "double" if double else "float"
         for i in [2, 3, 4, 8, 16]:
-            setattr(
-                self, "vfloat" + str(i), getattr(cltypes, dtype_base + str(i))
-            )
+            setattr(self, "vfloat" + str(i), getattr(cltypes, dtype_base + str(i)))
 
 
 class OpenCL(object):

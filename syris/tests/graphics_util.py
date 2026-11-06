@@ -88,7 +88,7 @@ class Metaball(object):
         self.R = R
         self.c = c
         if r != 0:
-            self.coeff = 1.0 / (R ** 2 - r ** 2) ** 2
+            self.coeff = 1.0 / (R**2 - r**2) ** 2
         else:
             self.coeff = 1
         self.lower = self.c - self.R
@@ -96,7 +96,7 @@ class Metaball(object):
         self.center = (self.lower + self.upper) / 2
 
     def get_metaball(self, x):
-        res = (self.R ** 2 - (x - self.c) ** 2) ** 2 * self.coeff
+        res = (self.R**2 - (x - self.c) ** 2) ** 2 * self.coeff
 
         res[np.where(np.abs(x - self.c) > self.R)] = 0
 
@@ -109,8 +109,8 @@ class Metaball(object):
             [
                 self.coeff,
                 -4 * self.coeff * self.c,
-                self.coeff * (-2 * self.R ** 2 + 6 * self.c ** 2),
-                self.coeff * (4 * self.R ** 2 * self.c - 4 * self.c ** 3),
-                self.coeff * (self.R ** 4 - 2 * self.R ** 2 * self.c ** 2 + self.c ** 4) - abs_val,
+                self.coeff * (-2 * self.R**2 + 6 * self.c**2),
+                self.coeff * (4 * self.R**2 * self.c - 4 * self.c**3),
+                self.coeff * (self.R**4 - 2 * self.R**2 * self.c**2 + self.c**4) - abs_val,
             ]
         )

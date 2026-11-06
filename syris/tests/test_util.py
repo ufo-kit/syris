@@ -15,10 +15,11 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
-import quantities as q
 import numpy as np
-from syris.util import make_tuple, get_magnitude, get_gauss
+import quantities as q
+
 from syris.tests import SyrisTest
+from syris.util import get_gauss, get_magnitude, make_tuple
 
 
 class TestUtil(SyrisTest):
@@ -44,7 +45,7 @@ class TestUtil(SyrisTest):
         sigma = 2
         mean = n // 2
         x = np.arange(n)
-        gt = np.exp(-((x - float(mean)) ** 2) / (2 * sigma ** 2))
+        gt = np.exp(-((x - float(mean)) ** 2) / (2 * sigma**2))
 
         g = get_gauss(x, mean, sigma, normalized=False)
         g_norm = get_gauss(n, mean, sigma, normalized=True)

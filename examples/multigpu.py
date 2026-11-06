@@ -20,12 +20,15 @@ compute, m is the base number of operations per pixel powered to k.
 """
 
 import time
-import pyopencl as cl
+
 import matplotlib.pyplot as plt
 import numpy as np
+import pyopencl as cl
+
 import syris
 import syris.config as cfg
 import syris.gpu.util as gutil
+
 from .util import get_default_parser
 
 
@@ -138,9 +141,7 @@ def run(n, m, complexity, prg, verbose=False):
     speedup = all_duration / host_duration
     if verbose:
         print("-------------------------------")
-        print(
-            "    Mean duration: {:.2f} s".format(all_duration / len(devices))
-        )
+        print("    Mean duration: {:.2f} s".format(all_duration / len(devices)))
         print("-------------------------------")
         print("          Speedup: {:.2f} / {}".format(speedup, len(devices)))
         print("-------------------------------")
@@ -164,9 +165,7 @@ def main():
         runs = []
         for i in range(args.runs):
             print("Run {} / {}".format(i + 1, args.runs))
-            runs.append(
-                run(args.n, args.m, complexity, prg, verbose=args.verbose)
-            )
+            runs.append(run(args.n, args.m, complexity, prg, verbose=args.verbose))
         if args.output:
             np.save(args.output.format(complexity), runs)
         results.append(np.mean(runs))
@@ -174,11 +173,7 @@ def main():
     print()
     print("===============================")
     for i, result in enumerate(results):
-        print(
-            "Complexity: {:.2f}, speedup: {:.2f}".format(
-                complexities[i], result
-            )
-        )
+        print("Complexity: {:.2f}, speedup: {:.2f}".format(complexities[i], result))
     print("===============================")
 
     if args.plot:

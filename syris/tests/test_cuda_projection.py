@@ -6,6 +6,7 @@ Python accelerator; no rendered image is used as a reference.
 """
 
 import unittest
+
 import numpy as np
 
 from .cuda_projection_util import ProjectionHarness, box
@@ -16,8 +17,11 @@ class ProjectionCases:
 
     @classmethod
     def setUpClass(cls):
-        cls.gpu = ProjectionHarness(cls.double, mixed_precision=cls.mixed_precision,
-                                    hit_capacity=getattr(cls, "hit_capacity", None))
+        cls.gpu = ProjectionHarness(
+            cls.double,
+            mixed_precision=cls.mixed_precision,
+            hit_capacity=getattr(cls, "hit_capacity", None),
+        )
 
     @property
     def rtol(self):
@@ -28,8 +32,7 @@ class ProjectionCases:
         b = rng.uniform(0.1, 1, (512, 2)).astype(self.gpu.dtype)
         b = np.column_stack([b, np.zeros(len(b))])
         a = 0.01 * np.column_stack([-b[:, 1], b[:, 0], np.zeros(len(b))])
-        pairs = np.stack([np.stack([a, b, -b], axis=1),
-                          np.stack([-a, -b, b], axis=1)], axis=1)
+        pairs = np.stack([np.stack([a, b, -b], axis=1), np.stack([-a, -b, b], axis=1)], axis=1)
         for scale in (1e-9, 1e-3, 1, 1e3):
             for order in ([0, 1, 2], [2, 1, 0], [1, 2, 0]):
                 with self.subTest(scale=scale, order=order):
@@ -47,8 +50,9 @@ class ProjectionCases:
         b = rng.uniform(0.1, 1, (2048, 2)).astype(np.float32)
         b = np.column_stack([b, np.zeros(len(b))])
         a = np.column_stack([-b[:, 1], b[:, 0], np.zeros(len(b))])
-        triangles = np.stack([np.stack([a, b, -b], axis=1),
-                              np.stack([-a, -b, b], axis=1)], axis=1).reshape(-1, 3, 3)
+        triangles = np.stack(
+            [np.stack([a, b, -b], axis=1), np.stack([-a, -b, b], axis=1)], axis=1
+        ).reshape(-1, 3, 3)
         d = np.column_stack([rng.uniform(-0.4, 0.4, (len(b), 2)), np.ones(len(b))])
         d = (d / np.linalg.norm(d, axis=1)[:, None]).astype(self.gpu.dtype)
         d = np.repeat(d, 2, axis=0)
@@ -60,7 +64,8 @@ class ProjectionCases:
         triangles[3] = [[0, 0, 0], [0.5, 0.5, 0], [1, 1, 0]]
         flags, distances = self.gpu.triangles(
             [[0.2, 0.3, -1], [0.5, 0.5001, -1], [0.2, 0.3, 1], [0.5, 0.5, -1]],
-            [[0, 0, 1]] * 4, triangles,
+            [[0, 0, 1]] * 4,
+            triangles,
         )
         np.testing.assert_array_equal(flags[:, 0], [1, 0, 0, 0])
         np.testing.assert_allclose(distances[0], 1, rtol=self.rtol)
@@ -72,7 +77,9 @@ class ProjectionCases:
         flags = self.gpu.boxes(
             [[0, 0, 0], [1, 1, 0], [2, 0, 0], [0, 0, 2], [0, 0, 0]],
             [[0, -0.0, 1], [-0.0, 0, 1], [0, 0, 1], [0, 0, -1], [0, 1, 0]],
-            lower, upper, [[z, z], [0, 4], [0, 4], [0, 4], [0, 4]],
+            lower,
+            upper,
+            [[z, z], [0, 4], [0, 4], [0, 4], [0, 4]],
         )
         np.testing.assert_array_equal(flags, [1, 1, 0, 1, 1])
 
@@ -104,11 +111,17 @@ class ProjectionCases:
         exit = np.maximum(near, far).min(axis=1)
         expected = np.maximum(exit - entry, 0)
         vertices = box(z0=-0.5, z1=0.5) @ rotation.T + translation
-        actual = self.gpu.trace(self.gpu.build(vertices),
-                                local_origins @ rotation.T + translation,
-                                directions @ rotation.T)
-        np.testing.assert_allclose(actual, np.repeat(expected[:, None], 2, axis=1),
-                                   rtol=self.rtol, atol=2e-6 if not self.double else 1e-13)
+        actual = self.gpu.trace(
+            self.gpu.build(vertices),
+            local_origins @ rotation.T + translation,
+            directions @ rotation.T,
+        )
+        np.testing.assert_allclose(
+            actual,
+            np.repeat(expected[:, None], 2, axis=1),
+            rtol=self.rtol,
+            atol=2e-6 if not self.double else 1e-13,
+        )
 
     def test_thin_layer_is_independent_of_external_ray_origin(self):
         accel = self.gpu.build(box(z1=5e-6))
@@ -119,8 +132,9 @@ class ProjectionCases:
     def test_candidate_and_actual_hit_counts_do_not_truncate_layers(self):
         for layers in (80, 140):
             with self.subTest(layers=layers):
-                vertices = np.concatenate([box(z0=i * 0.02, z1=i * 0.02 + 0.01)
-                                           for i in range(layers)])
+                vertices = np.concatenate(
+                    [box(z0=i * 0.02, z1=i * 0.02 + 0.01) for i in range(layers)]
+                )
                 accel = self.gpu.build(vertices)
                 result = self.gpu.trace(accel, [[0.1, 0.2, -1]], [[0, 0, 1]])
                 np.testing.assert_allclose(result, layers * 0.01, rtol=self.rtol)
@@ -130,11 +144,11 @@ class ProjectionCases:
         # both sides of the 32- and 256-record limits, plus interior rays.
         for layers in (8, 9, 16, 17, 64, 65, 140):
             with self.subTest(layers=layers):
-                vertices = np.concatenate([box(z0=i * 0.02, z1=i * 0.02 + 0.01)
-                                           for i in range(layers)])
+                vertices = np.concatenate(
+                    [box(z0=i * 0.02, z1=i * 0.02 + 0.01) for i in range(layers)]
+                )
                 accel = self.gpu.build(vertices)
-                result = self.gpu.trace(accel, [[0, 0, -1], [0.1, 0.2, -1]],
-                                        [[0, 0, 1]] * 2)
+                result = self.gpu.trace(accel, [[0, 0, -1], [0.1, 0.2, -1]], [[0, 0, 1]] * 2)
                 np.testing.assert_allclose(result, layers * 0.01, rtol=self.rtol)
 
     def test_event_batches_keep_complete_duplicate_groups(self):
@@ -142,27 +156,31 @@ class ProjectionCases:
         # neither consume the event batch nor toggle parity repeatedly.
         vertices = np.tile(box(), (150, 1, 1))
         accel = self.gpu.build(vertices)
-        result = self.gpu.trace(accel, [[0, 0, -1], [0.1, 0.2, -1], [0.1, 0.2, 0.25]],
-                                [[0, 0, 1]] * 3)
+        result = self.gpu.trace(
+            accel, [[0, 0, -1], [0.1, 0.2, -1], [0.1, 0.2, 0.25]], [[0, 0, 1]] * 3
+        )
         np.testing.assert_allclose(result, [[1, 1], [1, 1], [0.75, 0.75]], rtol=self.rtol)
 
     def test_event_batches_order_reversed_rays_and_shuffled_thin_layers(self):
         rng = np.random.default_rng(731)
         widths = rng.uniform(1e-5, 0.01, 160)
-        vertices = np.concatenate([box(z0=i * 0.02, z1=i * 0.02 + width)
-                                   for i, width in enumerate(widths)])
+        vertices = np.concatenate(
+            [box(z0=i * 0.02, z1=i * 0.02 + width) for i, width in enumerate(widths)]
+        )
         vertices = vertices[rng.permutation(len(vertices))]
         accel = self.gpu.build(vertices)
-        result = self.gpu.trace(accel,
-                                [[0.1, 0.2, -1], [0.1, 0.2, 4],
-                                 [0.1, 0.2, widths[0] / 2]],
-                                [[0, 0, 1], [0, 0, -1], [0, 0, 1]])
+        result = self.gpu.trace(
+            accel,
+            [[0.1, 0.2, -1], [0.1, 0.2, 4], [0.1, 0.2, widths[0] / 2]],
+            [[0, 0, 1], [0, 0, -1], [0, 0, 1]],
+        )
         expected = np.array([widths.sum(), widths.sum(), widths.sum() - widths[0] / 2])
         np.testing.assert_allclose(result, np.repeat(expected[:, None], 2, axis=1), rtol=self.rtol)
 
     def test_staged_sampling_preserves_local_rays_and_refinement(self):
-        vertices = np.concatenate([box(-0.7, 0.6, -0.8, 0.5, 0, 1.3),
-                                   box(-0.2, 0.3, -0.3, 0.2, 0.4, 0.8)[:, ::-1]])
+        vertices = np.concatenate(
+            [box(-0.7, 0.6, -0.8, 0.5, 0, 1.3), box(-0.2, 0.3, -0.3, 0.2, 0.4, 0.8)[:, ::-1]]
+        )
         rotation, _ = np.linalg.qr(np.random.default_rng(192).normal(size=(3, 3)))
         if np.linalg.det(rotation) < 0:
             rotation[:, 0] *= -1
@@ -171,16 +189,29 @@ class ProjectionCases:
             for parallel in (False, True):
                 for basis in (np.eye(3), rotation):
                     for shape in ((7, 11), (1, 9), (9, 1)):
-                        for depth, tolerance in ((1, 1e6), (1, 0.02),
-                                                 (2 if self.double else 3, 0)):
-                            with self.subTest(normals=normals, parallel=parallel,
-                                              shape=shape, depth=depth, tolerance=tolerance):
-                                kwargs = dict(parallel=parallel, depth=depth, shape=shape,
-                                              basis=basis, origin=(-0.9231, -0.8763, -1.3127),
-                                              pixel_size=(0.1731, 0.2117), source=(0, 0, -3),
-                                              abs_tolerance=0, rel_tolerance=tolerance)
+                        for depth, tolerance in ((1, 1e6), (1, 0.02), (2 if self.double else 3, 0)):
+                            with self.subTest(
+                                normals=normals,
+                                parallel=parallel,
+                                shape=shape,
+                                depth=depth,
+                                tolerance=tolerance,
+                            ):
+                                kwargs = dict(
+                                    parallel=parallel,
+                                    depth=depth,
+                                    shape=shape,
+                                    basis=basis,
+                                    origin=(-0.9231, -0.8763, -1.3127),
+                                    pixel_size=(0.1731, 0.2117),
+                                    source=(0, 0, -3),
+                                    abs_tolerance=0,
+                                    rel_tolerance=tolerance,
+                                )
                                 local = self.gpu.project_image(accel, **kwargs)
-                                staged = self.gpu.project_image(accel, sampling_mode="staged", **kwargs)
+                                staged = self.gpu.project_image(
+                                    accel, sampling_mode="staged", **kwargs
+                                )
                                 np.testing.assert_array_equal(staged, local)
 
     def test_staged_sampling_preserves_nonfinite_results(self):
@@ -189,9 +220,15 @@ class ProjectionCases:
         accel = self.gpu.build(box()[:, ::-1])
         for parallel in (False, True):
             for tolerance in (0, 1e6):
-                kwargs = dict(depth=1, parallel=parallel, shape=(3, 5),
-                              origin=(-0.4, -0.3, -1), pixel_size=(0.15, 0.2),
-                              source=(0, 0, -3), rel_tolerance=tolerance)
+                kwargs = dict(
+                    depth=1,
+                    parallel=parallel,
+                    shape=(3, 5),
+                    origin=(-0.4, -0.3, -1),
+                    pixel_size=(0.15, 0.2),
+                    source=(0, 0, -3),
+                    rel_tolerance=tolerance,
+                )
                 local = self.gpu.project_image(accel, **kwargs)
                 self.assertTrue(np.isnan(local).any())
                 staged = self.gpu.project_image(accel, sampling_mode="staged", **kwargs)
@@ -206,8 +243,13 @@ class ProjectionCases:
         for normals in (False, True):
             with self.subTest(normals=normals):
                 accel = self.gpu.build(box(), use_normals=normals)
-                result = self.gpu.project(accel, parallel=False, origin=(-0.1, -0.1, 3),
-                                          pixel_size=(0.2, 0.2), source=(0, 0, -3))
+                result = self.gpu.project(
+                    accel,
+                    parallel=False,
+                    origin=(-0.1, -0.1, 3),
+                    pixel_size=(0.2, 0.2),
+                    source=(0, 0, -3),
+                )
                 np.testing.assert_allclose(result, 1, rtol=self.rtol)
 
     def test_oblique_conebeam_measures_path_length(self):
@@ -216,23 +258,34 @@ class ProjectionCases:
         for normals in (False, True):
             with self.subTest(normals=normals):
                 accel = self.gpu.build(box(-3, 3, -3, 3), use_normals=normals)
-                result = self.gpu.project(accel, parallel=False, origin=(2, 1, 3),
-                                          pixel_size=(0.2, 0.2), source=(0, 0, -3))
+                result = self.gpu.project(
+                    accel,
+                    parallel=False,
+                    origin=(2, 1, 3),
+                    pixel_size=(0.2, 0.2),
+                    source=(0, 0, -3),
+                )
                 np.testing.assert_allclose(result, expected, rtol=self.rtol)
 
     def test_adaptive_conebeam_integrates_oblique_slab(self):
         nodes, weights = np.polynomial.legendre.leggauss(12)
         x = 2.1 + 0.1 * nodes[:, None]
         y = 1.1 + 0.1 * nodes[None, :]
-        reference = np.sum(np.sqrt(1 + (x*x + y*y) / 36)
-                           * weights[:, None] * weights[None, :]) / 4
+        reference = (
+            np.sum(np.sqrt(1 + (x * x + y * y) / 36) * weights[:, None] * weights[None, :]) / 4
+        )
         for normals in (False, True):
             with self.subTest(normals=normals):
                 accel = self.gpu.build(box(-3, 3, -3, 3), use_normals=normals)
                 result = self.gpu.project(
-                    accel, parallel=False, depth=2 if self.double else 3,
-                    origin=(2, 1, 3), pixel_size=(0.2, 0.2), source=(0, 0, -3),
-                    abs_tolerance=0, rel_tolerance=0,
+                    accel,
+                    parallel=False,
+                    depth=2 if self.double else 3,
+                    origin=(2, 1, 3),
+                    pixel_size=(0.2, 0.2),
+                    source=(0, 0, -3),
+                    abs_tolerance=0,
+                    rel_tolerance=0,
                 )
                 np.testing.assert_allclose(result, reference, rtol=1e-5)
 
@@ -256,35 +309,49 @@ class ProjectionCases:
 
     def test_normals_follow_mesh_transform(self):
         import quantities as q
-        from syris.bodies.mesh import Mesh
+
         from syris.bodies.accelerators import BvhCupyAccelerator
+        from syris.bodies.mesh import Mesh
         from syris.geometry import Trajectory
 
         vertices = box().astype(self.gpu.dtype)
         normals = np.cross(vertices[:, 1] - vertices[:, 0], vertices[:, 2] - vertices[:, 0])
         for supplied in ("computed", "array", "quantity"):
             with self.subTest(supplied=supplied), self.gpu.configured():
-                supplied_normals = {"computed": None, "array": normals,
-                                    "quantity": normals * q.um}[supplied]
-                mesh = Mesh(vertices.reshape(-1, 3).T * q.um,
-                            Trajectory([(0, 0, 0)] * q.um), center=None,
-                            use_normals=True, normals=supplied_normals)
+                supplied_normals = {"computed": None, "array": normals, "quantity": normals * q.um}[
+                    supplied
+                ]
+                mesh = Mesh(
+                    vertices.reshape(-1, 3).T * q.um,
+                    Trajectory([(0, 0, 0)] * q.um),
+                    center=None,
+                    use_normals=True,
+                    normals=supplied_normals,
+                )
                 mesh.transform()
                 original_normals = np.asarray(mesh.normals).copy()
                 mesh.transform_matrix = np.diag([1, -1, -1, 1]).astype(self.gpu.dtype)
                 mesh.transform()
-                np.testing.assert_allclose(np.asarray(mesh.normals), original_normals @ np.diag([1, -1, -1]))
+                np.testing.assert_allclose(
+                    np.asarray(mesh.normals), original_normals @ np.diag([1, -1, -1])
+                )
                 accel = BvhCupyAccelerator(mesh)
                 accel.build()
-                np.testing.assert_allclose(self.gpu.trace(accel, [[0.1, 0.2, -2]], [[0, 0, 1]]), 1, rtol=self.rtol)
+                np.testing.assert_allclose(
+                    self.gpu.trace(accel, [[0.1, 0.2, -2]], [[0, 0, 1]]), 1, rtol=self.rtol
+                )
 
     def test_morton_leaves_map_back_to_original_triangles(self):
         vertices = np.random.default_rng(741).uniform(-2, 2, (512, 3, 3)).astype(self.gpu.dtype)
         tree = self.gpu.build(vertices).tree
         indices = tree["indices"].get()
         self.assertEqual(indices.dtype, np.uint32)
-        np.testing.assert_array_equal(tree["bbMin"].get()[:len(vertices), :3], vertices[indices].min(axis=1))
-        np.testing.assert_array_equal(tree["bbMax"].get()[:len(vertices), :3], vertices[indices].max(axis=1))
+        np.testing.assert_array_equal(
+            tree["bbMin"].get()[: len(vertices), :3], vertices[indices].min(axis=1)
+        )
+        np.testing.assert_array_equal(
+            tree["bbMax"].get()[: len(vertices), :3], vertices[indices].max(axis=1)
+        )
 
     def test_single_triangle_and_planar_bounds_build(self):
         vertices = np.array([[[0, 0, 0], [1, 0, 0], [0, 1, 0]]])
@@ -312,19 +379,22 @@ class ProjectionCases:
                 tree = self.gpu.build(vertices).tree
                 lo, hi = tree["bbMin"].get()[:, :3], tree["bbMax"].get()[:, :3]
                 left, rope = tree["left"].get(), tree["rope"].get()
-                n = len(vertices); seen = set(); stack = [n]
+                n = len(vertices)
+                seen = set()
+                stack = [n]
                 while stack:
                     node = stack.pop()
                     self.assertNotIn(node, seen)
                     seen.add(node)
                     if node < n:
                         continue
-                    a = int(left[node]); b = int(rope[a])
-                    self.assertTrue(0 <= a < 2*n and 0 <= b < 2*n)
+                    a = int(left[node])
+                    b = int(rope[a])
+                    self.assertTrue(0 <= a < 2 * n and 0 <= b < 2 * n)
                     self.assertTrue(np.all(lo[node] <= np.minimum(lo[a], lo[b])))
                     self.assertTrue(np.all(hi[node] >= np.maximum(hi[a], hi[b])))
                     stack.extend([a, b])
-                self.assertEqual(len(seen), 2*n - 1)
+                self.assertEqual(len(seen), 2 * n - 1)
 
 
 class TestCudaProjectionFloat32(ProjectionCases, unittest.TestCase):
@@ -352,8 +422,9 @@ class TestCudaProjectionMixed(ProjectionCases, unittest.TestCase):
         triangle = np.array([[-size, -size, 0], [size, -size, 0], [0, size, 0]])
         triangles = np.array([triangle, triangle[::-1], triangle])
         flags, distances = self.gpu.triangles(
-            [[distance, 0, -distance], [distance, 0, -distance],
-             [distance, 4 * size, -distance]], [[-1, 0, 1]] * 3, triangles,
+            [[distance, 0, -distance], [distance, 0, -distance], [distance, 4 * size, -distance]],
+            [[-1, 0, 1]] * 3,
+            triangles,
         )
         np.testing.assert_array_equal(flags[:, 0], [1, 1, 0])
         np.testing.assert_array_equal(distances[:2], distance)
@@ -364,27 +435,33 @@ class TestMixedPrecisionConfiguration(unittest.TestCase):
     def test_incompatible_modes_are_rejected(self):
         import syris
 
-        for kwargs in ({"compute_backend": "opencl"},
-                       {"compute_backend": "cuda", "double_precision": True}):
-            with self.subTest(kwargs=kwargs), self.assertRaisesRegex(
-                ValueError, "mixed_precision requires"
+        for kwargs in (
+            {"compute_backend": "opencl"},
+            {"compute_backend": "cuda", "double_precision": True},
+        ):
+            with (
+                self.subTest(kwargs=kwargs),
+                self.assertRaisesRegex(ValueError, "mixed_precision requires"),
             ):
                 syris.init(mixed_precision=True, **kwargs)
 
 
 class TestCudaModuleCache(unittest.TestCase):
     def test_changed_header_recompiles_the_module(self):
-        from pathlib import Path
         import tempfile
+        from pathlib import Path
+
         from .cuda_projection_util import cuda_or_skip
 
         cp = cuda_or_skip()
         from syris.gpu.cuda_utils import CudaPipeline
+
         with tempfile.TemporaryDirectory() as directory:
             header = Path(directory) / "value.cuh"
             source = Path(directory) / "value.cu"
-            source.write_text('#include "value.cuh"\n'
-                              'extern "C" __global__ void value(int *out) { *out = VALUE; }')
+            source.write_text(
+                '#include "value.cuh"\nextern "C" __global__ void value(int *out) { *out = VALUE; }'
+            )
             for expected in (17, 29):
                 header.write_text(f"#define VALUE {expected}\n")
                 pipeline = CudaPipeline([directory])

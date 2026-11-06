@@ -20,10 +20,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
+
 import syris
 import syris.imageprocessing as ip
-from syris.geometry import Trajectory
 from syris.devices.sources import BendingMagnet, FixedSpectrumSource
+from syris.geometry import Trajectory
+
 from .util import get_default_parser, show
 
 
@@ -56,13 +58,9 @@ def run_bending_magnet():
     )
 
     # Flat at time = 0
-    flat_0 = (
-        abs(bm.transfer((512, 256), ps, energies[0], t=0 * q.s)) ** 2
-    ).real.get()
+    flat_0 = (abs(bm.transfer((512, 256), ps, energies[0], t=0 * q.s)) ** 2).real.get()
     # Flat at half the time
-    flat_1 = (
-        abs(bm.transfer((512, 256), ps, energies[0], t=tr.time / 2)) ** 2
-    ).real.get()
+    flat_1 = (abs(bm.transfer((512, 256), ps, energies[0], t=tr.time / 2)) ** 2).real.get()
 
     plt.subplot(121)
     plt.imshow(flat_0)
@@ -81,24 +79,18 @@ def run_fixed():
     weights = np.arange(1, len(energies) + 1)[:, np.newaxis, np.newaxis]
     flux = weights * flux
     traj = Trajectory([(n / 2, n / 2, 0)] * ps)
-    source = FixedSpectrumSource(
-        energies, flux, 30 * q.m, (100, 500) * q.um, traj, pixel_size=ps
-    )
+    source = FixedSpectrumSource(energies, flux, 30 * q.m, (100, 500) * q.um, traj, pixel_size=ps)
 
     im = ip.compute_intensity(source.transfer((n, n), ps, 5 * q.keV)).get()
     show(im, title="Original sampling")
-    im = ip.compute_intensity(
-        source.transfer((2 * n,) * 2, ps / 2, 5 * q.keV)
-    ).get()
+    im = ip.compute_intensity(source.transfer((2 * n,) * 2, ps / 2, 5 * q.keV)).get()
     show(im, title="2x supersampled")
     plt.show()
 
 
 def main():
     parser = get_default_parser(__doc__)
-    subparsers = parser.add_subparsers(
-        help="sub-command help", dest="sub-commands", required=True
-    )
+    subparsers = parser.add_subparsers(help="sub-command help", dest="sub-commands", required=True)
 
     bm = subparsers.add_parser("bm", help="BendingMagnet example")
     bm.set_defaults(_func=run_bending_magnet)

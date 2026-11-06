@@ -21,15 +21,17 @@ Bodies based on isosurfaces.
 
 import itertools
 import logging
+import struct
+
 import numpy as np
 import pyopencl as cl
 import pyopencl.array as cl_array
 import pyopencl.cltypes as cltypes
 import quantities as q
-import syris.gpu.util as g_util
+
 import syris.geometry as geom
+import syris.gpu.util as g_util
 import syris.util as util
-import struct
 from syris import config as cfg
 from syris.bodies.base import CompositeBody, MovableBody
 from syris.geometry import BoundingBox
@@ -42,17 +44,13 @@ class MetaBall(MovableBody):
     bodies.
     """
 
-    def __init__(
-        self, trajectory, radius, material=None, orientation=geom.Y_AX
-    ):
+    def __init__(self, trajectory, radius, material=None, orientation=geom.Y_AX):
         """Create a metaball with *radius*."""
         if radius <= 0:
             raise ValueError("Radius must be greater than zero.")
 
         self._radius = radius.simplified
-        super(MetaBall, self).__init__(
-            trajectory, material=material, orientation=orientation
-        )
+        super(MetaBall, self).__init__(trajectory, material=material, orientation=orientation)
 
     @property
     def radius(self):
@@ -77,9 +75,7 @@ class MetaBall(MovableBody):
         # Transform by the current transformation matrix.
         transformed = []
         for point in points:
-            transformed.append(
-                geom.transform_vector(self.transform_matrix, point)
-            )
+            transformed.append(geom.transform_vector(self.transform_matrix, point))
 
         return BoundingBox(np.array(transformed) * q.m)
 
@@ -134,9 +130,7 @@ class MetaBalls(CompositeBody):
     """Composite body composed of metaballs."""
 
     def __init__(self, trajectory, metaballs, orientation=geom.Y_AX):
-        super(MetaBalls, self).__init__(
-            trajectory, orientation=orientation, bodies=metaballs
-        )
+        super(MetaBalls, self).__init__(trajectory, orientation=orientation, bodies=metaballs)
 
     def _project(self, shape=None, pixel_size=None, /, **kwargs):
         offset = kwargs.pop("offset", None)
@@ -279,9 +273,7 @@ def project_metaballs_naive(
         func = np.max if sgn > 0 else np.min
         x_ps = util.make_tuple(pixel_size)[1]
         res = [
-            (
-                ball.position[2] + sgn * (2 * ball.radius + x_ps)
-            ).simplified.magnitude
+            (ball.position[2] + sgn * (2 * ball.radius + x_ps)).simplified.magnitude
             for ball in metaballs
         ]
 

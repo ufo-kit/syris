@@ -19,9 +19,11 @@
 
 import itertools
 import re
+
 import numpy as np
 import pyopencl.array as cl_array
 import quantities as q
+
 import syris.config as cfg
 import syris.geometry as geom
 import syris.gpu.util as gutil
@@ -103,9 +105,7 @@ class Mesh(MovableBody):
         self.normalization_scale = normalize_factor
 
         self._triangles = np.copy(self._current)
-        self._furthest_point = np.max(
-            np.sqrt(np.sum(self._triangles**2, axis=0))
-        )
+        self._furthest_point = np.max(np.sqrt(np.sum(self._triangles**2, axis=0)))
         self.iterations = iterations
 
         self._accelerator = None
@@ -120,9 +120,7 @@ class Mesh(MovableBody):
         self._epsilon = epsilon * normalize_factor
         self.dynamic_range = dynamic_range
 
-        super(Mesh, self).__init__(
-            trajectory, material=material, orientation=orientation
-        )
+        super(Mesh, self).__init__(trajectory, material=material, orientation=orientation)
 
     @classmethod
     def from_file(
@@ -162,7 +160,10 @@ class Mesh(MovableBody):
             Mesh: A fully initialized Mesh object.
         """
         reader = PyvistaReader(
-            filename=source, unit=unit, dtype=cfg.PRECISION.np_float, repair=repair,
+            filename=source,
+            unit=unit,
+            dtype=cfg.PRECISION.np_float,
+            repair=repair,
             float32_rounding=float32_rounding,
         )
 
@@ -228,10 +229,7 @@ class Mesh(MovableBody):
         def get_middle(ends):
             return (ends[0] + ends[1]) / 2.0
 
-        return (
-            np.array([get_middle(ends) for ends in self.extrema.magnitude])
-            * cfg.UNIT
-        )
+        return np.array([get_middle(ends) for ends in self.extrema.magnitude]) * cfg.UNIT
 
     @property
     def diff(self):
@@ -379,9 +377,7 @@ class Mesh(MovableBody):
     def _make_vertices(self, index, pixel_size):
         """Make a flat array of vertices belong to *triangles* at *index*."""
         # Convert to meters
-        vertices = (
-            self._current[:, index::3] / pixel_size.rescale(cfg.UNIT).magnitude
-        )
+        vertices = self._current[:, index::3] / pixel_size.rescale(cfg.UNIT).magnitude
 
         return vertices.transpose().flatten().astype(cfg.PRECISION.np_float)
 
@@ -395,18 +391,13 @@ class Mesh(MovableBody):
     def transform(self):
         """Apply transformation *matrix* and return the resulting triangles."""
         matrix = self.get_rescaled_transform_matrix(cfg.UNIT)
-        self._current = np.dot(
-            matrix.astype(self._triangles.dtype), self._triangles
-        )
+        self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
 
     def build_accelerator(self):
         """
         Lazy-initializes and rebuilds the accelerator only if the mesh state has changed.
         """
-        if (
-            self._accelerator is None
-            or self._accelerator._built_for_state != self._state
-        ):
+        if self._accelerator is None or self._accelerator._built_for_state != self._state:
             self._accelerator = cfg.BACKEND.get_accelerator_for_mesh(self)
             self._accelerator.build()
         return self._accelerator
@@ -416,9 +407,7 @@ class Mesh(MovableBody):
         accel = self.build_accelerator()
         return accel.project(shape, pixel_size, **kwargs)
 
-    def compute_slices(
-        self, shape, pixel_size, queue=None, out=None, offset=None
-    ):
+    def compute_slices(self, shape, pixel_size, queue=None, out=None, offset=None):
         """Compute slices with *shape* as (z, y, x), *pixel_size*. Use *queue* and *out* for
         outuput. Offset is the starting point offset as (x, y, z).
         """
@@ -435,9 +424,7 @@ class Mesh(MovableBody):
             offset = gutil.make_vfloat3(0, 0, 0)
         else:
             offset = offset.simplified.magnitude
-            offset = gutil.make_vfloat3(
-                offset[0] / psm[1], offset[1] / psm[0], offset[2] / psm[1]
-            )
+            offset = gutil.make_vfloat3(offset[0] / psm[1], offset[1] / psm[0], offset[2] / psm[1])
 
         cfg.OPENCL.programs["mesh"].compute_slices(
             queue,
@@ -469,9 +456,7 @@ def _extract_object(txt):
     v_pattern = re.compile(pattern.format("v"))
     f_pattern = re.compile(pattern.format("f"))
     vertices = np.array(re.findall(v_pattern, subtxt)).astype(np.float32)
-    faces = (
-        np.array(re.findall(f_pattern, subtxt)).astype(np.int32).flatten() - 1
-    )
+    faces = np.array(re.findall(f_pattern, subtxt)).astype(np.int32).flatten() - 1
 
     remainder = txt[obj_end:] if obj_end else None
 
@@ -491,9 +476,7 @@ def read_blender_obj(filename, objects=None):
             if triangles is None:
                 triangles = v[f - face_start].transpose()
             else:
-                triangles = np.concatenate(
-                    (triangles, v[f - face_start].transpose()), axis=1
-                )
+                triangles = np.concatenate((triangles, v[f - face_start].transpose()), axis=1)
         face_start += len(v)
         i += 1
 

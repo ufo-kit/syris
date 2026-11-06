@@ -17,10 +17,12 @@
 
 import numpy as np
 import pyopencl as cl
+
 from syris import config as cfg
 from syris.gpu import util as g_util
-from .graphics_util import derivative, f, sgn, Metaball
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import SyrisTest, default_syris_init
+
+from .graphics_util import Metaball, derivative, f, sgn
 
 
 class TestThickness(SyrisTest):

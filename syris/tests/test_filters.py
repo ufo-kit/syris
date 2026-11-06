@@ -17,11 +17,12 @@
 
 import numpy as np
 import quantities as q
+
 from syris.devices.filters import GaussianFilter, MaterialFilter, Scintillator
 from syris.materials import Material
 from syris.math import fwnm_to_sigma, sigma_to_fwnm
 from syris.physics import energy_to_wavelength
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import SyrisTest, default_syris_init
 
 
 class TestFilters(SyrisTest):
@@ -90,7 +91,7 @@ class TestFilters(SyrisTest):
         )
         d_wavelength_dense = wavelengths_dense[1] - wavelengths_dense[0]
         sigma = 20.0 * q.nm
-        luminescence = np.exp(-((wavelengths - 400 * q.nm) ** 2) / (2 * sigma ** 2)) / (
+        luminescence = np.exp(-((wavelengths - 400 * q.nm) ** 2) / (2 * sigma**2)) / (
             sigma * np.sqrt(2 * np.pi)
         )
         sc = Scintillator(

@@ -10,6 +10,7 @@ build/
 install_manifest.txt
 .venv/
 .pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 coverage.xml

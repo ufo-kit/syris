@@ -15,10 +15,12 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with this library. If not, see <http://www.gnu.org/licenses/>.
 
+import itertools
+
 import numpy as np
 import quantities as q
+
 from syris import geometry as geom
-import itertools
 from syris.geometry import BoundingBox
 from syris.tests import SyrisTest
 

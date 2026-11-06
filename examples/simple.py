@@ -20,10 +20,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
+
 import syris
-from syris.physics import propagate
 from syris.bodies.simple import make_sphere
 from syris.materials import make_henke
+from syris.physics import propagate
 
 
 def main():

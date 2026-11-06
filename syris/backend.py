@@ -1,5 +1,7 @@
-import numpy as np
 import logging
+
+import numpy as np
+
 from .bodies.accelerators import BvhCupyAccelerator, LegacyCpuAccelerator
 
 LOG = logging.getLogger(__name__)

@@ -20,15 +20,17 @@ mollifiers in the edge-enhancement regime.
 """
 
 import logging
+
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
+
 import syris
 from syris.bodies.simple import make_sphere
-from syris.imageprocessing import fft_2, ifft_2, decimate
+from syris.imageprocessing import decimate, fft_2, ifft_2
 from syris.physics import compute_propagator, energy_to_wavelength
-from .util import get_default_parser, get_material
 
+from .util import get_default_parser, get_material
 
 LOG = logging.getLogger(__name__)
 
@@ -125,12 +127,8 @@ def main():
 def parse_args():
     """Parse command line arguments."""
     parser = get_default_parser(__doc__)
-    parser.add_argument(
-        "--supersampling", type=int, default=4, help="Supersampling"
-    )
-    parser.add_argument(
-        "--mollified", action="store_true", help="Suppress aliased frequencies"
-    )
+    parser.add_argument("--supersampling", type=int, default=4, help="Supersampling")
+    parser.add_argument("--mollified", action="store_true", help="Suppress aliased frequencies")
     parser.add_argument(
         "--mollifier",
         type=str,
@@ -138,9 +136,7 @@ def parse_args():
         default="gauss",
         help="Mollifier type",
     )
-    parser.add_argument(
-        "--filename", type=str, help="Save figure to this filename."
-    )
+    parser.add_argument("--filename", type=str, help="Save figure to this filename.")
 
     return parser.parse_args()
 

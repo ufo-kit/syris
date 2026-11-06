@@ -17,9 +17,10 @@
 
 import numpy as np
 import quantities as q
+
 import syris.config as cfg
 from syris.devices.cameras import Camera, is_fps_feasible
-from syris.tests import default_syris_init, SyrisTest
+from syris.tests import SyrisTest, default_syris_init
 
 
 class TestCamera(SyrisTest):
@@ -66,7 +67,7 @@ class TestCamera(SyrisTest):
         self.assertAlmostEqual(0.1, self.camera.fps.simplified.magnitude)
 
     def test_bpp(self):
-        self.assertEqual(self.camera.max_grey_value, 2 ** self.camera.bpp - 1)
+        self.assertEqual(self.camera.max_grey_value, 2**self.camera.bpp - 1)
 
     def test_dark(self):
         photons = np.zeros(self.camera.shape, dtype=cfg.PRECISION.np_float)

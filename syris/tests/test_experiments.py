@@ -17,13 +17,14 @@
 
 import numpy as np
 import quantities as q
+
 from syris.bodies.isosurfaces import MetaBall
 from syris.devices.cameras import Camera
-from syris.devices.lenses import Lens
 from syris.devices.detectors import Detector
-from syris.geometry import Trajectory
-from syris.tests import default_syris_init, SyrisTest
+from syris.devices.lenses import Lens
 from syris.experiments import Experiment
+from syris.geometry import Trajectory
+from syris.tests import SyrisTest, default_syris_init
 
 
 class TestExperiments(SyrisTest):
