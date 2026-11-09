@@ -61,15 +61,24 @@ struct Quad {
 // The cache includes centers at the deepest level. Only pending regions need
 // storage: a depth-first quadtree has at most 1 + 3 * MAX_DEPTH of them.
 
+// Distinct surface crossings can round to the same Float32 distance even
+// with mixed triangle arithmetic. Keep distances wide through sorting,
+// deduplication and thickness integration in mixed mode.
+#ifdef SYRIS_MIXED_PRECISION
+using HIT_T = double;
+#else
+using HIT_T = FP_T;
+#endif
+
 struct HitRecord {
-    FP_T t;
+    HIT_T t;
     unsigned int triangle_idx;
 
     // Only the written prefix of a List may be read. Initializing every unused
     // record costs local-memory stores for every ray, including adaptive rays.
     __device__ HitRecord() = default;
     
-    __device__ HitRecord(FP_T t_val, unsigned int idx) : t(t_val), triangle_idx(idx) {}
+    __device__ HitRecord(HIT_T t_val, unsigned int idx) : t(t_val), triangle_idx(idx) {}
 };
 
 struct EpsilonParams {

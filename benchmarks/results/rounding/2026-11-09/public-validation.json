@@ -1,0 +1,45 @@
+{
+  "passed": 260,
+  "preexisting_errors": 1,
+  "main_suite": {
+    "run": 255,
+    "passed": 254,
+    "errors": 1,
+    "log": "/tmp/syris-precision-tests.log"
+  },
+  "additional_pose_tests": {
+    "run": 6,
+    "passed": 6,
+    "log": "/tmp/syris-precision-pose-tests.log"
+  },
+  "preexisting_error": {
+    "test": "syris.tests.test_cameras.TestCamera.test_constructor",
+    "trigger": "Camera constructed with shape=None",
+    "error": "TypeError: unsupported operand type(s) for *: 'float' and 'NoneType'",
+    "reproduced_on_preserved_prechange_source": true,
+    "baseline_log": "/tmp/syris-precision-baseline-camera.log"
+  },
+  "suites": [
+    "test_cuda_projection",
+    "test_cuda_precision_modes",
+    "test_cuda_signed_projection",
+    "test_cuda_projection_variants",
+    "test_cuda_scheduling.TestWarpTileConfiguration",
+    "test_cuda_scheduling.TestPixelSchedulerCoverage",
+    "test_mesh_examples",
+    "test_cameras",
+    "test_precision",
+    "test_mesh_repair",
+    "benchmarks.rounding_precision.test_references"
+  ],
+  "static_checks": [
+    "ruff check",
+    "ruff format --check",
+    "git diff --check"
+  ],
+  "log_sha256": {
+    "syris-precision-tests.log": "4691fbcde75c387ae63cfb496c03ee58a5d6d66e642cc02ca335dc705bdbdd0d",
+    "syris-precision-pose-tests.log": "02a0998427433a6df95583efde6bf63f11a652e432d0784045f425776e79e825",
+    "syris-precision-baseline-camera.log": "a0f5f04e8df84b8a2706134cfd8fb3b2803e002f22e79c13ac4280c72ab21d85"
+  }
+}

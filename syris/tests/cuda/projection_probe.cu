@@ -25,7 +25,7 @@ extern "C" __global__ void test_triangles(
     FP_T4 lo, hi;
     calculateTriangleBoundingBox(vertices[3*i], vertices[3*i+1], vertices[3*i+2], lo, hi);
     WatertightRay ray(origins[i], directions[i], lo, hi, test_eps(eps));
-    FP_T t = -1;
+    HIT_T t = -1;
     hits[2*i] = ray.intersects(vertices[3*i], vertices[3*i+1], vertices[3*i+2], t, 0, 0);
     hits[2*i+1] = ray.intersects(lo, hi);
     distances[i] = t;

@@ -13,7 +13,7 @@ extern "C" __global__ void growTreeKernel(
 extern "C" __global__ void project_parallel_kernel(
     unsigned nb_keys, FP_T *image, uint2 N,
     FP_T4 U, FP_T4 V, FP_T4 W, // projection basis and origin
-    FP_T4 upperleft_origin, FP_T2 ps,
+    FP_T4 detector_origin, FP_T2 ps,
     int *rope,
     int *left,
     unsigned *permutation, // BVH tree

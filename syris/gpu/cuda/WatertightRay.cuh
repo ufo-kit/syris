@@ -51,7 +51,7 @@ public:
     __device__ bool intersects(const FP_T4& minBbox, const FP_T4& maxBbox, FP_T tmin, FP_T tmax) const;
     __device__ bool intersects (FP_T4 const &minBbox, FP_T4 const &maxBbox) const; // AABB
     __device__ bool intersects (FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &tmin, FP_T &tmax) const; // Triangle
-    __device__ bool intersects (FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, FP_T &t, unsigned col, unsigned row, bool *boundary = nullptr) const; // Triangle
+    __device__ bool intersects (FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3, HIT_T &t, unsigned col, unsigned row, bool *boundary = nullptr) const; // Triangle
 
     __device__ FP_T point_2_parametric (FP_T4 const &point) const;
 };

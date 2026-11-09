@@ -141,6 +141,30 @@ class Camera(MovableBody):
         vec_4d = np.append(vec, w_val)
         return vec_4d.astype(cfg.PRECISION.np_float)
 
+    def get_cuda_geometry(self, origin, scale):
+        """Encode detector and source in a mesh's local frame.
+
+        ``origin`` is a Float64 position in ``cfg.UNIT`` and ``scale`` is a
+        power of two. Subtract the common offset before any Float32 cast.
+        Mixed/Float64 kernels expect the detector centre; Float32 kernels
+        retain corner-based sampling. Pixel sizes are returned in x,y order.
+        """
+        centre = np.asarray(self.position.rescale(cfg.UNIT).magnitude, dtype=np.float64) - origin
+        pitch = np.broadcast_to(self._pixel_size_vec.magnitude, (2,))[::-1]
+        detector = centre
+        if not cfg.PRECISION.centered_rays:
+            detector = centre - self.u * (self.shape[1] * pitch[0] / 2)
+            detector = detector - self.v * (self.shape[0] * pitch[1] / 2)
+        source = None
+        if self._source_detector_distance is not None:
+            distance = float(self._source_detector_distance.rescale(cfg.UNIT).magnitude)
+            source = self._to_cuda_vector((centre + distance * self.w) * scale)
+        return (
+            self._to_cuda_vector(detector * scale),
+            np.asarray(pitch * scale, dtype=cfg.PRECISION.np_float),
+            source,
+        )
+
     def update_fov(self):
         if self._focal_length is None:
             return

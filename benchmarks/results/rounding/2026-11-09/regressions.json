@@ -1,0 +1,260 @@
+{
+  "provenance": {
+    "timestamp_utc": "2026-11-09T15:06:38.998534+00:00",
+    "command": [
+      "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/benchmarks/rounding_precision/investigate.py",
+      "--benchmark-root",
+      "/mnt/data/Agents/syris-benchmarks",
+      "--output",
+      "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/benchmarks/results/rounding/2026-11-09/regressions.json"
+    ],
+    "python": "3.13.12",
+    "numpy": "2.5.4",
+    "cupy": "14.2.0",
+    "gpu": "NVIDIA RTX 2000 Ada Generation",
+    "cuda_driver": 13020,
+    "cuda_runtime": 13020,
+    "git_revision": "4897a08de2dadb8d850778450fec54557691cea3",
+    "source_sha256": {
+      "syris/gpu/cuda/Ray.cu": "41a9f50b21228a121aad1628affba51a261491635c0db80b70f9b4eafb6da1b7",
+      "syris/gpu/cuda/sort.cu": "f5a0b5f12227e27258cfef8eb2b0ecf9a5894b95b57a80de1d2b5cd1e7eca815",
+      "syris/gpu/cuda/source.cu": "0c91d867cba856578a768da6a2ab26d503b1a850d41f688da57bfc154fc611da",
+      "syris/gpu/cuda/Legacy.cu": "fb1a033925941a2db8fd959fd163e1580b9b5e592db87d605d6b8b31f90b6fcc",
+      "syris/gpu/cuda/WatertightRay.cu": "fa669597810ad490ee6535b70625e50f028b38cf0a793f01cc3e45a702952251",
+      "syris/gpu/cuda/Ray.cuh": "6c61ce29b7b07def94a4cf3261be068014362f9b9a574abed9e1ac833fb6e195",
+      "syris/gpu/cuda/PixelScheduler.cuh": "f124e86564bc96befab95fa31ca73fc08f0dedef32dc7a9ac89ddbca1dc84dc8",
+      "syris/gpu/cuda/source.cuh": "4c0c3e6398bed4392c1297cdce10efb407775c8263fdd5a7bc43c41a410ef189",
+      "syris/gpu/cuda/staged.cuh": "15cfdb608f70cfa198109d96b77ebb06beef0fd728ca105f2c7be076b22b1c29",
+      "syris/gpu/cuda/Commons.cuh": "1d3de9c93cc0a497a5cc20828507b06a95c6083d0df696e8edf77e0afc5616d5",
+      "syris/gpu/cuda/WatertightRay.cuh": "ecfdaa1753e62416696858659547211f2366f3bb423e8c60525b173825ee09da",
+      "syris/config.py": "f3e22e179c7d5812ecec04ddc914b9668a66e9403bc10f4ea97044b6d904cb0f",
+      "syris/bodies/accelerators.py": "38cf0e77be23772d80a6f893633c07dba19950841390d640c718713b7ddc760a",
+      "syris/bodies/mesh.py": "27f343690f3029cf164251cb6e60e70f3e3f8030a00ef9617bb562b77c1bad16",
+      "syris/devices/cameras.py": "e7d3a2216a1247c2155641f32bbfecd1f7397f916379190612b37d0979190a35",
+      "examples/mesh_projection.py": "ecb9f2b6005574213534644dfe4eedf744b71d0c94be43eebb03657828c3897f",
+      "benchmarks/rounding_precision/validate.py": "385940fd0f539375a8caa6f0883ae0c2bc469551a068a68fa2f301b84cbe83ec",
+      "benchmarks/rounding_precision/investigate.py": "d0ab75c6f5f49ac0e5128223ed1c30ee59a649424e501d6138eee7c79ea38e4d",
+      "benchmarks/rounding_precision/probe.py": "eaede7e8a02abf7b4e37ff1d9cf281065c3104c9d05511fc4487be0bd128eb23",
+      "benchmarks/rounding_precision/test_references.py": "1eabd7257ecf0f71fdefabd45fb825f3c096dac3b8fba63f52e6b188c0b267b6",
+      "benchmarks/rounding_precision/__init__.py": "ceea5881d1f55cade4a794bd58d4fc892815f24fa643013475012d407e48cd24"
+    },
+    "input_sha256": {
+      "data/prepared/bunny/float32-baseline.npz": "c601bb779ec4c1e21142aee950207c4063f8fca71e5a28669e936889f347f839",
+      "data/prepared/armadillo/float32-baseline.npz": "a79bfe616ea05be2836489945ecfd1776eaaf4c51a863fd59071140d4f05ec28",
+      "data/baseline/bunny.json": "0ec83476cb20bfd51c4d2939968a1d0ad1a5b18486ade3f6c16721aa7c7ec086",
+      "data/baseline/armadillo.json": "455356269f4bb28e3134479b736c32090c2c7226063a2010368f78055a9740b7"
+    },
+    "geometry_contract": "Every precision uses the same stored Float32 geometry; Float64 promotes those coordinates exactly.",
+    "scope": "Parallel beam, one sample per pixel; experimental source copies and coordinate changes, no production edits."
+  },
+  "results": [
+    {
+      "angle": 45,
+      "centered": true,
+      "ray_mode": "centered",
+      "mode": "float32",
+      "pixel": [
+        1291,
+        652
+      ],
+      "original_um": 3.101653874182375,
+      "reference_um": 3.101656739785261,
+      "variant_um": 57.32147110393271,
+      "encoded_reference_um": 3.101655623566711,
+      "metrics": {
+        "nonfinite": 0,
+        "negative": 0,
+        "exceeding_pixels": 1,
+        "foreground_pixels": 814102,
+        "false_zero": 0,
+        "extra_positive": 0,
+        "max_error_nm": 54219.81436414745,
+        "foreground_p99_error_nm": 0.030050075082268257,
+        "foreground_rmse_nm": 60.09227163049728
+      },
+      "triangle_hits": [
+        {
+          "face": 142,
+          "distance": 0.42359229922294617,
+          "world_z_um": 22.10250473022461
+        },
+        {
+          "face": 144,
+          "distance": 0.42359229922294617,
+          "world_z_um": 22.10250473022461
+        },
+        {
+          "face": 359,
+          "distance": 0.4515058994293213,
+          "world_z_um": 25.675445556640625
+        },
+        {
+          "face": 414,
+          "distance": 0.475737601518631,
+          "world_z_um": 28.777103424072266
+        }
+      ]
+    },
+    {
+      "angle": 45,
+      "centered": true,
+      "ray_mode": "centered",
+      "mode": "mixed",
+      "pixel": [
+        1291,
+        652
+      ],
+      "original_um": 3.101653874182375,
+      "reference_um": 3.101656739785261,
+      "variant_um": 57.32147110393271,
+      "encoded_reference_um": 3.101655623566711,
+      "metrics": {
+        "nonfinite": 0,
+        "negative": 0,
+        "exceeding_pixels": 1,
+        "foreground_pixels": 814102,
+        "false_zero": 0,
+        "extra_positive": 0,
+        "max_error_nm": 54219.81436414745,
+        "foreground_p99_error_nm": 0.030084111581915197,
+        "foreground_rmse_nm": 60.09227161526451
+      },
+      "triangle_hits": [
+        {
+          "face": 142,
+          "distance": 0.42359229922294617,
+          "world_z_um": 22.10250473022461
+        },
+        {
+          "face": 144,
+          "distance": 0.42359229922294617,
+          "world_z_um": 22.10250473022461
+        },
+        {
+          "face": 359,
+          "distance": 0.4515058994293213,
+          "world_z_um": 25.675445556640625
+        },
+        {
+          "face": 414,
+          "distance": 0.475737601518631,
+          "world_z_um": 28.777103424072266
+        }
+      ]
+    },
+    {
+      "angle": 90,
+      "centered": false,
+      "ray_mode": "current",
+      "mode": "float32",
+      "pixel": [
+        1138,
+        1220
+      ],
+      "original_um": 66.14570884266868,
+      "reference_um": 66.14578704995472,
+      "variant_um": 65.45339419972152,
+      "encoded_reference_um": 66.14574784524604,
+      "metrics": {
+        "nonfinite": 0,
+        "negative": 0,
+        "exceeding_pixels": 6,
+        "foreground_pixels": 739067,
+        "false_zero": 0,
+        "extra_positive": 0,
+        "max_error_nm": 692.3928502332055,
+        "foreground_p99_error_nm": 0.07223609703482131,
+        "foreground_rmse_nm": 0.8057123398850439
+      },
+      "triangle_hits": [
+        {
+          "face": 606,
+          "distance": 0.529764711856842,
+          "world_z_um": 17.80950164794922
+        },
+        {
+          "face": 626,
+          "distance": 0.417097806930542,
+          "world_z_um": 3.3881378173828125
+        },
+        {
+          "face": 634,
+          "distance": 0.529764711856842,
+          "world_z_um": 17.80950164794922
+        },
+        {
+          "face": 636,
+          "distance": 0.7789415121078491,
+          "world_z_um": 49.704132080078125
+        },
+        {
+          "face": 640,
+          "distance": 0.19619163870811462,
+          "world_z_um": -24.88785171508789
+        },
+        {
+          "face": 647,
+          "distance": 0.4830839931964874,
+          "world_z_um": 11.834369659423828
+        }
+      ]
+    },
+    {
+      "angle": 90,
+      "centered": false,
+      "ray_mode": "current",
+      "mode": "mixed",
+      "pixel": [
+        1138,
+        1220
+      ],
+      "original_um": 66.14570884266868,
+      "reference_um": 66.14578704995472,
+      "variant_um": 66.14574522245675,
+      "encoded_reference_um": 66.14574784524604,
+      "metrics": {
+        "nonfinite": 0,
+        "negative": 0,
+        "exceeding_pixels": 5,
+        "foreground_pixels": 739067,
+        "false_zero": 0,
+        "extra_positive": 0,
+        "max_error_nm": 3.3626911555560315,
+        "foreground_p99_error_nm": 0.07214915829288975,
+        "foreground_rmse_nm": 0.022441267107798278
+      },
+      "triangle_hits": [
+        {
+          "face": 606,
+          "distance": 0.529764711856842,
+          "world_z_um": 17.80950164794922
+        },
+        {
+          "face": 626,
+          "distance": 0.417097806930542,
+          "world_z_um": 3.3881378173828125
+        },
+        {
+          "face": 634,
+          "distance": 0.5297647714614868,
+          "world_z_um": 17.80950927734375
+        },
+        {
+          "face": 636,
+          "distance": 0.7789415121078491,
+          "world_z_um": 49.704132080078125
+        },
+        {
+          "face": 640,
+          "distance": 0.19619163870811462,
+          "world_z_um": -24.88785171508789
+        },
+        {
+          "face": 647,
+          "distance": 0.4830839931964874,
+          "world_z_um": 11.834369659423828
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import abc
 import logging
+import math
 
 import numpy as np
 import pyopencl.array as cl_array
@@ -70,18 +71,37 @@ class BvhCupyAccelerator(AcceleratorBase):
         """
         Build a bounding volume hierarchy tree for the mesh.
         """
-        self.mesh.transform()
-
-        host_vertices = self.mesh._current[0:3, :]
-        nb_vertices = host_vertices.shape[1]
         nb_keys = self.mesh.num_triangles
-
-        host_normals = self.mesh.normals if self.mesh._use_normals else None
-
         if nb_keys == 0:
             raise ValueError("Cannot build a BVH for an empty mesh")
-        # Bounds must describe the transformed vertices, not the original file.
+        # Rebase on the host BEFORE casting to the GPU precision. Mesh and
+        # camera share this frame, without changing their public world poses.
+        host_vertices, self.coordinate_origin = self.mesh._transform_for_cuda()
+        nb_vertices = host_vertices.shape[1]
+        host_normals = None
+        if self.mesh._use_normals:
+            if self.mesh._normals is not None:
+                host_normals = self.mesh.normals
+            else:
+                # Derive normals from nearby vertices too; a large common
+                # world offset must not erase their edge differences.
+                a, b, c = (host_vertices[:, i::3].T for i in range(3))
+                host_normals = np.cross(b - a, c - a)
         lo, hi = host_vertices.min(axis=1), host_vertices.max(axis=1)
+        extent = float(max(np.max(np.abs(lo)), np.max(np.abs(hi))))
+        if not np.isfinite(extent):
+            raise ValueError("Mesh coordinates must be finite")
+        # Multiplication by 2**k preserves significands for normal values.
+        # Cache normalized geometry in the BVH instead of scaling its arrays
+        # again on every projection. Clamp to finite powers in the GPU dtype.
+        exponent = math.frexp(extent)[1] if extent > 0 else 0
+        limits = np.finfo(self.float_dtype)
+        self.coordinate_scale = math.ldexp(
+            1.0, max(limits.minexp, min(-exponent, limits.maxexp - 1))
+        )
+        host_vertices *= self.coordinate_scale
+        lo *= self.coordinate_scale
+        hi *= self.coordinate_scale
         sceneMin = np.array([*lo, 0], dtype=self.float_dtype)
         sceneMax = np.array([*hi, 0], dtype=self.float_dtype)
         t_epsilon = self.mesh.epsilon
@@ -217,12 +237,12 @@ class BvhCupyAccelerator(AcceleratorBase):
         use_normals = self.tree["normals"] is not None
         U, V, W = camera.viewport_basis_vectors
 
-        # --- Calculate Scaling ---
-        # Scale geometry to [-1, 1] for numerical stability in kernel
-        max_bound = float(self.mesh.furthest_point.magnitude)
-        scale = 1.0
-        if max_bound > 0:
-            scale = float(1.0 / max_bound)
+        scale = self.coordinate_scale
+        detector_origin, pitch, source_point = camera.get_cuda_geometry(
+            self.coordinate_origin, scale
+        )
+        if not parallel and source_point is None:
+            raise ValueError("Cone-beam projection requires source_detector_distance")
 
         # --- Prepare Kernel Launch ---
         image = self.xp.ones(camera.shape[0] * camera.shape[1], dtype=self.float_dtype) * -1
@@ -241,7 +261,7 @@ class BvhCupyAccelerator(AcceleratorBase):
             global_counter,
             nb_keys,
             image,
-            (self.tree["vertices"] * scale).view(self.float4_view),
+            self.tree["vertices"].view(self.float4_view),
         ]
         if use_normals:
             base_args.append(self.tree["normals"].view(self.float4_view))
@@ -251,21 +271,21 @@ class BvhCupyAccelerator(AcceleratorBase):
             U.view(self.float4_view),
             V.view(self.float4_view),
             W.view(self.float4_view),
-            (camera.p00_corner * scale).view(self.float4_view),
-            (camera.kernel_pixel_size_xy * scale).view(self.float2_view),
+            detector_origin.view(self.float4_view),
+            pitch.view(self.float2_view),
         ]
 
         if not parallel:
-            camera_args.append((camera.source_point * scale).view(self.float4_view))
+            camera_args.append(source_point.view(self.float4_view))
 
         tree_args = [
             self.tree["rope"],
             self.tree["left"],
             self.tree["indices"],
-            self.tree["bbMin"] * scale,
-            self.tree["bbMax"] * scale,
-            (self.tree["sceneMin"] * scale).view(self.float4_view),
-            (self.tree["sceneMax"] * scale).view(self.float4_view),
+            self.tree["bbMin"],
+            self.tree["bbMax"],
+            self.tree["sceneMin"].view(self.float4_view),
+            self.tree["sceneMax"].view(self.float4_view),
         ]
 
         sampling_args = [
@@ -299,9 +319,9 @@ class BvhCupyAccelerator(AcceleratorBase):
             queue = self.xp.empty(rows * cols, dtype=self.xp.uint32)
             queue_count = self.xp.zeros(1, dtype=self.xp.uint32)
             eps = self.xp.asarray(self._epsilon_args, dtype=self.float_dtype)
-            source = (
-                np.zeros(4, dtype=self.float_dtype) if parallel else camera.source_point * scale
-            ).view(self.float4_view)
+            source = (np.zeros(4, dtype=self.float_dtype) if parallel else source_point).view(
+                self.float4_view
+            )
             staged_args = (
                 *base_args[:4],
                 base_args[4] if use_normals else np.uint64(0),

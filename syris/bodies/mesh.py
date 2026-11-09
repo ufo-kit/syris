@@ -109,6 +109,8 @@ class Mesh(MovableBody):
         self.iterations = iterations
 
         self._accelerator = None
+        self._cuda_local_vertices = None
+        self._cuda_local_centre = None
         self._normals = normals
         self._use_normals = use_normals
 
@@ -392,6 +394,25 @@ class Mesh(MovableBody):
         """Apply transformation *matrix* and return the resulting triangles."""
         matrix = self.get_rescaled_transform_matrix(cfg.UNIT)
         self._current = np.dot(matrix.astype(self._triangles.dtype), self._triangles)
+
+    def _transform_for_cuda(self):
+        """Transform about a stable local centre before adding world translation.
+
+        Return Float64 vertices relative to that centre and its world position
+        in ``cfg.UNIT``. Keeping the centre fixed in the body frame avoids a
+        different coordinate quantization merely because its bbox rotates.
+        """
+        if self._cuda_local_vertices is None:
+            vertices = np.asarray(self._triangles[:3], dtype=np.float64)
+            self._cuda_local_centre = vertices.min(axis=1) / 2 + vertices.max(axis=1) / 2
+            self._cuda_local_vertices = vertices - self._cuda_local_centre[:, None]
+        matrix = np.asarray(self.get_rescaled_transform_matrix(cfg.UNIT), dtype=np.float64)
+        origin = matrix[:3, :3] @ self._cuda_local_centre + matrix[:3, 3]
+        local = matrix[:3, :3] @ self._cuda_local_vertices
+        self._current = np.empty((4, local.shape[1]), dtype=np.float64)
+        np.add(local, origin[:, None], out=self._current[:3])
+        self._current[3] = 1
+        return local, origin
 
     def build_accelerator(self):
         """

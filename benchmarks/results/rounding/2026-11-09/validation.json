@@ -1,0 +1,5698 @@
+{
+  "provenance": {
+    "timestamp_utc": "2026-11-09T15:05:54.792924+00:00",
+    "command": [
+      "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/benchmarks/rounding_precision/validate.py",
+      "--benchmark-root",
+      "/mnt/data/Agents/syris-benchmarks",
+      "--output",
+      "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/benchmarks/results/rounding/2026-11-09/validation.json"
+    ],
+    "python": "3.13.12",
+    "numpy": "2.5.4",
+    "cupy": "14.2.0",
+    "gpu": "NVIDIA RTX 2000 Ada Generation",
+    "cuda_driver": 13020,
+    "cuda_runtime": 13020,
+    "git_revision": "4897a08de2dadb8d850778450fec54557691cea3",
+    "source_sha256": {
+      "syris/gpu/cuda/Ray.cu": "41a9f50b21228a121aad1628affba51a261491635c0db80b70f9b4eafb6da1b7",
+      "syris/gpu/cuda/sort.cu": "f5a0b5f12227e27258cfef8eb2b0ecf9a5894b95b57a80de1d2b5cd1e7eca815",
+      "syris/gpu/cuda/source.cu": "0c91d867cba856578a768da6a2ab26d503b1a850d41f688da57bfc154fc611da",
+      "syris/gpu/cuda/Legacy.cu": "fb1a033925941a2db8fd959fd163e1580b9b5e592db87d605d6b8b31f90b6fcc",
+      "syris/gpu/cuda/WatertightRay.cu": "fa669597810ad490ee6535b70625e50f028b38cf0a793f01cc3e45a702952251",
+      "syris/gpu/cuda/Ray.cuh": "6c61ce29b7b07def94a4cf3261be068014362f9b9a574abed9e1ac833fb6e195",
+      "syris/gpu/cuda/PixelScheduler.cuh": "f124e86564bc96befab95fa31ca73fc08f0dedef32dc7a9ac89ddbca1dc84dc8",
+      "syris/gpu/cuda/source.cuh": "4c0c3e6398bed4392c1297cdce10efb407775c8263fdd5a7bc43c41a410ef189",
+      "syris/gpu/cuda/staged.cuh": "15cfdb608f70cfa198109d96b77ebb06beef0fd728ca105f2c7be076b22b1c29",
+      "syris/gpu/cuda/Commons.cuh": "1d3de9c93cc0a497a5cc20828507b06a95c6083d0df696e8edf77e0afc5616d5",
+      "syris/gpu/cuda/WatertightRay.cuh": "ecfdaa1753e62416696858659547211f2366f3bb423e8c60525b173825ee09da",
+      "syris/config.py": "f3e22e179c7d5812ecec04ddc914b9668a66e9403bc10f4ea97044b6d904cb0f",
+      "syris/bodies/accelerators.py": "38cf0e77be23772d80a6f893633c07dba19950841390d640c718713b7ddc760a",
+      "syris/bodies/mesh.py": "27f343690f3029cf164251cb6e60e70f3e3f8030a00ef9617bb562b77c1bad16",
+      "syris/devices/cameras.py": "e7d3a2216a1247c2155641f32bbfecd1f7397f916379190612b37d0979190a35",
+      "examples/mesh_projection.py": "ecb9f2b6005574213534644dfe4eedf744b71d0c94be43eebb03657828c3897f",
+      "benchmarks/rounding_precision/validate.py": "385940fd0f539375a8caa6f0883ae0c2bc469551a068a68fa2f301b84cbe83ec",
+      "benchmarks/rounding_precision/investigate.py": "d0ab75c6f5f49ac0e5128223ed1c30ee59a649424e501d6138eee7c79ea38e4d",
+      "benchmarks/rounding_precision/probe.py": "eaede7e8a02abf7b4e37ff1d9cf281065c3104c9d05511fc4487be0bd128eb23",
+      "benchmarks/rounding_precision/test_references.py": "1eabd7257ecf0f71fdefabd45fb825f3c096dac3b8fba63f52e6b188c0b267b6",
+      "benchmarks/rounding_precision/__init__.py": "ceea5881d1f55cade4a794bd58d4fc892815f24fa643013475012d407e48cd24"
+    },
+    "input_sha256": {
+      "data/prepared/bunny/float32-baseline.npz": "c601bb779ec4c1e21142aee950207c4063f8fca71e5a28669e936889f347f839",
+      "data/prepared/armadillo/float32-baseline.npz": "a79bfe616ea05be2836489945ecfd1776eaaf4c51a863fd59071140d4f05ec28",
+      "data/baseline/bunny.json": "0ec83476cb20bfd51c4d2939968a1d0ad1a5b18486ade3f6c16721aa7c7ec086",
+      "data/baseline/armadillo.json": "455356269f4bb28e3134479b736c32090c2c7226063a2010368f78055a9740b7"
+    },
+    "geometry_contract": "Every precision uses the same stored Float32 geometry; Float64 promotes those coordinates exactly.",
+    "scope": "Parallel beam, one sample per pixel; experimental source copies and coordinate changes, no production edits."
+  },
+  "scope": "Same prepared Float32 geometry for every variant, including Float64 comparison. Parallel single-sample images. Timing is warmed accelerator.project plus D2H and metre conversion, excluding BVH build and pose.",
+  "tolerance": {
+    "absolute_m": 1e-09,
+    "relative": 0.0001
+  },
+  "seed": 20261109,
+  "results": [
+    {
+      "worst_pixels": [
+        [
+          989,
+          1485
+        ],
+        [
+          1390,
+          550
+        ],
+        [
+          911,
+          1520
+        ],
+        [
+          947,
+          1504
+        ],
+        [
+          1393,
+          581
+        ],
+        [
+          1384,
+          489
+        ],
+        [
+          1387,
+          520
+        ],
+        [
+          1393,
+          582
+        ],
+        [
+          1390,
+          551
+        ],
+        [
+          1389,
+          540
+        ],
+        [
+          1392,
+          571
+        ],
+        [
+          1386,
+          510
+        ],
+        [
+          1383,
+          479
+        ],
+        [
+          1389,
+          541
+        ],
+        [
+          1395,
+          603
+        ],
+        [
+          1392,
+          572
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 0,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 46,
+      "foreground_pixels": 964268,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 7.004125131173777,
+      "foreground_p99_error_nm": 0.07323546138017639,
+      "foreground_rmse_nm": 0.03254728147688276,
+      "projection_host_ms": [
+        17.944194027222693,
+        19.35009000590071,
+        18.17847101483494
+      ],
+      "independent_reference_check": {
+        "selected_rays": 420,
+        "established_rays": 420,
+        "max_float64_reference_error_nm": 5.6929084384961526e-09
+      },
+      "independent_exceeding_pixels": 7,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.491455613525372e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          1385,
+          499
+        ],
+        [
+          1175,
+          1038
+        ],
+        [
+          1156,
+          975
+        ],
+        [
+          1390,
+          550
+        ],
+        [
+          956,
+          1500
+        ],
+        [
+          929,
+          1512
+        ],
+        [
+          1144,
+          935
+        ],
+        [
+          1388,
+          530
+        ],
+        [
+          1390,
+          551
+        ],
+        [
+          1393,
+          581
+        ],
+        [
+          1394,
+          592
+        ],
+        [
+          1389,
+          540
+        ],
+        [
+          1384,
+          489
+        ],
+        [
+          1395,
+          603
+        ],
+        [
+          1389,
+          541
+        ],
+        [
+          1383,
+          479
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 0,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 7,
+      "foreground_pixels": 964268,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 3.5464734582150386,
+      "foreground_p99_error_nm": 0.049547373492972877,
+      "foreground_rmse_nm": 0.0171940341546195,
+      "projection_host_ms": [
+        10.506717022508383,
+        8.620014996267855,
+        9.927789040375501
+      ],
+      "independent_reference_check": {
+        "selected_rays": 420,
+        "established_rays": 420,
+        "max_float64_reference_error_nm": 5.6929084384961526e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.248187751073937e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          989,
+          1485
+        ],
+        [
+          399,
+          800
+        ],
+        [
+          399,
+          801
+        ],
+        [
+          399,
+          803
+        ],
+        [
+          399,
+          802
+        ],
+        [
+          396,
+          646
+        ],
+        [
+          396,
+          648
+        ],
+        [
+          396,
+          645
+        ],
+        [
+          396,
+          647
+        ],
+        [
+          1385,
+          499
+        ],
+        [
+          1388,
+          530
+        ],
+        [
+          1391,
+          560
+        ],
+        [
+          1391,
+          561
+        ],
+        [
+          650,
+          565
+        ],
+        [
+          1394,
+          592
+        ],
+        [
+          1383,
+          479
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 0,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 964268,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.1088571272070087,
+      "foreground_p99_error_nm": 0.022363814569335037,
+      "foreground_rmse_nm": 0.008992763313369666,
+      "projection_host_ms": [
+        10.250668041408062,
+        9.763811016455293,
+        10.687105008400977
+      ],
+      "independent_reference_check": {
+        "selected_rays": 420,
+        "established_rays": 420,
+        "max_float64_reference_error_nm": 5.6929084384961526e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 8.090858712173077e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          989,
+          1485
+        ],
+        [
+          1390,
+          550
+        ],
+        [
+          911,
+          1520
+        ],
+        [
+          947,
+          1504
+        ],
+        [
+          1393,
+          581
+        ],
+        [
+          1384,
+          489
+        ],
+        [
+          1387,
+          520
+        ],
+        [
+          1393,
+          582
+        ],
+        [
+          1390,
+          551
+        ],
+        [
+          1389,
+          540
+        ],
+        [
+          1392,
+          571
+        ],
+        [
+          1386,
+          510
+        ],
+        [
+          1383,
+          479
+        ],
+        [
+          1389,
+          541
+        ],
+        [
+          1395,
+          603
+        ],
+        [
+          1392,
+          572
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 0,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 46,
+      "foreground_pixels": 964268,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 7.007763109980869,
+      "foreground_p99_error_nm": 0.07306543592847325,
+      "foreground_rmse_nm": 0.03259242497226859,
+      "projection_host_ms": [
+        9.383413009345531,
+        8.634064986836165,
+        9.448852040804923
+      ],
+      "independent_reference_check": {
+        "selected_rays": 420,
+        "established_rays": 420,
+        "max_float64_reference_error_nm": 5.6929084384961526e-09
+      },
+      "independent_exceeding_pixels": 7,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.491455613525372e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          661,
+          555
+        ],
+        [
+          660,
+          556
+        ],
+        [
+          397,
+          701
+        ],
+        [
+          397,
+          704
+        ],
+        [
+          397,
+          700
+        ],
+        [
+          397,
+          707
+        ],
+        [
+          397,
+          708
+        ],
+        [
+          397,
+          702
+        ],
+        [
+          397,
+          705
+        ],
+        [
+          397,
+          703
+        ],
+        [
+          397,
+          706
+        ],
+        [
+          397,
+          698
+        ],
+        [
+          397,
+          699
+        ],
+        [
+          397,
+          697
+        ],
+        [
+          650,
+          565
+        ],
+        [
+          673,
+          544
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 0,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 964268,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.0367324510894262,
+      "foreground_p99_error_nm": 0.03047533412402713,
+      "foreground_rmse_nm": 0.011573416562425394,
+      "projection_host_ms": [
+        14.089909964241087,
+        14.344967028591782,
+        14.616394997574389
+      ],
+      "independent_reference_check": {
+        "selected_rays": 420,
+        "established_rays": 420,
+        "max_float64_reference_error_nm": 5.6929084384961526e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 8.346662662243876e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          661,
+          555
+        ],
+        [
+          660,
+          556
+        ],
+        [
+          397,
+          701
+        ],
+        [
+          397,
+          704
+        ],
+        [
+          397,
+          700
+        ],
+        [
+          397,
+          703
+        ],
+        [
+          397,
+          707
+        ],
+        [
+          397,
+          708
+        ],
+        [
+          397,
+          702
+        ],
+        [
+          397,
+          705
+        ],
+        [
+          397,
+          706
+        ],
+        [
+          397,
+          698
+        ],
+        [
+          397,
+          699
+        ],
+        [
+          397,
+          697
+        ],
+        [
+          650,
+          565
+        ],
+        [
+          673,
+          544
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 0,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 964268,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.0367324510894262,
+      "foreground_p99_error_nm": 0.0306104112819467,
+      "foreground_rmse_nm": 0.011667795787681163,
+      "projection_host_ms": [
+        9.240537998266518,
+        9.371706983074546,
+        9.80517698917538
+      ],
+      "independent_reference_check": {
+        "selected_rays": 420,
+        "established_rays": 420,
+        "max_float64_reference_error_nm": 5.6929084384961526e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 8.346662662243876e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          718,
+          842
+        ],
+        [
+          742,
+          834
+        ],
+        [
+          1593,
+          477
+        ],
+        [
+          730,
+          838
+        ],
+        [
+          1561,
+          505
+        ],
+        [
+          715,
+          843
+        ],
+        [
+          1537,
+          526
+        ],
+        [
+          398,
+          750
+        ],
+        [
+          701,
+          556
+        ],
+        [
+          745,
+          833
+        ],
+        [
+          398,
+          749
+        ],
+        [
+          1530,
+          532
+        ],
+        [
+          733,
+          837
+        ],
+        [
+          673,
+          1659
+        ],
+        [
+          684,
+          1652
+        ],
+        [
+          665,
+          1664
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 17,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 9,
+      "foreground_pixels": 924345,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 6.69640855050955,
+      "foreground_p99_error_nm": 0.05139747378759667,
+      "foreground_rmse_nm": 0.020384487211004717,
+      "projection_host_ms": [
+        11.851420043967664,
+        9.26385895581916,
+        8.552776009310037
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 7.081195439045951e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.800241591208527e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          701,
+          556
+        ],
+        [
+          1601,
+          470
+        ],
+        [
+          1482,
+          574
+        ],
+        [
+          1530,
+          532
+        ],
+        [
+          673,
+          1659
+        ],
+        [
+          1537,
+          526
+        ],
+        [
+          1585,
+          484
+        ],
+        [
+          684,
+          1652
+        ],
+        [
+          1514,
+          546
+        ],
+        [
+          736,
+          527
+        ],
+        [
+          1546,
+          518
+        ],
+        [
+          398,
+          749
+        ],
+        [
+          397,
+          699
+        ],
+        [
+          398,
+          750
+        ],
+        [
+          397,
+          698
+        ],
+        [
+          413,
+          748
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 17,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 16,
+      "foreground_pixels": 924345,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 10.083839571720608,
+      "foreground_p99_error_nm": 0.0838713330180589,
+      "foreground_rmse_nm": 0.026362170199471586,
+      "projection_host_ms": [
+        15.354008006397635,
+        14.386180031578988,
+        14.025567041244358
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 7.081195439045951e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.800241591208527e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          1364,
+          791
+        ],
+        [
+          1370,
+          791
+        ],
+        [
+          1369,
+          791
+        ],
+        [
+          1365,
+          791
+        ],
+        [
+          1366,
+          791
+        ],
+        [
+          1367,
+          791
+        ],
+        [
+          1371,
+          791
+        ],
+        [
+          1368,
+          791
+        ],
+        [
+          1372,
+          791
+        ],
+        [
+          1373,
+          791
+        ],
+        [
+          736,
+          527
+        ],
+        [
+          398,
+          750
+        ],
+        [
+          398,
+          749
+        ],
+        [
+          413,
+          748
+        ],
+        [
+          397,
+          698
+        ],
+        [
+          701,
+          556
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 17,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 3,
+      "foreground_pixels": 924345,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 6.380438742006403,
+      "foreground_p99_error_nm": 0.03696351190404176,
+      "foreground_rmse_nm": 0.017519885680684365,
+      "projection_host_ms": [
+        9.257555997464806,
+        8.343935012817383,
+        8.895373030100018
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 7.081195439045951e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.800241591208527e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          1365,
+          791
+        ],
+        [
+          1363,
+          791
+        ],
+        [
+          1364,
+          791
+        ],
+        [
+          1370,
+          791
+        ],
+        [
+          1371,
+          791
+        ],
+        [
+          1369,
+          791
+        ],
+        [
+          1368,
+          791
+        ],
+        [
+          1366,
+          791
+        ],
+        [
+          1367,
+          791
+        ],
+        [
+          1372,
+          791
+        ],
+        [
+          1373,
+          791
+        ],
+        [
+          736,
+          527
+        ],
+        [
+          398,
+          749
+        ],
+        [
+          398,
+          750
+        ],
+        [
+          701,
+          556
+        ],
+        [
+          413,
+          748
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 17,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 924345,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 5.751006812474379,
+      "foreground_p99_error_nm": 0.02679392052603041,
+      "foreground_rmse_nm": 0.013214945913024785,
+      "projection_host_ms": [
+        10.57588099502027,
+        9.164302959106863,
+        9.7052920027636
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 7.081195439045951e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.800241591208527e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          1601,
+          470
+        ],
+        [
+          1482,
+          574
+        ],
+        [
+          701,
+          556
+        ],
+        [
+          1530,
+          532
+        ],
+        [
+          673,
+          1659
+        ],
+        [
+          1537,
+          526
+        ],
+        [
+          1585,
+          484
+        ],
+        [
+          684,
+          1652
+        ],
+        [
+          1514,
+          546
+        ],
+        [
+          736,
+          527
+        ],
+        [
+          1546,
+          518
+        ],
+        [
+          398,
+          749
+        ],
+        [
+          397,
+          699
+        ],
+        [
+          398,
+          750
+        ],
+        [
+          397,
+          698
+        ],
+        [
+          413,
+          748
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 17,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 16,
+      "foreground_pixels": 924345,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 10.123857338598617,
+      "foreground_p99_error_nm": 0.08395218319829462,
+      "foreground_rmse_nm": 0.026438877575810434,
+      "projection_host_ms": [
+        10.007650998886675,
+        10.160966019611806,
+        9.771949029527605
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 7.081195439045951e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.800241591208527e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          1363,
+          791
+        ],
+        [
+          1369,
+          791
+        ],
+        [
+          1370,
+          791
+        ],
+        [
+          1367,
+          791
+        ],
+        [
+          1365,
+          791
+        ],
+        [
+          1366,
+          791
+        ],
+        [
+          1373,
+          791
+        ],
+        [
+          1371,
+          791
+        ],
+        [
+          1368,
+          791
+        ],
+        [
+          1372,
+          791
+        ],
+        [
+          736,
+          527
+        ],
+        [
+          398,
+          750
+        ],
+        [
+          398,
+          749
+        ],
+        [
+          413,
+          748
+        ],
+        [
+          397,
+          698
+        ],
+        [
+          701,
+          556
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 17,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 3,
+      "foreground_pixels": 924345,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 6.403289796388448,
+      "foreground_p99_error_nm": 0.03694043327563027,
+      "foreground_rmse_nm": 0.017483456449997443,
+      "projection_host_ms": [
+        16.173667972907424,
+        15.682431985624135,
+        15.640979981981218
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 7.081195439045951e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.800241591208527e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          557,
+          1582
+        ],
+        [
+          528,
+          1504
+        ],
+        [
+          567,
+          1517
+        ],
+        [
+          523,
+          1562
+        ],
+        [
+          469,
+          918
+        ],
+        [
+          535,
+          1569
+        ],
+        [
+          550,
+          1578
+        ],
+        [
+          576,
+          1520
+        ],
+        [
+          475,
+          923
+        ],
+        [
+          528,
+          1565
+        ],
+        [
+          540,
+          1572
+        ],
+        [
+          555,
+          1581
+        ],
+        [
+          575,
+          1520
+        ],
+        [
+          451,
+          904
+        ],
+        [
+          398,
+          778
+        ],
+        [
+          398,
+          777
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 45,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 7,
+      "foreground_pixels": 814102,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.818211297995966,
+      "foreground_p99_error_nm": 0.10482773630973712,
+      "foreground_rmse_nm": 0.027102872034950303,
+      "projection_host_ms": [
+        9.666601021308452,
+        9.463838010560721,
+        11.993163963779807
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.980553729855286e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.310882384227609e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          399,
+          851
+        ],
+        [
+          399,
+          848
+        ],
+        [
+          399,
+          852
+        ],
+        [
+          399,
+          846
+        ],
+        [
+          399,
+          849
+        ],
+        [
+          399,
+          853
+        ],
+        [
+          399,
+          855
+        ],
+        [
+          399,
+          854
+        ],
+        [
+          399,
+          856
+        ],
+        [
+          718,
+          1538
+        ],
+        [
+          705,
+          1535
+        ],
+        [
+          400,
+          923
+        ],
+        [
+          400,
+          924
+        ],
+        [
+          400,
+          925
+        ],
+        [
+          398,
+          777
+        ],
+        [
+          398,
+          778
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 45,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 814102,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.034609224077288,
+      "foreground_p99_error_nm": 0.03643120675902633,
+      "foreground_rmse_nm": 0.012640648045256784,
+      "projection_host_ms": [
+        8.459976001176983,
+        9.837845049332827,
+        8.454870025161654
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.980553729855286e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.310882384227609e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          557,
+          1582
+        ],
+        [
+          528,
+          1504
+        ],
+        [
+          567,
+          1517
+        ],
+        [
+          523,
+          1562
+        ],
+        [
+          469,
+          918
+        ],
+        [
+          535,
+          1569
+        ],
+        [
+          550,
+          1578
+        ],
+        [
+          576,
+          1520
+        ],
+        [
+          475,
+          923
+        ],
+        [
+          528,
+          1565
+        ],
+        [
+          540,
+          1572
+        ],
+        [
+          555,
+          1581
+        ],
+        [
+          575,
+          1520
+        ],
+        [
+          451,
+          904
+        ],
+        [
+          398,
+          778
+        ],
+        [
+          398,
+          777
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 45,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 7,
+      "foreground_pixels": 814102,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.809116350978237,
+      "foreground_p99_error_nm": 0.1047362723035769,
+      "foreground_rmse_nm": 0.02700608101290423,
+      "projection_host_ms": [
+        15.49066201550886,
+        13.657920993864536,
+        14.040823036339134
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.980553729855286e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.310882384227609e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          399,
+          851
+        ],
+        [
+          399,
+          852
+        ],
+        [
+          399,
+          848
+        ],
+        [
+          399,
+          846
+        ],
+        [
+          399,
+          849
+        ],
+        [
+          399,
+          853
+        ],
+        [
+          399,
+          855
+        ],
+        [
+          399,
+          854
+        ],
+        [
+          399,
+          856
+        ],
+        [
+          718,
+          1538
+        ],
+        [
+          705,
+          1535
+        ],
+        [
+          400,
+          923
+        ],
+        [
+          400,
+          924
+        ],
+        [
+          400,
+          925
+        ],
+        [
+          398,
+          777
+        ],
+        [
+          398,
+          778
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 45,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 814102,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.034609224077288,
+      "foreground_p99_error_nm": 0.03645326206205766,
+      "foreground_rmse_nm": 0.012580732617442372,
+      "projection_host_ms": [
+        13.821406988427043,
+        13.557455036789179,
+        12.521515018306673
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.980553729855286e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.310882384227609e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          718,
+          1538
+        ],
+        [
+          399,
+          852
+        ],
+        [
+          399,
+          850
+        ],
+        [
+          399,
+          847
+        ],
+        [
+          399,
+          851
+        ],
+        [
+          399,
+          846
+        ],
+        [
+          399,
+          849
+        ],
+        [
+          399,
+          848
+        ],
+        [
+          399,
+          856
+        ],
+        [
+          399,
+          855
+        ],
+        [
+          399,
+          853
+        ],
+        [
+          399,
+          854
+        ],
+        [
+          705,
+          1535
+        ],
+        [
+          398,
+          777
+        ],
+        [
+          398,
+          778
+        ],
+        [
+          1291,
+          652
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 45,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 814102,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 54219.81436414745,
+      "foreground_p99_error_nm": 0.030050075082268257,
+      "foreground_rmse_nm": 60.09227163049728,
+      "projection_host_ms": [
+        8.878357999492437,
+        9.218775958288461,
+        8.715924981515855
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.980553729855286e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.310882384227609e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          736,
+          1542
+        ],
+        [
+          531,
+          1567
+        ],
+        [
+          607,
+          1530
+        ],
+        [
+          460,
+          911
+        ],
+        [
+          532,
+          1567
+        ],
+        [
+          766,
+          1549
+        ],
+        [
+          542,
+          1573
+        ],
+        [
+          718,
+          1538
+        ],
+        [
+          762,
+          1548
+        ],
+        [
+          480,
+          927
+        ],
+        [
+          552,
+          1579
+        ],
+        [
+          789,
+          1554
+        ],
+        [
+          474,
+          922
+        ],
+        [
+          740,
+          1543
+        ],
+        [
+          398,
+          778
+        ],
+        [
+          398,
+          777
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 45,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 814102,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.921005350097638,
+      "foreground_p99_error_nm": 0.05753088262361761,
+      "foreground_rmse_nm": 0.016030464803921868,
+      "projection_host_ms": [
+        10.293530998751521,
+        8.956959005445242,
+        8.847863995470107
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.980553729855286e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.310882384227609e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          409,
+          1188
+        ],
+        [
+          433,
+          1098
+        ],
+        [
+          433,
+          1097
+        ],
+        [
+          409,
+          1189
+        ],
+        [
+          403,
+          1288
+        ],
+        [
+          403,
+          1286
+        ],
+        [
+          403,
+          1289
+        ],
+        [
+          403,
+          1287
+        ],
+        [
+          400,
+          1234
+        ],
+        [
+          400,
+          1235
+        ],
+        [
+          397,
+          1181
+        ],
+        [
+          819,
+          1501
+        ],
+        [
+          863,
+          1495
+        ],
+        [
+          406,
+          1342
+        ],
+        [
+          406,
+          1343
+        ],
+        [
+          841,
+          1498
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 90,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 8,
+      "foreground_pixels": 739067,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.4249380014536555,
+      "foreground_p99_error_nm": 0.03180055429611287,
+      "foreground_rmse_nm": 0.014759748540348694,
+      "projection_host_ms": [
+        11.125740013085306,
+        9.209424024447799,
+        8.111340983305126
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.2620790914089075e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.686442597983312e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          1168,
+          1007
+        ],
+        [
+          679,
+          1335
+        ],
+        [
+          1121,
+          940
+        ],
+        [
+          1154,
+          987
+        ],
+        [
+          694,
+          1347
+        ],
+        [
+          1131,
+          954
+        ],
+        [
+          1128,
+          950
+        ],
+        [
+          698,
+          1350
+        ],
+        [
+          670,
+          1328
+        ],
+        [
+          1115,
+          931
+        ],
+        [
+          707,
+          1357
+        ],
+        [
+          1163,
+          1000
+        ],
+        [
+          863,
+          1495
+        ],
+        [
+          1170,
+          1010
+        ],
+        [
+          841,
+          1498
+        ],
+        [
+          819,
+          1501
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 90,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 6,
+      "foreground_pixels": 739067,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.899498465522773,
+      "foreground_p99_error_nm": 0.12901225708510838,
+      "foreground_rmse_nm": 0.03874509669976043,
+      "projection_host_ms": [
+        8.295488951262087,
+        9.251197974663228,
+        8.338955987710506
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.2620790914089075e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.686442597983312e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          436,
+          968
+        ],
+        [
+          436,
+          969
+        ],
+        [
+          436,
+          966
+        ],
+        [
+          436,
+          970
+        ],
+        [
+          436,
+          963
+        ],
+        [
+          436,
+          964
+        ],
+        [
+          405,
+          1324
+        ],
+        [
+          436,
+          965
+        ],
+        [
+          405,
+          1325
+        ],
+        [
+          433,
+          1099
+        ],
+        [
+          433,
+          1097
+        ],
+        [
+          433,
+          1098
+        ],
+        [
+          826,
+          1500
+        ],
+        [
+          863,
+          1495
+        ],
+        [
+          841,
+          1498
+        ],
+        [
+          819,
+          1501
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 90,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 3,
+      "foreground_pixels": 739067,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.5852997722622222,
+      "foreground_p99_error_nm": 0.02558216449732808,
+      "foreground_rmse_nm": 0.011115894407526845,
+      "projection_host_ms": [
+        9.524424036499113,
+        8.17351503064856,
+        9.509725030511618
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.2620790914089075e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.686442597983312e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          433,
+          1099
+        ],
+        [
+          433,
+          1097
+        ],
+        [
+          433,
+          1098
+        ],
+        [
+          409,
+          1189
+        ],
+        [
+          403,
+          1288
+        ],
+        [
+          403,
+          1286
+        ],
+        [
+          403,
+          1289
+        ],
+        [
+          403,
+          1287
+        ],
+        [
+          400,
+          1234
+        ],
+        [
+          400,
+          1235
+        ],
+        [
+          397,
+          1181
+        ],
+        [
+          819,
+          1501
+        ],
+        [
+          863,
+          1495
+        ],
+        [
+          406,
+          1342
+        ],
+        [
+          406,
+          1343
+        ],
+        [
+          841,
+          1498
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 90,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 8,
+      "foreground_pixels": 739067,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.4210726489711205,
+      "foreground_p99_error_nm": 0.031077777936306582,
+      "foreground_rmse_nm": 0.014597643660233531,
+      "projection_host_ms": [
+        13.872452022042125,
+        13.890167989302427,
+        13.16688401857391
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.2620790914089075e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.686442597983312e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          1168,
+          1007
+        ],
+        [
+          679,
+          1335
+        ],
+        [
+          1121,
+          940
+        ],
+        [
+          1154,
+          987
+        ],
+        [
+          694,
+          1347
+        ],
+        [
+          1131,
+          954
+        ],
+        [
+          1128,
+          950
+        ],
+        [
+          698,
+          1350
+        ],
+        [
+          670,
+          1328
+        ],
+        [
+          1115,
+          931
+        ],
+        [
+          707,
+          1357
+        ],
+        [
+          1163,
+          1000
+        ],
+        [
+          863,
+          1495
+        ],
+        [
+          1170,
+          1010
+        ],
+        [
+          841,
+          1498
+        ],
+        [
+          819,
+          1501
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 90,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 6,
+      "foreground_pixels": 739067,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.899498465522773,
+      "foreground_p99_error_nm": 0.1291129275505038,
+      "foreground_rmse_nm": 0.03876793631520509,
+      "projection_host_ms": [
+        14.880795031785965,
+        14.194596034940332,
+        13.67692300118506
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.2620790914089075e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.686442597983312e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          1046,
+          898
+        ],
+        [
+          679,
+          1335
+        ],
+        [
+          1119,
+          937
+        ],
+        [
+          1149,
+          980
+        ],
+        [
+          693,
+          1346
+        ],
+        [
+          1121,
+          940
+        ],
+        [
+          1168,
+          1007
+        ],
+        [
+          1156,
+          990
+        ],
+        [
+          863,
+          1495
+        ],
+        [
+          1126,
+          947
+        ],
+        [
+          1131,
+          954
+        ],
+        [
+          841,
+          1498
+        ],
+        [
+          1161,
+          997
+        ],
+        [
+          819,
+          1501
+        ],
+        [
+          826,
+          1500
+        ],
+        [
+          1138,
+          1220
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 90,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 6,
+      "foreground_pixels": 739067,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 692.3928502332055,
+      "foreground_p99_error_nm": 0.07223609703482131,
+      "foreground_rmse_nm": 0.8057123398850439,
+      "projection_host_ms": [
+        9.707230958156288,
+        8.58554698061198,
+        9.386443998664618
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.2620790914089075e-09
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.686442597983312e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          437,
+          1026
+        ],
+        [
+          437,
+          1025
+        ],
+        [
+          437,
+          1024
+        ],
+        [
+          437,
+          1023
+        ],
+        [
+          434,
+          1106
+        ],
+        [
+          437,
+          1022
+        ],
+        [
+          437,
+          1021
+        ],
+        [
+          442,
+          895
+        ],
+        [
+          442,
+          894
+        ],
+        [
+          434,
+          1105
+        ],
+        [
+          1339,
+          1130
+        ],
+        [
+          406,
+          1525
+        ],
+        [
+          1357,
+          1083
+        ],
+        [
+          1347,
+          1109
+        ],
+        [
+          1344,
+          1117
+        ],
+        [
+          1331,
+          1151
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 135,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 21,
+      "foreground_pixels": 870302,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 9.197969843840474,
+      "foreground_p99_error_nm": 0.08200138117051115,
+      "foreground_rmse_nm": 0.037690730017582254,
+      "projection_host_ms": [
+        9.381411015056074,
+        10.506587044801563,
+        9.5006040064618
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 5.082197683525802e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.356798667497219e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          442,
+          895
+        ],
+        [
+          442,
+          894
+        ],
+        [
+          439,
+          974
+        ],
+        [
+          439,
+          971
+        ],
+        [
+          439,
+          973
+        ],
+        [
+          439,
+          972
+        ],
+        [
+          439,
+          970
+        ],
+        [
+          439,
+          969
+        ],
+        [
+          436,
+          1051
+        ],
+        [
+          436,
+          1052
+        ],
+        [
+          436,
+          1050
+        ],
+        [
+          436,
+          1053
+        ],
+        [
+          436,
+          1049
+        ],
+        [
+          433,
+          1132
+        ],
+        [
+          433,
+          1133
+        ],
+        [
+          406,
+          1525
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 135,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 870302,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 9.597579676934423,
+      "foreground_p99_error_nm": 0.03031338020004988,
+      "foreground_rmse_nm": 0.018842177780347726,
+      "projection_host_ms": [
+        14.51060496037826,
+        14.782561978790909,
+        14.447509020101279
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 5.082197683525802e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.356798667497219e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          442,
+          894
+        ],
+        [
+          442,
+          895
+        ],
+        [
+          439,
+          972
+        ],
+        [
+          439,
+          973
+        ],
+        [
+          439,
+          969
+        ],
+        [
+          439,
+          974
+        ],
+        [
+          439,
+          971
+        ],
+        [
+          439,
+          970
+        ],
+        [
+          406,
+          1525
+        ],
+        [
+          436,
+          1053
+        ],
+        [
+          436,
+          1051
+        ],
+        [
+          436,
+          1052
+        ],
+        [
+          436,
+          1049
+        ],
+        [
+          436,
+          1050
+        ],
+        [
+          433,
+          1132
+        ],
+        [
+          433,
+          1133
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 135,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 870302,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.355922784013861,
+      "foreground_p99_error_nm": 0.023550833697959253,
+      "foreground_rmse_nm": 0.013640911855648578,
+      "projection_host_ms": [
+        9.193904988933355,
+        8.425413980148733,
+        8.350363990757614
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 5.082197683525802e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.356798667497219e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          437,
+          1026
+        ],
+        [
+          437,
+          1025
+        ],
+        [
+          437,
+          1024
+        ],
+        [
+          437,
+          1023
+        ],
+        [
+          434,
+          1106
+        ],
+        [
+          437,
+          1022
+        ],
+        [
+          437,
+          1021
+        ],
+        [
+          442,
+          895
+        ],
+        [
+          442,
+          894
+        ],
+        [
+          434,
+          1105
+        ],
+        [
+          1339,
+          1130
+        ],
+        [
+          406,
+          1525
+        ],
+        [
+          1357,
+          1083
+        ],
+        [
+          1347,
+          1109
+        ],
+        [
+          1344,
+          1117
+        ],
+        [
+          1331,
+          1151
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 135,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 21,
+      "foreground_pixels": 870302,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 9.286190829912448,
+      "foreground_p99_error_nm": 0.08204236236445743,
+      "foreground_rmse_nm": 0.03767650538143416,
+      "projection_host_ms": [
+        13.466641015838832,
+        14.986618014518172,
+        15.811565972398967
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 5.082197683525802e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.356798667497219e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          436,
+          1049
+        ],
+        [
+          433,
+          1132
+        ],
+        [
+          1331,
+          1151
+        ],
+        [
+          436,
+          1050
+        ],
+        [
+          433,
+          1133
+        ],
+        [
+          1166,
+          1706
+        ],
+        [
+          436,
+          1051
+        ],
+        [
+          1352,
+          1096
+        ],
+        [
+          1339,
+          1130
+        ],
+        [
+          1189,
+          1704
+        ],
+        [
+          1200,
+          1703
+        ],
+        [
+          1100,
+          1712
+        ],
+        [
+          1111,
+          1711
+        ],
+        [
+          1110,
+          1711
+        ],
+        [
+          1109,
+          1711
+        ],
+        [
+          406,
+          1525
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 135,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 20,
+      "foreground_pixels": 870302,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 6.324944067004231,
+      "foreground_p99_error_nm": 0.055812076088461275,
+      "foreground_rmse_nm": 0.024723045155607606,
+      "projection_host_ms": [
+        8.84032400790602,
+        8.281812013592571,
+        9.153973020147532
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 5.082197683525802e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.356798667497219e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          442,
+          895
+        ],
+        [
+          442,
+          894
+        ],
+        [
+          439,
+          973
+        ],
+        [
+          439,
+          972
+        ],
+        [
+          439,
+          974
+        ],
+        [
+          439,
+          971
+        ],
+        [
+          439,
+          970
+        ],
+        [
+          439,
+          969
+        ],
+        [
+          436,
+          1053
+        ],
+        [
+          436,
+          1051
+        ],
+        [
+          436,
+          1050
+        ],
+        [
+          436,
+          1052
+        ],
+        [
+          436,
+          1049
+        ],
+        [
+          433,
+          1132
+        ],
+        [
+          433,
+          1133
+        ],
+        [
+          406,
+          1525
+        ]
+      ],
+      "mesh": "bunny",
+      "resolution": 2048,
+      "angle_deg": 135,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 870302,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 9.601445029416958,
+      "foreground_p99_error_nm": 0.03048547082818475,
+      "foreground_rmse_nm": 0.018948811091403128,
+      "projection_host_ms": [
+        10.482885991223156,
+        8.918329025618732,
+        9.702701005153358
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 5.082197683525802e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.356798667497219e-08
+    },
+    {
+      "worst_pixels": [
+        [
+          84,
+          297
+        ],
+        [
+          298,
+          200
+        ],
+        [
+          391,
+          128
+        ],
+        [
+          372,
+          311
+        ],
+        [
+          85,
+          303
+        ],
+        [
+          85,
+          309
+        ],
+        [
+          84,
+          149
+        ],
+        [
+          85,
+          130
+        ],
+        [
+          328,
+          127
+        ],
+        [
+          85,
+          177
+        ],
+        [
+          83,
+          330
+        ],
+        [
+          403,
+          257
+        ],
+        [
+          85,
+          169
+        ],
+        [
+          85,
+          310
+        ],
+        [
+          85,
+          293
+        ],
+        [
+          85,
+          174
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 0,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46528,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.554923580352434,
+      "foreground_p99_error_nm": 0.0316906389528285,
+      "foreground_rmse_nm": 0.01386395451022743,
+      "projection_host_ms": [
+        3.6356819909997284,
+        3.4650840098038316,
+        3.3865849836729467
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.2298707803511623e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.134523027080837e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          83,
+          332
+        ],
+        [
+          373,
+          290
+        ],
+        [
+          84,
+          161
+        ],
+        [
+          400,
+          373
+        ],
+        [
+          83,
+          178
+        ],
+        [
+          359,
+          191
+        ],
+        [
+          85,
+          293
+        ],
+        [
+          411,
+          269
+        ],
+        [
+          83,
+          174
+        ],
+        [
+          84,
+          297
+        ],
+        [
+          391,
+          128
+        ],
+        [
+          372,
+          311
+        ],
+        [
+          85,
+          174
+        ],
+        [
+          84,
+          149
+        ],
+        [
+          83,
+          330
+        ],
+        [
+          403,
+          257
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 0,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46528,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.49926921827025894,
+      "foreground_p99_error_nm": 0.026956628961194943,
+      "foreground_rmse_nm": 0.00820755240226588,
+      "projection_host_ms": [
+        3.4167669946327806,
+        3.4550870186649263,
+        3.193090029526502
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.2298707803511623e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.134523027080837e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          391,
+          128
+        ],
+        [
+          358,
+          322
+        ],
+        [
+          358,
+          174
+        ],
+        [
+          368,
+          153
+        ],
+        [
+          311,
+          183
+        ],
+        [
+          383,
+          304
+        ],
+        [
+          372,
+          311
+        ],
+        [
+          412,
+          255
+        ],
+        [
+          334,
+          120
+        ],
+        [
+          409,
+          268
+        ],
+        [
+          373,
+          290
+        ],
+        [
+          301,
+          203
+        ],
+        [
+          347,
+          260
+        ],
+        [
+          358,
+          224
+        ],
+        [
+          328,
+          127
+        ],
+        [
+          403,
+          257
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 0,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 46528,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.580193095926719,
+      "foreground_p99_error_nm": 0.09825261048981737,
+      "foreground_rmse_nm": 0.03065265523100074,
+      "projection_host_ms": [
+        3.6892519565299153,
+        3.3413029741495848,
+        3.3626530203036964
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.2298707803511623e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.134523027080837e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          359,
+          164
+        ],
+        [
+          376,
+          399
+        ],
+        [
+          373,
+          290
+        ],
+        [
+          340,
+          240
+        ],
+        [
+          317,
+          158
+        ],
+        [
+          331,
+          261
+        ],
+        [
+          342,
+          126
+        ],
+        [
+          334,
+          120
+        ],
+        [
+          332,
+          250
+        ],
+        [
+          359,
+          191
+        ],
+        [
+          358,
+          224
+        ],
+        [
+          311,
+          183
+        ],
+        [
+          372,
+          311
+        ],
+        [
+          270,
+          297
+        ],
+        [
+          403,
+          257
+        ],
+        [
+          328,
+          127
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 0,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 4,
+      "foreground_pixels": 46528,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.7467660395877198,
+      "foreground_p99_error_nm": 0.11547179831494328,
+      "foreground_rmse_nm": 0.03391925289250978,
+      "projection_host_ms": [
+        3.335418994538486,
+        3.5176799865439534,
+        3.2520429813303053
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.2298707803511623e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.134523027080837e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          391,
+          128
+        ],
+        [
+          358,
+          322
+        ],
+        [
+          358,
+          174
+        ],
+        [
+          368,
+          153
+        ],
+        [
+          311,
+          183
+        ],
+        [
+          383,
+          304
+        ],
+        [
+          372,
+          311
+        ],
+        [
+          412,
+          255
+        ],
+        [
+          334,
+          120
+        ],
+        [
+          409,
+          268
+        ],
+        [
+          373,
+          290
+        ],
+        [
+          301,
+          203
+        ],
+        [
+          347,
+          260
+        ],
+        [
+          358,
+          224
+        ],
+        [
+          328,
+          127
+        ],
+        [
+          403,
+          257
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 0,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 46528,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.580193095926719,
+      "foreground_p99_error_nm": 0.09869639932483765,
+      "foreground_rmse_nm": 0.030723099210801432,
+      "projection_host_ms": [
+        3.452744975220412,
+        3.1795710092410445,
+        3.3822740078903735
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.2298707803511623e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.134523027080837e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          84,
+          297
+        ],
+        [
+          298,
+          200
+        ],
+        [
+          391,
+          128
+        ],
+        [
+          372,
+          311
+        ],
+        [
+          85,
+          303
+        ],
+        [
+          85,
+          309
+        ],
+        [
+          84,
+          149
+        ],
+        [
+          85,
+          130
+        ],
+        [
+          328,
+          127
+        ],
+        [
+          85,
+          177
+        ],
+        [
+          83,
+          330
+        ],
+        [
+          403,
+          257
+        ],
+        [
+          85,
+          169
+        ],
+        [
+          85,
+          310
+        ],
+        [
+          85,
+          293
+        ],
+        [
+          85,
+          174
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 0,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46528,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.554923580352434,
+      "foreground_p99_error_nm": 0.031240099487126863,
+      "foreground_rmse_nm": 0.013913372091779596,
+      "projection_host_ms": [
+        3.3177389996126294,
+        3.3174060517922044,
+        3.1751400092616677
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.2298707803511623e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.134523027080837e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          361,
+          360
+        ],
+        [
+          253,
+          311
+        ],
+        [
+          362,
+          271
+        ],
+        [
+          411,
+          242
+        ],
+        [
+          381,
+          309
+        ],
+        [
+          388,
+          368
+        ],
+        [
+          153,
+          341
+        ],
+        [
+          312,
+          199
+        ],
+        [
+          331,
+          235
+        ],
+        [
+          220,
+          277
+        ],
+        [
+          373,
+          374
+        ],
+        [
+          376,
+          371
+        ],
+        [
+          311,
+          186
+        ],
+        [
+          412,
+          244
+        ],
+        [
+          406,
+          280
+        ],
+        [
+          341,
+          251
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 17,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46567,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.428389271005716,
+      "foreground_p99_error_nm": 0.09553029874015485,
+      "foreground_rmse_nm": 0.027827867077410626,
+      "projection_host_ms": [
+        3.325411002151668,
+        3.238026984035969,
+        3.6392839974723756
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.8465318250143747e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.275822317739708e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          85,
+          316
+        ],
+        [
+          85,
+          313
+        ],
+        [
+          85,
+          318
+        ],
+        [
+          85,
+          180
+        ],
+        [
+          362,
+          271
+        ],
+        [
+          85,
+          314
+        ],
+        [
+          85,
+          312
+        ],
+        [
+          249,
+          312
+        ],
+        [
+          85,
+          311
+        ],
+        [
+          83,
+          344
+        ],
+        [
+          85,
+          321
+        ],
+        [
+          85,
+          310
+        ],
+        [
+          86,
+          312
+        ],
+        [
+          85,
+          307
+        ],
+        [
+          85,
+          315
+        ],
+        [
+          341,
+          251
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 17,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46567,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7808290433433912,
+      "foreground_p99_error_nm": 0.03135315675934312,
+      "foreground_rmse_nm": 0.010751551859331203,
+      "projection_host_ms": [
+        4.057884973008186,
+        3.3225679653696716,
+        3.2565700239501894
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.8465318250143747e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.275822317739708e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          361,
+          360
+        ],
+        [
+          253,
+          311
+        ],
+        [
+          362,
+          271
+        ],
+        [
+          411,
+          242
+        ],
+        [
+          381,
+          309
+        ],
+        [
+          388,
+          368
+        ],
+        [
+          153,
+          341
+        ],
+        [
+          331,
+          235
+        ],
+        [
+          312,
+          199
+        ],
+        [
+          220,
+          277
+        ],
+        [
+          373,
+          374
+        ],
+        [
+          376,
+          371
+        ],
+        [
+          311,
+          186
+        ],
+        [
+          412,
+          244
+        ],
+        [
+          406,
+          280
+        ],
+        [
+          341,
+          251
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 17,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46567,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.428389271005716,
+      "foreground_p99_error_nm": 0.09616139684726228,
+      "foreground_rmse_nm": 0.02779127424238444,
+      "projection_host_ms": [
+        3.493645985145122,
+        3.4379289718344808,
+        3.4505989751778543
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.8465318250143747e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.275822317739708e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          320,
+          342
+        ],
+        [
+          388,
+          368
+        ],
+        [
+          376,
+          355
+        ],
+        [
+          88,
+          317
+        ],
+        [
+          311,
+          336
+        ],
+        [
+          381,
+          309
+        ],
+        [
+          406,
+          280
+        ],
+        [
+          88,
+          335
+        ],
+        [
+          376,
+          371
+        ],
+        [
+          331,
+          235
+        ],
+        [
+          373,
+          374
+        ],
+        [
+          253,
+          311
+        ],
+        [
+          337,
+          325
+        ],
+        [
+          362,
+          271
+        ],
+        [
+          249,
+          312
+        ],
+        [
+          311,
+          186
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 17,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 46567,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.5875369118581903,
+      "foreground_p99_error_nm": 0.11237353829479525,
+      "foreground_rmse_nm": 0.03200732859060075,
+      "projection_host_ms": [
+        3.3461859566159546,
+        3.2588280155323446,
+        3.3886439632624388
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.8465318250143747e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.7127006193481953e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          331,
+          235
+        ],
+        [
+          85,
+          313
+        ],
+        [
+          85,
+          318
+        ],
+        [
+          85,
+          180
+        ],
+        [
+          362,
+          271
+        ],
+        [
+          85,
+          312
+        ],
+        [
+          85,
+          314
+        ],
+        [
+          249,
+          312
+        ],
+        [
+          85,
+          311
+        ],
+        [
+          83,
+          344
+        ],
+        [
+          85,
+          321
+        ],
+        [
+          85,
+          310
+        ],
+        [
+          86,
+          312
+        ],
+        [
+          85,
+          307
+        ],
+        [
+          85,
+          315
+        ],
+        [
+          341,
+          251
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 17,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46567,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7808290433433912,
+      "foreground_p99_error_nm": 0.03083539701539409,
+      "foreground_rmse_nm": 0.010672453912473666,
+      "projection_host_ms": [
+        3.496466961223632,
+        3.4640940139070153,
+        3.389785997569561
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.8465318250143747e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.275822317739708e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          152,
+          172
+        ],
+        [
+          411,
+          240
+        ],
+        [
+          404,
+          238
+        ],
+        [
+          153,
+          341
+        ],
+        [
+          83,
+          330
+        ],
+        [
+          380,
+          104
+        ],
+        [
+          360,
+          100
+        ],
+        [
+          393,
+          225
+        ],
+        [
+          376,
+          371
+        ],
+        [
+          83,
+          183
+        ],
+        [
+          373,
+          374
+        ],
+        [
+          83,
+          212
+        ],
+        [
+          83,
+          344
+        ],
+        [
+          411,
+          242
+        ],
+        [
+          86,
+          312
+        ],
+        [
+          341,
+          251
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 17,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46567,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7262593612370155,
+      "foreground_p99_error_nm": 0.027778082743609184,
+      "foreground_rmse_nm": 0.00831832320563566,
+      "projection_host_ms": [
+        3.4091990091837943,
+        3.229991008993238,
+        3.2144280266948044
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 1.8465318250143747e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 4.275822317739708e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          85,
+          327
+        ],
+        [
+          84,
+          317
+        ],
+        [
+          100,
+          194
+        ],
+        [
+          377,
+          319
+        ],
+        [
+          245,
+          226
+        ],
+        [
+          86,
+          296
+        ],
+        [
+          83,
+          248
+        ],
+        [
+          83,
+          202
+        ],
+        [
+          86,
+          297
+        ],
+        [
+          355,
+          308
+        ],
+        [
+          375,
+          82
+        ],
+        [
+          85,
+          323
+        ],
+        [
+          85,
+          316
+        ],
+        [
+          413,
+          256
+        ],
+        [
+          83,
+          314
+        ],
+        [
+          85,
+          314
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 45,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 44061,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.813782927031265,
+      "foreground_p99_error_nm": 0.032515624287992935,
+      "foreground_rmse_nm": 0.01280156236938666,
+      "projection_host_ms": [
+        3.417161002289504,
+        3.3351719612255692,
+        3.941114991903305
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.692562527788824e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.5139937874507634e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          84,
+          317
+        ],
+        [
+          83,
+          332
+        ],
+        [
+          84,
+          308
+        ],
+        [
+          104,
+          308
+        ],
+        [
+          84,
+          334
+        ],
+        [
+          83,
+          330
+        ],
+        [
+          376,
+          326
+        ],
+        [
+          100,
+          194
+        ],
+        [
+          411,
+          280
+        ],
+        [
+          245,
+          226
+        ],
+        [
+          86,
+          296
+        ],
+        [
+          83,
+          248
+        ],
+        [
+          86,
+          297
+        ],
+        [
+          83,
+          202
+        ],
+        [
+          413,
+          256
+        ],
+        [
+          83,
+          314
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 45,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 44061,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7797537452977142,
+      "foreground_p99_error_nm": 0.02615224020678982,
+      "foreground_rmse_nm": 0.009903887761162095,
+      "projection_host_ms": [
+        3.289070969913155,
+        3.2279680017381907,
+        3.1177530181594193
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.692562527788824e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.2912241223228824e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          377,
+          319
+        ],
+        [
+          149,
+          294
+        ],
+        [
+          388,
+          281
+        ],
+        [
+          379,
+          318
+        ],
+        [
+          325,
+          297
+        ],
+        [
+          344,
+          331
+        ],
+        [
+          278,
+          230
+        ],
+        [
+          411,
+          280
+        ],
+        [
+          289,
+          320
+        ],
+        [
+          356,
+          81
+        ],
+        [
+          84,
+          334
+        ],
+        [
+          376,
+          326
+        ],
+        [
+          355,
+          308
+        ],
+        [
+          118,
+          248
+        ],
+        [
+          387,
+          294
+        ],
+        [
+          413,
+          256
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 45,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 44061,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 3.938540678847646,
+      "foreground_p99_error_nm": 0.1254319128941595,
+      "foreground_rmse_nm": 0.03964327017663543,
+      "projection_host_ms": [
+        3.197869984433055,
+        3.1862029572948813,
+        3.101015987340361
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.692562527788824e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.5139937874507634e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          169,
+          331
+        ],
+        [
+          379,
+          318
+        ],
+        [
+          336,
+          333
+        ],
+        [
+          358,
+          77
+        ],
+        [
+          289,
+          320
+        ],
+        [
+          376,
+          326
+        ],
+        [
+          356,
+          81
+        ],
+        [
+          328,
+          300
+        ],
+        [
+          377,
+          319
+        ],
+        [
+          395,
+          291
+        ],
+        [
+          394,
+          316
+        ],
+        [
+          388,
+          281
+        ],
+        [
+          411,
+          280
+        ],
+        [
+          245,
+          226
+        ],
+        [
+          118,
+          248
+        ],
+        [
+          413,
+          256
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 45,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 3,
+      "foreground_pixels": 44061,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.583004716538896,
+      "foreground_p99_error_nm": 0.1053150223860186,
+      "foreground_rmse_nm": 0.03885265318067899,
+      "projection_host_ms": [
+        3.2152269850485027,
+        4.379202029667795,
+        3.108960052486509
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.692562527788824e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.5614276324970042e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          169,
+          331
+        ],
+        [
+          379,
+          318
+        ],
+        [
+          336,
+          333
+        ],
+        [
+          358,
+          77
+        ],
+        [
+          289,
+          320
+        ],
+        [
+          356,
+          81
+        ],
+        [
+          376,
+          326
+        ],
+        [
+          328,
+          300
+        ],
+        [
+          377,
+          319
+        ],
+        [
+          395,
+          291
+        ],
+        [
+          394,
+          316
+        ],
+        [
+          388,
+          281
+        ],
+        [
+          411,
+          280
+        ],
+        [
+          245,
+          226
+        ],
+        [
+          118,
+          248
+        ],
+        [
+          413,
+          256
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 45,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 3,
+      "foreground_pixels": 44061,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.5866657879848995,
+      "foreground_p99_error_nm": 0.10475595420137535,
+      "foreground_rmse_nm": 0.03884294956458022,
+      "projection_host_ms": [
+        5.296638992149383,
+        6.009284988977015,
+        5.945513024926186
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.692562527788824e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.5614276324970042e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          85,
+          327
+        ],
+        [
+          84,
+          317
+        ],
+        [
+          100,
+          194
+        ],
+        [
+          377,
+          319
+        ],
+        [
+          245,
+          226
+        ],
+        [
+          86,
+          296
+        ],
+        [
+          83,
+          248
+        ],
+        [
+          86,
+          297
+        ],
+        [
+          83,
+          202
+        ],
+        [
+          355,
+          308
+        ],
+        [
+          375,
+          82
+        ],
+        [
+          85,
+          323
+        ],
+        [
+          85,
+          316
+        ],
+        [
+          413,
+          256
+        ],
+        [
+          83,
+          314
+        ],
+        [
+          85,
+          314
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 45,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 44061,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.8174209058383567,
+      "foreground_p99_error_nm": 0.032286860350268405,
+      "foreground_rmse_nm": 0.012917375508087067,
+      "projection_host_ms": [
+        5.956181033980101,
+        5.957810033578426,
+        6.048429990187287
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.692562527788824e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 2.5139937874507634e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          382,
+          335
+        ],
+        [
+          414,
+          283
+        ],
+        [
+          83,
+          277
+        ],
+        [
+          369,
+          339
+        ],
+        [
+          391,
+          329
+        ],
+        [
+          83,
+          278
+        ],
+        [
+          84,
+          263
+        ],
+        [
+          410,
+          247
+        ],
+        [
+          83,
+          260
+        ],
+        [
+          404,
+          183
+        ],
+        [
+          104,
+          274
+        ],
+        [
+          83,
+          274
+        ],
+        [
+          428,
+          196
+        ],
+        [
+          83,
+          261
+        ],
+        [
+          369,
+          181
+        ],
+        [
+          358,
+          256
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 90,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 36307,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7699286100503107,
+      "foreground_p99_error_nm": 0.025767764021922414,
+      "foreground_rmse_nm": 0.008827489901611066,
+      "projection_host_ms": [
+        3.0712320003658533,
+        3.0456859967671335,
+        3.673314000479877
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 6.453332266893701e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.9293292956084826e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          231,
+          314
+        ],
+        [
+          263,
+          328
+        ],
+        [
+          398,
+          315
+        ],
+        [
+          402,
+          315
+        ],
+        [
+          357,
+          248
+        ],
+        [
+          194,
+          250
+        ],
+        [
+          227,
+          315
+        ],
+        [
+          404,
+          183
+        ],
+        [
+          358,
+          251
+        ],
+        [
+          369,
+          339
+        ],
+        [
+          226,
+          315
+        ],
+        [
+          353,
+          256
+        ],
+        [
+          391,
+          329
+        ],
+        [
+          251,
+          253
+        ],
+        [
+          258,
+          328
+        ],
+        [
+          358,
+          256
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 90,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 36307,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.8299129587646625,
+      "foreground_p99_error_nm": 0.1119981262342108,
+      "foreground_rmse_nm": 0.04041687693339536,
+      "projection_host_ms": [
+        3.105650015641004,
+        3.6634000134654343,
+        3.1287589808925986
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 6.453332266893701e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.9058241313221758e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          231,
+          314
+        ],
+        [
+          263,
+          328
+        ],
+        [
+          398,
+          315
+        ],
+        [
+          357,
+          248
+        ],
+        [
+          402,
+          315
+        ],
+        [
+          194,
+          250
+        ],
+        [
+          227,
+          315
+        ],
+        [
+          404,
+          183
+        ],
+        [
+          358,
+          251
+        ],
+        [
+          369,
+          339
+        ],
+        [
+          226,
+          315
+        ],
+        [
+          353,
+          256
+        ],
+        [
+          391,
+          329
+        ],
+        [
+          251,
+          253
+        ],
+        [
+          258,
+          328
+        ],
+        [
+          358,
+          256
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 90,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 36307,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.822637001150479,
+      "foreground_p99_error_nm": 0.11166479414174625,
+      "foreground_rmse_nm": 0.04031455095294273,
+      "projection_host_ms": [
+        6.022992020007223,
+        5.948357982560992,
+        6.218082970008254
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 6.453332266893701e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.9058241313221758e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          195,
+          252
+        ],
+        [
+          263,
+          328
+        ],
+        [
+          247,
+          325
+        ],
+        [
+          339,
+          150
+        ],
+        [
+          220,
+          314
+        ],
+        [
+          351,
+          252
+        ],
+        [
+          357,
+          248
+        ],
+        [
+          228,
+          312
+        ],
+        [
+          369,
+          339
+        ],
+        [
+          391,
+          329
+        ],
+        [
+          382,
+          335
+        ],
+        [
+          231,
+          314
+        ],
+        [
+          94,
+          314
+        ],
+        [
+          251,
+          253
+        ],
+        [
+          258,
+          328
+        ],
+        [
+          358,
+          256
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 90,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 36307,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.7453511023011106,
+      "foreground_p99_error_nm": 0.14043416275178294,
+      "foreground_rmse_nm": 0.0423153009754499,
+      "projection_host_ms": [
+        3.272928996011615,
+        3.00595595035702,
+        3.0209679971449077
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 6.453332266893701e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 1.9058241313221758e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          104,
+          274
+        ],
+        [
+          83,
+          274
+        ],
+        [
+          85,
+          292
+        ],
+        [
+          85,
+          304
+        ],
+        [
+          85,
+          273
+        ],
+        [
+          85,
+          302
+        ],
+        [
+          357,
+          248
+        ],
+        [
+          85,
+          287
+        ],
+        [
+          83,
+          261
+        ],
+        [
+          85,
+          288
+        ],
+        [
+          85,
+          289
+        ],
+        [
+          106,
+          270
+        ],
+        [
+          85,
+          303
+        ],
+        [
+          85,
+          285
+        ],
+        [
+          85,
+          286
+        ],
+        [
+          358,
+          256
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 90,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 36307,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7699286100503107,
+      "foreground_p99_error_nm": 0.03272588569068629,
+      "foreground_rmse_nm": 0.01165679650707554,
+      "projection_host_ms": [
+        3.085317963268608,
+        2.942133985925466,
+        2.9951559845358133
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 6.453332266893701e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 7.242131699024268e-10
+    },
+    {
+      "worst_pixels": [
+        [
+          104,
+          274
+        ],
+        [
+          83,
+          274
+        ],
+        [
+          85,
+          292
+        ],
+        [
+          85,
+          304
+        ],
+        [
+          85,
+          302
+        ],
+        [
+          85,
+          273
+        ],
+        [
+          357,
+          248
+        ],
+        [
+          83,
+          261
+        ],
+        [
+          85,
+          287
+        ],
+        [
+          85,
+          288
+        ],
+        [
+          85,
+          289
+        ],
+        [
+          106,
+          270
+        ],
+        [
+          85,
+          303
+        ],
+        [
+          85,
+          285
+        ],
+        [
+          85,
+          286
+        ],
+        [
+          358,
+          256
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 90,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 36307,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7699286100503107,
+      "foreground_p99_error_nm": 0.03310537750555095,
+      "foreground_rmse_nm": 0.011553296640831087,
+      "projection_host_ms": [
+        3.286837018094957,
+        3.8606030284427106,
+        3.219818987417966
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 6.453332266893701e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 7.242131699024268e-10
+    },
+    {
+      "worst_pixels": [
+        [
+          424,
+          177
+        ],
+        [
+          217,
+          283
+        ],
+        [
+          373,
+          331
+        ],
+        [
+          357,
+          318
+        ],
+        [
+          393,
+          274
+        ],
+        [
+          363,
+          324
+        ],
+        [
+          220,
+          280
+        ],
+        [
+          388,
+          323
+        ],
+        [
+          358,
+          310
+        ],
+        [
+          413,
+          261
+        ],
+        [
+          87,
+          319
+        ],
+        [
+          349,
+          323
+        ],
+        [
+          369,
+          321
+        ],
+        [
+          309,
+          216
+        ],
+        [
+          365,
+          324
+        ],
+        [
+          185,
+          300
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 135,
+      "variant": "current",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 43768,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 3.570464836158408,
+      "foreground_p99_error_nm": 0.10387232262748161,
+      "foreground_rmse_nm": 0.03395763249323356,
+      "projection_host_ms": [
+        3.187567985150963,
+        3.7758239777758718,
+        3.20195103995502
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.103874629447085e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.4719615810157754e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          413,
+          261
+        ],
+        [
+          388,
+          323
+        ],
+        [
+          331,
+          339
+        ],
+        [
+          357,
+          318
+        ],
+        [
+          424,
+          177
+        ],
+        [
+          373,
+          331
+        ],
+        [
+          355,
+          281
+        ],
+        [
+          347,
+          342
+        ],
+        [
+          211,
+          289
+        ],
+        [
+          349,
+          323
+        ],
+        [
+          276,
+          233
+        ],
+        [
+          254,
+          325
+        ],
+        [
+          369,
+          321
+        ],
+        [
+          365,
+          324
+        ],
+        [
+          309,
+          216
+        ],
+        [
+          185,
+          300
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 135,
+      "variant": "power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 43768,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.973559365609162,
+      "foreground_p99_error_nm": 0.1304019331956713,
+      "foreground_rmse_nm": 0.043364908647456596,
+      "projection_host_ms": [
+        3.2523749978281558,
+        3.1720250262878835,
+        3.1027959776110947
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.103874629447085e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.4719615810157754e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          424,
+          177
+        ],
+        [
+          217,
+          283
+        ],
+        [
+          373,
+          331
+        ],
+        [
+          357,
+          318
+        ],
+        [
+          393,
+          274
+        ],
+        [
+          363,
+          324
+        ],
+        [
+          220,
+          280
+        ],
+        [
+          388,
+          323
+        ],
+        [
+          358,
+          310
+        ],
+        [
+          413,
+          261
+        ],
+        [
+          87,
+          319
+        ],
+        [
+          349,
+          323
+        ],
+        [
+          369,
+          321
+        ],
+        [
+          309,
+          216
+        ],
+        [
+          365,
+          324
+        ],
+        [
+          185,
+          300
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 135,
+      "variant": "mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 43768,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 3.5741312366749303,
+      "foreground_p99_error_nm": 0.1031096286169374,
+      "foreground_rmse_nm": 0.03393382487145449,
+      "projection_host_ms": [
+        4.033690027426928,
+        3.276769013609737,
+        3.3023350406438112
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.103874629447085e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.4719615810157754e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          85,
+          256
+        ],
+        [
+          85,
+          336
+        ],
+        [
+          357,
+          318
+        ],
+        [
+          83,
+          206
+        ],
+        [
+          85,
+          239
+        ],
+        [
+          392,
+          319
+        ],
+        [
+          355,
+          322
+        ],
+        [
+          103,
+          347
+        ],
+        [
+          104,
+          318
+        ],
+        [
+          85,
+          329
+        ],
+        [
+          365,
+          324
+        ],
+        [
+          85,
+          334
+        ],
+        [
+          85,
+          330
+        ],
+        [
+          90,
+          350
+        ],
+        [
+          85,
+          342
+        ],
+        [
+          85,
+          236
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 135,
+      "variant": "centered_power2_mixed",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 43768,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.3311180082330594,
+      "foreground_p99_error_nm": 0.0329856764992248,
+      "foreground_rmse_nm": 0.012819906454730736,
+      "projection_host_ms": [
+        3.418327949475497,
+        3.357680980116129,
+        3.240738995373249
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.103874629447085e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 7.580944877925988e-10
+    },
+    {
+      "worst_pixels": [
+        [
+          408,
+          114
+        ],
+        [
+          411,
+          287
+        ],
+        [
+          84,
+          348
+        ],
+        [
+          373,
+          211
+        ],
+        [
+          365,
+          324
+        ],
+        [
+          84,
+          347
+        ],
+        [
+          83,
+          317
+        ],
+        [
+          83,
+          320
+        ],
+        [
+          83,
+          316
+        ],
+        [
+          211,
+          289
+        ],
+        [
+          85,
+          236
+        ],
+        [
+          83,
+          206
+        ],
+        [
+          369,
+          321
+        ],
+        [
+          400,
+          264
+        ],
+        [
+          104,
+          318
+        ],
+        [
+          185,
+          300
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 135,
+      "variant": "centered_power2_rays",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 43768,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.39973893210253686,
+      "foreground_p99_error_nm": 0.02588992646943097,
+      "foreground_rmse_nm": 0.007778521517006107,
+      "projection_host_ms": [
+        3.2333710114471614,
+        3.1265629804693162,
+        3.9336899644695222
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.103874629447085e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 3.4719615810157754e-09
+    },
+    {
+      "worst_pixels": [
+        [
+          85,
+          336
+        ],
+        [
+          85,
+          343
+        ],
+        [
+          357,
+          318
+        ],
+        [
+          83,
+          206
+        ],
+        [
+          85,
+          239
+        ],
+        [
+          355,
+          322
+        ],
+        [
+          392,
+          319
+        ],
+        [
+          103,
+          347
+        ],
+        [
+          104,
+          318
+        ],
+        [
+          85,
+          329
+        ],
+        [
+          365,
+          324
+        ],
+        [
+          85,
+          334
+        ],
+        [
+          85,
+          330
+        ],
+        [
+          90,
+          350
+        ],
+        [
+          85,
+          342
+        ],
+        [
+          85,
+          236
+        ]
+      ],
+      "mesh": "armadillo",
+      "resolution": 512,
+      "angle_deg": 135,
+      "variant": "centered_power2",
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 43768,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.3311180082330594,
+      "foreground_p99_error_nm": 0.032936875286630286,
+      "foreground_rmse_nm": 0.012857770147996715,
+      "projection_host_ms": [
+        3.847219981253147,
+        3.1929159886203706,
+        3.2248349743895233
+      ],
+      "independent_reference_check": {
+        "selected_rays": 320,
+        "established_rays": 320,
+        "max_float64_reference_error_nm": 4.103874629447085e-10
+      },
+      "independent_exceeding_pixels": 0,
+      "worst_selected_established": 16,
+      "worst_reference_discrepancy_nm": 7.580944877925988e-10
+    }
+  ]
+}

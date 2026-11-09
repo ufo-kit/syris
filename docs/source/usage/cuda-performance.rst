@@ -9,6 +9,11 @@ available for comparison, rather than becoming defaults.
 See :doc:`cuda-performance-ledger` for the running record of confirmed methods
 and experiments that have not justified a default change.
 
+These measurements predate the centred-coordinate precision modes and refer
+to the source hashes in their reports. In particular, the mixed mode measured
+here still stored hit distances in Float32. See :doc:`cuda-projection` for the
+current mode definitions.
+
 Why batch overflow events?
 --------------------------
 

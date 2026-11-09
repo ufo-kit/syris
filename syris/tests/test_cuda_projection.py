@@ -345,20 +345,21 @@ class ProjectionCases:
         vertices = np.random.default_rng(741).uniform(-2, 2, (512, 3, 3)).astype(self.gpu.dtype)
         tree = self.gpu.build(vertices).tree
         indices = tree["indices"].get()
+        encoded = tree["vertices"].get()[:, :3].reshape(-1, 3, 3)
         self.assertEqual(indices.dtype, np.uint32)
         np.testing.assert_array_equal(
-            tree["bbMin"].get()[: len(vertices), :3], vertices[indices].min(axis=1)
+            tree["bbMin"].get()[: len(vertices), :3], encoded[indices].min(axis=1)
         )
         np.testing.assert_array_equal(
-            tree["bbMax"].get()[: len(vertices), :3], vertices[indices].max(axis=1)
+            tree["bbMax"].get()[: len(vertices), :3], encoded[indices].max(axis=1)
         )
 
     def test_single_triangle_and_planar_bounds_build(self):
         vertices = np.array([[[0, 0, 0], [1, 0, 0], [0, 1, 0]]])
         tree = self.gpu.build(vertices).tree
         self.assertEqual(int(tree["rope"].get()[0]), -1)
-        np.testing.assert_array_equal(tree["bbMin"].get()[0, :3], [0, 0, 0])
-        np.testing.assert_array_equal(tree["bbMax"].get()[0, :3], [1, 1, 0])
+        np.testing.assert_array_equal(tree["bbMin"].get()[0, :3], [-0.5, -0.5, 0])
+        np.testing.assert_array_equal(tree["bbMax"].get()[0, :3], [0.5, 0.5, 0])
 
     def test_invalid_sampling_settings_are_rejected(self):
         accel = self.gpu.build(box())
@@ -413,6 +414,20 @@ class TestCudaProjectionSmallHitBuffer(ProjectionCases, unittest.TestCase):
 class TestCudaProjectionMixed(ProjectionCases, unittest.TestCase):
     double = False
     mixed_precision = True
+
+    def test_distinct_crossings_survive_float32_hit_distance_collision(self):
+        # A separate component puts the ray's rebased origin near z=-1.
+        # Both hits on the thin slab then round to the SAME Float32 distance,
+        # even though every input vertex and the final thickness fit Float32.
+        thickness = 2**-28
+        vertices = np.concatenate(
+            [
+                box(x0=-4, x1=-3, z0=-1, z1=1),
+                box(z0=0, z1=thickness),
+            ]
+        )
+        result = self.gpu.trace(self.gpu.build(vertices), [[0.1, 0.2, -2]], [[0, 0, 1]])
+        np.testing.assert_allclose(result, thickness, rtol=1e-6, atol=0)
 
     def test_triangle_coordinates_are_promoted_before_subtracting_ray_origin(self):
         # All inputs are exactly representable in Float32. Subtracting the

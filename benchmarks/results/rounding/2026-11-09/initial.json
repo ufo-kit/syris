@@ -1,0 +1,462 @@
+{
+  "provenance": {
+    "timestamp_utc": "2026-11-09T15:05:49.093751+00:00",
+    "command": [
+      "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/benchmarks/rounding_precision/probe.py",
+      "--benchmark-root",
+      "/mnt/data/Agents/syris-benchmarks",
+      "--output",
+      "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/benchmarks/results/rounding/2026-11-09/initial.json"
+    ],
+    "python": "3.13.12",
+    "numpy": "2.5.4",
+    "cupy": "14.2.0",
+    "gpu": "NVIDIA RTX 2000 Ada Generation",
+    "cuda_driver": 13020,
+    "cuda_runtime": 13020,
+    "git_revision": "4897a08de2dadb8d850778450fec54557691cea3",
+    "source_sha256": {
+      "syris/gpu/cuda/Ray.cu": "41a9f50b21228a121aad1628affba51a261491635c0db80b70f9b4eafb6da1b7",
+      "syris/gpu/cuda/sort.cu": "f5a0b5f12227e27258cfef8eb2b0ecf9a5894b95b57a80de1d2b5cd1e7eca815",
+      "syris/gpu/cuda/source.cu": "0c91d867cba856578a768da6a2ab26d503b1a850d41f688da57bfc154fc611da",
+      "syris/gpu/cuda/Legacy.cu": "fb1a033925941a2db8fd959fd163e1580b9b5e592db87d605d6b8b31f90b6fcc",
+      "syris/gpu/cuda/WatertightRay.cu": "fa669597810ad490ee6535b70625e50f028b38cf0a793f01cc3e45a702952251",
+      "syris/gpu/cuda/Ray.cuh": "6c61ce29b7b07def94a4cf3261be068014362f9b9a574abed9e1ac833fb6e195",
+      "syris/gpu/cuda/PixelScheduler.cuh": "f124e86564bc96befab95fa31ca73fc08f0dedef32dc7a9ac89ddbca1dc84dc8",
+      "syris/gpu/cuda/source.cuh": "4c0c3e6398bed4392c1297cdce10efb407775c8263fdd5a7bc43c41a410ef189",
+      "syris/gpu/cuda/staged.cuh": "15cfdb608f70cfa198109d96b77ebb06beef0fd728ca105f2c7be076b22b1c29",
+      "syris/gpu/cuda/Commons.cuh": "1d3de9c93cc0a497a5cc20828507b06a95c6083d0df696e8edf77e0afc5616d5",
+      "syris/gpu/cuda/WatertightRay.cuh": "ecfdaa1753e62416696858659547211f2366f3bb423e8c60525b173825ee09da",
+      "syris/config.py": "f3e22e179c7d5812ecec04ddc914b9668a66e9403bc10f4ea97044b6d904cb0f",
+      "syris/bodies/accelerators.py": "38cf0e77be23772d80a6f893633c07dba19950841390d640c718713b7ddc760a",
+      "syris/bodies/mesh.py": "27f343690f3029cf164251cb6e60e70f3e3f8030a00ef9617bb562b77c1bad16",
+      "syris/devices/cameras.py": "e7d3a2216a1247c2155641f32bbfecd1f7397f916379190612b37d0979190a35",
+      "examples/mesh_projection.py": "ecb9f2b6005574213534644dfe4eedf744b71d0c94be43eebb03657828c3897f",
+      "benchmarks/rounding_precision/validate.py": "385940fd0f539375a8caa6f0883ae0c2bc469551a068a68fa2f301b84cbe83ec",
+      "benchmarks/rounding_precision/investigate.py": "d0ab75c6f5f49ac0e5128223ed1c30ee59a649424e501d6138eee7c79ea38e4d",
+      "benchmarks/rounding_precision/probe.py": "eaede7e8a02abf7b4e37ff1d9cf281065c3104c9d05511fc4487be0bd128eb23",
+      "benchmarks/rounding_precision/test_references.py": "1eabd7257ecf0f71fdefabd45fb825f3c096dac3b8fba63f52e6b188c0b267b6",
+      "benchmarks/rounding_precision/__init__.py": "ceea5881d1f55cade4a794bd58d4fc892815f24fa643013475012d407e48cd24"
+    },
+    "input_sha256": {
+      "data/prepared/bunny/float32-baseline.npz": "c601bb779ec4c1e21142aee950207c4063f8fca71e5a28669e936889f347f839",
+      "data/prepared/armadillo/float32-baseline.npz": "a79bfe616ea05be2836489945ecfd1776eaaf4c51a863fd59071140d4f05ec28",
+      "data/baseline/bunny.json": "0ec83476cb20bfd51c4d2939968a1d0ad1a5b18486ade3f6c16721aa7c7ec086",
+      "data/baseline/armadillo.json": "455356269f4bb28e3134479b736c32090c2c7226063a2010368f78055a9740b7"
+    },
+    "geometry_contract": "Every precision uses the same stored Float32 geometry; Float64 promotes those coordinates exactly.",
+    "scope": "Parallel beam, one sample per pixel; experimental source copies and coordinate changes, no production edits."
+  },
+  "pixels": [
+    [
+      636,
+      578
+    ],
+    [
+      989,
+      1485
+    ],
+    [
+      1165,
+      1304
+    ],
+    [
+      1395,
+      603
+    ]
+  ],
+  "reference_um": [
+    0.7027646636651211,
+    2.0262765774600457,
+    0.15460792349632185,
+    34.82597575276623
+  ],
+  "results": [
+    {
+      "variant": "float32-positive-current-current",
+      "scale": 0.014884722146717867,
+      "values_um": [
+        0.701409760495153,
+        2.0239249352016486,
+        0.15358943983301288,
+        34.819018765119836
+      ],
+      "errors_nm": [
+        -1.3549031699681136,
+        -2.351642258397124,
+        -1.0184836633089778,
+        -6.956987646397295
+      ],
+      "encoded_input_error_nm": [
+        -1.3571412651488535,
+        -2.3508703408925413,
+        -1.023070581357921,
+        -6.957412515440353
+      ],
+      "remaining_arithmetic_error_nm": [
+        0.0022380951807399185,
+        -0.0007719175045828308,
+        0.004586918048943289,
+        0.0004248690430586066
+      ],
+      "projection_host_ms": [
+        13.526890019420534,
+        12.592847982887179,
+        11.70147699303925
+      ],
+      "nonfinite": 0,
+      "negative": 0,
+      "bitwise_equal_retained_tiff": true
+    },
+    {
+      "variant": "float32-positive-power2-current",
+      "scale": 0.0078125,
+      "values_um": [
+        0.7024993919912959,
+        2.0266036244720453,
+        0.1540908840524935,
+        34.823311580112204
+      ],
+      "errors_nm": [
+        -0.2652716738252847,
+        0.32704701199959274,
+        -0.5170394438283599,
+        -2.6641726540290733
+      ],
+      "encoded_input_error_nm": [
+        -0.25078594206728866,
+        0.3267033983167522,
+        -0.5151327258153537,
+        -2.6695382673125323
+      ],
+      "remaining_arithmetic_error_nm": [
+        -0.014485731757996057,
+        0.00034361368284052674,
+        -0.0019067180130061256,
+        0.00536561328345897
+      ],
+      "projection_host_ms": [
+        9.497841994743794,
+        10.410220013000071,
+        9.185831004288048
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    },
+    {
+      "variant": "float32-centered-power2-current",
+      "scale": 0.0078125,
+      "values_um": [
+        0.7026710591162555,
+        2.0265349576220615,
+        0.1545066794506056,
+        34.8260800819844
+      ],
+      "errors_nm": [
+        -0.09360454886564451,
+        0.25838016201573666,
+        -0.10124404571626444,
+        0.10432921816772023
+      ],
+      "encoded_input_error_nm": [
+        -0.08640862295472562,
+        0.26290216596080995,
+        -0.09869454496522212,
+        0.09510132659329429
+      ],
+      "remaining_arithmetic_error_nm": [
+        -0.007195925910918888,
+        -0.004522003945073294,
+        -0.0025495007510423218,
+        0.00922789157442594
+      ],
+      "projection_host_ms": [
+        10.512423003092408,
+        9.525706002023071,
+        9.443464979995042
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    },
+    {
+      "variant": "float32-centered-power2-centered",
+      "scale": 0.0078125,
+      "values_um": [
+        0.7026710591162555,
+        2.025821686402196,
+        0.1545066794506056,
+        34.8260800819844
+      ],
+      "errors_nm": [
+        -0.09360454886564451,
+        -0.4548910578496823,
+        -0.10124404571626444,
+        0.10432921816772023
+      ],
+      "encoded_input_error_nm": [
+        -0.08640862295472562,
+        -0.46288167269636915,
+        -0.09869454496522212,
+        0.09510132659329429
+      ],
+      "remaining_arithmetic_error_nm": [
+        -0.007195925910918888,
+        0.007990614846686839,
+        -0.0025495007510423218,
+        0.00922789157442594
+      ],
+      "projection_host_ms": [
+        9.986809978727251,
+        10.661814012564719,
+        10.956440994050354
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    },
+    {
+      "variant": "float32-centered-none-centered",
+      "scale": 1.0,
+      "values_um": [
+        0.7026710591162555,
+        2.025821686402196,
+        0.1545066794506056,
+        34.8260800819844
+      ],
+      "errors_nm": [
+        -0.09360454886564451,
+        -0.4548910578496823,
+        -0.10124404571626444,
+        0.10432921816772023
+      ],
+      "encoded_input_error_nm": [
+        -0.08640862295472562,
+        -0.46288167269636915,
+        -0.09869454496522212,
+        0.09510132659329429
+      ],
+      "remaining_arithmetic_error_nm": [
+        -0.007195925910918888,
+        0.007990614846686839,
+        -0.0025495007510423218,
+        0.00922789157442594
+      ],
+      "projection_host_ms": [
+        9.389558981638402,
+        9.768190968316048,
+        10.540657967794687
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    },
+    {
+      "variant": "mixed-positive-current-current",
+      "scale": 0.014884722146717867,
+      "values_um": [
+        0.7014057814558328,
+        2.0239249352016486,
+        0.1535854323719832,
+        34.819018765119836
+      ],
+      "errors_nm": [
+        -1.3588822092883701,
+        -2.351642258397124,
+        -1.0224911243386647,
+        -6.956987646397295
+      ],
+      "encoded_input_error_nm": [
+        -1.3571412651488535,
+        -2.3508703408925413,
+        -1.023070581357921,
+        -6.957412515440353
+      ],
+      "remaining_arithmetic_error_nm": [
+        -0.0017409441395166425,
+        -0.0007719175045828308,
+        0.0005794570192563242,
+        0.0004248690430586066
+      ],
+      "projection_host_ms": [
+        15.425423975102603,
+        15.574911027215421,
+        14.904591022059321
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    },
+    {
+      "variant": "mixed-positive-power2-current",
+      "scale": 0.0078125,
+      "values_um": [
+        0.7025146260275505,
+        2.0266036244720453,
+        0.1540908840524935,
+        34.8233079421334
+      ],
+      "errors_nm": [
+        -0.25003763757058817,
+        0.32704701199959274,
+        -0.5170394438283599,
+        -2.667810632836165
+      ],
+      "encoded_input_error_nm": [
+        -0.25078594206728866,
+        0.3267033983167522,
+        -0.5151327258153537,
+        -2.6695382673125323
+      ],
+      "remaining_arithmetic_error_nm": [
+        0.0007483044967004915,
+        0.00034361368284052674,
+        -0.0019067180130061256,
+        0.0017276344763672569
+      ],
+      "projection_host_ms": [
+        16.018612950574607,
+        16.05109899537638,
+        15.891823975834996
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    },
+    {
+      "variant": "mixed-centered-power2-current",
+      "scale": 0.0078125,
+      "values_um": [
+        0.7026786761343828,
+        2.026538822974544,
+        0.15451050217052398,
+        34.82607280602679
+      ],
+      "errors_nm": [
+        -0.08598753073829624,
+        0.2622455144982716,
+        -0.0974213257978751,
+        0.0970532605535368
+      ],
+      "encoded_input_error_nm": [
+        -0.08640862295472562,
+        0.26290216596080995,
+        -0.09869454496522212,
+        0.09510132659329429
+      ],
+      "remaining_arithmetic_error_nm": [
+        0.0004210922164293862,
+        -0.000656651462538349,
+        0.0012732191673470172,
+        0.0019519339602425134
+      ],
+      "projection_host_ms": [
+        16.916473978199065,
+        15.762525028549135,
+        15.19012701464817
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    },
+    {
+      "variant": "mixed-centered-power2-centered",
+      "scale": 0.0078125,
+      "values_um": [
+        0.7026786761343828,
+        2.025810317718424,
+        0.15451050217052398,
+        34.82607280602679
+      ],
+      "errors_nm": [
+        -0.08598753073829624,
+        -0.4662597416218439,
+        -0.0974213257978751,
+        0.0970532605535368
+      ],
+      "encoded_input_error_nm": [
+        -0.08640862295472562,
+        -0.46288167269636915,
+        -0.09869454496522212,
+        0.09510132659329429
+      ],
+      "remaining_arithmetic_error_nm": [
+        0.0004210922164293862,
+        -0.0033780689254747642,
+        0.0012732191673470172,
+        0.0019519339602425134
+      ],
+      "projection_host_ms": [
+        15.962909033987671,
+        14.989099989179522,
+        14.557821035850793
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    },
+    {
+      "variant": "mixed-centered-none-centered",
+      "scale": 1.0,
+      "values_um": [
+        0.7026786761343828,
+        2.025810317718424,
+        0.15451050217052398,
+        34.82607280602679
+      ],
+      "errors_nm": [
+        -0.08598753073829624,
+        -0.4662597416218439,
+        -0.0974213257978751,
+        0.0970532605535368
+      ],
+      "encoded_input_error_nm": [
+        -0.08640862295472562,
+        -0.46288167269636915,
+        -0.09869454496522212,
+        0.09510132659329429
+      ],
+      "remaining_arithmetic_error_nm": [
+        0.0004210922164293862,
+        -0.0033780689254747642,
+        0.0012732191673470172,
+        0.0019519339602425134
+      ],
+      "projection_host_ms": [
+        17.71990500856191,
+        17.32555200578645,
+        17.02851796289906
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    },
+    {
+      "variant": "float64-positive-current-current",
+      "scale": 0.014884722146717867,
+      "values_um": [
+        0.70276466366944,
+        2.026276577457018,
+        0.15460792349347732,
+        34.82597575276302
+      ],
+      "errors_nm": [
+        4.3188785880943215e-09,
+        -3.027800232757727e-09,
+        -2.844530166967729e-09,
+        -3.211653165635653e-09
+      ],
+      "encoded_input_error_nm": [
+        4.3010039973978564e-09,
+        -3.0091484859440243e-09,
+        -2.8494429038516955e-09,
+        -3.204547738278052e-09
+      ],
+      "remaining_arithmetic_error_nm": [
+        1.787459069646502e-11,
+        -1.865174681370263e-11,
+        4.912736883966318e-12,
+        -7.105427357601002e-12
+      ],
+      "projection_host_ms": [
+        48.87901101028547,
+        48.6418689833954,
+        45.246605994179845
+      ],
+      "nonfinite": 0,
+      "negative": 0
+    }
+  ]
+}

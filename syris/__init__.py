@@ -33,13 +33,19 @@ def init(
     unit="um",
     mixed_precision=False,
     warp_tile_width=0,
+    precision=None,
 ):
     """Initialize syris with the best available compute backend.
 
-    ``mixed_precision=True`` is experimental and CUDA-only: keep Float32
-    storage and BVH traversal, but evaluate ray/triangle intersections in
-    Float64. It is mutually exclusive with ``double_precision=True`` and
-    does not fix geometry already damaged by Float32 conversion.
+    ``precision`` selects ``"float32"`` (default), ``"mixed"`` (CUDA only),
+    or ``"float64"``. The existing ``double_precision`` and ``mixed_precision``
+    switches remain aliases; conflicting settings raise ValueError.
+
+    CUDA centres mesh/camera coordinates before GPU conversion and normalizes
+    lengths with a power of two. Mixed mode retains Float32 geometry, BVH and
+    images, with Float64 triangle arithmetic and hit distances. Mixed and
+    Float64 modes also compute detector samples relative to its centre.
+    These reduce rounding errors but cannot recover lost input geometry.
 
     ``warp_tile_width`` is an optional CUDA pixel scheduler. A positive width
     assigns each warp a width-by-(32/width) detector tile. Zero retains the
@@ -47,6 +53,15 @@ def init(
     """
     from numbers import Integral
 
+    if precision is not None:
+        if precision not in ("float32", "mixed", "float64"):
+            raise ValueError("precision must be 'float32', 'mixed', or 'float64'.")
+        if (double_precision and precision != "float64") or (
+            mixed_precision and precision != "mixed"
+        ):
+            raise ValueError("precision conflicts with double_precision or mixed_precision.")
+        double_precision = precision == "float64"
+        mixed_precision = precision == "mixed"
     if (
         isinstance(warp_tile_width, bool)
         or not isinstance(warp_tile_width, Integral)
@@ -76,7 +91,7 @@ def init(
         level=logging.INFO if loglevel is None else loglevel,
         logger_file=logfile,
     )
-    cfg.PRECISION = cfg.Precision(double_precision)
+    cfg.PRECISION = cfg.Precision(double_precision, mixed=mixed_precision)
     cfg.BACKEND = ComputeBackend(compute_backend=compute_backend)
     if mixed_precision and getattr(cfg.BACKEND, "name", None) != cfg.BACKEND.CUDA:
         raise ValueError("mixed_precision requires an available CUDA backend.")
@@ -101,8 +116,8 @@ def init(
         if mixed_precision:
             options.append("-DSYRIS_MIXED_PRECISION")
             LOG.info(
-                "Experimental mixed precision: Float32 storage/BVH, "
-                "Float64 ray/triangle arithmetic."
+                "Mixed precision: Float32 geometry/BVH/images, "
+                "Float64 triangle arithmetic and hit distances."
             )
         cfg.BACKEND.pipeline = CudaPipeline(headers=cuda_headers, options=options)
 

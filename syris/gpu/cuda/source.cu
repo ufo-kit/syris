@@ -2,6 +2,7 @@
 #include "Ray.cuh"
 #include "WatertightRay.cuh"
 #include "PixelScheduler.cuh"
+#include "Detector.cuh"
 #include <cuda/atomic>
 
 
@@ -235,8 +236,13 @@ __device__ RayType rebaseRay(const RayType &ray, const Tree &tree)
             entry = fmax(entry, (near_plane - o[axis]) / d[axis]);
         }
     }
-    const double guard = fmax(32.0 * ::cuda::std::numeric_limits<FP_T>::epsilon() * extent,
-                             2.0 * double(ray.m_epsilons.tri_ray_tmin));
+    // The shift itself is computed in double. For a distant Float64 camera,
+    // its rounding can exceed a guard based only on the small mesh extent,
+    // placing the rebased origin just INSIDE the first surface.
+    const double shift_error = 8.0 * ::cuda::std::numeric_limits<double>::epsilon() * entry;
+    const double guard = fmax(shift_error,
+        fmax(32.0 * ::cuda::std::numeric_limits<FP_T>::epsilon() * extent,
+             2.0 * double(ray.m_epsilons.tri_ray_tmin)));
     double shift = fmax(0.0, entry - guard);
     FP_T4 origin = MAKE_FP_T4(FP_T(fma(shift, d[0], o[0])),
                               FP_T(fma(shift, d[1], o[1])),
@@ -247,11 +253,11 @@ __device__ RayType rebaseRay(const RayType &ray, const Tree &tree)
 template<bool WithNormals>
 struct ThicknessSum {
     double total = 0.0;
-    FP_T entry = 0, last = 0;
+    HIT_T entry = 0, last = 0;
     int inside = 0;
     bool first = true, valid = true;
 
-    __device__ void event(FP_T t, int orientation) {
+    __device__ void event(HIT_T t, int orientation) {
         if constexpr (WithNormals) {
             if (orientation == 0) return; // A tangential contact, or touching faces.
             if (first && orientation < 0) inside = 1; // Ray starts in material.
@@ -308,16 +314,16 @@ __device__ __noinline__ FP_T traceEvents(const RayType &ray, const Tree &tree,
                                         unsigned row, unsigned col)
 {
     constexpr unsigned BatchSize = 32;
-    struct Event { FP_T t; int orientation; };
+    struct Event { HIT_T t; int orientation; };
     Event events[BatchSize];
     ThicknessSum<WithNormals> sum;
-    FP_T previous = NEG_INFINITY;
+    HIT_T previous = NEG_INFINITY;
     while (true) {
         unsigned count = 0, furthest = 0;
         int node = treeRoot(tree), leaf;
         while ((leaf = nextLeaf(tree, ray, node)) != SENTINEL) {
             unsigned triangle = tree.indices[leaf], base = 3 * triangle;
-            FP_T t;
+            HIT_T t;
             if (!ray.intersects(vertices[base], vertices[base+1], vertices[base+2], t, col, row)
                 || t <= previous) continue;
             if (count == BatchSize && t > events[furthest].t) continue;
@@ -366,7 +372,7 @@ __device__ FP_T traceCollected(const RayType &ray, const Tree &tree,
     while ((leaf = nextLeaf(tree, ray, node)) != SENTINEL) {
         unsigned triangle = tree.indices[leaf];
         unsigned base = 3 * triangle;
-        FP_T t;
+        HIT_T t;
         if (ray.intersects(vertices[base], vertices[base+1], vertices[base+2], t, col, row)) {
             if (!hits.push_back(HitRecord(t, triangle))) {
                 overflow = true;
@@ -378,7 +384,7 @@ __device__ FP_T traceCollected(const RayType &ray, const Tree &tree,
     ThicknessSum<WithNormals> sum;
     unsigned i = 0;
     while (i < hits.size()) {
-        FP_T t = hits.values[i].t;
+        HIT_T t = hits.values[i].t;
         int orientation = 0;
         do {
             orientation += hitOrientation<WithNormals>(ray, normals, hits.values[i].triangle_idx);
@@ -451,11 +457,11 @@ __device__ FP_T traceSignedThickness(const RayType &ray, const Tree &tree,
 {
     SignedLength sum;
     int balance = 0, first_orientation = 0;
-    FP_T first = POS_INFINITY;
+    HIT_T first = POS_INFINITY;
     int node = treeRoot(tree), leaf;
     while ((leaf = nextLeaf(tree, ray, node)) != SENTINEL) {
         unsigned triangle = tree.indices[leaf], base = 3 * triangle;
-        FP_T t;
+        HIT_T t;
         bool boundary = false;
         if (!ray.intersects(vertices[base], vertices[base+1], vertices[base+2],
                             t, col, row, &boundary)) continue;
@@ -617,7 +623,7 @@ __device__ FP_T traceSubPixel(
 
 __device__ FP_T traceAndCache(
     FP_T u, FP_T v, FP_T* value_cache, bool* is_cached,
-    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
+    const DetectorPixel &pixel, FP_T4 direction,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
     Tree &tree, FP_T4 *__restrict__ vertices, 
     const EpsilonParams& epsilons,
@@ -631,7 +637,7 @@ __device__ FP_T traceAndCache(
         return value_cache[index];
     }
 
-    FP_T4 sample_origin = base_pixel_origin + scaled_U * u + scaled_V * v;
+    FP_T4 sample_origin = pixel.point(u, v);
 
     FP_T value = traceSubPixel(
         sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col
@@ -645,7 +651,7 @@ __device__ FP_T traceAndCache(
 
 __device__ FP_T traceAndCache_conebeam(
     FP_T u, FP_T v, FP_T* value_cache, bool* is_cached,
-    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 source, // Note: 'source'
+    const DetectorPixel &pixel, FP_T4 source, // Note: 'source'
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
     Tree &tree, FP_T4 *__restrict__ vertices, 
     const EpsilonParams& epsilons,
@@ -659,7 +665,7 @@ __device__ FP_T traceAndCache_conebeam(
         return value_cache[index];
     }
 
-    FP_T4 sample_origin = base_pixel_origin + scaled_U * u + scaled_V * v;
+    FP_T4 sample_origin = pixel.point(u, v);
     
     // (Source -> Pixel)
     FP_T4 direction = sample_origin - source;
@@ -678,7 +684,7 @@ __device__ FP_T traceAndCache_conebeam(
 
 __device__ FP_T traceAndCache(
     FP_T u, FP_T v, FP_T* value_cache, bool* is_cached,
-    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
+    const DetectorPixel &pixel, FP_T4 direction,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
     Tree &tree, FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
     const EpsilonParams& epsilons,
@@ -692,7 +698,7 @@ __device__ FP_T traceAndCache(
         return value_cache[index];
     }
 
-    FP_T4 sample_origin = base_pixel_origin + scaled_U * u + scaled_V * v;
+    FP_T4 sample_origin = pixel.point(u, v);
 
     FP_T value = traceSubPixel(
         sample_origin, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col
@@ -706,7 +712,7 @@ __device__ FP_T traceAndCache(
 
 __device__ FP_T traceAndCache_conebeam(
     FP_T u, FP_T v, FP_T* value_cache, bool* is_cached,
-    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 source, // Note: 'source'
+    const DetectorPixel &pixel, FP_T4 source, // Note: 'source'
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax,
     Tree &tree, FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
     const EpsilonParams& epsilons,
@@ -720,7 +726,7 @@ __device__ FP_T traceAndCache_conebeam(
         return value_cache[index];
     }
 
-    FP_T4 sample_origin = base_pixel_origin + scaled_U * u + scaled_V * v;
+    FP_T4 sample_origin = pixel.point(u, v);
 
     // (Source -> Pixel)
     FP_T4 direction = sample_origin - source;
@@ -758,7 +764,7 @@ __device__ void seedAdaptiveCache(FP_T *values, bool *cached,
 }
 
 __device__ FP_T tracePixelAdaptive(
-    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
+    const DetectorPixel &pixel, FP_T4 direction,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree, FP_T4 *__restrict__ vertices,
     const EpsilonParams& epsilons,
     const AdaptiveSamplingParams& sampling_params,
@@ -777,11 +783,11 @@ __device__ FP_T tracePixelAdaptive(
         FP_T u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0;
         
         FP_T values[5];
-        values[0] = traceAndCache(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
-        values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
-        values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
-        values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
-        values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[0] = traceAndCache(u,      v,      value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
         
         // Decision
         FP_T midpoint_value = values[4];
@@ -809,7 +815,7 @@ __device__ FP_T tracePixelAdaptive(
 }
 
 __device__ FP_T tracePixelAdaptive(
-    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 direction,
+    const DetectorPixel &pixel, FP_T4 direction,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree,
     FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
     const EpsilonParams& epsilons,
@@ -829,11 +835,11 @@ __device__ FP_T tracePixelAdaptive(
         FP_T u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0;
         
         FP_T values[5];
-        values[0] = traceAndCache(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
-        values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
-        values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
-        values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
-        values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[0] = traceAndCache(u,      v,      value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[1] = traceAndCache(u + s,  v,      value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[2] = traceAndCache(u,      v + s,  value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[3] = traceAndCache(u + s,  v + s,  value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[4] = traceAndCache(u + hs, v + hs, value_cache, is_cached, pixel, direction, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
         
         // Decision
         FP_T midpoint_value = values[4];
@@ -861,7 +867,7 @@ __device__ FP_T tracePixelAdaptive(
 }
 
 __device__ FP_T tracePixelAdaptive_conebeam(
-    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 source, // Note: 'source'
+    const DetectorPixel &pixel, FP_T4 source, // Note: 'source'
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree, FP_T4 *__restrict__ vertices,
     const EpsilonParams& epsilons,
     const AdaptiveSamplingParams& sampling_params,
@@ -880,11 +886,11 @@ __device__ FP_T tracePixelAdaptive_conebeam(
         FP_T u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0;
         
         FP_T values[5];
-        values[0] = traceAndCache_conebeam(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
-        values[1] = traceAndCache_conebeam(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
-        values[2] = traceAndCache_conebeam(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
-        values[3] = traceAndCache_conebeam(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
-        values[4] = traceAndCache_conebeam(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[0] = traceAndCache_conebeam(u,      v,      value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[1] = traceAndCache_conebeam(u + s,  v,      value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[2] = traceAndCache_conebeam(u,      v + s,  value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[3] = traceAndCache_conebeam(u + s,  v + s,  value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
+        values[4] = traceAndCache_conebeam(u + hs, v + hs, value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col);
         FP_T midpoint_value = values[4];
         for (int j = 0; j < 5; ++j) {
 #ifdef SYRIS_SIGNED_DEFER_FALLBACK
@@ -910,7 +916,7 @@ __device__ FP_T tracePixelAdaptive_conebeam(
 }
 
 __device__ FP_T tracePixelAdaptive_conebeam(
-    FP_T4 base_pixel_origin, FP_T4 scaled_U, FP_T4 scaled_V, FP_T4 source,
+    const DetectorPixel &pixel, FP_T4 source,
     FP_T4 const scene_bbMin, FP_T4 const scene_bbMax, Tree &tree,
     FP_T4 *__restrict__ vertices, FP_T4 *__restrict__ normals,
     const EpsilonParams& epsilons,
@@ -930,11 +936,11 @@ __device__ FP_T tracePixelAdaptive_conebeam(
         FP_T u = current_quad.u, v = current_quad.v, s = current_quad.size, hs = s / 2.0;
         
         FP_T values[5];
-        values[0] = traceAndCache_conebeam(u,      v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
-        values[1] = traceAndCache_conebeam(u + s,  v,      value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
-        values[2] = traceAndCache_conebeam(u,      v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
-        values[3] = traceAndCache_conebeam(u + s,  v + s,  value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
-        values[4] = traceAndCache_conebeam(u + hs, v + hs, value_cache, is_cached, base_pixel_origin, scaled_U, scaled_V, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[0] = traceAndCache_conebeam(u,      v,      value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[1] = traceAndCache_conebeam(u + s,  v,      value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[2] = traceAndCache_conebeam(u,      v + s,  value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[3] = traceAndCache_conebeam(u + s,  v + s,  value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
+        values[4] = traceAndCache_conebeam(u + hs, v + hs, value_cache, is_cached, pixel, source, scene_bbMin, scene_bbMax, tree, vertices, normals, epsilons, row, col);
         FP_T midpoint_value = values[4];
         for (int j = 0; j < 5; ++j) {
 #ifdef SYRIS_SIGNED_DEFER_FALLBACK
@@ -973,7 +979,7 @@ extern "C" __global__ void project_parallel_kernel(
     // camera_args (6 args)
     uint2 N,
     FP_T4 U, FP_T4 V, FP_T4 W,
-    FP_T4 upperleft_origin,
+    FP_T4 detector_origin,
     FP_T2 ps,
 
     // tree_args (7 args)
@@ -1028,17 +1034,17 @@ extern "C" __global__ void project_parallel_kernel(
 #endif
 
         unsigned int row = index / N.x; unsigned int col = index % N.x;
-        FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
+        DetectorPixel pixel(detector_origin, scaled_U, scaled_V, N, col, row);
 
         if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
             image[index] = tracePixelAdaptive(
-                base_pixel_origin, scaled_U, scaled_V, W,
+                pixel, W,
                 scene_bbMin, scene_bbMax, tree, vertices,
                 epsilons, sampling_params,
                 row, col
             );
         } else {
-            FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
+            FP_T4 sample_origin = pixel.point(FP_T(0.5), FP_T(0.5));
             image[index] = traceSubPixel(
                 sample_origin, W, scene_bbMin, scene_bbMax, tree, vertices, epsilons, row, col
             );
@@ -1057,7 +1063,7 @@ extern "C" __global__ void project_parallel_normals_kernel(
     // camera_args (6 args)
     uint2 N,
     FP_T4 U, FP_T4 V, FP_T4 W,
-    FP_T4 upperleft_origin,
+    FP_T4 detector_origin,
     FP_T2 ps,
 
     // tree_args (7 args)
@@ -1121,15 +1127,15 @@ extern "C" __global__ void project_parallel_normals_kernel(
         }
         #endif
 
-        FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
+        DetectorPixel pixel(detector_origin, scaled_U, scaled_V, N, col, row);
 
         if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
             image[index] = tracePixelAdaptive(
-                base_pixel_origin, scaled_U, scaled_V, W,
+                pixel, W,
                 scene_bbMin, scene_bbMax, tree, vertices, normals,
                 epsilons, sampling_params, row, col);
         } else {
-            FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
+            FP_T4 sample_origin = pixel.point(FP_T(0.5), FP_T(0.5));
             FP_T4 direction = W;
 
             image[index] = traceSubPixel(
@@ -1156,7 +1162,7 @@ extern "C" __global__ void project_conebeam_kernel(
     // camera_args (7 args)
     uint2 N,
     FP_T4 U, FP_T4 V, FP_T4 W,
-    FP_T4 upperleft_origin,
+    FP_T4 detector_origin,
     FP_T2 ps,
     FP_T4 source,
 
@@ -1212,16 +1218,16 @@ extern "C" __global__ void project_conebeam_kernel(
 #endif
 
         unsigned int row = index / N.x; unsigned int col = index % N.x;
-        FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
+        DetectorPixel pixel(detector_origin, scaled_U, scaled_V, N, col, row);
 
         if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
             image[index] = tracePixelAdaptive_conebeam(
-                base_pixel_origin, scaled_U, scaled_V, source,
+                pixel, source,
                 scene_bbMin, scene_bbMax, tree, vertices,
                 epsilons, sampling_params, row, col
             );
         } else {
-            FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
+            FP_T4 sample_origin = pixel.point(FP_T(0.5), FP_T(0.5));
             FP_T4 direction = sample_origin - source;
             FP_T norm = inverse_length(direction.x, direction.y, direction.z);
             direction = direction * norm;
@@ -1244,7 +1250,7 @@ extern "C" __global__ void project_conebeam_normals_kernel(
     // camera_args (7 args)
     uint2 N,
     FP_T4 U, FP_T4 V, FP_T4 W,
-    FP_T4 upperleft_origin,
+    FP_T4 detector_origin,
     FP_T2 ps,
     FP_T4 source,
 
@@ -1310,16 +1316,16 @@ extern "C" __global__ void project_conebeam_normals_kernel(
         }
         #endif
 
-        FP_T4 base_pixel_origin = upperleft_origin + scaled_U * col + scaled_V * row;
+        DetectorPixel pixel(detector_origin, scaled_U, scaled_V, N, col, row);
 
         if ((sampling_params.max_depth > 0) && (sampling_params.max_depth <= MAX_DEPTH)) {
             image[index] = tracePixelAdaptive_conebeam(
-                base_pixel_origin, scaled_U, scaled_V, source,
+                pixel, source,
                 scene_bbMin, scene_bbMax, tree, vertices, normals,
                 epsilons, sampling_params, row, col
             );
         } else {
-            FP_T4 sample_origin = base_pixel_origin + scaled_U * 0.5 + scaled_V * 0.5;
+            FP_T4 sample_origin = pixel.point(FP_T(0.5), FP_T(0.5));
             FP_T4 direction = sample_origin - source;
             FP_T norm = inverse_length(direction.x, direction.y, direction.z);
             direction = direction * norm;

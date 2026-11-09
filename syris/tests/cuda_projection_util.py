@@ -70,7 +70,7 @@ class ProjectionHarness:
         from syris import config as cfg
         from syris.gpu.cuda_utils import CudaPipeline
 
-        self.precision = cfg.Precision(double)
+        self.precision = cfg.Precision(double, mixed=mixed_precision)
         self.dtype = self.precision.np_float
         kernel_dir = Path(__file__).resolve().parents[1] / "gpu" / "cuda"
         options = ["-D__FP_T_D__"] if double else []
@@ -186,14 +186,18 @@ class ProjectionHarness:
     def build(self, vertices, use_normals=True):
         from syris.bodies.accelerators import BvhCupyAccelerator
 
-        vertices = np.asarray(vertices, dtype=self.dtype).reshape(-1, 3, 3)
+        vertices = np.asarray(vertices, dtype=np.float64).reshape(-1, 3, 3)
         lo = vertices.min(axis=(0, 1))
         hi = vertices.max(axis=(0, 1))
+        centre = lo / 2 + hi / 2
+        normals = np.cross(vertices[:, 1] - vertices[:, 0], vertices[:, 2] - vertices[:, 0])
         mesh = SimpleNamespace(
             transform=lambda: None,
+            _transform_for_cuda=lambda: (vertices.reshape(-1, 3).T - centre[:, None], centre),
             _current=np.vstack((vertices.reshape(-1, 3).T, np.ones(3 * len(vertices)))),
             num_triangles=len(vertices),
-            normals=np.cross(vertices[:, 1] - vertices[:, 0], vertices[:, 2] - vertices[:, 0]),
+            normals=normals,
+            _normals=normals,
             _use_normals=use_normals,
             bounds=np.column_stack([lo, hi]).ravel(),
             epsilon=0,
@@ -216,7 +220,9 @@ class ProjectionHarness:
             (
                 np.int32(n),
                 np.uint32(len(t["keys"])),
-                self.vectors(origins),
+                self.vectors(
+                    (np.asarray(origins) - accel.coordinate_origin) * accel.coordinate_scale
+                ),
                 self.vectors(directions),
                 t["vertices"],
                 t["normals"],
@@ -229,7 +235,7 @@ class ProjectionHarness:
                 out,
             ),
         )
-        return out.get()
+        return out.get() / accel.coordinate_scale
 
     def project(self, accel, **kwargs):
         return float(self.project_image(accel, **kwargs)[0, 0])
@@ -250,6 +256,17 @@ class ProjectionHarness:
         def vec(x):
             return np.array([*x, 0], dtype=self.dtype)
 
+        def geometry(frame_origin, scale):
+            position = np.asarray(origin, dtype=np.float64) - frame_origin
+            if self.precision.centered_rays:
+                position += np.asarray(basis[0]) * pixel_size[0] * shape[1] / 2
+                position += np.asarray(basis[1]) * pixel_size[1] * shape[0] / 2
+            return (
+                vec(position * scale),
+                np.asarray(np.asarray(pixel_size) * scale, dtype=self.dtype),
+                vec((np.asarray(source) - frame_origin) * scale),
+            )
+
         camera = SimpleNamespace(
             shape=shape,
             viewport_basis_vectors=tuple(vec(axis) for axis in basis),
@@ -257,6 +274,7 @@ class ProjectionHarness:
             p00_corner=vec(origin),
             kernel_pixel_size_xy=np.array(pixel_size, dtype=self.dtype),
             source_point=vec(source),
+            get_cuda_geometry=geometry,
         )
         with self.configured():
             return accel.project(camera=camera, parallel=parallel, iterations=depth, **kwargs).get()

@@ -146,17 +146,22 @@ features during loading. The optional CGAL Boolean implementation uses libigl's
 copyleft module; see its `licenses
 <https://github.com/libigl/libigl-python-bindings>`_.
 
-To try Float32 storage and BVH traversal with Float64 triangle arithmetic::
+Select CUDA mesh precision with ``syris.init(compute_backend="cuda",
+precision="float32")``, ``precision="mixed"`` or ``precision="float64"``.
+All three modes use centred coordinates and power-of-two scaling. Mixed mode
+keeps Float32 geometry, BVH and output images, with Float64 triangle arithmetic
+and hit distances. Mixed and Float64 modes also calculate rays relative to the
+detector centre. See ``docs/source/usage/cuda-projection.rst`` for their scope.
+
+For mixed precision with optional repair and bounded Float32 rounding::
 
     uv run --extra cuda13 --extra examples --extra mesh-repair \
-        python -m examples.mesh_cuda --repair-mesh --float32-rounding --mixed-precision
+        python -m examples.mesh_cuda --repair-mesh --float32-rounding --precision mixed
 
-The equivalent Python options are ``syris.init(compute_backend="cuda",
-mixed_precision=True)`` and ``Mesh.from_file(..., repair=True,
-float32_rounding=True)``. Both options are experimental and independent;
-omit ``--mixed-precision`` to compare the usual Float32 intersection path.
-``--double-precision`` selects the Float64 reference and cannot be combined
-with either of these options.
+The mesh-loading options are ``Mesh.from_file(..., repair=True,
+float32_rounding=True)``. Bounded rounding remains experimental and independent
+of projection precision. ``--mixed-precision`` and ``--double-precision`` remain
+aliases for the named modes. Float64 cannot be combined with Float32 rounding.
 
 Bounded rounding tries the two Float32 values bracketing affected coordinates
 without changing the repaired connectivity. It checks for merged vertices,
@@ -168,10 +173,10 @@ Float32 output.
 
 Validation covers the returned mesh coordinates. Later vertex transformations,
 including rotations and unit conversions, can introduce new rounding defects.
-For rigid scans, keep the mesh fixed and rotate the camera, as this example
-does. Mixed triangle arithmetic improves intersection accuracy but is not an
-exact predicate or a guarantee that every thickness ray is valid; unresolved
-crossings can still produce NaN. Defaults remain unchanged.
+For rigid scans, keeping the mesh fixed and rotating the camera avoids repeatedly
+rounding transformed vertices. Mixed mode reduces specific intersection and hit
+rounding errors; it does not guarantee a valid or more accurate result for every
+ray. Unresolved crossings can still produce NaN. Float32 remains the default.
 
 
 Citation

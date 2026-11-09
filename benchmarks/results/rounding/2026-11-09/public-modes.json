@@ -1,0 +1,1108 @@
+{
+  "timestamp_utc": "2026-11-09T16:17:32.100769+00:00",
+  "command": [
+    "/home/lt0649/.codex/worktrees/a6ee/syris_cuda/benchmarks/rounding_precision/public_modes.py",
+    "--benchmark-root",
+    "/mnt/data/Agents/syris-benchmarks",
+    "--references",
+    "/tmp/syris-public-precision-references",
+    "--output",
+    "benchmarks/results/rounding/2026-11-09/public-modes.json"
+  ],
+  "implementation_root": "/home/lt0649/.codex/worktrees/a6ee/syris_cuda",
+  "legacy": false,
+  "source_sha256": {
+    "syris/gpu/cuda/Ray.cuh": "6c61ce29b7b07def94a4cf3261be068014362f9b9a574abed9e1ac833fb6e195",
+    "syris/gpu/cuda/Ray.cu": "41a9f50b21228a121aad1628affba51a261491635c0db80b70f9b4eafb6da1b7",
+    "syris/gpu/cuda/sort.cu": "f5a0b5f12227e27258cfef8eb2b0ecf9a5894b95b57a80de1d2b5cd1e7eca815",
+    "syris/gpu/cuda/source.cu": "e5c98cad7deb249555e6aa8cc46cfedc552d329988de6de406970d9ed706be07",
+    "syris/gpu/cuda/PixelScheduler.cuh": "f124e86564bc96befab95fa31ca73fc08f0dedef32dc7a9ac89ddbca1dc84dc8",
+    "syris/gpu/cuda/source.cuh": "2ad939ee7b65dd0739d4ebe966b50e90f51f9bdc38ab26f6a88408afcf863dd5",
+    "syris/gpu/cuda/staged.cuh": "cf3f8003fbf807aa7c53530287ee1865c87ad405c5ea21b530a4403980070b58",
+    "syris/gpu/cuda/Legacy.cu": "fb1a033925941a2db8fd959fd163e1580b9b5e592db87d605d6b8b31f90b6fcc",
+    "syris/gpu/cuda/Commons.cuh": "6fbabcbd6fe0cce3237b881be9db0fda352e712d9c10e7a086b34397c6b5a7f8",
+    "syris/gpu/cuda/Detector.cuh": "bb97f3b731bd2ad1bc06b6abc9c64751fcdd1d95ed54445e9a413bbe604f91ae",
+    "syris/gpu/cuda/WatertightRay.cuh": "a20fba7b19953b7a7598e0e455be82c7622524adef323713b87317f907504a5d",
+    "syris/gpu/cuda/WatertightRay.cu": "8f9148ba077bf65aedd2089f394c7bf2b648b041afd0d605d162b2e8679e02f6",
+    "syris/__init__.py": "36430ce95e42d1e815a6c60af92fb16a6047d0b6a3beec9bed71d34c8e4f4d80",
+    "syris/config.py": "e5b1997de90155b66d06bb5551c78cbba92970cfbd430770f569128b8040b580",
+    "syris/bodies/accelerators.py": "2f77e5af0551d00f22e92ec63e0e353842ee2bedc8078046ca994650a6a6deb5",
+    "syris/bodies/mesh.py": "26fa828f24d23a7ed5cefc4154d39852d194dbf9bfc5eccba5934d8a16c74d48",
+    "syris/devices/cameras.py": "ba0f57b8c98277458c6c00c28cbf20e13a5ee4224a0f21da9a0271bb5b344005",
+    "examples/mesh_projection.py": "ecb9f2b6005574213534644dfe4eedf744b71d0c94be43eebb03657828c3897f"
+  },
+  "input_sha256": {
+    "/mnt/data/Agents/syris-benchmarks/data/prepared/bunny/float32-baseline.npz": "c601bb779ec4c1e21142aee950207c4063f8fca71e5a28669e936889f347f839",
+    "/mnt/data/Agents/syris-benchmarks/data/prepared/armadillo/float32-baseline.npz": "a79bfe616ea05be2836489945ecfd1776eaaf4c51a863fd59071140d4f05ec28",
+    "/mnt/data/Agents/syris-benchmarks/data/baseline/bunny.json": "0ec83476cb20bfd51c4d2939968a1d0ad1a5b18486ade3f6c16721aa7c7ec086",
+    "/mnt/data/Agents/syris-benchmarks/data/baseline/armadillo.json": "455356269f4bb28e3134479b736c32090c2c7226063a2010368f78055a9740b7"
+  },
+  "gpu": "NVIDIA RTX 2000 Ada Generation",
+  "cupy": "14.2.0",
+  "numpy": "2.5.4",
+  "timing": "warmed wall time; projection includes D2H and metre conversion; no TIFF I/O",
+  "results": [
+    {
+      "mode": "float64",
+      "mesh": "bunny",
+      "angle_deg": 0,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 964268,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.3078188705606397e-08,
+      "foreground_p99_error_nm": 3.1848438816761693e-10,
+      "foreground_rmse_nm": 1.0133390117613914e-10,
+      "build_ms": [
+        1.2647730181924999,
+        1.000639982521534,
+        0.9449449717067182
+      ],
+      "projection_host_ms": [
+        55.274337995797396,
+        48.667849972844124,
+        50.006076984573156,
+        50.374947022646666,
+        45.778337051160634,
+        43.30200602998957,
+        45.95312901074067
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 1.491455613525372e-08,
+      "audited_pixels": [
+        {
+          "row": 636,
+          "col": 578,
+          "thickness_um": 0.7027646636651211,
+          "reference_um": 0.70276466366944
+        },
+        {
+          "row": 989,
+          "col": 1485,
+          "thickness_um": 2.026276577458688,
+          "reference_um": 2.026276577457018
+        },
+        {
+          "row": 1165,
+          "col": 1304,
+          "thickness_um": 0.15460792349635,
+          "reference_um": 0.15460792349347732
+        },
+        {
+          "row": 1395,
+          "col": 603,
+          "thickness_um": 34.825975752768734,
+          "reference_um": 34.82597575276302
+        }
+      ]
+    },
+    {
+      "mode": "float64",
+      "mesh": "bunny",
+      "angle_deg": 17,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 924345,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.793338272688404e-08,
+      "foreground_p99_error_nm": 3.3881317890172014e-10,
+      "foreground_rmse_nm": 1.4223268041598603e-10,
+      "build_ms": [
+        1.0813900153152645,
+        1.0263860458508134,
+        1.003512996248901
+      ],
+      "projection_host_ms": [
+        46.07707203831524,
+        46.13328701816499,
+        44.940859952475876,
+        45.69888301193714,
+        44.292988954111934,
+        43.68686699308455,
+        46.402030042372644
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 4.800241591208527e-08,
+      "audited_pixels": []
+    },
+    {
+      "mode": "float64",
+      "mesh": "bunny",
+      "angle_deg": 45,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 814102,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 3.309527131512002e-08,
+      "foreground_p99_error_nm": 3.9641141931501256e-10,
+      "foreground_rmse_nm": 1.100614338177556e-10,
+      "build_ms": [
+        1.1426070122979581,
+        1.0067630209960043,
+        1.0276579996570945
+      ],
+      "projection_host_ms": [
+        44.32354599703103,
+        42.412624054122716,
+        42.74464800255373,
+        43.747673043981194,
+        42.155084025580436,
+        42.54508001031354,
+        42.1023559756577
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 3.310882384227609e-08,
+      "audited_pixels": [
+        {
+          "row": 1291,
+          "col": 652,
+          "thickness_um": 3.1016567397851773,
+          "reference_um": 3.101656739785261
+        }
+      ]
+    },
+    {
+      "mode": "float64",
+      "mesh": "bunny",
+      "angle_deg": 90,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 739067,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.275384606209227e-08,
+      "foreground_p99_error_nm": 4.202723374391524e-10,
+      "foreground_rmse_nm": 1.323663344773738e-10,
+      "build_ms": [
+        1.067937002517283,
+        1.015110989101231,
+        0.9798409882932901
+      ],
+      "projection_host_ms": [
+        43.641131022013724,
+        42.712145019322634,
+        43.08726696763188,
+        42.08424995886162,
+        42.9858029820025,
+        40.48034601146355,
+        43.89475501375273
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 1.686442597983312e-08,
+      "audited_pixels": [
+        {
+          "row": 1138,
+          "col": 1220,
+          "thickness_um": 66.1457870499548,
+          "reference_um": 66.14578704995472
+        }
+      ]
+    },
+    {
+      "mode": "float64",
+      "mesh": "bunny",
+      "angle_deg": 135,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 870302,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 4.3562904477288666e-08,
+      "foreground_p99_error_nm": 3.1509625637859973e-10,
+      "foreground_rmse_nm": 1.5479285954492326e-10,
+      "build_ms": [
+        1.7329389811493456,
+        1.0413270210847259,
+        1.0030469857156277
+      ],
+      "projection_host_ms": [
+        46.69888102216646,
+        43.29739004606381,
+        43.56526100309566,
+        43.0552470497787,
+        43.26656396733597,
+        42.97737200977281,
+        45.14227400068194
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 4.356798667497219e-08,
+      "audited_pixels": []
+    },
+    {
+      "mode": "float64",
+      "mesh": "armadillo",
+      "angle_deg": 0,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46528,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.72405795836983e-09,
+      "foreground_p99_error_nm": 1.4599883395348882e-10,
+      "foreground_rmse_nm": 4.2543287028298023e-11,
+      "build_ms": [
+        16.99739502510056,
+        16.826655017212033,
+        14.254668029025197
+      ],
+      "projection_host_ms": [
+        8.015792001970112,
+        6.759645999409258,
+        6.763817043974996,
+        7.253226998727769,
+        6.797871959861368,
+        8.050439006183296,
+        6.804917997214943
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 2.134523027080837e-09
+    },
+    {
+      "mode": "float64",
+      "mesh": "armadillo",
+      "angle_deg": 17,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46567,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 3.943785402416022e-09,
+      "foreground_p99_error_nm": 1.4230153513872246e-10,
+      "foreground_rmse_nm": 4.356847147810458e-11,
+      "build_ms": [
+        14.817978022620082,
+        15.574628952890635,
+        17.132828012108803
+      ],
+      "projection_host_ms": [
+        8.74331797240302,
+        7.820083003025502,
+        8.608565025497228,
+        7.565022038761526,
+        8.319474989548326,
+        7.244225998874754,
+        7.773352030199021
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 4.275822317739708e-09
+    },
+    {
+      "mode": "float64",
+      "mesh": "armadillo",
+      "angle_deg": 45,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 44061,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.4580896129319796e-09,
+      "foreground_p99_error_nm": 1.4992483166401116e-10,
+      "foreground_rmse_nm": 4.624347470367797e-11,
+      "build_ms": [
+        13.89346702490002,
+        13.459159003105015,
+        13.092747947666794
+      ],
+      "projection_host_ms": [
+        7.835694006644189,
+        7.2013489552773535,
+        7.46180402347818,
+        6.924037996213883,
+        6.923954992089421,
+        7.797151047270745,
+        7.250894035678357
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 2.5614276324970042e-09
+    },
+    {
+      "mode": "float64",
+      "mesh": "armadillo",
+      "angle_deg": 90,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 36307,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.9551638004997388e-09,
+      "foreground_p99_error_nm": 1.4821806027529424e-10,
+      "foreground_rmse_nm": 4.5314287793121156e-11,
+      "build_ms": [
+        14.637594984378666,
+        13.692345004528761,
+        13.540935004130006
+      ],
+      "projection_host_ms": [
+        6.825124961324036,
+        6.2876620213501155,
+        6.539595022331923,
+        6.653311022091657,
+        7.215646968688816,
+        6.721597979776561,
+        6.2812380492687225
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 1.9293292956084826e-09
+    },
+    {
+      "mode": "float64",
+      "mesh": "armadillo",
+      "angle_deg": 135,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 43768,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 5.5923232760097044e-09,
+      "foreground_p99_error_nm": 1.5246593050577406e-10,
+      "foreground_rmse_nm": 5.066527706166177e-11,
+      "build_ms": [
+        15.829765005037189,
+        14.571662992238998,
+        13.09325295733288
+      ],
+      "projection_host_ms": [
+        7.471358985640109,
+        7.838663004804403,
+        7.280662015546113,
+        8.206684025935829,
+        7.707560958806425,
+        8.288842043839395,
+        7.487914990633726
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 3.4719615810157754e-09
+    },
+    {
+      "mode": "float32",
+      "mesh": "bunny",
+      "angle_deg": 0,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 964268,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.0367324510894262,
+      "foreground_p99_error_nm": 0.0306104112819467,
+      "foreground_rmse_nm": 0.011667795787681163,
+      "build_ms": [
+        1.1614120448939502,
+        1.0234189685434103,
+        0.9872430237010121
+      ],
+      "projection_host_ms": [
+        9.586115018464625,
+        10.296079039108008,
+        9.118299989495426,
+        8.302532020024955,
+        8.351184951607138,
+        8.307849988341331,
+        8.632869983557612
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 8.346662662243876e-09,
+      "audited_pixels": [
+        {
+          "row": 636,
+          "col": 578,
+          "thickness_um": 0.7026710591162555,
+          "reference_um": 0.70276466366944
+        },
+        {
+          "row": 989,
+          "col": 1485,
+          "thickness_um": 2.0265349576220615,
+          "reference_um": 2.026276577457018
+        },
+        {
+          "row": 1165,
+          "col": 1304,
+          "thickness_um": 0.1545066794506056,
+          "reference_um": 0.15460792349347732
+        },
+        {
+          "row": 1395,
+          "col": 603,
+          "thickness_um": 34.8260800819844,
+          "reference_um": 34.82597575276302
+        }
+      ]
+    },
+    {
+      "mode": "float32",
+      "mesh": "bunny",
+      "angle_deg": 17,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 3,
+      "foreground_pixels": 924345,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 6.380438742006403,
+      "foreground_p99_error_nm": 0.03696351190404176,
+      "foreground_rmse_nm": 0.017519885680684365,
+      "build_ms": [
+        1.0246880119666457,
+        0.9709119913168252,
+        0.988687970675528
+      ],
+      "projection_host_ms": [
+        9.21374000608921,
+        10.204619029536843,
+        9.430563019122928,
+        8.28385999193415,
+        8.315148996189237,
+        8.186466991901398,
+        8.604775997810066
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 4.800241591208527e-08,
+      "audited_pixels": []
+    },
+    {
+      "mode": "float32",
+      "mesh": "bunny",
+      "angle_deg": 45,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 814102,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.034609224077288,
+      "foreground_p99_error_nm": 0.03643120675902633,
+      "foreground_rmse_nm": 0.012640648045256784,
+      "build_ms": [
+        1.0982209932990372,
+        1.070526021067053,
+        0.9878780110739172
+      ],
+      "projection_host_ms": [
+        9.221490996424109,
+        9.534158976748586,
+        8.57210997492075,
+        9.095979039557278,
+        8.5648910026066,
+        9.558823017869145,
+        9.465967013966292
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 3.310882384227609e-08,
+      "audited_pixels": [
+        {
+          "row": 1291,
+          "col": 652,
+          "thickness_um": 3.1016350021673134,
+          "reference_um": 3.101656739785261
+        }
+      ]
+    },
+    {
+      "mode": "float32",
+      "mesh": "bunny",
+      "angle_deg": 90,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 8,
+      "foreground_pixels": 739067,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.4249380014536555,
+      "foreground_p99_error_nm": 0.03180055429611287,
+      "foreground_rmse_nm": 0.014759748540348694,
+      "build_ms": [
+        1.0856789886020124,
+        1.8374280189163983,
+        1.0374910198152065
+      ],
+      "projection_host_ms": [
+        10.435917996801436,
+        9.08137101214379,
+        9.754678991157562,
+        9.712301020044833,
+        9.78949898853898,
+        10.033703001681715,
+        9.187627001665533
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 1.686442597983312e-08,
+      "audited_pixels": [
+        {
+          "row": 1138,
+          "col": 1220,
+          "thickness_um": 66.1457670503296,
+          "reference_um": 66.14578704995472
+        }
+      ]
+    },
+    {
+      "mode": "float32",
+      "mesh": "bunny",
+      "angle_deg": 135,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 870302,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 9.601445029416958,
+      "foreground_p99_error_nm": 0.03048547082818475,
+      "foreground_rmse_nm": 0.018948811091403128,
+      "build_ms": [
+        1.068540965206921,
+        1.8550349632278085,
+        1.3337379787117243
+      ],
+      "projection_host_ms": [
+        10.744482045993209,
+        9.572833019774407,
+        10.203904006630182,
+        9.447488992009312,
+        10.060813976451755,
+        10.254719003569335,
+        9.769625030457973
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 4.356798667497219e-08,
+      "audited_pixels": []
+    },
+    {
+      "mode": "float32",
+      "mesh": "armadillo",
+      "angle_deg": 0,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46528,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.554923580352434,
+      "foreground_p99_error_nm": 0.031240099487126863,
+      "foreground_rmse_nm": 0.013913372091779596,
+      "build_ms": [
+        13.614133989904076,
+        13.505237002391368,
+        13.768717995844781
+      ],
+      "projection_host_ms": [
+        2.8022610349580646,
+        3.1783519661985338,
+        2.7081979787908494,
+        2.703429025132209,
+        2.7542189927771688,
+        2.7286289841867983,
+        2.6722499751485884
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 2.134523027080837e-09
+    },
+    {
+      "mode": "float32",
+      "mesh": "armadillo",
+      "angle_deg": 17,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46567,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7808290433433912,
+      "foreground_p99_error_nm": 0.03135315675934312,
+      "foreground_rmse_nm": 0.010751551859331203,
+      "build_ms": [
+        14.614100975450128,
+        14.569124963600188,
+        14.80259996606037
+      ],
+      "projection_host_ms": [
+        2.84239201573655,
+        2.757276000920683,
+        2.789949008729309,
+        2.7551500243134797,
+        2.7306550182402134,
+        3.404096991289407,
+        2.692270965781063
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 4.275822317739708e-09
+    },
+    {
+      "mode": "float32",
+      "mesh": "armadillo",
+      "angle_deg": 45,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 44061,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.8174209058383567,
+      "foreground_p99_error_nm": 0.032286860350268405,
+      "foreground_rmse_nm": 0.012917375508087067,
+      "build_ms": [
+        14.875448017846793,
+        13.508212985470891,
+        13.285843946505338
+      ],
+      "projection_host_ms": [
+        3.427417017519474,
+        2.676486037671566,
+        2.610316965728998,
+        2.9335400322452188,
+        2.600156993139535,
+        2.5764500023797154,
+        3.343402990140021
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 2.5139937874507634e-09
+    },
+    {
+      "mode": "float32",
+      "mesh": "armadillo",
+      "angle_deg": 90,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 36307,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7699286100503107,
+      "foreground_p99_error_nm": 0.03272588569068629,
+      "foreground_rmse_nm": 0.01165679650707554,
+      "build_ms": [
+        13.984149030875415,
+        13.814186037052423,
+        13.83085100678727
+      ],
+      "projection_host_ms": [
+        2.616601006593555,
+        3.2239300198853016,
+        2.484609023667872,
+        2.4896470131352544,
+        2.5335379759781063,
+        2.4283400271087885,
+        2.4726520059630275
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 7.242131699024268e-10
+    },
+    {
+      "mode": "float32",
+      "mesh": "armadillo",
+      "angle_deg": 135,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 43768,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.3311180082330594,
+      "foreground_p99_error_nm": 0.032936875286630286,
+      "foreground_rmse_nm": 0.012857770147996715,
+      "build_ms": [
+        15.490500954911113,
+        15.080413955729455,
+        14.648644020780921
+      ],
+      "projection_host_ms": [
+        2.786025987006724,
+        2.6731290272437036,
+        2.5894640129990876,
+        2.635204989928752,
+        2.9485200066119432,
+        2.5860710302367806,
+        2.6063619880005717
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 7.580944877925988e-10
+    },
+    {
+      "mode": "mixed",
+      "mesh": "bunny",
+      "angle_deg": 0,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 1,
+      "foreground_pixels": 964268,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.1107898034482762,
+      "foreground_p99_error_nm": 0.02201185397776956,
+      "foreground_rmse_nm": 0.008625172406296613,
+      "build_ms": [
+        1.3504200032912195,
+        1.163290988188237,
+        1.8446340109221637
+      ],
+      "projection_host_ms": [
+        18.711744982283562,
+        16.707692004274577,
+        18.265086051542312,
+        18.563967023510486,
+        17.451444000471383,
+        17.54368597175926,
+        17.484224983491004
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 8.090858712173077e-09,
+      "audited_pixels": [
+        {
+          "row": 636,
+          "col": 578,
+          "thickness_um": 0.7026782782304508,
+          "reference_um": 0.70276466366944
+        },
+        {
+          "row": 989,
+          "col": 1485,
+          "thickness_um": 2.02581350094988,
+          "reference_um": 2.026276577457018
+        },
+        {
+          "row": 1165,
+          "col": 1304,
+          "thickness_um": 0.15450923740445432,
+          "reference_um": 0.15460792349347732
+        },
+        {
+          "row": 1395,
+          "col": 603,
+          "thickness_um": 34.82607280602679,
+          "reference_um": 34.82597575276302
+        }
+      ]
+    },
+    {
+      "mode": "mixed",
+      "mesh": "bunny",
+      "angle_deg": 17,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 924345,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 5.787386600545296,
+      "foreground_p99_error_nm": 0.026568491491866957,
+      "foreground_rmse_nm": 0.013074510309405206,
+      "build_ms": [
+        1.2492630048654974,
+        1.0339169530197978,
+        1.173265976831317
+      ],
+      "projection_host_ms": [
+        16.44733001012355,
+        15.21515497006476,
+        15.65335801569745,
+        15.742550021968782,
+        14.298497990239412,
+        15.364697959739715,
+        16.80150197353214
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 4.800241591208527e-08,
+      "audited_pixels": []
+    },
+    {
+      "mode": "mixed",
+      "mesh": "bunny",
+      "angle_deg": 45,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 814102,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.036428213480834,
+      "foreground_p99_error_nm": 0.0299451663543207,
+      "foreground_rmse_nm": 0.009902158974932813,
+      "build_ms": [
+        1.4715730212628841,
+        2.2259170073084533,
+        1.0800400050356984
+      ],
+      "projection_host_ms": [
+        15.656571951694787,
+        16.555593989323825,
+        15.384708007331938,
+        15.398478019051254,
+        16.523574013262987,
+        15.383663994725794,
+        15.505638031754643
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 3.310882384227609e-08,
+      "audited_pixels": [
+        {
+          "row": 1291,
+          "col": 652,
+          "thickness_um": 3.1016556931717787,
+          "reference_um": 3.101656739785261
+        }
+      ]
+    },
+    {
+      "mode": "mixed",
+      "mesh": "bunny",
+      "angle_deg": 90,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 3,
+      "foreground_pixels": 739067,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 1.580297551402471,
+      "foreground_p99_error_nm": 0.025121987798267728,
+      "foreground_rmse_nm": 0.01066254096450353,
+      "build_ms": [
+        1.4605349861085415,
+        1.4552889624610543,
+        1.4356760075315833
+      ],
+      "projection_host_ms": [
+        15.197328990325332,
+        15.53253800375387,
+        16.482495004311204,
+        15.635888034012169,
+        15.026186010800302,
+        15.012916002888232,
+        16.523380007129163
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 1.686442597983312e-08,
+      "audited_pixels": [
+        {
+          "row": 1138,
+          "col": 1220,
+          "thickness_um": 66.14578887820244,
+          "reference_um": 66.14578704995472
+        }
+      ]
+    },
+    {
+      "mode": "mixed",
+      "mesh": "bunny",
+      "angle_deg": 135,
+      "resolution": 2048,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 2,
+      "foreground_pixels": 870302,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 2.354103794610315,
+      "foreground_p99_error_nm": 0.023174669207133812,
+      "foreground_rmse_nm": 0.013350896061633028,
+      "build_ms": [
+        1.5117559814825654,
+        1.4751730486750603,
+        1.4102489803917706
+      ],
+      "projection_host_ms": [
+        14.512371039018035,
+        14.431976014748216,
+        15.09943197015673,
+        15.742499963380396,
+        15.957261028233916,
+        16.924611991271377,
+        16.592136991675943
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 4.356798667497219e-08,
+      "audited_pixels": []
+    },
+    {
+      "mode": "mixed",
+      "mesh": "armadillo",
+      "angle_deg": 0,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46528,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.5029071970773507,
+      "foreground_p99_error_nm": 0.027024712443610203,
+      "foreground_rmse_nm": 0.007982613728576803,
+      "build_ms": [
+        13.748173019848764,
+        14.5075450418517,
+        15.377108007669449
+      ],
+      "projection_host_ms": [
+        3.6274189478717744,
+        3.583465004339814,
+        3.597836010158062,
+        4.444372956641018,
+        3.584659018088132,
+        3.582626988645643,
+        3.5413919831626117
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 2.134523027080837e-09
+    },
+    {
+      "mode": "mixed",
+      "mesh": "armadillo",
+      "angle_deg": 17,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 46567,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7226213824299238,
+      "foreground_p99_error_nm": 0.02756755778001596,
+      "foreground_rmse_nm": 0.008101333356332837,
+      "build_ms": [
+        15.917840006295592,
+        14.932085992768407,
+        14.542694960255176
+      ],
+      "projection_host_ms": [
+        3.737922990694642,
+        3.6565809859894216,
+        4.78997896425426,
+        3.6694370210170746,
+        3.6398560041561723,
+        3.720240027178079,
+        4.539843008387834
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 4.275822317739708e-09
+    },
+    {
+      "mode": "mixed",
+      "mesh": "armadillo",
+      "angle_deg": 45,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 44061,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.7786168769204981,
+      "foreground_p99_error_nm": 0.02557058497302859,
+      "foreground_rmse_nm": 0.009491988867283738,
+      "build_ms": [
+        13.569237024057657,
+        13.412576983682811,
+        17.345882020890713
+      ],
+      "projection_host_ms": [
+        5.152427998837084,
+        4.331224015913904,
+        4.397307988256216,
+        4.350922012235969,
+        5.2847680053673685,
+        4.302984976675361,
+        4.103776009287685
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 2.2912241223228824e-09
+    },
+    {
+      "mode": "mixed",
+      "mesh": "armadillo",
+      "angle_deg": 90,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 36307,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.766290631243219,
+      "foreground_p99_error_nm": 0.025451809283857763,
+      "foreground_rmse_nm": 0.008416115230875546,
+      "build_ms": [
+        15.014539007097483,
+        17.698649025987834,
+        14.745419030077755
+      ],
+      "projection_host_ms": [
+        3.6282859509810805,
+        3.504487976897508,
+        4.821819020435214,
+        3.6125529441051185,
+        3.4948060056194663,
+        3.4759690170176327,
+        4.841613001190126
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 1.9293292956084826e-09
+    },
+    {
+      "mode": "mixed",
+      "mesh": "armadillo",
+      "angle_deg": 135,
+      "resolution": 512,
+      "nonfinite": 0,
+      "negative": 0,
+      "exceeding_pixels": 0,
+      "foreground_pixels": 43768,
+      "false_zero": 0,
+      "extra_positive": 0,
+      "max_error_nm": 0.39813310551971903,
+      "foreground_p99_error_nm": 0.025878533318298914,
+      "foreground_rmse_nm": 0.0076474627777226994,
+      "build_ms": [
+        17.84602296538651,
+        15.526440984103829,
+        14.20399098424241
+      ],
+      "projection_host_ms": [
+        3.9558109710924327,
+        3.982242022175342,
+        3.8048760034143925,
+        5.070158978924155,
+        3.823835984803736,
+        3.947947989217937,
+        3.7643149844370782
+      ],
+      "independent_reference_rays": 48,
+      "independent_reference_max_error_nm": 3.4719615810157754e-09
+    }
+  ]
+}

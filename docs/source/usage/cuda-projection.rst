@@ -6,7 +6,7 @@ Run the focused regression suite with a CUDA device and CuPy installed::
     SYRIS_REQUIRE_CUDA=1 python -m unittest syris.tests.test_cuda_projection -v
 
 Without ``SYRIS_REQUIRE_CUDA=1``, these tests skip when CUDA is unavailable.
-They compile the production kernels in both precisions and exercise the Python
+They compile the production kernels in all three modes and exercise the Python
 BVH builder and projector as well as individual device predicates.
 
 The references are analytic: shared triangle edges, box intersection lengths,
@@ -15,6 +15,76 @@ Additional cases cover hit-list overflow, transformed normals, sorted BVH
 leaves, conservative box clipping, and singleton trees. Checking BVH structure
 repeatedly can expose publication failures, but is not a proof of race freedom;
 the builder uses device-scope acquire/release publication for that purpose.
+
+Precision modes
+---------------
+
+Select a mode before constructing meshes and cameras::
+
+    syris.init(compute_backend="cuda", precision="float32")
+    syris.init(compute_backend="cuda", precision="mixed")
+    syris.init(compute_backend="cuda", precision="float64")
+
+These are alternative initializations. ``float32`` is the default.
+``mixed_precision=True`` and ``double_precision=True`` remain aliases for
+``mixed`` and ``float64``; conflicting settings raise ``ValueError``.
+OpenCL supports ``float32`` and ``float64`` with its existing projection path.
+
+.. list-table:: CUDA mesh projection
+   :header-rows: 1
+
+   * - Mode
+     - Geometry, rays and BVH
+     - Triangle arithmetic / stored hits
+     - Output
+   * - ``float32``
+     - Float32
+     - Float32 with existing double intermediates and edge fallback / Float32
+     - Float32
+   * - ``mixed``
+     - Float32
+     - Float64 / Float64
+     - Float32
+   * - ``float64``
+     - Float64
+     - Float64 / Float64
+     - Float64
+
+All CUDA modes use the original mesh's bounding-box centre as a stable local
+origin. Vertices are centred before the host transform; the matching transformed
+origin is subtracted from the camera before GPU conversion. Lengths are
+normalized with a power of two, preserving significands when scaling normal floating-point
+values. The normalized vertices and bounding boxes are cached when building
+the BVH. Returned thicknesses retain the configured length unit, and public
+mesh and camera poses retain their world coordinates.
+
+Mixed and Float64 modes compute sample positions as offsets from the detector
+centre. Parallel, cone-beam, local adaptive and staged adaptive sampling use
+the same formula. These are the same intended physical rays; only their
+floating-point evaluation changes. Mixed mode retains Float64 hit distances
+through sorting, duplicate handling and accumulation: promoting triangle
+arithmetic alone can still collapse distinct crossings when storing their
+distances in Float32. Float32 mode retains the corner-based ray formula because
+the revised formula exposed such a collision in the rounding experiments.
+
+These modes reduce specific rounding errors, but do not guarantee a prescribed
+accuracy or recover detail already lost in the input mesh. Float32 is intended
+for speed; mixed mode trades more arithmetic and hit-buffer memory for accuracy.
+Measure performance on the target GPU and workload. Mesh repair and its optional
+``float32_rounding`` step remain separate loading options.
+
+The mesh examples accept the same names::
+
+    python -m examples.mesh_scan_cuda --precision mixed
+
+Public API and coordinate-frame checks can be run with::
+
+    SYRIS_REQUIRE_CUDA=1 python -m unittest syris.tests.test_cuda_precision_modes -v
+
+For direct kernel users, the detector-origin argument denotes its corner in
+Float32 mode and its centre in mixed/Float64 mode. BVH arrays now contain local,
+normalized coordinates: recover world coordinates with
+``local / accelerator.coordinate_scale + accelerator.coordinate_origin``.
 
 Projection assumptions
 ----------------------

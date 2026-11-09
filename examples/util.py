@@ -47,16 +47,25 @@ def add_cuda_mesh_options(parser):
         help="Try bounded Float32 rounding after repair (experimental; requires --repair-mesh)",
     )
     precision = parser.add_mutually_exclusive_group()
+    precision.add_argument(
+        "--precision",
+        choices=("float32", "mixed", "float64"),
+        help="Mesh precision mode (default: float32; mixed requires CUDA)",
+    )
     precision.add_argument("--double-precision", action="store_true", help="Use double precision")
     precision.add_argument(
         "--mixed-precision",
         action="store_true",
-        help="CUDA Float32 storage/BVH with Float64 ray/triangle arithmetic (experimental)",
+        help="CUDA Float32 geometry/BVH/images with Float64 triangle arithmetic and hit distances",
     )
 
 
 def validate_cuda_mesh_options(parser, args):
     """Reject incompatible precision and repair options before loading a mesh."""
+    mode = getattr(args, "precision", None)
+    if mode is not None:
+        args.double_precision = mode == "float64"
+        args.mixed_precision = mode == "mixed"
     if args.float32_rounding and (not args.repair_mesh or args.double_precision):
         parser.error("--float32-rounding requires --repair-mesh without --double-precision")
 

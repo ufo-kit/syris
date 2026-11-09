@@ -1,392 +1,288 @@
 # Copyright (C) 2013-2023 Karlsruhe Institute of Technology
-#
-# This file is part of syris.
-#
-# This library is free software: you can redistribute it and/or
-# modify it under the terms of the GNU Lesser General Public
-# License as published by the Free Software Foundation, either
-# version 3 of the License, or (at your option) any later version.
-#
-# This library is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public
-# License along with this library. If not, see <http://www.gnu.org/licenses/>.
+# SPDX-License-Identifier: LGPL-3.0-or-later
 
-"""Laminography data set generation with mesh geometry."""
+"""Laminography data sets with matched OpenCL and CUDA projection settings."""
 
+import copy
 import itertools
 import logging
+import multiprocessing
 import os
 import time
 from functools import partial
-from multiprocessing import Lock, Pool
 
-import imageio
+import imageio.v2 as imageio
 import numpy as np
 import quantities as q
 
+import syris.config as cfg
 from syris.geometry import X_AX, Y_AX, Z_AX
 
+from .mesh_projection import (
+    Projector,
+    add_mesh_options,
+    cone_distances,
+    detector_center,
+    initialize,
+    load_mesh,
+    log_projection_setup,
+    positive_int,
+    rotation_span,
+    validate_mesh_options,
+)
 from .util import get_default_parser
 
-LOCK = Lock()
 LOG = logging.getLogger(__name__)
 
 
-def make_projection(shape, ps, axis, mesh, center, lamino_angle, tomo_angle, ss=1):
-    from syris.imageprocessing import bin_image
+def projection_angles(args, n):
+    count = int(np.pi * n) if args.num_projections is None else args.num_projections
+    return np.linspace(0, args.rotation_angle, count, endpoint=False) * q.deg
 
-    if axis == "z":
+
+def scan(mesh, projector, args, index=0):
+    """Rotate the mesh in a fixed detector frame, identically on both backends."""
+    angles = projection_angles(args, projector.shape[0])
+    indices = np.array_split(np.arange(len(angles)), args.num_devices)[index]
+    if not len(indices):
+        return None
+    point = detector_center(projector.shape, projector.pixel_size * projector.ss)
+    lamino_angle = args.lamino_angle
+    if args.rotation_axis == "z":
         lamino_angle = lamino_angle + 90 * q.deg
-        tomo_angle = -tomo_angle
-    axis = Y_AX if axis == "y" else Z_AX
-    mesh.clear_transformation()
-    mesh.translate(center)
-    mesh.rotate(lamino_angle, X_AX)
-    mesh.rotate(tomo_angle, axis)
+    axis = Y_AX if args.rotation_axis == "y" else Z_AX
 
-    orig_shape = shape
-    shape = tuple([n * ss for n in orig_shape])
-    ps = ps / ss
+    def project(index, shift=0 * q.m):
+        mesh.clear_transformation()
+        center = point.copy()
+        center[0] += shift
+        mesh.translate(center)
+        mesh.rotate(lamino_angle, X_AX)
+        angle = angles[index] if args.rotation_axis == "y" else -angles[index]
+        mesh.rotate(angle, axis)
+        return projector.project()
 
-    # t=None for trajectory override
-    projection = mesh.project(shape, ps, t=None)
-    if ss > 1:
-        projection = bin_image(projection, orig_shape, average=True)
-
-    return projection.get()
-
-
-def scan(
-    shape,
-    ps,
-    axis,
-    mesh,
-    angles,
-    prefix,
-    lamino_angle=45 * q.deg,
-    index=0,
-    num_devices=1,
-    shift_coeff=1e4,
-    ss=1,
-):
-    """Make a scan of tomographic angles. *shift_coeff* is the coefficient multiplied by pixel size
-    which shifts the triangles to get rid of faulty pixels.
-    """
-    psm = ps.simplified.magnitude
-    log_fmt = "{}: {:>04}/{:>04} in {:6.2f} s, angle: {:>6.2f} deg, maxima: {}"
-
-    # Move to the middle of the FOV
-    point = (shape[1] * psm / 2, shape[0] * psm / 2, 0) * q.m
-    if index == 0:
-        LOG.info("Mesh shift: {}".format(point.rescale(q.um)))
-        LOG.info("Mesh shift in pixels: {}".format((point / ps).simplified.magnitude))
-
-    # Compute this device portion of tomographic angles
-    enumerated = list(enumerate(angles))
-    num_angles = len(enumerated)
-    per_device = num_angles // num_devices
-    stop = None if index == num_devices - 1 else (index + 1) * per_device
-    mine = enumerated[index * per_device : stop]
+    for _ in range(args.warmup):
+        project(indices[0])
+    LOG.info(
+        "Worker %s: warm-up complete (%s projections); %s measured views",
+        index,
+        args.warmup,
+        len(indices),
+    )
 
     last = None
-    # Projections which metric exceeds allowed limit
     checked_indices = []
-    # Projections which exceed the allowed metric difference even after more iterations
     bad_indices = []
-    for i, angle in mine:
-        st = time.time()
-        projs = [make_projection(shape, ps, axis, mesh, point, lamino_angle, angle, ss=ss)]
-        max_vals = [projs[-1].max()]
-        best = 0
-        if last is not None and max_vals[0] > 2 * last or np.isnan(max_vals[0]):
-            # Check for faulty pixels
-            checked_indices.append(i)
-            for shift in [-psm / shift_coeff, psm / shift_coeff]:
-                shifted_point = point + (shift, 0, 0) * q.m
-                projs.append(
-                    make_projection(
-                        shape,
-                        ps,
-                        axis,
-                        mesh,
-                        shifted_point,
-                        lamino_angle,
-                        angle,
-                        ss=ss,
-                    )
-                )
-                max_vals.append(projs[-1].max())
-            best = np.argmin(max_vals)
-            if max_vals[best] > 2 * last or np.isnan(max_vals[best]):
-                bad_indices.append(i)
-        duration = time.time() - st
-        with LOCK:
-            LOG.info(
-                log_fmt.format(
-                    index,
-                    i + 1,
-                    num_angles,
-                    duration,
-                    float(angle.magnitude),
-                    max_vals,
-                )
-            )
-        imageio.imwrite(prefix.format(i), projs[best])
-        last = max_vals[best]
+    durations = []
+    start = time.perf_counter()
+    for i in indices:
+        tick = time.perf_counter()
+        proj = project(i)
+        maximum = proj.max()
+        suspicious = not np.isfinite(maximum) or (last is not None and maximum > 2 * last)
+        if args.test_pixels and suspicious:
+            checked_indices.append(int(i))
+            candidates = [proj]
+            shift = projector.pixel_size * projector.ss / 1e4
+            candidates.extend(project(i, sign * shift) for sign in (-1, 1))
+            maxima = [p.max() for p in candidates]
+            scores = [m if np.isfinite(m) else np.inf for m in maxima]
+            best = int(np.argmin(scores))
+            proj, maximum = candidates[best], maxima[best]
+            if not np.isfinite(maximum) or (last is not None and maximum > 2 * last):
+                bad_indices.append(int(i))
+        duration = time.perf_counter() - tick
+        durations.append(duration)
+        LOG.info(
+            "%s: %04d/%04d in %.6f s; angle %.6f deg; maximum %.8g m",
+            index,
+            i + 1,
+            len(angles),
+            duration,
+            angles[i].magnitude,
+            maximum,
+        )
+        imageio.imwrite(args.prefix.format(i), proj)
+        last = maximum if np.isfinite(maximum) else None
 
-    with LOCK:
-        LOG.info("Checked indices: {}".format(checked_indices))
-        LOG.info("Which map to files: {}".format([prefix.format(i) for i in checked_indices]))
-        LOG.info("Exceeding indices: {}".format(bad_indices))
-        LOG.info("Which map to files: {}".format([prefix.format(i) for i in bad_indices]))
-
-    return projs[best]
+    LOG.info(
+        "Worker %s projection time (pose, build, trace, transfer, averaging): %.6f s; "
+        "median: %.6f s",
+        index,
+        sum(durations),
+        np.median(durations),
+    )
+    LOG.info(
+        "Worker %s wall time including file output: %.6f s", index, time.perf_counter() - start
+    )
+    LOG.info("Retried views: %s; still suspect: %s", checked_indices, bad_indices)
+    return proj
 
 
 def make_ground_truth(args, shape, mesh):
-    """Shape is (y, x), so the total number of slices is y."""
-    import syris.config as cfg
-    from syris.imageprocessing import bin_image
-
+    """Write occupancy slices using the shared OpenCL slicer, with CPU averaging."""
     if args.z_chunk % args.supersampling:
-        raise ValueError("z_chunk must be dividable by supersampling")
-
-    queue = cfg.OPENCL.queue
-    # Move the mesh to the middle
-    ps = args.pixel_size / args.supersampling
-    psm = ps.simplified.magnitude
-    orig_shape = shape
-    shape = tuple([n * args.supersampling for n in shape])
-    # Make sure the projections are computed with the same x- and y-offsets
-    point = (shape[1] * psm / 2, shape[0] * psm / 2, shape[1] * psm / 2) * q.m
-    LOG.info("Mesh shift: {}".format(point.rescale(q.um)))
-    LOG.info("Mesh shift in pixels: {}".format((point / args.pixel_size).simplified.magnitude))
+        raise ValueError("z_chunk must be divisible by supersampling")
+    ss = args.supersampling
+    ps = args.pixel_size / ss
+    fine_shape = tuple(n * ss for n in shape)
+    point = detector_center(shape, args.pixel_size)
+    point[2] = shape[1] * args.pixel_size / 2
+    mesh.clear_transformation()
     mesh.translate(point)
     mesh.transform()
     mesh.sort()
-
-    z_stack = np.empty((args.supersampling,) + orig_shape, dtype=cfg.PRECISION.np_float)
-
-    for i in range(0, shape[0], args.z_chunk):
-        end = min(i + args.z_chunk, shape[0])
-        offset = (0, i * ps.rescale(q.um).magnitude, 0) * q.um
-        slices = mesh.compute_slices((end - i,) + shape, ps, offset=offset).get()
-        LOG.info("Computing slices {}-{}".format(i, end))
-        enumerated = list(enumerate(slices))[:: args.supersampling]
-        for j, sl in enumerated:
-            # Z-dimension downsampling
-            for k in range(args.supersampling):
-                z_stack[k] = bin_image(slices[j + k], orig_shape, average=True, queue=queue).get()
-            # Sum only the slices which are present (last run might not go to the end)
-            sl = np.mean(z_stack[: slices.shape[0]], axis=0)
-            index = (i + j) // args.supersampling
-            imageio.imwrite(args.prefix.format(index), sl)
-
+    for i in range(0, fine_shape[0], args.z_chunk):
+        end = min(i + args.z_chunk, fine_shape[0])
+        offset = np.array([0, i * float(ps.rescale(q.m).magnitude), 0]) * q.m
+        slices = mesh.compute_slices((end - i,) + fine_shape, ps, offset=offset).get()
+        # The slicer's stack axis is mesh y; each image has (z, x) axes.
+        slices = (
+            slices.astype(cfg.PRECISION.np_float)
+            .reshape(
+                (end - i) // ss,
+                ss,
+                shape[0],
+                ss,
+                shape[1],
+                ss,
+            )
+            .mean(axis=(1, 3, 5))
+        )
+        LOG.info("Computing slices %s-%s", i // ss, end // ss)
+        for j, sl in enumerate(slices):
+            imageio.imwrite(args.prefix.format(i // ss + j), sl)
     return sl
 
 
-def process(args, device_index):
-    import syris
-    from syris.bodies.mesh import Mesh, read_blender_obj
-    from syris.geometry import Trajectory
-
-    syris.init(
-        device_index=device_index,
-        logfile=args.logfile,
-        double_precision=args.double_precision,
-    )
-    path, ext = os.path.splitext(args.input)
-    if ext == ".obj":
-        tri = read_blender_obj(args.input)
-    else:
-        tri = np.load(args.input)
-    tri = tri * q.um
-
-    tr = Trajectory([(0, 0, 0)] * q.um)
-    mesh = Mesh(tri, tr, center=None, iterations=args.supersampling_projection)
-
-    if args.n:
-        n = args.n
-        fov = n * args.pixel_size
-    else:
-        fov = max([ends[1] - ends[0] for ends in mesh.extrema[:-1]]) * 1.1
-        n = int(np.ceil((fov / args.pixel_size).simplified.magnitude))
+def process(args, index=0):
+    initialize(args, args.device_index + index)
+    mesh = load_mesh(args)
+    span = rotation_span(mesh)
+    if args.conebeam:
+        args.sod, args.sdd = cone_distances(args, span)
+        span *= float((args.sdd / args.sod).simplified.magnitude)
+    n = args.n
+    if n is None:
+        n = int(np.ceil(float((span * args.margin / args.pixel_size).simplified.magnitude)))
     shape = (n, n)
-
     if args.make_gt:
-        LOG.info("--- Args info ---")
-        log_attributes(args)
-
         return make_ground_truth(args, shape, mesh)
-    else:
-        num_projs = int(np.pi * n) if args.num_projections is None else args.num_projections
-        angles = np.linspace(0, args.rotation_angle, num_projs, endpoint=False) * q.deg
-        if device_index == 0:
-            LOG.info("n: {}, ps: {}, FOV: {}".format(n, args.pixel_size, fov))
-            LOG.info("Total rotation angle: {} deg".format(args.rotation_angle))
-            LOG.info("Number of projections: {}".format(num_projs))
-            LOG.info("--- Mesh info ---")
-            log_attributes(mesh)
-            LOG.info("--- Args info ---")
-            log_attributes(args)
-
-        return scan(
-            shape,
-            args.pixel_size,
-            args.rotation_axis,
-            mesh,
-            angles,
-            args.prefix,
-            lamino_angle=args.lamino_angle,
-            index=device_index,
-            num_devices=args.num_devices,
-            ss=args.supersampling,
-        )
+    log_projection_setup(args, shape, args.pixel_size)
+    LOG.info(
+        "Angles: %s views over [0, %s) degrees; axis %s; laminography angle %s",
+        len(projection_angles(args, n)),
+        args.rotation_angle,
+        args.rotation_axis,
+        args.lamino_angle,
+    )
+    return scan(mesh, Projector(mesh, shape, args.pixel_size, args), args, index=index)
 
 
-def parse_args():
+def parse_args(argv=None, backend="opencl"):
     parser = get_default_parser(__doc__)
-    parser.add_argument("input", type=str, help="Blender .obj input file name")
-    parser.add_argument("--n", type=int, help="Number of pixels")
+    add_mesh_options(parser)
+    parser.add_argument("input_path", nargs="?", help="Mesh file (alias for --input)")
+    parser.add_argument("--input", help="Mesh file; omitted: built-in cube")
     parser.add_argument(
-        "--supersampling-projection",
-        type=int,
-        default=1,
-        help="Supersampling for mesh projections computation",
+        "--n", type=positive_int, help="Detector width and height; omitted: fit mesh"
+    )
+    parser.add_argument("--margin", type=float, default=1.2, help="Automatic FOV margin factor")
+    parser.add_argument("--dset", help="Data set name; omitted: mesh filename or cube_default")
+    parser.add_argument("--num-projections", type=positive_int)
+    parser.add_argument("--out-directory", default="dataset")
+    parser.add_argument(
+        "--pixel-size", type=float, default=[750.0], nargs="+", help="Pixel size in nm"
     )
     parser.add_argument(
-        "--dset",
-        type=str,
-        help="Data set name, if not specified guessed from input",
-    )
-    parser.add_argument("--num-projections", type=int, help="Number of projections")
-    parser.add_argument(
-        "--out-directory",
-        type=str,
-        default="dataset",
-        help="Output directory, result goes to 'out-directory/dset/projections'"
-        "or 'out-directory/dset/truth', depending on the --make-gt switch",
+        "--rotation-angle", type=float, default=180, help="Angular range in degrees"
     )
     parser.add_argument(
-        "--pixel-size",
-        type=float,
-        default=[750.0],
-        nargs="+",
-        help="Pixel size in nm",
+        "--lamino-angle", type=float, default=[5], nargs="+", help="Tilt in degrees"
     )
-    parser.add_argument(
-        "--rotation-angle",
-        type=float,
-        default=180,
-        help="Total rotation angle in degrees",
-    )
-    parser.add_argument(
-        "--lamino-angle",
-        type=float,
-        default=[5],
-        nargs="+",
-        help="Laminographic angle in degrees",
-    )
-    parser.add_argument(
-        "--rotation-axis",
-        type=str,
-        choices=["y", "z"],
-        default=["y"],
-        nargs="+",
-        help="Rotation axis (y - up, z - beam direction)",
-    )
-    parser.add_argument(
-        "--num-devices",
-        type=int,
-        default=1,
-        help="Number of compute devices to use",
-    )
+    parser.add_argument("--rotation-axis", choices=["y", "z"], default=["y"], nargs="+")
+    parser.add_argument("--num-devices", type=positive_int, default=1)
     parser.add_argument(
         "--supersampling",
-        type=int,
+        type=positive_int,
         default=[1],
         nargs="+",
-        help="Supersampling computes with n-times more pixels than usual",
+        help="Uniform samples per pixel axis; average the resulting s by s samples",
     )
-    parser.add_argument("--double-precision", action="store_true", help="Use double precision")
-    # Ground truth related
+    parser.add_argument("--z-chunk", type=positive_int, default=100)
     parser.add_argument(
-        "--z-chunk",
-        type=int,
-        default=100,
-        help="Number of ground truth slices to compute during one pass",
+        "--make-gt", action="store_true", help="Write occupancy slices using OpenCL"
     )
-    parser.add_argument(
-        "--make-gt",
+    testing = parser.add_mutually_exclusive_group()
+    testing.add_argument(
+        "--test-pixels",
         action="store_true",
-        help="Create ground truth instead of projections",
+        help="Opt in to shifted retries of suspect projections",
     )
-
-    return parser.parse_args()
-
-
-def main():
-    args = parse_args()
-    combinations = list(
-        itertools.product(
-            args.lamino_angle,
-            args.pixel_size,
-            args.rotation_axis,
-            args.supersampling,
-        )
+    testing.add_argument(
+        "--skip-pixel-testing",
+        action="store_false",
+        dest="test_pixels",
+        help="Disable shifted retries (the default)",
     )
-    if args.make_gt:
-        image_directory = "truth"
-        file_prefix = "slice"
-    else:
-        image_directory = "projections"
-        file_prefix = image_directory[:-1]
+    parser.set_defaults(test_pixels=False)
+    args = parser.parse_args(argv)
+    validate_mesh_options(parser, args, backend)
+    if args.input is not None and args.input_path is not None:
+        parser.error("Specify the mesh either positionally or with --input")
+    args.input = args.input if args.input is not None else args.input_path
+    if args.margin <= 0 or any(ps <= 0 for ps in args.pixel_size):
+        parser.error("--margin and --pixel-size must be positive")
+    if args.make_gt and args.num_devices != 1:
+        parser.error("--make-gt uses one OpenCL device; set --num-devices 1")
+    if args.make_gt and any(args.z_chunk % ss for ss in args.supersampling):
+        parser.error("--z-chunk must be divisible by every --supersampling factor")
+    return args
 
-    file_prefix += "_{:>04}.tif"
 
-    devices = list(range(args.num_devices))
-    pool = Pool(processes=args.num_devices)
-
-    for lamino_angle, pixel_size, rotation_axis, ss in combinations:
-        # Prepare output
-        if args.dset is None:
-            dset = os.path.splitext(os.path.basename(args.input))[0]
-        else:
-            dset = args.dset
-        if len(combinations) > 1:
-            dset += "_lamino_angle_{:>02}_deg".format(int(lamino_angle))
-            dset += "_axis_{}".format(rotation_axis)
-            dset += "_ps_{:>04}_nm".format(int(pixel_size))
-            dset += "_ss_{:>02}".format(ss)
-
-        args.prefix = os.path.join(args.out_directory, dset, image_directory, file_prefix)
-        args.logfile = os.path.join(args.out_directory, dset, "simulation.log")
-        directory = os.path.dirname(args.prefix)
-        if not os.path.exists(directory):
-            os.makedirs(directory, mode=0o755)
-
-        args.pixel_size = pixel_size * q.nm
-        args.lamino_angle = lamino_angle * q.deg
-        args.rotation_axis = rotation_axis
-        args.supersampling = ss
-
+def main(argv=None, backend="opencl"):
+    args = parse_args(argv, backend=backend)
+    combinations = itertools.product(
+        args.lamino_angle,
+        args.pixel_size,
+        args.rotation_axis,
+        args.supersampling,
+    )
+    multiple = (
+        len(args.lamino_angle)
+        * len(args.pixel_size)
+        * len(args.rotation_axis)
+        * len(args.supersampling)
+    ) > 1
+    image_directory, file_prefix = (
+        ("truth", "slice") if args.make_gt else ("projections", "projection")
+    )
+    result = None
+    for angle, pixel_size, axis, ss in combinations:
+        run = copy.copy(args)
+        dset = args.dset
+        if dset is None:
+            dset = (
+                os.path.splitext(os.path.basename(args.input))[0] if args.input else "cube_default"
+            )
+        if multiple:
+            dset += f"_lamino_angle_{angle:g}_deg_axis_{axis}_ps_{pixel_size:g}_nm_ss_{ss:02}"
+        directory = os.path.join(args.out_directory, dset, image_directory)
+        os.makedirs(directory, exist_ok=True)
+        run.prefix = os.path.join(directory, file_prefix + "_{:04}.tif")
+        run.logfile = os.path.join(args.out_directory, dset, "simulation.log")
+        run.pixel_size = pixel_size * q.nm
+        run.lamino_angle = angle * q.deg
+        run.rotation_axis = axis
+        run.supersampling = ss
         if args.num_devices == 1:
-            # Easier exception message handling for debugging
-            process(args, 0)
+            result = process(run)
         else:
-            exec_func = partial(process, args)
-            pool.map(exec_func, devices)
-
-
-def log_attributes(obj):
-    """Log object *obj* attributes."""
-    for attr in dir(obj):
-        if not attr.startswith("_") and not callable(getattr(obj, attr)):
-            LOG.info("{}: {}".format(attr, getattr(obj, attr)))
+            # Spawn avoids inheriting GPU contexts; each worker owns disjoint file indices.
+            with multiprocessing.get_context("spawn").Pool(args.num_devices) as pool:
+                pool.map(partial(process, run), range(args.num_devices))
+    return result
 
 
 if __name__ == "__main__":

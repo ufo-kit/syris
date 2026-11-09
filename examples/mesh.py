@@ -1,160 +1,144 @@
 # Copyright (C) 2013-2023 Karlsruhe Institute of Technology
-#
-# This file is part of syris.
-#
-# This library is free software: you can redistribute it and/or
-# modify it under the terms of the GNU Lesser General Public
-# License as published by the Free Software Foundation, either
-# version 3 of the License, or (at your option) any later version.
-#
-# This library is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-# Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public
-# License along with this library. If not, see <http://www.gnu.org/licenses/>.
+# SPDX-License-Identifier: LGPL-3.0-or-later
 
-"""Mesh projection and slice."""
+"""Rotate and project a mesh with OpenCL; mesh_cuda uses the same workflow."""
 
 import logging
 import time
 
-import imageio
+import imageio.v2 as imageio
 import matplotlib.pyplot as plt
 import numpy as np
 import quantities as q
 import tqdm
 
-import syris
-import syris.geometry as geom
-from syris.bodies.mesh import Mesh, make_cube, read_blender_obj
+from syris.geometry import X_AX, Y_AX
 
+from .mesh_projection import (
+    Projector,
+    add_mesh_options,
+    cone_distances,
+    detector_center,
+    initialize,
+    load_mesh,
+    log_projection_setup,
+    positive_int,
+    rotation_span,
+    validate_mesh_options,
+)
 from .util import get_default_parser, show
 
 LOG = logging.getLogger(__name__)
 
 
-def main():
-    """Main function."""
-    args = parse_args()
-    syris.init(loglevel=logging.INFO, double_precision=args.double_precision)
-    units = q.Quantity(1, args.units)
-    triangles = make_cube().magnitude if args.input is None else read_blender_obj(args.input)
-    triangles = triangles * units
-    tr = geom.Trajectory([(0, 0, 0)] * units)
-    mesh = Mesh(triangles, tr, center=args.center, iterations=args.supersampling)
-    LOG.info("Number of triangles: {}".format(mesh.num_triangles))
+def main(argv=None, backend="opencl"):
+    args = parse_args(argv, backend=backend)
+    initialize(args, args.device_index)
+    mesh = load_mesh(args)
+    shape = (args.n_y, args.n_x)
+    span = rotation_span(mesh)
+    magnification = 1
+    if args.conebeam:
+        args.sod, args.sdd = cone_distances(args, span)
+        magnification = float((args.sdd / args.sod).simplified.magnitude)
+    pixel_size = args.pixel_size
+    if pixel_size is None:
+        pixel_size = span * args.margin * magnification / min(shape)
+    center = detector_center(shape, pixel_size)
+    if args.translate is not None:
+        center[:2] = args.translate
+    projector = Projector(mesh, shape, pixel_size, args)
+    log_projection_setup(args, shape, pixel_size)
 
-    shape = (args.n, args.n)
-    if args.pixel_size is None:
-        if args.input is None:
-            fov = 4.0 * units
-        else:
-            # Maximum sample size in x and y direction
-            max_diff = np.max(mesh.extrema[:-1, 1] - mesh.extrema[:-1, 0])
-            fov = max_diff
-        fov *= args.margin
-        args.pixel_size = fov / args.n
-    else:
-        fov = args.n * args.pixel_size
+    def set_pose(index):
+        mesh.clear_transformation()
+        mesh.translate(center)
+        mesh.rotate(args.x_rotate, X_AX)
+        mesh.rotate(index * args.y_rotate, Y_AX)
 
-    if args.translate is None:
-        translate = (
-            fov.simplified.magnitude / 2.0,
-            fov.simplified.magnitude / 2.0,
-            0,
-        ) * q.m
-    else:
-        translate = (
-            args.translate[0].simplified.magnitude,
-            args.translate[1].simplified.magnitude,
-            0,
-        ) * q.m
-    LOG.info("Translation: {}".format(translate.rescale(q.um)))
-
-    mesh.translate(translate)
-    mesh.rotate(args.x_rotate, geom.X_AX)
-
-    fmt = "n: {}, pixel size: {}, FOV: {}"
-    LOG.info(fmt.format(args.n, args.pixel_size.rescale(q.um), fov.rescale(q.um)))
-    st = time.time()
+    for _ in range(args.warmup):
+        set_pose(0)
+        projector.project()
+    LOG.info("Warm-up complete: %s untimed projection(s)", args.warmup)
+    durations = []
+    start = time.perf_counter()
     for i in tqdm.tqdm(range(args.num_y_rotations)):
-        proj = mesh.project(shape, args.pixel_size, t=None).get()
+        tick = time.perf_counter()
+        set_pose(i)
+        proj = projector.project()
+        durations.append(time.perf_counter() - tick)
         if args.projection_filename is not None:
-            imageio.imwrite(args.projection_filename + f"_{i:>05}.tif", proj)
-        mesh.rotate(args.y_rotate, geom.Y_AX)
-
-    LOG.info("Duration: {} s".format(time.time() - st))
-    offset = (0, translate[1].simplified, -(fov / 2.0).simplified) * q.m
+            imageio.imwrite(f"{args.projection_filename}_{i:05}.tif", proj)
+    LOG.info(
+        "Projection time (pose, build, trace, transfer, averaging): %.6f s; median: %.6f s",
+        sum(durations),
+        np.median(durations),
+    )
+    LOG.info("Wall time including file output: %.6f s", time.perf_counter() - start)
 
     if args.compute_slice:
-        sl = mesh.compute_slices((1,) + shape, args.pixel_size, offset=offset).get()[0]
+        # The slicer is OpenCL-only, including when invoked through mesh_cuda.
+        LOG.info("Slice generation uses OpenCL in both examples")
+        mesh.transform()
+        mesh.sort()
+        offset = (
+            np.array(
+                [
+                    0,
+                    float(center[1].rescale(q.m).magnitude),
+                    -shape[0] * float(pixel_size.rescale(q.m).magnitude) / 2,
+                ]
+            )
+            * q.m
+        )
+        sl = mesh.compute_slices((1,) + shape, pixel_size, offset=offset).get()[0]
         if args.slice_filename is not None:
             imageio.imwrite(args.slice_filename, sl)
-        show(sl, title="Slice at y = {}".format(args.n / 2))
+        if not args.no_show:
+            show(sl, title="Slice")
+    if not args.no_show:
+        show(proj, title="Projection thickness [m]")
+        plt.show()
+    return proj
 
-    show(proj, title="Projection")
-    plt.show()
 
-
-def parse_args():
-    """Parse command line arguments."""
+def parse_args(argv=None, backend="opencl"):
+    """Both entry points accept the same geometry and sampling arguments."""
     parser = get_default_parser(__doc__)
-
-    parser.add_argument("--input", type=str, help="Input .obj file")
-    parser.add_argument("--units", type=str, default="um", help="Mesh physical units")
-    parser.add_argument("--n", type=int, default=256, help="Number of pixels")
+    add_mesh_options(parser)
+    parser.add_argument("--input", help="Mesh file; omitted: built-in cube")
+    parser.add_argument("--n", type=positive_int, default=256, help="Default detector width/height")
+    parser.add_argument("--n-y", type=positive_int, help="Detector rows (overrides --n)")
+    parser.add_argument("--n-x", type=positive_int, help="Detector columns (overrides --n)")
+    parser.add_argument("--pixel-size", type=float, help="Pixel size; omitted: fit all rotations")
+    parser.add_argument("--pixel-size-units", default="um")
+    parser.add_argument("--margin", type=float, default=1.2, help="Automatic FOV margin factor")
     parser.add_argument(
         "--supersampling",
-        type=int,
+        type=positive_int,
         default=1,
-        help="Supersampling for mesh computation",
+        help="Uniform samples per pixel axis; average the resulting s by s samples",
     )
-    parser.add_argument("--pixel-size", type=float, help="Pixel size in um")
-    parser.add_argument("--center", type=str, help="Mesh centering on creation")
-    parser.add_argument("--translate", type=float, nargs=2, help="Translation as (x, y) in um")
-    parser.add_argument(
-        "--x-rotate",
-        type=float,
-        default=0.0,
-        help="Rotation around x axis [deg]",
-    )
-    parser.add_argument(
-        "--y-rotate",
-        type=float,
-        default=0.0,
-        help="Rotation around y axis [deg]",
-    )
-    parser.add_argument(
-        "--num-y-rotations",
-        type=int,
-        default=1,
-        help="How many times rotate around y axis (tomography simulation)",
-    )
-    parser.add_argument(
-        "--margin",
-        type=float,
-        default=1.0,
-        help="Margin in factor of the full FOV",
-    )
-    parser.add_argument(
-        "--projection-filename",
-        type=str,
-        help="Save projection to this filename prefix (.tif is appended)",
-    )
-    parser.add_argument("--compute-slice", action="store_true", help="Compute also one slice")
-    parser.add_argument("--slice-filename", type=str, help="Save slice to this filename")
-    parser.add_argument("--double-precision", action="store_true", help="Use double precision")
-
-    args = parser.parse_args()
+    parser.add_argument("--translate", type=float, nargs=2, help="Mesh center (x, y) in um")
+    parser.add_argument("--x-rotate", type=float, default=0, help="Initial x rotation in degrees")
+    parser.add_argument("--y-rotate", type=float, default=0, help="Y rotation step in degrees")
+    parser.add_argument("--num-y-rotations", type=positive_int, default=1)
+    parser.add_argument("--projection-filename", help="TIFF prefix; appends _00000.tif, etc.")
+    parser.add_argument("--compute-slice", action="store_true", help="Also compute an OpenCL slice")
+    parser.add_argument("--slice-filename", help="Slice output filename")
+    parser.add_argument("--no-show", action="store_true", help="Do not open plotting windows")
+    args = parser.parse_args(argv)
+    validate_mesh_options(parser, args, backend)
+    if args.margin <= 0 or (args.pixel_size is not None and args.pixel_size <= 0):
+        parser.error("--margin and --pixel-size must be positive")
+    args.n_y = args.n if args.n_y is None else args.n_y
+    args.n_x = args.n if args.n_x is None else args.n_x
     if args.pixel_size is not None:
-        args.pixel_size = args.pixel_size * q.um
-    args.x_rotate = args.x_rotate * q.deg
-    args.y_rotate = args.y_rotate * q.deg
+        args.pixel_size *= q.Quantity(1, args.pixel_size_units)
+    args.x_rotate *= q.deg
+    args.y_rotate *= q.deg
     if args.translate is not None:
-        args.translate = args.translate * q.um
-
+        args.translate = np.array(args.translate) * q.um
     return args
 
 

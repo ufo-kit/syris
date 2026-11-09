@@ -7,6 +7,11 @@ projections. Raw results include the source hashes used for that experiment.
 The hardware so far is an RTX 2000 Ada. See :doc:`cuda-performance` for the first
 round's detailed methodology and reproduction commands.
 
+The measurements below predate the centred-coordinate precision modes.
+Their mixed mode used Float32 hit storage. Current mode definitions and
+validation are described in :doc:`cuda-projection`; historical timings and
+claims of identical outputs apply to the recorded source versions.
+
 Confirmed useful
 ----------------
 

@@ -36,15 +36,20 @@ class Precision(object):
     OpenCL data types. If *double* is True, double precision is used.
     """
 
-    def __init__(self, double=False):
-        self.set_precision(double)
+    def __init__(self, double=False, *, mixed=False):
+        self.set_precision(double, mixed=mixed)
 
     def is_single(self):
         """Return True if the precision is single."""
         return self.cl_float == 4
 
-    def set_precision(self, double):
+    def set_precision(self, double, *, mixed=False):
         """If *double* is True set the double precision."""
+        if double and mixed:
+            raise ValueError("Choose double or mixed precision, not both.")
+        self.mixed = mixed
+        self.mode = "float64" if double else "mixed" if mixed else "float32"
+        self.centered_rays = double or mixed
         if double:
             self.cl_float = 8
             self.cl_cplx = 16

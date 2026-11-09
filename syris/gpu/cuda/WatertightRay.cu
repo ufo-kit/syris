@@ -264,7 +264,7 @@ __device__ double boundary_distance(const T *x, const T *y, const T *z,
 
 __device__ bool WatertightRay::intersects(
     FP_T4 const &V1, FP_T4 const &V2, FP_T4 const &V3,
-    FP_T &t, unsigned col, unsigned row, bool *boundary) const
+    HIT_T &t, unsigned col, unsigned row, bool *boundary) const
 {
 #ifdef SYRIS_MIXED_PRECISION
     // Promote BEFORE subtracting or shearing: promoting rounded Float32
@@ -324,7 +324,7 @@ __device__ bool WatertightRay::intersects(
     else if (w == 0.0) distance = boundary_distance(x, y, z, 0, 1, sz);
     else distance = (fma(u, double(z[0]), fma(v, double(z[1]), w * double(z[2]))) / det) * double(sz);
 
-    t = FP_T(distance);
+    t = HIT_T(distance);
     if (boundary) *boundary = u == 0.0 || v == 0.0 || w == 0.0;
     return isfinite(t) && t > m_epsilons.tri_ray_tmin;
 }

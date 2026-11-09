@@ -235,13 +235,15 @@ def main():
         float32_rounding=args.float32_rounding,
     )
 
-    mesh.build_accelerator()
+    accelerator = mesh.build_accelerator()
 
     plotter = pv.Plotter()
 
     tree = mesh.tree
-    bbMin_all_raw = tree["bbMin"][:, :3].get()
-    bbMax_all_raw = tree["bbMax"][:, :3].get()
+    bbMin_all_raw = tree["bbMin"][:, :3].get().astype(np.float64)
+    bbMax_all_raw = tree["bbMax"][:, :3].get().astype(np.float64)
+    bbMin_all_raw = bbMin_all_raw / accelerator.coordinate_scale + accelerator.coordinate_origin
+    bbMax_all_raw = bbMax_all_raw / accelerator.coordinate_scale + accelerator.coordinate_origin
     keys_all_raw = tree["indices"].get()
     left_all = tree["left"].get()
     rope_all = tree["rope"].get()

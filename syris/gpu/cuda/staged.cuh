@@ -6,10 +6,9 @@
 // original local sampler supplies all deeper levels.
 
 __device__ FP_T4 stagedPoint(FP_T4 origin, FP_T4 u, FP_T4 v,
-                             unsigned col, unsigned row, FP_T x, FP_T y)
+                             uint2 shape, unsigned col, unsigned row, FP_T x, FP_T y)
 {
-    FP_T4 base = origin + u * col + v * row;
-    return base + u * x + v * y;
+    return DetectorPixel(origin, u, v, shape, col, row).point(x, y);
 }
 
 __device__ bool sameCoordinate(FP_T a, FP_T b)
@@ -83,7 +82,7 @@ extern "C" __global__ void project_shared_samples_kernel(STAGED_ARGUMENTS)
             col = (index - corners) % n.x; row = (index - corners) / n.x;
             x = y = FP_T(0.5);
         }
-        FP_T4 point = stagedPoint(origin, su, sv, col, row, x, y);
+        FP_T4 point = stagedPoint(origin, su, sv, n, col, row, x, y);
         FP_T4 direction = w, tail = point;
         if (!parallel) {
             direction = point - source;
@@ -112,8 +111,8 @@ extern "C" __global__ void project_missing_samples_kernel(STAGED_ARGUMENTS)
         unsigned col = pixel % n.x, row = pixel / n.x;
         unsigned x = k & 1, y = k >> 1, gx = col + x, gy = row + y;
         unsigned owner_col = min(gx, n.x - 1), owner_row = min(gy, n.y - 1);
-        FP_T4 point = stagedPoint(origin, su, sv, col, row, FP_T(x), FP_T(y));
-        FP_T4 shared = stagedPoint(origin, su, sv, owner_col, owner_row,
+        FP_T4 point = stagedPoint(origin, su, sv, n, col, row, FP_T(x), FP_T(y));
+        FP_T4 shared = stagedPoint(origin, su, sv, n, owner_col, owner_row,
                                    FP_T(gx - owner_col), FP_T(gy - owner_row));
         FP_T value;
         if (samePoint(point, shared)) {
@@ -165,15 +164,15 @@ extern "C" __global__ void refine_shared_samples_kernel(STAGED_ARGUMENTS)
         unsigned index = queue[work], col = index % n.x, row = index / n.x;
         FP_T roots[5];
         unsigned mask = stagedRoots(col, row, n, samples, roots);
-        FP_T4 base = origin + su * col + sv * row;
+        DetectorPixel pixel(origin, su, sv, n, col, row);
         if (parallel) {
             image[index] = normals
-                ? tracePixelAdaptive(base, su, sv, w, scene_min, scene_max, tree, vertices, normals, epsilons, sampling, row, col, roots, mask)
-                : tracePixelAdaptive(base, su, sv, w, scene_min, scene_max, tree, vertices, epsilons, sampling, row, col, roots, mask);
+                ? tracePixelAdaptive(pixel, w, scene_min, scene_max, tree, vertices, normals, epsilons, sampling, row, col, roots, mask)
+                : tracePixelAdaptive(pixel, w, scene_min, scene_max, tree, vertices, epsilons, sampling, row, col, roots, mask);
         } else {
             image[index] = normals
-                ? tracePixelAdaptive_conebeam(base, su, sv, source, scene_min, scene_max, tree, vertices, normals, epsilons, sampling, row, col, roots, mask)
-                : tracePixelAdaptive_conebeam(base, su, sv, source, scene_min, scene_max, tree, vertices, epsilons, sampling, row, col, roots, mask);
+                ? tracePixelAdaptive_conebeam(pixel, source, scene_min, scene_max, tree, vertices, normals, epsilons, sampling, row, col, roots, mask)
+                : tracePixelAdaptive_conebeam(pixel, source, scene_min, scene_max, tree, vertices, epsilons, sampling, row, col, roots, mask);
         }
     }
 }
