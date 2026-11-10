@@ -1,6 +1,6 @@
 import abc
 import logging
-import os
+import operator
 import pathlib
 import typing
 
@@ -255,18 +255,88 @@ class PyvistaReader(MeshReaderBase):
         return self._smallest_feature_size
 
 
-class WavefrontAnimationReader(MeshReaderBase):
-    def __init__(self, folder: str):
-        self.filenames = sorted(
-            [os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".obj")]
-        )
-        if not self.filenames:
-            raise FileNotFoundError(f"No .obj files found in folder: {folder}")
+class MeshAnimationReader(MeshReaderBase):
+    """Read an OBJ folder or a temporal VTKHDF polygon mesh one frame at a time.
 
-        # Initialize properties to None; they will be set by the iterator
+    ``source`` is either a directory of lexically ordered ``.obj`` files or a
+    ``.vtkhdf``/``.hdf`` file containing ``vtkPolyData``. A static VTKHDF mesh
+    is a one-frame sequence. VTKHDF timestamps are available as ``time_values``;
+    untimed sources have ``time_values=None``. No interpolation is performed.
+
+    Each iteration yields this reader with updated ``vertices`` (3*N, 3),
+    ``normals`` (N, 3), ``bounds`` (6,), ``frame_index`` and ``frame_time``.
+    Vertices and bounds use the file's coordinate units, without a quantities
+    wrapper; normals are dimensionless.
+    Float32 remains the default; pass ``dtype=np.float64`` to retain Float64
+    coordinates. Copy the arrays to retain snapshots of the mutable reader.
+    """
+
+    def __init__(self, source: typing.Union[str, pathlib.Path], *, dtype=np.float32):
+        self.dtype = np.dtype(dtype)
+        if self.dtype not in (np.dtype(np.float32), np.dtype(np.float64)):
+            raise ValueError("Animation dtype must be float32 or float64.")
+
         self._vertices = None
         self._normals = None
         self._bounds = None
+        self.frame_index = None
+        self.frame_time = None
+        self.time_values = None
+        self.filenames = []
+        self._hdf_reader = None
+
+        source = pathlib.Path(source)
+        if source.is_dir():
+            self.filenames = sorted(str(p) for p in source.glob("*.obj") if p.is_file())
+            if not self.filenames:
+                raise FileNotFoundError(f"No .obj files found in folder: {source}")
+        else:
+            if not source.is_file():
+                raise FileNotFoundError(source)
+            if source.suffix.lower() not in (".vtkhdf", ".hdf"):
+                raise ValueError("Expected an OBJ folder or a .vtkhdf/.hdf file.")
+            if not hasattr(vtk, "vtkHDFReader"):
+                raise ImportError("VTKHDF animations require a VTK build with vtkHDFReader.")
+            self.filename = str(source)
+            self._hdf_reader = vtk.vtkHDFReader()
+            self._hdf_reader.SetFileName(self.filename)
+            if not self._hdf_reader.CanReadFile(self.filename):
+                raise ValueError(f"Not a readable VTKHDF file: {source}")
+            self._update(self._hdf_reader, self.filename, information_only=True)
+            if not isinstance(self._hdf_reader.GetOutputDataObject(0), vtk.vtkPolyData):
+                raise ValueError("VTKHDF animations must contain a vtkPolyData surface mesh.")
+            self._number_of_frames = max(1, self._hdf_reader.GetNumberOfSteps())
+            times = self._hdf_reader.GetOutputInformation(0).Get(
+                vtk.vtkStreamingDemandDrivenPipeline.TIME_STEPS()
+            )
+            if times is not None:
+                self.time_values = tuple(times)
+                if len(self.time_values) != self._number_of_frames:
+                    raise ValueError("VTKHDF frame count does not match its timestamps.")
+
+    @staticmethod
+    def _update(reader, filename, *, information_only=False):
+        # VTK normally reports I/O errors as events, without raising in Python.
+        errors = []
+        observer = reader.AddObserver(vtk.vtkCommand.ErrorEvent, lambda *_: errors.append(True))
+        try:
+            if information_only:
+                reader.UpdateInformation()
+            else:
+                reader.Update()
+        finally:
+            reader.RemoveObserver(observer)
+        if errors or reader.GetErrorCode():
+            raise OSError(f"Failed to read mesh data from {filename}")
+
+    def __len__(self):
+        if self._hdf_reader is None:
+            # Existing benchmark callers may reorder or subset this public list.
+            return len(self.filenames)
+        return self._number_of_frames
+
+    def __iter__(self):
+        return self.iter_frames()
 
     @property
     def vertices(self):
@@ -288,44 +358,89 @@ class WavefrontAnimationReader(MeshReaderBase):
 
     def _read_file(self, filename):
         reader = vtk.vtkOBJReader()
-        reader.SetFileName(filename)
-        reader.Update()
-        polydata = reader.GetOutput()
+        reader.SetFileName(str(filename))
+        self._update(reader, filename)
+        return self._extract_frame(reader.GetOutput())
+
+    def _extract_frame(self, polydata):
+        if not isinstance(polydata, vtk.vtkPolyData):
+            raise ValueError("Animation frames must contain a vtkPolyData surface mesh.")
+        if polydata.GetNumberOfVerts() or polydata.GetNumberOfLines():
+            raise ValueError(
+                "Animation frames must contain only surface cells, not points or lines."
+            )
+        if not (polydata.GetNumberOfPolys() or polydata.GetNumberOfStrips()):
+            raise ValueError("Animation frame contains no surface cells.")
+
+        if polydata.GetNumberOfStrips() or polydata.GetPolys().IsHomogeneous() != 3:
+            triangulate = vtk.vtkTriangleFilter()
+            triangulate.SetInputData(polydata)
+            triangulate.Update()
+            polydata = triangulate.GetOutput()
+        if not polydata.GetNumberOfPolys():
+            raise ValueError("Animation frame contains no triangles after triangulation.")
 
         # Extract and process data
         points_np = vtk_to_numpy(polydata.GetPoints().GetData())
-        cells_np = vtk_to_numpy(polydata.GetPolys().GetData()).reshape(-1, 4)[:, 1:].flatten()
+        cells_np = vtk_to_numpy(polydata.GetPolys().GetConnectivityArray())
 
-        vertices = points_np[cells_np].astype(np.float32)
-        bounds = np.array(polydata.GetBounds()).astype(np.float32)
+        vertices = points_np[cells_np].astype(self.dtype, copy=False)
+        bounds = np.array(polydata.GetBounds(), dtype=self.dtype)
 
-        # Compute normals if not present
-        if polydata.GetCellData().GetNormals() is None:
+        # VTKHDF can preserve the array without preserving its active-normal role.
+        cell_normals = polydata.GetCellData().GetNormals()
+        if cell_normals is None:
+            cell_normals = polydata.GetCellData().GetArray("Normals")
+        if cell_normals is None:
             normal_filter = vtk.vtkPolyDataNormals()
             normal_filter.SetInputData(polydata)
             normal_filter.ComputeCellNormalsOn()
             normal_filter.ComputePointNormalsOff()
             normal_filter.Update()
-            normals = vtk_to_numpy(normal_filter.GetOutput().GetCellData().GetNormals()).astype(
-                np.float32
-            )
-        else:
-            normals = vtk_to_numpy(polydata.GetCellData().GetNormals()).astype(np.float32)
+            cell_normals = normal_filter.GetOutput().GetCellData().GetNormals()
+        if (
+            cell_normals.GetNumberOfComponents() != 3
+            or cell_normals.GetNumberOfTuples() != polydata.GetNumberOfPolys()
+        ):
+            raise ValueError("Animation cell normals must have shape (number of triangles, 3).")
+        # Own the arrays: updating the persistent HDF reader may reuse VTK buffers.
+        normals = np.array(vtk_to_numpy(cell_normals), dtype=self.dtype, copy=True)
 
         return vertices, normals, bounds
 
+    def read_frame(self, index):
+        """Load a zero-based frame index and return this updated reader."""
+        index = operator.index(index)
+        if not 0 <= index < len(self):
+            raise IndexError(f"Frame index {index} is outside [0, {len(self)}).")
+        if self._hdf_reader is None:
+            vertices, normals, bounds = self._read_file(self.filenames[index])
+        else:
+            self._hdf_reader.SetStep(index)
+            self._update(self._hdf_reader, self.filename)
+            vertices, normals, bounds = self._extract_frame(self._hdf_reader.GetOutputDataObject(0))
+
+        self._vertices = vertices
+        self._normals = normals
+        self._bounds = bounds
+        self.frame_index = index
+        self.frame_time = self.time_values[index] if self.time_values is not None else None
+        return self
+
     def iter_frames(self):
-        """Generator that yields the data for each frame in the animation sequence."""
-        for filename in self.filenames:
-            # Read the data for the current frame
-            v, n, b = self._read_file(filename)
+        """Yield this reader for each frame; repeated iteration restarts at zero."""
+        for index in range(len(self)):
+            yield self.read_frame(index)
 
-            # Update instance properties so they can be accessed after iteration
-            self._vertices = v
-            self._normals = n
-            self._bounds = b
 
-            yield self  # Yield the reader instance itself
+class WavefrontAnimationReader(MeshAnimationReader):
+    """Backward-compatible name for :class:`MeshAnimationReader`.
+
+    ``folder`` retains its original keyword name and also accepts VTKHDF files.
+    """
+
+    def __init__(self, folder: typing.Union[str, pathlib.Path], *, dtype=np.float32):
+        super().__init__(folder, dtype=dtype)
 
 
 class RandomMeshReader(MeshReaderBase):

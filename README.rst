@@ -106,6 +106,34 @@ A simple white beam propagation example looks like this:
 For more detailed information please see the `reference <https://syris.readthedocs.io/en/latest>`_.
 
 
+Mesh animations
+***************
+
+Read a temporal VTKHDF surface mesh or a directory of OBJ frames with the same API:
+
+.. code-block:: python
+
+    import numpy as np
+    from syris.bodies.meshreader import MeshAnimationReader
+
+    reader = MeshAnimationReader("sample.vtkhdf", dtype=np.float64)
+    for frame in reader:
+        print(frame.frame_index, frame.frame_time, frame.vertices.shape)
+
+Frames are loaded on demand. ``len(reader)`` gives the frame count,
+``reader.time_values`` contains the stored timestamps, and ``reader.read_frame(i)``
+loads a selected frame without interpolation. OBJ directories use lexical filename
+order and have no timestamps; static VTKHDF files produce one untimed frame.
+VTKHDF input must contain a ``vtkPolyData`` surface; polygons are triangulated.
+
+The default dtype is Float32. Vertices have shape ``(3*N, 3)`` and bounds
+``(6,)``, in the file's coordinate units; cell normals are dimensionless with
+shape ``(N, 3)``. Iteration updates and yields the same reader object, so copy
+arrays when collecting snapshots.
+The existing ``WavefrontAnimationReader(folder)`` API remains available and
+also accepts VTKHDF paths. Reading requires VTK's ``vtkHDFReader`` module.
+
+
 Examples
 ********
 
